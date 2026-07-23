@@ -25,8 +25,8 @@ open = "5.4.0"
 rand = "0.10.2"
 ratatui = "0.30.2"
 ratatui-image = { version = "11.0.6", default-features = false, features = ["crossterm", "image-defaults"] }
-reqwest = { version = "0.13.4", features = ["json"] }
-self_update = { version = "0.44.0", features = ["archive-tar", "archive-zip"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+self_update = { version = "0.44.0", default-features = false, features = ["archive-tar", "archive-zip", "rustls", "reqwest"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 thiserror = "2.0.18"
