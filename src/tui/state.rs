@@ -9,6 +9,7 @@ pub enum PlayerKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
+    Startup,
     Home,
     Details,
 }
@@ -48,6 +49,7 @@ pub struct SubjectStreamPool {
 
 pub struct AppState {
     pub active_screen: Screen,
+    pub dirty: bool,
     pub input_mode: InputMode,
     pub search_query: String,
     pub last_suggest_query: String,
@@ -70,6 +72,7 @@ pub struct AppState {
     pub selected_resources: Option<serde_json::Value>,
     pub stream_pool: std::collections::HashMap<String, SubjectStreamPool>,
     pub fetch_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub is_fetching_streams: bool,
     pub preview_cache: lru::LruCache<String, serde_json::Value>,
     pub resource_list_state: ListState,
 
@@ -109,6 +112,11 @@ pub struct AppState {
     pub toast_message: Option<String>,
     pub toast_timer: usize,
     pub update_available: Option<String>,
+    pub updater_progress: Option<f64>,
+    pub updater_status: Option<String>,
+    pub updater_done: bool,
+    pub auto_update: bool,
+    pub last_update_check: u64,
 
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
@@ -128,7 +136,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            active_screen: Screen::Home,
+            active_screen: Screen::Startup,
             input_mode: InputMode::Normal,
             search_query: String::new(),
             last_suggest_query: String::new(),
@@ -155,6 +163,7 @@ impl Default for AppState {
             selected_resources: None,
             stream_pool: std::collections::HashMap::new(),
             fetch_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            is_fetching_streams: false,
             preview_cache: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             resource_list_state: ListState::default(),
 
@@ -198,49 +207,20 @@ impl Default for AppState {
             player_picker_state: ListState::default(),
             player_picker_link: None,
             player_picker_subtitle: None,
-            available_players: {
-                let mut players = Vec::new();
-                let which_cmd = if cfg!(target_os = "windows") {
-                    "where"
-                } else {
-                    "which"
-                };
-                let check_player = |cmd: &str| -> bool {
-                    std::process::Command::new(which_cmd)
-                        .arg(cmd)
-                        .output()
-                        .map(|o| o.status.success())
-                        .unwrap_or(false)
-                };
-
-                #[cfg(target_os = "macos")]
-                {
-                    if std::path::Path::new("/Applications/IINA.app").exists()
-                        || check_player("iina")
-                    {
-                        players.push(PlayerKind::Iina);
-                    }
-                }
-                if std::path::Path::new("/Applications/mpv.app").exists()
-                    || std::path::Path::new("C:\\Program Files\\mpv\\mpv.exe").exists()
-                    || check_player("mpv")
-                {
-                    players.push(PlayerKind::Mpv);
-                }
-                if std::path::Path::new("/Applications/VLC.app").exists()
-                    || std::path::Path::new("C:\\Program Files\\VideoLAN\\VLC\\vlc.exe").exists()
-                    || check_player("vlc")
-                {
-                    players.push(PlayerKind::Vlc);
-                }
-                players
-            },
+            available_players: Vec::new(),
+            dirty: true,
             is_loading: false,
             status_message: String::new(),
             status_timer: 0,
             toast_message: None,
             toast_timer: 0,
             update_available: None,
+            updater_progress: None,
+            updater_status: None,
+            updater_done: false,
+            auto_update: true,
+            last_update_check: 0,
+
             download_progress: None,
             download_status: None,
             cancel_download: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),

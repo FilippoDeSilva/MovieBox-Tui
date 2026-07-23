@@ -13,7 +13,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             theme.header.add_modifier(ratatui::style::Modifier::BOLD),
         )]),
         Line::from(vec![
-            Span::styled("    [?] / [F1] ", theme.header),
+            Span::styled("    [?]        ", theme.header),
             Span::styled("Toggle Help Menu", theme.text),
         ]),
         Line::from(vec![
@@ -62,6 +62,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("    /anime     ", theme.header),
             Span::styled("Discover Anime", theme.text),
         ]),
+        Line::from(vec![
+            Span::styled("    /github    ", theme.header),
+            Span::styled("Open GitHub Repo", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    /update    ", theme.header),
+            Span::styled("Check for updates", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    /toggle-update ", theme.header),
+            Span::styled("Toggle auto updates", theme.text),
+        ]),
         Line::from(vec![]),
         Line::from(vec![Span::styled(
             "  Stream Controls",
@@ -69,7 +81,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         )]),
         Line::from(vec![
             Span::styled("    [Enter]    ", theme.header),
-            Span::styled("Play Video in mpv", theme.text),
+            Span::styled("Play with default player", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [o]        ", theme.header),
@@ -82,10 +94,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         Line::from(vec![
             Span::styled("    [d]        ", theme.header),
             Span::styled("Download Video", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [c]        ", theme.header),
-            Span::styled("Copy URL to Clipboard", theme.text),
         ]),
     ];
 

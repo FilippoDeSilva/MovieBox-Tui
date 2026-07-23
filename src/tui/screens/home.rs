@@ -299,7 +299,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             if let Some(version_str) = &state.update_available {
                 let update_text = Paragraph::new(format!(
-                    "Update v{} available! Run: cargo install moviebox-tui",
+                    "Update v{} available! Auto-update failed, please reinstall manually.",
                     version_str
                 ))
                 .alignment(Alignment::Center)
@@ -369,15 +369,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 if is_sky { theme.accent } else { theme.teal }
             };
 
-            let search_query = if state.search_query.is_empty() {
-                "recent...".to_string()
+            let loading_text = if state.is_homepage_mode {
+                state.status_message.clone()
             } else {
-                format!("\"{}\"...", state.search_query)
+                format!("Searching for \"{}\"...", state.search_query)
             };
 
             let p = Paragraph::new(ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(format!("{}  Searching for ", spinner), spinner_color),
-                ratatui::text::Span::styled(search_query, theme.title),
+                ratatui::text::Span::styled(format!("{}  ", spinner), spinner_color),
+                ratatui::text::Span::styled(loading_text, theme.title),
             ]))
             .alignment(Alignment::Center);
             frame.render_widget(p, v_chunks[1]);
