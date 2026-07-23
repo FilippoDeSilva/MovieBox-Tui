@@ -37,6 +37,14 @@ pub struct SearchResult {
     pub cover_url: Option<String>,
 }
 
+#[derive(Debug, Default)]
+pub struct SubjectStreamPool {
+    pub episode_index: std::collections::HashMap<(usize, usize), Vec<serde_json::Value>>,
+    pub fetched_pages: std::collections::HashMap<u32, std::collections::HashSet<usize>>,
+    pub total_pages: std::collections::HashMap<u32, usize>,
+    pub available_resolutions: Vec<u32>,
+}
+
 pub struct AppState {
     pub active_screen: Screen,
     pub input_mode: InputMode,
@@ -59,7 +67,8 @@ pub struct AppState {
     pub selected_details: Option<serde_json::Value>,
     pub active_subject_id: Option<String>,
     pub selected_resources: Option<serde_json::Value>,
-    pub stream_cache: lru::LruCache<(String, usize, usize), Vec<serde_json::Value>>,
+    pub stream_pool: std::collections::HashMap<String, SubjectStreamPool>,
+    pub fetch_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub preview_cache: lru::LruCache<String, serde_json::Value>,
     pub resource_list_state: ListState,
 
@@ -142,7 +151,8 @@ impl Default for AppState {
             selected_details: None,
             active_subject_id: None,
             selected_resources: None,
-            stream_cache: lru::LruCache::new(std::num::NonZeroUsize::new(50).unwrap()),
+            stream_pool: std::collections::HashMap::new(),
+            fetch_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             preview_cache: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             resource_list_state: ListState::default(),
 

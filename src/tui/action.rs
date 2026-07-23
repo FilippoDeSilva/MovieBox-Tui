@@ -52,13 +52,15 @@ pub enum Action {
     FetchDetails(String),
     DetailsSuccess(String, serde_json::Value),
     DetailsFailure(String),
-    FetchResources {
+    InitStreamPool(String),
+    StreamPoolInitialized(String, Vec<u32>),
+    FetchEpisodeStreams {
         subject_id: String,
         season: usize,
         episode: usize,
     },
-    ResourcesSuccess(u64, usize, usize, serde_json::Value),
-    ResourcesFailure(u64, String),
+    EpisodeStreamsReady(usize, usize, serde_json::Value),
+    EpisodeStreamsFailed(usize, usize, String),
     PosterSuccess(String, std::sync::Arc<image::DynamicImage>),
     SearchPosterLoaded(String, Option<std::sync::Arc<image::DynamicImage>>),
     UpdateAvailable(String),

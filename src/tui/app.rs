@@ -217,28 +217,33 @@ impl App {
                         >= std::time::Duration::from_millis(300)
                 {
                     if let Some((subject_id, se, ep)) = self.state.pending_episode_fetch.take() {
-                        if let Some(cached) = self
-                            .state
-                            .stream_cache
-                            .get(&(subject_id.clone(), se, ep))
-                            .cloned()
-                        {
-                            let count = cached.len();
-                            let mut result = serde_json::Map::new();
-                            result.insert("list".to_string(), serde_json::Value::Array(cached));
-                            self.state.selected_resources = Some(serde_json::Value::Object(result));
-                            self.state.is_loading = false;
-                            self.state.resource_list_state.select(if count > 0 {
-                                Some(0)
-                            } else {
-                                None
-                            });
-                            self.state.status_message =
-                                format!("Resolved {} direct stream sources (cached).", count);
-                            self.state.status_timer = 150;
-                        } else {
+                        let mut found_cached = false;
+                        if let Some(pool) = self.state.stream_pool.get(&subject_id) {
+                            if let Some(cached) = pool.episode_index.get(&(se, ep)) {
+                                found_cached = true;
+                                let count = cached.len();
+                                let mut result = serde_json::Map::new();
+                                result.insert(
+                                    "list".to_string(),
+                                    serde_json::Value::Array(cached.clone()),
+                                );
+                                self.state.selected_resources =
+                                    Some(serde_json::Value::Object(result));
+                                self.state.is_loading = false;
+                                self.state.resource_list_state.select(if count > 0 {
+                                    Some(0)
+                                } else {
+                                    None
+                                });
+                                self.state.status_message =
+                                    format!("Resolved {} direct stream sources (cached).", count);
+                                self.state.status_timer = 150;
+                            }
+                        }
+
+                        if !found_cached {
                             self.action_sender
-                                .send(Action::FetchResources {
+                                .send(Action::FetchEpisodeStreams {
                                     subject_id,
                                     season: se,
                                     episode: ep,
@@ -425,7 +430,7 @@ impl App {
                                         self.state.selected_episode
                                     };
                                     self.action_sender
-                                        .send(Action::FetchResources {
+                                        .send(Action::FetchEpisodeStreams {
                                             subject_id: id,
                                             season: se,
                                             episode: ep,
@@ -478,17 +483,7 @@ impl App {
                                                 .language_list_state
                                                 .selected()
                                                 .unwrap_or(0);
-                                            self.action_sender
-                                                .send(Action::FetchResources {
-                                                    subject_id: self
-                                                        .state
-                                                        .active_subject_id
-                                                        .clone()
-                                                        .unwrap_or("".to_string()),
-                                                    season: self.state.selected_season,
-                                                    episode: self.state.selected_episode,
-                                                })
-                                                .ok();
+
                                             self.action_sender
                                                 .send(Action::SelectLanguage(idx))
                                                 .ok();
@@ -535,6 +530,11 @@ impl App {
                         }
                     }
                     Screen::Details => {
+                        self.state
+                            .fetch_cancel
+                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                        self.state.pending_episode_fetch = None;
+                        self.state.selected_resources = None;
                         self.state.active_screen = Screen::Home;
                         self.state.is_loading = false;
                         self.state.language_chosen = false;
@@ -2278,19 +2278,11 @@ impl App {
                         self.state.details_pane = crate::tui::state::DetailsPane::Streams;
                     }
 
-                    let (se, ep) = if stype == 2 {
-                        (1usize, 1usize)
-                    } else {
-                        (0usize, 0usize)
-                    };
+                    self.state
+                        .fetch_cancel
+                        .store(false, std::sync::atomic::Ordering::Relaxed);
                     let sender = self.action_sender.clone();
-                    sender
-                        .send(Action::FetchResources {
-                            subject_id: id,
-                            season: se,
-                            episode: ep,
-                        })
-                        .ok();
+                    sender.send(Action::InitStreamPool(id)).ok();
                 }
             }
             Action::DetailsFailure(err) => {
@@ -2298,68 +2290,180 @@ impl App {
                 self.state.status_message = format!("Details fetch failed: {}", err);
                 self.state.status_timer = 150;
             }
-            Action::FetchResources {
+            Action::InitStreamPool(subject_id) => {
+                let client = self.client.clone();
+                let sender = self.action_sender.clone();
+                let id_clone = subject_id.clone();
+                tokio::spawn(async move {
+                    let resolutions = client
+                        .fetch_collection_resolutions(&id_clone)
+                        .await
+                        .unwrap_or_else(|_| vec![1080, 720, 480, 360]);
+                    sender
+                        .send(Action::StreamPoolInitialized(id_clone, resolutions))
+                        .ok();
+                });
+            }
+            Action::StreamPoolInitialized(subject_id, resolutions) => {
+                let mut pool = crate::tui::state::SubjectStreamPool::default();
+                pool.available_resolutions = resolutions;
+                self.state.stream_pool.insert(subject_id.clone(), pool);
+
+                let (se, ep) = if let Some(details) = &self.state.selected_details {
+                    let stype = details
+                        .get("subjectType")
+                        .and_then(|s| s.as_i64())
+                        .or_else(|| details.get("stype").and_then(|s| s.as_i64()))
+                        .unwrap_or(1);
+                    if stype == 2 {
+                        (1usize, 1usize)
+                    } else {
+                        (0usize, 0usize)
+                    }
+                } else {
+                    (1usize, 1usize)
+                };
+
+                self.action_sender
+                    .send(Action::FetchEpisodeStreams {
+                        subject_id,
+                        season: se,
+                        episode: ep,
+                    })
+                    .ok();
+            }
+            Action::FetchEpisodeStreams {
                 subject_id,
                 season,
                 episode,
             } => {
-                self.state.active_resource_request =
-                    self.state.active_resource_request.wrapping_add(1);
-                let req_id = self.state.active_resource_request;
-                let client = self.client.clone();
-                let sender = self.action_sender.clone();
                 self.state.is_loading = true;
                 self.state.selected_resources = None;
-                tokio::spawn(async move {
-                    match client.get_all_resources(&subject_id, season, episode).await {
-                        Ok(res) => {
-                            sender
-                                .send(Action::ResourcesSuccess(req_id, season, episode, res))
-                                .ok();
-                        }
-                        Err(e) => {
-                            sender
-                                .send(Action::ResourcesFailure(req_id, format!("{:?}", e)))
-                                .ok();
+
+                if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
+                    if let Some(cached) = pool.episode_index.get(&(season, episode)) {
+                        self.action_sender
+                            .send(Action::EpisodeStreamsReady(
+                                season,
+                                episode,
+                                serde_json::Value::Array(cached.clone()),
+                            ))
+                            .ok();
+                        return None;
+                    }
+
+                    let mut episodes_before_target = 0;
+                    for s in &self.state.available_seasons {
+                        let s_se = s.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
+                        if s_se < season {
+                            episodes_before_target +=
+                                s.get("maxEp").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
                         }
                     }
-                });
-            }
-            Action::ResourcesSuccess(req_id, target_se, target_ep, payload) => {
-                if req_id != self.state.active_resource_request {
-                    return None;
+                    episodes_before_target += episode.saturating_sub(1);
+
+                    let page_estimate = (episodes_before_target / 20) + 1;
+
+                    let client = self.client.clone();
+                    let sender = self.action_sender.clone();
+                    let cancel_token = self.state.fetch_cancel.clone();
+                    let id_clone = subject_id.clone();
+                    let resolutions = pool.available_resolutions.clone();
+
+                    tokio::spawn(async move {
+                        let mut handles = Vec::new();
+                        for res in resolutions {
+                            let c = client.clone();
+                            let id = id_clone.clone();
+                            let ct = cancel_token.clone();
+
+                            handles.push(tokio::spawn(async move {
+                                if ct.load(std::sync::atomic::Ordering::Relaxed) {
+                                    return (res, page_estimate, Vec::new(), serde_json::json!({}));
+                                }
+                                match tokio::time::timeout(
+                                    std::time::Duration::from_secs(15),
+                                    c.fetch_resource_page(&id, res, page_estimate),
+                                )
+                                .await
+                                {
+                                    Ok(Ok((items, pager))) => (res, page_estimate, items, pager),
+                                    _ => (res, page_estimate, Vec::new(), serde_json::json!({})),
+                                }
+                            }));
+                        }
+
+                        let mut all_items = Vec::new();
+                        for h in handles {
+                            if let Ok((res, page, items, pager)) = h.await {
+                                all_items.extend(items);
+                            }
+                        }
+
+                        if all_items.is_empty() {
+                            sender
+                                .send(Action::EpisodeStreamsFailed(
+                                    season,
+                                    episode,
+                                    "No streams found".to_string(),
+                                ))
+                                .ok();
+                        } else {
+                            sender
+                                .send(Action::EpisodeStreamsReady(
+                                    season,
+                                    episode,
+                                    serde_json::Value::Array(all_items),
+                                ))
+                                .ok();
+                        }
+                    });
                 }
+            }
+            Action::EpisodeStreamsReady(target_se, target_ep, payload) => {
+                let mut raw_list = payload.as_array().cloned().unwrap_or_default();
 
-                let raw_list = payload
-                    .get("list")
-                    .and_then(|l| l.as_array())
-                    .cloned()
-                    .unwrap_or_default();
-
-                let mut filtered: Vec<serde_json::Value> = if target_se == 0 && target_ep == 0 {
-                    raw_list
-                } else {
-                    raw_list
-                        .into_iter()
-                        .filter(|stream| {
-                            let s = stream
+                if let Some(subject_id) = &self.state.active_subject_id {
+                    let id = subject_id.clone();
+                    if let Some(pool) = self.state.stream_pool.get_mut(&id) {
+                        for item in raw_list.clone() {
+                            let se = item
                                 .get("se")
                                 .and_then(|v| {
                                     v.as_i64()
                                         .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
                                 })
                                 .unwrap_or(0) as usize;
-                            let e = stream
+                            let ep = item
                                 .get("ep")
                                 .and_then(|v| {
                                     v.as_i64()
                                         .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
                                 })
                                 .unwrap_or(0) as usize;
-                            s == target_se && e == target_ep
-                        })
-                        .collect()
-                };
+                            let entry = pool.episode_index.entry((se, ep)).or_insert_with(Vec::new);
+                            let link = item
+                                .get("resourceLink")
+                                .and_then(|l| l.as_str())
+                                .unwrap_or("");
+                            if !entry.iter().any(|i| {
+                                i.get("resourceLink").and_then(|l| l.as_str()).unwrap_or("") == link
+                            }) {
+                                entry.push(item);
+                            }
+                        }
+
+                        if let Some(target_streams) =
+                            pool.episode_index.get(&(target_se, target_ep))
+                        {
+                            raw_list = target_streams.clone();
+                        } else {
+                            raw_list.clear();
+                        }
+                    }
+                }
+
+                let mut filtered = raw_list;
 
                 filtered.sort_by(|a, b| {
                     let res_a = a.get("resolution").and_then(|r| r.as_i64()).unwrap_or(0);
@@ -2368,37 +2472,20 @@ impl App {
                 });
 
                 let count = filtered.len();
-
-                if let Some(ref subject_id) = self.state.active_subject_id {
-                    self.state
-                        .stream_cache
-                        .put((subject_id.clone(), target_se, target_ep), filtered.clone());
-                }
-
                 let mut result = serde_json::Map::new();
                 result.insert("list".to_string(), serde_json::Value::Array(filtered));
                 self.state.selected_resources = Some(serde_json::Value::Object(result));
                 self.state.is_loading = false;
-
                 self.state
                     .resource_list_state
                     .select(if count > 0 { Some(0) } else { None });
                 self.state.status_message = format!("Resolved {} direct stream sources.", count);
                 self.state.status_timer = 150;
             }
-            Action::ResourcesFailure(req_id, err) => {
-                if req_id != self.state.active_resource_request {
-                    return None;
-                }
+            Action::EpisodeStreamsFailed(season, episode, err) => {
                 self.state.is_loading = false;
-                if err.contains("406") || err.to_lowercase().contains("exhausted") {
-                    self.state.status_message =
-                        "Error: No streams found on server (unreleased or removed).".to_string();
-                    self.state.status_timer = 150;
-                } else {
-                    self.state.status_message = format!("Error: Links resolution failed: {}", err);
-                    self.state.status_timer = 150;
-                }
+                self.state.status_message = format!("Error: {}", err);
+                self.state.status_timer = 150;
             }
             Action::UpdateDownload(prog, stat) => {
                 self.state.download_progress = prog;
