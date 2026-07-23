@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Paragraph},
+    widgets::Paragraph,
 };
 
 const QUOTES: &[&str] = &[

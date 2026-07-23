@@ -63,26 +63,16 @@ A short walkthrough of the app in action:
 ## What it can do
 
 **Search and discovery**
-- Type-to-search with live, debounced suggestions.
-- Slash commands to browse curated feeds: `/movies`, `/shows`, `/anime`, `/discover`.
-- Each result shows a poster, release year, and (when highlighted) IMDb rating and genres.
+The search bar is always active. Just start typing to get live, debounced suggestions, or use slash commands like `/movies`, `/shows`, `/anime`, `/discover`, and `/home` to browse curated trending feeds. When you hover over a result, you instantly see its full poster, release year, IMDb rating, and genres.
 
 **Playback**
-- Detects `mpv`, `IINA`, and `VLC` at startup. You get a picker for whatever you have installed.
-- Full season and episode browsing for TV series and anime, with per-episode stream resolution.
-- Multiple resolutions (1080p, 720p, 480p, 360p) are fetched in parallel and listed by quality.
-- Attach external subtitle tracks, and switch between available audio dubs before playing.
-- If a stream fails or expires, hit <kbd>R</kbd> to re-resolve it.
+The app automatically detects if you have `mpv`, `IINA`, or `VLC` installed. You get full access to season and episode browsing for TV series and anime. When you pick an episode, it concurrently fetches multiple resolutions (1080p, 720p, 480p) in parallel so you can choose a quality instantly. You can also pick external subtitle tracks and switch between audio dubs before playing. If a stream expires, pressing <kbd>R</kbd> re-resolves it on the fly.
 
-**Downloading and sharing**
-- Built-in multi-connection downloader. Uses up to 16 parallel connections when the source allows range requests, with live speed, ETA, progress bar, and cancel.
-- Copy any direct stream URL to your clipboard with a single keystroke.
-- Downloads go to your system Downloads folder.
+**Downloading**
+If you want to save a video for later, the built-in downloader uses up to 16 parallel connections to max out your bandwidth. It shows live download speed, an ETA, and a progress bar directly in the interface. Everything saves cleanly to your system's default Downloads folder.
 
 **The interface**
-- Real poster art rendered inline in terminals that support graphics (Kitty, WezTerm, iTerm2, Ghostty, foot, etc.).
-- In-app notification when a newer version is published to crates.io.
-- The details view shows the poster, IMDb rating, year, genres, duration, country, and full description alongside the season, episode, and stream panels.
+If you use a modern terminal like Kitty, WezTerm, iTerm2, Ghostty, or foot, all movie posters are rendered natively as high-resolution images right in your terminal. The details view is packed with metadata, including duration, country of origin, and a full synopsis. The app also silently checks GitHub releases in the background and notifies you if there's a newer version available, which you can manage with `/update` or `/toggle-update`.
 
 ---
 
@@ -145,13 +135,13 @@ A short walkthrough of the app in action:
 
 ## Requirements
 
-You need three things:
+You only need two things to use MovieBox-Tui: a compatible video player and a reasonably sized terminal.
 
-1. **A video player.** `mpv` is the default and the most reliable. `IINA` (macOS) and `VLC` also work. The app detects whichever you have installed.
-2. **A terminal at least 85×24.** Anything smaller and the app will show a message asking you to enlarge it.
-3. **Rust 1.85 or newer** (edition 2024), only if you want to build from source. See [rustup.rs](https://rustup.rs/). If you install from crates.io, you already have it.
+**Video Player:** The app relies on your system's video players to handle playback. `mpv`, `IINA` (on macOS), and `VLC` are all fully supported. The app will automatically detect whichever players you have installed.
 
-For inline poster art, you'll want a terminal that speaks a graphics protocol: **Kitty, WezTerm, iTerm2, Ghostty**, or **foot**. Other terminals still work fine, you just get placeholder blocks instead of images.
+**Terminal Size:** Make sure your terminal window is at least 85×24 characters. If you launch the app in a window that's too small, it will pause and ask you to enlarge it. For the best experience with inline poster art, you'll want to use a terminal that speaks a modern graphics protocol like Kitty, WezTerm, iTerm2, Ghostty, or foot. Other terminals still work perfectly fine, but they will gracefully fall back to text placeholders instead of full images.
+
+**(Optional) Rust:** If you prefer to build the app from source or install it via Cargo, you will need Rust 1.85 or newer (edition 2024). However, if you use the automated installation scripts or download a pre-built binary, you don't need Rust installed at all.
 
 <details>
 <summary><b>How to install a video player</b></summary>
@@ -229,22 +219,13 @@ cargo install moviebox-tui
 
 ## Getting started
 
-Launch the app:
+Launch the app by typing `moviebox-tui` in your terminal. 
 
-```bash
-moviebox-tui
-```
+Once you land on the home screen, you can simply start typing to instantly search for any title, or use a slash command like `/movies` or `/discover` to browse curated trending feeds. Navigate through the results using your arrow keys, and press <kbd>Enter</kbd> to view the full details of any title.
 
-You'll land on the home screen. From there:
+From the details view, you can browse seasons and episodes. Once you select an episode, pick your preferred stream quality and press <kbd>Enter</kbd> to instantly start playing it in your default video player. If you want to use a different player, press <kbd>o</kbd>.
 
-1. Just start typing. The search bar activates automatically and live suggestions appear as you type.
-2. Or use a discover command: type `/movies`, `/shows`, `/anime`, or `/discover` and press <kbd>Enter</kbd> to browse curated feeds.
-3. Move through results with <kbd>Up</kbd>/<kbd>Down</kbd>. The selected result loads a poster preview with IMDb rating and genres.
-4. Press <kbd>Enter</kbd> to open the details view.
-5. For a TV series, pick a season and episode. If multiple language dubs are available, you'll be asked to pick one.
-6. Choose a stream quality and hit <kbd>Enter</kbd> to play in `mpv`, or <kbd>o</kbd> to pick a different player.
-
-Press <kbd>?</kbd> at any time to see all keybindings.
+You can press <kbd>?</kbd> at any time to see the full list of keybindings.
 
 ---
 
@@ -277,8 +258,18 @@ Press <kbd>?</kbd> at any time to see all keybindings.
 | <kbd>o</kbd> | Choose a different player (`mpv`, `IINA`, or `VLC`) |
 | <kbd>R</kbd> | Refresh streams. Useful when a link expires or fails. |
 | <kbd>d</kbd> | Download the selected stream |
-| <kbd>c</kbd> | Copy the direct stream URL to the clipboard |
 | <kbd>x</kbd> | Cancel an in-progress download |
+
+### Slash Commands
+You can type these into the search bar:
+
+| Command | Action |
+| :--- | :--- |
+| `/discover`, `/home` | Browse trending titles |
+| `/movies`, `/shows`, `/anime` | Browse specific categories |
+| `/update` | Check for newer versions manually |
+| `/toggle-update` | Toggle automatic update checking on startup |
+| `/github` | Open the source repository in your browser |
 
 ---
 
@@ -357,6 +348,14 @@ The app needs at least **85×24** characters. Enlarge the window or shrink the f
 <br>
 
 Direct stream URLs are short-lived and expire after some time. On the details screen, press <kbd>R</kbd> to re-resolve. If a title has no streams at all, it may be unreleased on MovieBox or temporarily gone from their catalog.
+
+</details>
+
+<details>
+<summary><b>"Failed to check for updates" on startup</b></summary>
+<br>
+
+The app checks GitHub for the latest release on startup. GitHub limits unauthenticated requests to 60 per hour per IP address. If you open and close the app many times in a short period, you might temporarily hit this limit. You can use the `/toggle-update` slash command to disable startup update checks and bypass this error.
 
 </details>
 

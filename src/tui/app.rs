@@ -58,10 +58,15 @@ impl App {
             let config_path = config_dir.join("moviebox-tui").join("config.json");
             if let Ok(config_str) = std::fs::read_to_string(config_path) {
                 if let Ok(config_json) = serde_json::from_str::<serde_json::Value>(&config_str) {
-                    if let Some(auto_update) = config_json.get("auto_update").and_then(|v| v.as_bool()) {
+                    if let Some(auto_update) =
+                        config_json.get("auto_update").and_then(|v| v.as_bool())
+                    {
                         state.auto_update = auto_update;
                     }
-                    if let Some(last_check) = config_json.get("last_update_check").and_then(|v| v.as_u64()) {
+                    if let Some(last_check) = config_json
+                        .get("last_update_check")
+                        .and_then(|v| v.as_u64())
+                    {
                         state.last_update_check = last_check;
                     }
                 }
@@ -195,7 +200,11 @@ impl App {
         let player_sender = self.action_sender.clone();
         tokio::task::spawn_blocking(move || {
             let mut players = Vec::new();
-            let which_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+            let which_cmd = if cfg!(target_os = "windows") {
+                "where"
+            } else {
+                "which"
+            };
             let check_player = |cmd: &str| -> bool {
                 std::process::Command::new(which_cmd)
                     .arg(cmd)
@@ -206,9 +215,7 @@ impl App {
 
             #[cfg(target_os = "macos")]
             {
-                if std::path::Path::new("/Applications/IINA.app").exists()
-                    || check_player("iina")
-                {
+                if std::path::Path::new("/Applications/IINA.app").exists() || check_player("iina") {
                     players.push(crate::tui::state::PlayerKind::Iina);
                 }
             }
@@ -358,7 +365,7 @@ impl App {
                     && self.state.download_progress.is_some()
                 {
                     self.action_sender.send(Action::CancelDownload).ok();
-                    return Some(());
+                    return None;
                 }
 
                 if key.code == KeyCode::F(1) {
@@ -726,8 +733,16 @@ impl App {
                     self.state.input_mode = InputMode::Normal;
                     self.state.toast_message = Some(format!(
                         "{} Auto Update is now {}",
-                        if self.state.basic_terminal { "[!]" } else { "!" },
-                        if self.state.auto_update { "Enabled" } else { "Disabled" }
+                        if self.state.basic_terminal {
+                            "[!]"
+                        } else {
+                            "!"
+                        },
+                        if self.state.auto_update {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
                     ));
                     self.state.toast_timer = 50;
                     return None;
@@ -1843,7 +1858,11 @@ impl App {
                     None => {
                         self.state.toast_message = Some(format!(
                             "{} No media player found. Install mpv, IINA, or VLC.",
-                            if self.state.basic_terminal { "[X]" } else { "✗" }
+                            if self.state.basic_terminal {
+                                "[X]"
+                            } else {
+                                "✗"
+                            }
                         ));
                         self.state.toast_timer = 150;
                     }
@@ -1855,12 +1874,18 @@ impl App {
                         };
                         self.state.toast_message = Some(format!(
                             "{} Launching {}...",
-                            if self.state.basic_terminal { "[OK]" } else { "✓" },
+                            if self.state.basic_terminal {
+                                "[OK]"
+                            } else {
+                                "✓"
+                            },
                             player_name
                         ));
                         self.state.toast_timer = 40;
 
-                        self.action_sender.send(Action::LaunchPlayer(kind, link, subtitle_url)).ok();
+                        self.action_sender
+                            .send(Action::LaunchPlayer(kind, link, subtitle_url))
+                            .ok();
                     }
                 }
             }
@@ -1879,9 +1904,13 @@ impl App {
                         .unwrap_or("MovieBox-Tui_Stream")
                         .to_string();
                     let ext = "mp4";
+                    let mut sanitized_title = title.replace(" ", "_");
+                    for c in &['/', '\\', ':', '*', '?', '"', '<', '>', '|'] {
+                        sanitized_title = sanitized_title.replace(*c, "_");
+                    }
                     let filename = format!(
                         "{}_{}.{}",
-                        title.replace(" ", "_").replace("/", "_"),
+                        sanitized_title,
                         std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
@@ -2723,10 +2752,18 @@ impl App {
 
                     let mut cmd = match kind {
                         crate::tui::state::PlayerKind::Mpv => {
-                            let mut c = if std::path::Path::new("C:\\Program Files\\mpv\\mpv.exe").exists() {
+                            let mut c = if std::path::Path::new("C:\\Program Files\\mpv\\mpv.exe")
+                                .exists()
+                            {
                                 std::process::Command::new("C:\\Program Files\\mpv\\mpv.exe")
-                            } else if std::path::Path::new("/Applications/mpv.app/Contents/MacOS/mpv").exists() {
-                                std::process::Command::new("/Applications/mpv.app/Contents/MacOS/mpv")
+                            } else if std::path::Path::new(
+                                "/Applications/mpv.app/Contents/MacOS/mpv",
+                            )
+                            .exists()
+                            {
+                                std::process::Command::new(
+                                    "/Applications/mpv.app/Contents/MacOS/mpv",
+                                )
                             } else {
                                 std::process::Command::new("mpv")
                             };
@@ -2797,7 +2834,7 @@ impl App {
                 let update_sender = self.action_sender.clone();
                 tokio::spawn(async move {
                     let start = std::time::Instant::now();
-                    
+
                     let result = tokio::task::spawn_blocking(move || {
                         let builder = self_update::backends::github::Update::configure()
                             .repo_owner("mesamirh")
@@ -2806,11 +2843,13 @@ impl App {
                             .show_download_progress(false)
                             .current_version(env!("CARGO_PKG_VERSION"))
                             .build();
-                        
+
                         if let Ok(updater) = builder {
                             if let Ok(release) = updater.get_latest_release() {
                                 let current = self_update::cargo_crate_version!();
-                                if self_update::version::bump_is_greater(current, &release.version).unwrap_or(false) {
+                                if self_update::version::bump_is_greater(current, &release.version)
+                                    .unwrap_or(false)
+                                {
                                     return Some(release.version.clone());
                                 } else {
                                     return Some("none".to_string());
@@ -2818,7 +2857,9 @@ impl App {
                             }
                         }
                         Some("error".to_string())
-                    }).await.unwrap_or(Some("error".to_string()));
+                    })
+                    .await
+                    .unwrap_or(Some("error".to_string()));
 
                     let elapsed = start.elapsed();
                     if elapsed.as_millis() < 1500 {
@@ -2835,9 +2876,11 @@ impl App {
                     if self.state.active_screen == Screen::Startup {
                         self.state.active_screen = Screen::Home;
                         if version == "none" {
-                            self.state.toast_message = Some("You are on the latest version!".to_string());
+                            self.state.toast_message =
+                                Some("You are on the latest version!".to_string());
                         } else {
-                            self.state.toast_message = Some("Failed to check for updates.".to_string());
+                            self.state.toast_message =
+                                Some("Failed to check for updates.".to_string());
                         }
                         self.state.toast_timer = 150;
                     }
@@ -2860,14 +2903,16 @@ impl App {
                         .bin_name("moviebox-tui")
                         .show_download_progress(false)
                         .current_version(env!("CARGO_PKG_VERSION"));
-                    
+
                     if let Ok(updater) = builder.build() {
                         if let Ok(_status) = updater.update() {
                             update_sender.send(Action::UpdateSuccess).ok();
                             return;
                         }
                     }
-                    update_sender.send(Action::UpdateFailure("Failed".into())).ok();
+                    update_sender
+                        .send(Action::UpdateFailure("Failed".into()))
+                        .ok();
                 });
 
                 let progress_sender = self.action_sender.clone();
@@ -2876,7 +2921,9 @@ impl App {
                     loop {
                         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
                         p += 0.01;
-                        if p > 0.98 { p = 0.98; }
+                        if p > 0.98 {
+                            p = 0.98;
+                        }
                         progress_sender.send(Action::UpdateProgress(p)).ok();
                     }
                 });
@@ -2889,10 +2936,10 @@ impl App {
             Action::UpdateSuccess => {
                 self.state.updater_done = true;
                 self.state.updater_progress = Some(1.0);
-                
+
                 let exe = std::env::current_exe().unwrap();
                 let _ = std::process::Command::new(exe).spawn();
-                return Some(()); 
+                return Some(());
             }
             Action::UpdateFailure(_err) => {
                 self.state.active_screen = Screen::Home;
