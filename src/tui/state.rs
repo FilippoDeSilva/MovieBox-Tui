@@ -35,6 +35,7 @@ pub struct SearchResult {
     pub stype: i64,
     pub release_year: String,
     pub cover_url: Option<String>,
+    pub season: usize,
 }
 
 #[derive(Debug, Default)]
@@ -121,6 +122,7 @@ pub struct AppState {
     pub pending_play_link: Option<String>,
     pub pending_open_with: bool,
     pub basic_terminal: bool,
+    pub username: String,
 }
 
 impl Default for AppState {
@@ -249,6 +251,9 @@ impl Default for AppState {
             subtitle_list_state: ListState::default(),
             pending_play_link: None,
             pending_open_with: false,
+            username: std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .unwrap_or_else(|_| "Friend".to_string()),
         }
     }
 }

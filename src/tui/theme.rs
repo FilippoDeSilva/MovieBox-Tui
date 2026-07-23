@@ -16,6 +16,11 @@ pub struct Theme {
     pub rating: Style,
     pub accent: Style,
     pub muted: Style,
+    pub teal: Style,
+    pub lavender: Style,
+    pub sapphire: Style,
+    pub subtext1: Style,
+    pub base: Color,
 }
 
 impl Default for Theme {
@@ -43,6 +48,11 @@ impl Default for Theme {
                 .fg(Color::Rgb(137, 220, 235))
                 .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(Color::Rgb(88, 91, 112)),
+            teal: Style::default().fg(Color::Rgb(148, 226, 213)),
+            lavender: Style::default().fg(Color::Rgb(180, 190, 254)),
+            sapphire: Style::default().fg(Color::Rgb(116, 199, 236)),
+            subtext1: Style::default().fg(Color::Rgb(186, 194, 222)),
+            base: Color::Rgb(30, 30, 46),
         }
     }
 }
@@ -76,7 +86,7 @@ impl Theme {
         Self {
             border: Style::default().fg(Color::DarkGray),
             border_focus: Style::default().fg(Color::Blue),
-            text: Style::default().fg(Color::Reset),
+            text: Style::default().fg(Color::White),
             text_dim: Style::default().fg(Color::Gray),
             title: Style::default()
                 .fg(Color::Magenta)
@@ -96,6 +106,11 @@ impl Theme {
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(Color::DarkGray),
+            teal: Style::default().fg(Color::Cyan),
+            lavender: Style::default().fg(Color::Blue),
+            sapphire: Style::default().fg(Color::Cyan),
+            subtext1: Style::default().fg(Color::White),
+            base: Color::Black,
         }
     }
 }

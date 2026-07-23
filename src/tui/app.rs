@@ -776,19 +776,54 @@ impl App {
                             })
                             .map(|s| s.to_string());
 
-                        let is_duplicate = self.state.search_results.iter().any(|r| {
+                        let season =
+                            item.get("season").and_then(|s| s.as_u64()).unwrap_or(0) as usize;
+
+                        if let Some(existing) =
+                            self.state.search_results.iter_mut().find(|r| r.id == id)
+                        {
+                            if season > existing.season {
+                                existing.season = season;
+                                existing.title = clean_title;
+                                existing.stype = stype;
+                                existing.release_year = release_year;
+                                existing.cover_url = cover_url;
+                            }
+                            continue;
+                        }
+
+                        let raw_lower = raw_title.to_lowercase();
+                        let is_dub = raw_lower.contains("[hindi]")
+                            || raw_lower.contains("[tamil]")
+                            || raw_lower.contains("[telugu]")
+                            || raw_lower.contains("[english]");
+
+                        if is_dub
+                            && self
+                                .state
+                                .search_results
+                                .iter()
+                                .any(|r| r.title == clean_title && r.stype == stype)
+                        {
+                            continue;
+                        }
+
+                        if self.state.search_results.iter().any(|r| {
                             r.title == clean_title
                                 && r.release_year == release_year
                                 && r.stype == stype
-                        });
+                        }) {
+                            continue;
+                        }
 
-                        if !id.is_empty() && !is_duplicate {
+                        if !id.is_empty() {
                             self.state.search_results.push(SearchResult {
                                 id,
                                 title: clean_title,
                                 stype,
                                 release_year,
                                 cover_url,
+                                season,
                             });
                             count += 1;
                         }
@@ -949,6 +984,43 @@ impl App {
                         .and_then(|u| u.as_str())
                         .map(|s| s.to_string());
 
+                    let season = item.get("season").and_then(|s| s.as_u64()).unwrap_or(0) as usize;
+
+                    if let Some(existing) =
+                        self.state.search_results.iter_mut().find(|r| r.id == id)
+                    {
+                        if season > existing.season {
+                            existing.season = season;
+                            existing.title = clean_title;
+                            existing.stype = stype;
+                            existing.release_year = release_year;
+                            existing.cover_url = cover_url;
+                        }
+                        continue;
+                    }
+
+                    let raw_lower = raw_title.to_lowercase();
+                    let is_dub = raw_lower.contains("[hindi]")
+                        || raw_lower.contains("[tamil]")
+                        || raw_lower.contains("[telugu]")
+                        || raw_lower.contains("[english]");
+
+                    if is_dub
+                        && self
+                            .state
+                            .search_results
+                            .iter()
+                            .any(|r| r.title == clean_title && r.stype == stype)
+                    {
+                        continue;
+                    }
+
+                    if self.state.search_results.iter().any(|r| {
+                        r.title == clean_title && r.release_year == release_year && r.stype == stype
+                    }) {
+                        continue;
+                    }
+
                     if !id.is_empty() {
                         self.state.search_results.push(SearchResult {
                             id,
@@ -956,6 +1028,7 @@ impl App {
                             stype,
                             release_year,
                             cover_url,
+                            season,
                         });
                         count += 1;
                     }
@@ -2395,7 +2468,7 @@ impl App {
 
                         let mut all_items = Vec::new();
                         for h in handles {
-                            if let Ok((res, page, items, pager)) = h.await {
+                            if let Ok((_res, _page, items, _pager)) = h.await {
                                 all_items.extend(items);
                             }
                         }
@@ -2426,21 +2499,33 @@ impl App {
                 if let Some(subject_id) = &self.state.active_subject_id {
                     let id = subject_id.clone();
                     if let Some(pool) = self.state.stream_pool.get_mut(&id) {
+                        let mut actual_resolutions = std::collections::HashSet::new();
+
                         for item in raw_list.clone() {
-                            let se = item
+                            if let Some(r) = item.get("resolution").and_then(|r| r.as_u64()) {
+                                actual_resolutions.insert(r as u32);
+                            }
+
+                            let mut se = item
                                 .get("se")
                                 .and_then(|v| {
                                     v.as_i64()
                                         .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
                                 })
                                 .unwrap_or(0) as usize;
-                            let ep = item
+                            let mut ep = item
                                 .get("ep")
                                 .and_then(|v| {
                                     v.as_i64()
                                         .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
                                 })
                                 .unwrap_or(0) as usize;
+
+                            if target_se == 0 && target_ep == 0 {
+                                se = 0;
+                                ep = 0;
+                            }
+
                             let entry = pool.episode_index.entry((se, ep)).or_insert_with(Vec::new);
                             let link = item
                                 .get("resourceLink")
@@ -2451,6 +2536,13 @@ impl App {
                             }) {
                                 entry.push(item);
                             }
+                        }
+
+                        if !actual_resolutions.is_empty() {
+                            let mut res_vec: Vec<u32> = actual_resolutions.into_iter().collect();
+                            res_vec.sort_unstable_by(|a, b| b.cmp(a));
+
+                            pool.available_resolutions = res_vec;
                         }
 
                         if let Some(target_streams) =
@@ -2482,7 +2574,7 @@ impl App {
                 self.state.status_message = format!("Resolved {} direct stream sources.", count);
                 self.state.status_timer = 150;
             }
-            Action::EpisodeStreamsFailed(season, episode, err) => {
+            Action::EpisodeStreamsFailed(_season, _episode, err) => {
                 self.state.is_loading = false;
                 self.state.status_message = format!("Error: {}", err);
                 self.state.status_timer = 150;
@@ -2673,7 +2765,6 @@ impl App {
 
         if let Some(prog) = self.state.download_progress {
             use ratatui::layout::{Constraint, Direction, Layout};
-            use ratatui::style::{Color, Modifier, Style};
             use ratatui::widgets::{Block, Borders, Gauge};
 
             let chunks = Layout::default()
@@ -2692,11 +2783,7 @@ impl App {
                         .borders(Borders::ALL)
                         .title(format!(" Download: {} [X] Cancel ", status)),
                 )
-                .gauge_style(
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                )
+                .gauge_style(self.theme.accent)
                 .ratio((prog / 100.0).clamp(0.0, 1.0));
             frame.render_widget(gauge, chunks[1]);
         }
