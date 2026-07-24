@@ -15,6 +15,11 @@ if (!(Test-Path $InstallDir)) {
 
 Write-Host "Extracting..."
 Expand-Archive -Path $ZipFile -DestinationPath $InstallDir -Force
+
+if (Test-Path "$InstallDir\moviebox-tui.exe") {
+    Remove-Item "$InstallDir\moviebox-tui.exe" -Force -ErrorAction SilentlyContinue
+}
+
 Rename-Item -Path "$InstallDir\MovieBox.exe" -NewName "moviebox-tui.exe" -Force -ErrorAction SilentlyContinue
 
 Remove-Item $ZipFile -Force
