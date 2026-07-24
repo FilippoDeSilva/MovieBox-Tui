@@ -60,10 +60,11 @@ pub struct AppState {
     pub is_homepage_mode: bool,
     pub current_tab_id: String,
     pub current_page: usize,
+    pub cached_animated_text: String,
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
     pub search_poster_protocols: std::collections::HashMap<
         String,
-        (ratatui::layout::Rect, ratatui_image::protocol::Protocol),
+        ((u16, u16), ratatui_image::protocol::Protocol),
     >,
     pub search_list_state: TableState,
 
@@ -139,6 +140,7 @@ impl Default for AppState {
         Self {
             active_screen: Screen::Startup,
             input_mode: InputMode::Normal,
+            cached_animated_text: String::new(),
             search_query: String::new(),
             last_suggest_query: String::new(),
             last_search_edit: std::time::Instant::now(),

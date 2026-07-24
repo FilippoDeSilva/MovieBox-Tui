@@ -184,11 +184,9 @@ impl MovieBoxClient {
             Err(e) => return Err(ScraperError::Reqwest(e)),
         };
 
-        let body_val: Value = match serde_json::from_str(&raw_text) {
+        let body_val: Value = match tokio::task::spawn_blocking(move || serde_json::from_str(&raw_text)).await.unwrap() {
             Ok(v) => v,
-            Err(e) => {
-                return Err(ScraperError::Json(e));
-            }
+            Err(e) => return Err(ScraperError::Json(e)),
         };
 
         if let Some(data) = body_val.get("data") {

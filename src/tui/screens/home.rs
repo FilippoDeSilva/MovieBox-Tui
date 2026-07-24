@@ -16,90 +16,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         if !state.status_message.is_empty() && state.input_mode == InputMode::Normal {
             format!("{}{}", search_prefix, state.status_message)
         } else if state.search_query.is_empty() {
-            use chrono::Timelike;
-            let hour = chrono::Local::now().hour();
-            let greeting_time = if hour >= 5 && hour < 12 {
-                "Good morning"
-            } else if hour >= 12 && hour < 17 {
-                "Good afternoon"
-            } else if hour >= 17 && hour < 21 {
-                "Good evening"
-            } else {
-                "Working late"
-            };
-            let punct = if greeting_time == "Working late" {
-                "?"
-            } else {
-                ""
-            };
-            let greeting = format!("{}, {}{}", greeting_time, state.username, punct);
-
-            let prompts = [
-                "What are you in the mood to watch?",
-                "Try 'Oppenheimer', 'Titanic', or 'Interstellar'...",
-                "Discover your next binge-worthy masterpiece...",
-                "Search for blockbuster movies, hit shows, or anime...",
-                "Feeling nostalgic? Search timeless classics...",
-                "Explore trending titles for your movie night...",
-            ];
-            let type_speed = 3;
-            let del_speed = 1;
-            let pause1 = 90;
-            let pause2 = 15;
-
-            let greeting_cycle =
-                greeting.len() * type_speed + pause1 + greeting.len() * del_speed + pause2;
-
-            let mut total_ticks = 0;
-            for p in prompts.iter() {
-                total_ticks += p.len() * type_speed + pause1 + p.len() * del_speed + pause2;
-            }
-
-            let tick_u = state.tick_count as usize;
-
-            let mut animated_text = String::new();
-
-            if tick_u < greeting_cycle {
-                let t = tick_u;
-                let t_type = greeting.len() * type_speed;
-                let t_del = greeting.len() * del_speed;
-
-                let display_len = if t < t_type {
-                    t / type_speed
-                } else if t < t_type + pause1 {
-                    greeting.len()
-                } else if t < t_type + pause1 + t_del {
-                    greeting
-                        .len()
-                        .saturating_sub((t - (t_type + pause1)) / del_speed)
-                } else {
-                    0
-                };
-                animated_text = greeting[0..display_len.min(greeting.len())].to_string();
-            } else {
-                let mut t = (tick_u - greeting_cycle) % total_ticks;
-                for p in prompts.iter() {
-                    let t_type = p.len() * type_speed;
-                    let t_del = p.len() * del_speed;
-                    let cycle = t_type + pause1 + t_del + pause2;
-
-                    if t < cycle {
-                        let display_len = if t < t_type {
-                            t / type_speed
-                        } else if t < t_type + pause1 {
-                            p.len()
-                        } else if t < t_type + pause1 + t_del {
-                            p.len().saturating_sub((t - (t_type + pause1)) / del_speed)
-                        } else {
-                            0
-                        };
-                        animated_text = p[0..display_len.min(p.len())].to_string();
-                        break;
-                    } else {
-                        t -= cycle;
-                    }
-                }
-            }
+            let animated_text = &state.cached_animated_text;
 
             if state.input_mode == InputMode::Editing {
                 if show_cursor {
@@ -473,14 +390,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                 if let Some(img) = state.search_posters.peek(&res.id) {
                     if state.image_supported {
+                        let target_dims = (poster_area.width, state.poster_rows);
                         let needs_protocol =
-                            state.search_poster_protocols.get(&res.id).map(|(r, _)| *r)
-                                != Some(poster_area);
+                            state.search_poster_protocols.get(&res.id).map(|(d, _)| *d)
+                                != Some(target_dims);
                         if needs_protocol {
                             if let Some(picker) = &mut state.image_picker {
                                 let size = ratatui::layout::Size::new(
-                                    poster_area.width,
-                                    poster_area.height.min(state.poster_rows),
+                                    target_dims.0,
+                                    target_dims.1,
                                 );
                                 if let Ok(proto) = picker.new_protocol(
                                     (**img).clone(),
@@ -489,7 +407,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 ) {
                                     state
                                         .search_poster_protocols
-                                        .insert(res.id.clone(), (poster_area, proto));
+                                        .insert(res.id.clone(), (target_dims, proto));
                                 }
                             }
                         }

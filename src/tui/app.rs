@@ -1,4 +1,4 @@
-use ratatui::{DefaultTerminal, Frame};
+use ratatui::Frame;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
@@ -173,7 +173,7 @@ impl App {
             .map(|s| s.to_string())
     }
 
-    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> std::io::Result<()> {
+    pub async fn run<B: ratatui::backend::Backend>(&mut self, terminal: &mut ratatui::Terminal<B>) -> std::io::Result<()> where std::io::Error: From<<B as ratatui::backend::Backend>::Error> {
         if self.state.image_picker.is_none() && self.state.image_supported {
             match ratatui_image::picker::Picker::from_query_stdio() {
                 Ok(picker) => {
@@ -292,12 +292,12 @@ impl App {
     }
 
     async fn handle_action(&mut self, action: Action) -> Option<()> {
-        if !matches!(action, Action::Tick) {
+        if !matches!(action, Action::Tick | Action::UpdateDownload(..)) {
             self.state.dirty = true;
         }
         match action {
             Action::Tick => {
-                let mut needs_redraw = self.state.is_loading || self.state.tick_count < 15;
+                let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0) || self.state.tick_count < 15;
                 self.state.tick_count = self.state.tick_count.wrapping_add(1);
                 if self.state.toast_timer > 0 {
                     needs_redraw = true;
@@ -317,6 +317,85 @@ impl App {
                     self.state.dirty = true;
                 }
 
+                if self.state.search_query.is_empty() && matches!(self.state.active_screen, crate::tui::state::Screen::Home) {
+                    use chrono::Timelike;
+                    let hour = chrono::Local::now().hour();
+                    let greeting_time = if hour >= 5 && hour < 12 {
+                        "Good morning"
+                    } else if hour >= 12 && hour < 17 {
+                        "Good afternoon"
+                    } else if hour >= 17 && hour < 21 {
+                        "Good evening"
+                    } else {
+                        "Working late"
+                    };
+                    let punct = if greeting_time == "Working late" { "?" } else { "" };
+                    let greeting = format!("{}, {}{}", greeting_time, self.state.username, punct);
+
+                    let prompts = [
+                        "What are you in the mood to watch?",
+                        "Try 'Oppenheimer', 'Titanic', or 'Interstellar'...",
+                        "Discover your next binge-worthy masterpiece...",
+                        "Search for blockbuster movies, hit shows, or anime...",
+                        "Feeling nostalgic? Search timeless classics...",
+                        "Explore trending titles for your movie night...",
+                    ];
+                    let type_speed = 3;
+                    let del_speed = 1;
+                    let pause1 = 90;
+                    let pause2 = 15;
+
+                    let greeting_cycle = greeting.len() * type_speed + pause1 + greeting.len() * del_speed + pause2;
+                    let mut total_ticks = 0;
+                    for p in prompts.iter() {
+                        total_ticks += p.len() * type_speed + pause1 + p.len() * del_speed + pause2;
+                    }
+
+                    let tick_u = self.state.tick_count as usize;
+                    let mut animated_text = String::new();
+
+                    if tick_u < greeting_cycle {
+                        let t = tick_u;
+                        let t_type = greeting.len() * type_speed;
+                        let t_del = greeting.len() * del_speed;
+                        let display_len = if t < t_type {
+                            t / type_speed
+                        } else if t < t_type + pause1 {
+                            greeting.len()
+                        } else if t < t_type + pause1 + t_del {
+                            greeting.len().saturating_sub((t - (t_type + pause1)) / del_speed)
+                        } else {
+                            0
+                        };
+                        animated_text = greeting[0..display_len.min(greeting.len())].to_string();
+                    } else {
+                        let mut t = (tick_u - greeting_cycle) % total_ticks;
+                        for p in prompts.iter() {
+                            let t_type = p.len() * type_speed;
+                            let t_del = p.len() * del_speed;
+                            let cycle = t_type + pause1 + t_del + pause2;
+                            if t < cycle {
+                                let display_len = if t < t_type {
+                                    t / type_speed
+                                } else if t < t_type + pause1 {
+                                    p.len()
+                                } else if t < t_type + pause1 + t_del {
+                                    p.len().saturating_sub((t - (t_type + pause1)) / del_speed)
+                                } else {
+                                    0
+                                };
+                                animated_text = p[0..display_len.min(p.len())].to_string();
+                                break;
+                            } else {
+                                t -= cycle;
+                            }
+                        }
+                    }
+                    if self.state.cached_animated_text != animated_text {
+                        self.state.cached_animated_text = animated_text;
+                        self.state.dirty = true;
+                    }
+                }
                 let current_query = self.state.search_query.trim().to_string();
                 if current_query != self.state.last_suggest_query
                     && self.state.last_search_edit.elapsed()
@@ -661,7 +740,10 @@ impl App {
                             } else {
                                 self.state.selected_episode
                             };
-                            crate::cache::invalidate_stream_cache(&id, se, ep);
+                            let id_clone = id.clone();
+                            tokio::task::spawn_blocking(move || {
+                                crate::cache::invalidate_stream_cache(&id_clone, se, ep);
+                            });
                             self.state.selected_season = se;
                             self.state.selected_episode = ep;
                             self.action_sender
@@ -1118,7 +1200,8 @@ impl App {
                                         .await
                                     {
                                         if let Ok(bytes) = resp.bytes().await {
-                                            if let Ok(img) = image::load_from_memory(&bytes) {
+                                            let bytes_clone = bytes.clone();
+                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes_clone)).await {
                                                 tx.send(Action::SearchPosterLoaded(
                                                     id,
                                                     Some(std::sync::Arc::new(img)),
@@ -1306,7 +1389,8 @@ impl App {
                                         .await
                                     {
                                         if let Ok(bytes) = resp.bytes().await {
-                                            if let Ok(img) = image::load_from_memory(&bytes) {
+                                            let bytes_clone = bytes.clone();
+                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes_clone)).await {
                                                 tx.send(Action::SearchPosterLoaded(
                                                     id,
                                                     Some(std::sync::Arc::new(img)),
@@ -1745,14 +1829,17 @@ impl App {
                 let id_clone = id.clone();
                 tokio::spawn(async move {
                     if !force_refresh {
-                        if let Some(cached) = crate::cache::get_details_cache(&id_clone) {
+                        let id_for_cache = id_clone.clone();
+                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || crate::cache::get_details_cache(&id_for_cache)).await {
                             sender.send(Action::DetailsSuccess(id_clone.clone(), cached)).ok();
                             return;
                         }
                     }
                     match client.get_details(&id_clone).await {
                         Ok(details) => {
-                            crate::cache::set_details_cache(&id_clone, &details);
+                            let id_for_cache = id_clone.clone();
+                            let details_for_cache = details.clone();
+                            let _ = tokio::task::spawn_blocking(move || crate::cache::set_details_cache(&id_for_cache, &details_for_cache)).await;
                             sender.send(Action::DetailsSuccess(id_clone, details)).ok();
                         }
                         Err(e) => {
@@ -1865,11 +1952,13 @@ impl App {
                             .header("User-Agent", "MovieBox-Tui/1.0")
                             .send()
                             .await
-                            && let Ok(bytes) = resp.bytes().await
-                            && let Ok(img) = image::load_from_memory(&bytes)
                         {
+                            if let Ok(bytes) = resp.bytes().await {
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
                             let _ = action_tx
                                 .send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                                }
+                            }
                         }
                     });
                 }
@@ -2568,13 +2657,15 @@ impl App {
                                 .header("User-Agent", "MovieBox-Tui/1.0")
                                 .send()
                                 .await
-                                && let Ok(bytes) = resp.bytes().await
-                                && let Ok(img) = image::load_from_memory(&bytes)
                             {
-                                let _ = action_tx.send(Action::PosterSuccess(
-                                    id_clone,
-                                    std::sync::Arc::new(img),
-                                ));
+                                if let Ok(bytes) = resp.bytes().await {
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                    let _ = action_tx.send(Action::PosterSuccess(
+                                        id_clone,
+                                        std::sync::Arc::new(img),
+                                    ));
+                                }
+                                }
                             }
                         });
                     }
@@ -2777,7 +2868,8 @@ impl App {
 
                     tokio::spawn(async move {
                         if !force_refresh {
-                            if let Some(cached) = crate::cache::get_stream_cache(&id_clone, season, episode) {
+                            let id_for_cache = id_clone.clone();
+                            if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || crate::cache::get_stream_cache(&id_for_cache, season, episode)).await {
                                 sender.send(Action::SetStatus("Loaded from cache.".to_string())).ok();
                                 sender.send(Action::EpisodeStreamsReady(season, episode, cached)).ok();
                                 return;
@@ -2962,7 +3054,11 @@ impl App {
                 let array_payload = serde_json::Value::Array(filtered.clone());
                 if count > 0 {
                     if let Some(subject_id) = &self.state.active_subject_id {
-                        crate::cache::set_stream_cache(subject_id, target_se, target_ep, &array_payload);
+                        let id_clone = subject_id.clone();
+                        let payload_clone = array_payload.clone();
+                        tokio::task::spawn_blocking(move || {
+                            crate::cache::set_stream_cache(&id_clone, target_se, target_ep, &payload_clone);
+                        });
                     }
                 }
                 
@@ -2988,8 +3084,11 @@ impl App {
                 self.state.status_timer = 150;
             }
             Action::UpdateDownload(prog, stat) => {
-                self.state.download_progress = prog;
-                self.state.download_status = stat;
+                if self.state.download_progress != prog || self.state.download_status != stat {
+                    self.state.download_progress = prog;
+                    self.state.download_status = stat;
+                    self.state.dirty = true;
+                }
             }
             Action::CancelDownload => {
                 self.state
