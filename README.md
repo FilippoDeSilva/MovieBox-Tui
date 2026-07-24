@@ -84,9 +84,9 @@ You can install MovieBox-Tui using our automated scripts, or via Cargo if you ar
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
 ```
 
-### Windows (PowerShell)
+### Windows
 ```powershell
-irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
+powershell -c "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex"
 ```
 
 ### Via Cargo

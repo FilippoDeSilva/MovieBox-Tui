@@ -1,3 +1,5 @@
+$ErrorActionPreference = 'Stop'
+
 Write-Host "Installing MovieBox-Tui..." -ForegroundColor Cyan
 
 $Url = "https://github.com/mesamirh/MovieBox-Tui/releases/latest/download/MovieBox_Windows_x64.zip"
@@ -5,7 +7,7 @@ $InstallDir = "$env:USERPROFILE\AppData\Local\MovieBox-Tui"
 $ZipFile = "$env:TEMP\MovieBox_Windows_x64.zip"
 
 Write-Host "Downloading latest release..."
-Invoke-WebRequest -Uri $Url -OutFile $ZipFile
+Invoke-WebRequest -Uri $Url -OutFile $ZipFile -UseBasicParsing
 
 if (!(Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
