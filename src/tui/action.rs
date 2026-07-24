@@ -12,6 +12,7 @@ pub enum Action {
     ToggleHelp,
     Search {
         query: String,
+        force_refresh: bool,
     },
     SelectSuggestion {
         query: String,
@@ -49,7 +50,7 @@ pub enum Action {
     DownloadStream,
     UpdateDownload(Option<f64>, Option<String>),
     CancelDownload,
-    FetchDetails(String),
+    FetchDetails(String, bool),
     DetailsSuccess(String, serde_json::Value),
     DetailsFailure(String),
     InitStreamPool(String),
@@ -58,6 +59,7 @@ pub enum Action {
         subject_id: String,
         season: usize,
         episode: usize,
+        force_refresh: bool,
     },
     EpisodeStreamsReady(usize, usize, serde_json::Value),
     EpisodeStreamsFailed(usize, usize, String),
@@ -69,4 +71,7 @@ pub enum Action {
     UpdateProgress(f64),
     UpdateSuccess,
     UpdateFailure(String),
+    SetStatus(String),
+    Refresh,
+    ClearCache,
 }

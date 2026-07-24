@@ -1,9 +1,8 @@
 use crate::providers::moviebox::crypto::build_signed_headers;
 use reqwest::Response;
 use serde_json::Value;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
+use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
 const HOST_POOL: &[&str] = &[
     "https://api6.aoneroom.com",
     "https://api5.aoneroom.com",
@@ -34,7 +33,7 @@ pub enum ScraperError {
 pub struct MovieBoxClient {
     client: reqwest::Client,
     runtime_token: Arc<RwLock<Option<String>>>,
-    active_base_idx: Arc<RwLock<usize>>,
+    active_base_idx: Arc<AtomicUsize>,
     user_agent: String,
     client_info: String,
     spoofed_ip: String,
@@ -55,7 +54,7 @@ impl MovieBoxClient {
             .pool_idle_timeout(std::time::Duration::from_secs(90))
             .pool_max_idle_per_host(4)
             .build()
-            .expect("Failed to build reqwest client; TLS backend may be missing");
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         let (user_agent, client_info) =
             crate::providers::moviebox::crypto::generate_client_info_and_ua();
@@ -64,7 +63,7 @@ impl MovieBoxClient {
         Self {
             client,
             runtime_token: Arc::new(RwLock::new(None)),
-            active_base_idx: Arc::new(RwLock::new(0)),
+            active_base_idx: Arc::new(AtomicUsize::new(0)),
             user_agent,
             client_info,
             spoofed_ip,
@@ -79,8 +78,8 @@ impl MovieBoxClient {
         let path = "/wefeed-mobile-bff/tab-operating?page=1&tabId=0&version=";
         let _ = self.get(path).await?;
 
-        let token = self.runtime_token.read().await;
-        if token.is_none() {
+        let has_token = self.runtime_token.read().unwrap().is_some();
+        if !has_token {
             return Err(ScraperError::MissingToken);
         }
         Ok(())
@@ -100,7 +99,7 @@ impl MovieBoxClient {
             return;
         };
         if !token.is_empty() {
-            let mut write_token = self.runtime_token.write().await;
+            let mut write_token = self.runtime_token.write().unwrap();
             *write_token = Some(token.to_string());
         }
     }
@@ -120,14 +119,17 @@ impl MovieBoxClient {
         path_and_query: &str,
         body: Option<&str>,
     ) -> Result<Value, ScraperError> {
-        let start_idx = *self.active_base_idx.read().await;
+        let start_idx = self.active_base_idx.load(Ordering::Relaxed);
 
         for i in 0..HOST_POOL.len() {
+            if i > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
             let idx = (start_idx + i) % HOST_POOL.len();
             let base = HOST_POOL[idx];
             let url = format!("{}{}", base, path_and_query);
 
-            let token = self.runtime_token.read().await.clone();
+            let token = self.runtime_token.read().unwrap().clone();
             let headers = build_signed_headers(
                 method,
                 &url,
@@ -157,8 +159,7 @@ impl MovieBoxClient {
                         continue;
                     }
 
-                    let mut active_idx = self.active_base_idx.write().await;
-                    *active_idx = idx;
+                    self.active_base_idx.store(idx, Ordering::Relaxed);
 
                     match self.parse_response(resp).await {
                         Ok(val) => return Ok(val),

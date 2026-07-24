@@ -165,7 +165,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
         }
         if let Some((_, proto)) = &state.poster_protocol {
-            frame.render_widget(ratatui_image::Image::new(proto), poster_area);
+            if !state.show_help {
+                frame.render_widget(ratatui_image::Image::new(proto), poster_area);
+            }
         }
     } else if state.image_supported {
         let current_spinner = if state.basic_terminal {
@@ -457,11 +459,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("codecName")
                             .and_then(|c| c.as_str())
                             .unwrap_or("None");
-                        let _upload_by = file
+                        let upload_by = file
                             .get("uploadBy")
                             .and_then(|u| u.as_str())
-                            .unwrap_or("None");
+                            .unwrap_or("Unknown");
                         let size_str = file.get("size").and_then(|s| s.as_str()).unwrap_or("0");
+                        
+                        let duration = file.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
+                        let duration_str = if duration > 0 {
+                            let hours = duration / 3600;
+                            let mins = (duration % 3600) / 60;
+                            let secs = duration % 60;
+                            if hours > 0 {
+                                format!("{:02}:{:02}:{:02}", hours, mins, secs)
+                            } else {
+                                format!("{:02}:{:02}", mins, secs)
+                            }
+                        } else {
+                            "--:--".to_string()
+                        };
 
                         let size_formatted = if let Ok(bytes) = size_str.parse::<f64>() {
                             let mb = bytes / 1024.0 / 1024.0;
@@ -490,7 +506,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         let stream_line = ratatui::text::Line::from(vec![
                             ratatui::text::Span::styled(pointer, theme.accent),
                             ratatui::text::Span::styled(
-                                format!("{:<7} {:<6} ", size_formatted, codec),
+                                format!("{:<7} | {:<5} | {} | By: {}", size_formatted, codec.to_uppercase(), duration_str, upload_by),
                                 stream_style,
                             ),
                         ]);
@@ -567,7 +583,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .and_then(|d| d.as_array())
                 .is_some_and(|a| a.len() > 1);
 
-            let msg = if state.is_loading {
+            let is_busy = state.is_loading || state.is_fetching_streams;
+
+            let msg = if is_busy {
                 let spinner = if state.basic_terminal {
                     let frames = ['-', '\\', '|', '/'];
                     frames[(state.tick_count as usize) % frames.len()]
@@ -578,28 +596,32 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 format!("{} Loading streams...", spinner)
             } else if has_multiple_dubs && !state.language_chosen {
                 "Please select a language dubbing from the Audio panel to view streams.".to_string()
-            } else if state.status_message.to_lowercase().contains("failed")
+            } else if state.status_message.to_lowercase().contains("no streams")
                 || state.status_message.to_lowercase().contains("error")
             {
                 state.status_message.clone()
             } else {
-                "Failed to load streams.".to_string()
+                String::new()
             };
 
-            let style = if state.is_loading || (has_multiple_dubs && !state.language_chosen) {
+            let style = if is_busy || (has_multiple_dubs && !state.language_chosen) {
                 theme.text_dim
             } else {
                 theme.error
             };
 
-            let inner = streams_block.inner(streams_area);
-            let pad = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
-            let p = Paragraph::new(format!("{}{}", pad, msg))
-                .style(style)
-                .alignment(Alignment::Center)
-                .wrap(Wrap { trim: true })
-                .block(streams_block.clone());
-            frame.render_widget(p, streams_area);
+            if !msg.is_empty() {
+                let inner = streams_block.inner(streams_area);
+                let pad = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
+                let p = Paragraph::new(format!("{}{}", pad, msg))
+                    .style(style)
+                    .alignment(Alignment::Center)
+                    .wrap(Wrap { trim: true })
+                    .block(streams_block.clone());
+                frame.render_widget(p, streams_area);
+            } else {
+                frame.render_widget(streams_block.clone(), streams_area);
+            }
         }
     }
     if !state.selected_resources.is_some() {
@@ -691,7 +713,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     let footer_text =
-        "Enter Play      o Open With...      D Download      C Copy Link      Esc Back";
+        "Enter Play      o Open With...      D Download      r Refresh      Esc Back";
     let footer_p = Paragraph::new(footer_text)
         .alignment(Alignment::Center)
         .style(theme.muted);

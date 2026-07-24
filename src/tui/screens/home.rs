@@ -263,16 +263,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(version, version_chunks[1]);
 
         if state.tick_count >= 3 {
-            let search_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(25),
-                ])
-                .split(vertical_chunks[5]);
-
-            search_bar_area = search_chunks[1];
+            search_bar_area = vertical_chunks[5];
 
             let search_bar = Paragraph::new(search_content.clone())
                 .alignment(Alignment::Center)
@@ -314,34 +305,51 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .split(area);
 
         search_bar_area = chunks[0];
-
         let border_style = if state.input_mode == InputMode::Editing {
             theme.border_focus
         } else {
             theme.border
         };
 
+        let loading_title = if state.is_loading && !state.search_results.is_empty() {
+            let spinner = if state.basic_terminal {
+                let frames = ['-', '\\', '|', '/'];
+                frames[(state.tick_count as usize) % frames.len()]
+            } else {
+                let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+                frames[(state.tick_count as usize) % frames.len()]
+            };
+            Some(ratatui::text::Line::from(ratatui::text::Span::styled(
+                format!(" {} ", spinner),
+                theme.accent,
+            )))
+        } else {
+            None
+        };
+
+        let mut search_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(border_style)
+            .border_type(if state.basic_terminal {
+                ratatui::widgets::BorderType::Plain
+            } else {
+                ratatui::widgets::BorderType::Rounded
+            })
+            .padding(ratatui::widgets::Padding::left(1));
+        if let Some(title) = loading_title {
+            search_block = search_block.title_top(title).title_alignment(Alignment::Right);
+        }
         let search_bar = Paragraph::new(search_content.clone())
             .style(match state.input_mode {
                 InputMode::Editing => theme.title,
                 InputMode::Normal => theme.text,
             })
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(border_style)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
-                    .padding(ratatui::widgets::Padding::left(1)),
-            );
+            .block(search_block);
         frame.render_widget(search_bar, search_bar_area);
 
         let list_block = Block::default();
 
-        if state.is_loading {
+        if state.is_loading && state.search_results.is_empty() {
             let spinner = if state.basic_terminal {
                 let frames = ['-', '\\', '|', '/'];
                 frames[(state.tick_count as usize) % frames.len()]
@@ -637,7 +645,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     {
         let search_area = search_bar_area;
 
-        let dropdown_height = std::cmp::min(state.search_suggestions.len() as u16 + 2, 10);
+        let dropdown_height = std::cmp::min(state.search_suggestions.len() as u16, 10);
 
         let is_home_screen = state.search_results.is_empty()
             && !state.is_loading
@@ -646,7 +654,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let dropdown_y = if !is_home_screen && search_area.y > area.height / 2 {
             search_area.y.saturating_sub(dropdown_height)
         } else {
-            search_area.y + search_area.height
+            search_area.y + 1
         };
 
         let max_len = state
@@ -655,8 +663,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .map(|s| s.len())
             .max()
             .unwrap_or(0) as u16;
+            
         let dropdown_width = std::cmp::min(std::cmp::max(max_len + 8, 30), search_area.width);
-        let dropdown_x = search_area.x + (search_area.width.saturating_sub(dropdown_width)) / 2;
+        
+        let text_len = search_content.chars().count() as u16;
+        let text_start_x = search_area.x + search_area.width.saturating_sub(text_len) / 2;
+        
+        let dropdown_x = if is_home_screen {
+            text_start_x + 2
+        } else {
+            search_area.x + 3
+        };
 
         let dropdown_area = Rect {
             x: dropdown_x,
@@ -691,13 +708,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .collect();
             let list = ratatui::widgets::List::new(items).block(
                 ratatui::widgets::Block::default()
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .border_style(theme.border_focus)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    }),
+                    .borders(ratatui::widgets::Borders::NONE),
             );
             frame.render_widget(list, dropdown_area);
         }

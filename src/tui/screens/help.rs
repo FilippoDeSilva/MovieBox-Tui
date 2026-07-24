@@ -74,6 +74,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("    /toggle-update ", theme.header),
             Span::styled("Toggle auto updates", theme.text),
         ]),
+        Line::from(vec![
+            Span::styled("    /clear-cache   ", theme.header),
+            Span::styled("Clear app cache", theme.text),
+        ]),
         Line::from(vec![]),
         Line::from(vec![Span::styled(
             "  Stream Controls",
@@ -88,8 +92,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Open Player Picker", theme.text),
         ]),
         Line::from(vec![
-            Span::styled("    [R]        ", theme.header),
-            Span::styled("Refresh Streams", theme.text),
+            Span::styled("    [r]        ", theme.header),
+            Span::styled("Refresh Streams/Search", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [d]        ", theme.header),

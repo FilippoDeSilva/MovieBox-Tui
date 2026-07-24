@@ -157,7 +157,9 @@ impl Default for AppState {
                 let is_windows = cfg!(target_os = "windows");
                 let is_dumb = term == "dumb" || term == "linux";
                 let is_apple_terminal = term_program == "Apple_Terminal";
-                is_windows || is_dumb || is_apple_terminal
+                let is_tmux = std::env::var("TMUX").is_ok();
+                let is_ssh = std::env::var("SSH_TTY").is_ok() || std::env::var("SSH_CLIENT").is_ok();
+                is_windows || is_dumb || is_apple_terminal || is_tmux || is_ssh
             },
             selected_details: None,
             active_subject_id: None,
@@ -186,16 +188,12 @@ impl Default for AppState {
             image_supported: {
                 let term = std::env::var("TERM").unwrap_or_default();
                 let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-                if term_program == "Apple_Terminal" || term == "dumb" {
+                if term_program == "Apple_Terminal" || term == "dumb" || term == "linux" {
+                    false
+                } else if std::env::var("TMUX").is_ok() || std::env::var("SSH_TTY").is_ok() {
                     false
                 } else {
-                    std::env::var("KITTY_WINDOW_ID").is_ok()
-                        || term_program.to_lowercase() == "ghostty"
-                        || term_program.to_lowercase() == "wezterm"
-                        || std::env::var("WEZTERM_UNIX_SOCKET").is_ok()
-                        || std::env::var("WEZTERM_EXECUTABLE").is_ok()
-                        || std::env::var("ITERM_SESSION_ID").is_ok()
-                        || term == "xterm-kitty"
+                    true // Let ratatui_image::picker::Picker query the terminal itself
                 }
             },
             poster_rows: 3,
@@ -235,7 +233,11 @@ impl Default for AppState {
             pending_open_with: false,
             username: std::env::var("USER")
                 .or_else(|_| std::env::var("USERNAME"))
-                .unwrap_or_else(|_| "Friend".to_string()),
+                .unwrap_or_else(|_| "Friend".to_string())
+                .split('\\')
+                .last()
+                .unwrap_or("Friend")
+                .to_string(),
         }
     }
 }

@@ -16,7 +16,10 @@ impl EventHandler {
 
         tokio::spawn(async move {
             loop {
-                let polled = crossterm::event::poll(Duration::from_millis(16)).unwrap_or(false);
+                let polled = match crossterm::event::poll(Duration::from_millis(16)) {
+                    Ok(p) => p,
+                    Err(_) => break,
+                };
                 if polled {
                     match crossterm::event::read() {
                         Ok(CrosstermEvent::Key(key)) => {
