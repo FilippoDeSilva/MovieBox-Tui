@@ -1944,7 +1944,11 @@ impl App {
 
                         let cancel_token = self.state.cancel_download.clone();
                         let sender = self.action_sender.clone();
-                        let client = self.client.http_client().clone();
+                        let client = reqwest::Client::builder()
+                            .connect_timeout(std::time::Duration::from_secs(10))
+                            .tcp_keepalive(std::time::Duration::from_secs(30))
+                            .build()
+                            .unwrap_or_else(|_| self.client.http_client().clone());
                         tokio::spawn(async move {
                             let head_res = client.head(&link).send().await;
                             let (total_size, supports_ranges) = match head_res {
@@ -2075,32 +2079,42 @@ impl App {
                                         use tokio::io::AsyncWriteExt;
                                         let expected_size = end - start + 1;
                                         let mut part_downloaded = 0;
-                                        while let Ok(Some(chunk)) = res.chunk().await {
-                                            if c_token.load(std::sync::atomic::Ordering::Relaxed) {
-                                                return Err(());
-                                            }
+                                        loop {
+                                            match res.chunk().await {
+                                                Ok(Some(chunk)) => {
+                                                    if c_token.load(std::sync::atomic::Ordering::Relaxed) {
+                                                        return Err(());
+                                                    }
 
-                                            let chunk_to_write = if part_downloaded
-                                                + chunk.len() as u64
-                                                > expected_size
-                                            {
-                                                &chunk[..(expected_size - part_downloaded) as usize]
-                                            } else {
-                                                &chunk[..]
-                                            };
+                                                    let chunk_to_write = if part_downloaded
+                                                        + chunk.len() as u64
+                                                        > expected_size
+                                                    {
+                                                        &chunk[..(expected_size - part_downloaded) as usize]
+                                                    } else {
+                                                        &chunk[..]
+                                                    };
 
-                                            if file.write_all(chunk_to_write).await.is_err() {
-                                                return Err(());
-                                            }
-                                            dl_total.fetch_add(
-                                                chunk_to_write.len() as u64,
-                                                std::sync::atomic::Ordering::Relaxed,
-                                            );
-                                            part_downloaded += chunk_to_write.len() as u64;
+                                                    if file.write_all(chunk_to_write).await.is_err() {
+                                                        return Err(());
+                                                    }
+                                                    dl_total.fetch_add(
+                                                        chunk_to_write.len() as u64,
+                                                        std::sync::atomic::Ordering::Relaxed,
+                                                    );
+                                                    part_downloaded += chunk_to_write.len() as u64;
 
-                                            if part_downloaded >= expected_size {
-                                                break;
+                                                    if part_downloaded >= expected_size {
+                                                        break;
+                                                    }
+                                                }
+                                                Ok(None) => break,
+                                                Err(_) => return Err(()),
                                             }
+                                        }
+
+                                        if part_downloaded < expected_size {
+                                            return Err(());
                                         }
                                         let _ = file.flush().await;
                                         Ok(())
@@ -2233,82 +2247,112 @@ impl App {
                                                     Some(format!("Downloading to {}", filename)),
                                                 ))
                                                 .ok();
-                                            while let Ok(Some(chunk)) = response.chunk().await {
-                                                if cancel_token
-                                                    .load(std::sync::atomic::Ordering::Relaxed)
-                                                {
-                                                    let _ = tokio::fs::remove_file(&filepath).await;
-                                                    sender
-                                                        .send(Action::UpdateDownload(
-                                                            None,
-                                                            Some("Download Cancelled".to_string()),
-                                                        ))
-                                                        .ok();
-                                                    tokio::time::sleep(
-                                                        std::time::Duration::from_secs(2),
-                                                    )
-                                                    .await;
-                                                    sender
-                                                        .send(Action::UpdateDownload(None, None))
-                                                        .ok();
-                                                    return;
+                                            loop {
+                                                match response.chunk().await {
+                                                    Ok(Some(chunk)) => {
+                                                        if cancel_token
+                                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                                        {
+                                                            let _ = tokio::fs::remove_file(&filepath).await;
+                                                            sender
+                                                                .send(Action::UpdateDownload(
+                                                                    None,
+                                                                    Some("Download Cancelled".to_string()),
+                                                                ))
+                                                                .ok();
+                                                            tokio::time::sleep(
+                                                                std::time::Duration::from_secs(2),
+                                                            )
+                                                            .await;
+                                                            sender
+                                                                .send(Action::UpdateDownload(None, None))
+                                                                .ok();
+                                                            return;
+                                                        }
+                                                        if buf_writer.write_all(&chunk).await.is_err() {
+                                                            sender
+                                                                .send(Action::UpdateDownload(
+                                                                    None,
+                                                                    Some("File write error!".to_string()),
+                                                                ))
+                                                                .ok();
+                                                            return;
+                                                        }
+                                                        downloaded += chunk.len() as u64;
+
+                                                        let now = std::time::Instant::now();
+                                                        if now.duration_since(last_ui_update).as_millis()
+                                                            > 200
+                                                        {
+                                                            last_ui_update = now;
+                                                            let progress = if total_size > 0 {
+                                                                (downloaded as f64 / total_size as f64)
+                                                                    * 100.0
+                                                            } else {
+                                                                0.0
+                                                            };
+
+                                                            let elapsed = now
+                                                                .duration_since(start_time)
+                                                                .as_secs_f64();
+                                                            let speed_bps = if elapsed > 0.0 {
+                                                                downloaded as f64 / elapsed
+                                                            } else {
+                                                                0.0
+                                                            };
+                                                            let speed_mbps = speed_bps / 1024.0 / 1024.0;
+
+                                                            let remaining_bytes = total_size
+                                                                .saturating_sub(downloaded)
+                                                                as f64;
+                                                            let eta_secs = if speed_bps > 0.0 {
+                                                                remaining_bytes / speed_bps
+                                                            } else {
+                                                                0.0
+                                                            };
+
+                                                            let status = format!(
+                                                                "{:.1} MB / {:.1} MB | {:.1} MB/s | ETA: {:.0}s [1x]",
+                                                                downloaded as f64 / 1024.0 / 1024.0,
+                                                                total_size as f64 / 1024.0 / 1024.0,
+                                                                speed_mbps,
+                                                                eta_secs
+                                                            );
+                                                            sender
+                                                                .send(Action::UpdateDownload(
+                                                                    Some(progress),
+                                                                    Some(status),
+                                                                ))
+                                                                .ok();
+                                                        }
+                                                    }
+                                                    Ok(None) => break,
+                                                    Err(e) => {
+                                                        let _ = tokio::fs::remove_file(&filepath).await;
+                                                        sender
+                                                            .send(Action::UpdateDownload(
+                                                                None,
+                                                                Some(format!("Stream Error: {}", e)),
+                                                            ))
+                                                            .ok();
+                                                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                                                        sender.send(Action::UpdateDownload(None, None)).ok();
+                                                        return;
+                                                    }
                                                 }
-                                                if buf_writer.write_all(&chunk).await.is_err() {
-                                                    sender
-                                                        .send(Action::UpdateDownload(
-                                                            None,
-                                                            Some("File write error!".to_string()),
-                                                        ))
-                                                        .ok();
-                                                    return;
-                                                }
-                                                downloaded += chunk.len() as u64;
+                                            }
 
-                                                let now = std::time::Instant::now();
-                                                if now.duration_since(last_ui_update).as_millis()
-                                                    > 200
-                                                {
-                                                    last_ui_update = now;
-                                                    let progress = if total_size > 0 {
-                                                        (downloaded as f64 / total_size as f64)
-                                                            * 100.0
-                                                    } else {
-                                                        0.0
-                                                    };
-
-                                                    let elapsed = now
-                                                        .duration_since(start_time)
-                                                        .as_secs_f64();
-                                                    let speed_bps = if elapsed > 0.0 {
-                                                        downloaded as f64 / elapsed
-                                                    } else {
-                                                        0.0
-                                                    };
-                                                    let speed_mbps = speed_bps / 1024.0 / 1024.0;
-
-                                                    let remaining_bytes = total_size
-                                                        .saturating_sub(downloaded)
-                                                        as f64;
-                                                    let eta_secs = if speed_bps > 0.0 {
-                                                        remaining_bytes / speed_bps
-                                                    } else {
-                                                        0.0
-                                                    };
-
-                                                    let status = format!(
-                                                        "{:.1} MB / {:.1} MB | {:.1} MB/s | ETA: {:.0}s [1x]",
-                                                        downloaded as f64 / 1024.0 / 1024.0,
-                                                        total_size as f64 / 1024.0 / 1024.0,
-                                                        speed_mbps,
-                                                        eta_secs
-                                                    );
-                                                    sender
-                                                        .send(Action::UpdateDownload(
-                                                            Some(progress),
-                                                            Some(status),
-                                                        ))
-                                                        .ok();
-                                                }
+                                            if total_size > 0 && downloaded != total_size {
+                                                let _ = tokio::fs::remove_file(&filepath).await;
+                                                sender
+                                                    .send(Action::UpdateDownload(
+                                                        None,
+                                                        Some("Incomplete download".to_string()),
+                                                    ))
+                                                    .ok();
+                                                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                                                sender.send(Action::UpdateDownload(None, None)).ok();
+                                                return;
                                             }
                                             let _ = buf_writer.flush().await;
                                             sender
@@ -2904,31 +2948,28 @@ impl App {
                 tokio::spawn(async move {
                     let start = std::time::Instant::now();
 
-                    let result = tokio::task::spawn_blocking(move || {
-                        let builder = self_update::backends::github::Update::configure()
-                            .repo_owner("mesamirh")
-                            .repo_name("MovieBox-Tui")
-                            .bin_name("moviebox-tui")
-                            .show_download_progress(false)
-                            .current_version(env!("CARGO_PKG_VERSION"))
-                            .build();
-
-                        if let Ok(updater) = builder {
-                            if let Ok(release) = updater.get_latest_release() {
-                                let current = self_update::cargo_crate_version!();
-                                if self_update::version::bump_is_greater(current, &release.version)
-                                    .unwrap_or(false)
-                                {
-                                    return Some(release.version.clone());
+                    let client = reqwest::Client::builder()
+                        .timeout(std::time::Duration::from_secs(10))
+                        .build()
+                        .unwrap_or_default();
+                    
+                    let result = match client.get("https://github.com/mesamirh/MovieBox-Tui/releases/latest").send().await {
+                        Ok(res) => {
+                            let url = res.url().as_str();
+                            if let Some(tag) = url.split("/tag/").last() {
+                                let version = tag.trim_start_matches('v');
+                                let current = env!("CARGO_PKG_VERSION");
+                                if self_update::version::bump_is_greater(current, version).unwrap_or(false) {
+                                    Some(version.to_string())
                                 } else {
-                                    return Some("none".to_string());
+                                    Some("none".to_string())
                                 }
+                            } else {
+                                Some("error".to_string())
                             }
                         }
-                        Some("error".to_string())
-                    })
-                    .await
-                    .unwrap_or(Some("error".to_string()));
+                        Err(_) => Some("error".to_string())
+                    };
 
                     let elapsed = start.elapsed();
                     if elapsed.as_millis() < 1500 {
@@ -2961,27 +3002,56 @@ impl App {
                 }
             }
             Action::StartUpdate => {
+                let version = self.state.update_available.clone().unwrap_or_default();
                 self.state.updater_progress = Some(0.0);
                 self.state.updater_status = Some("Starting update...".to_string());
                 let update_sender = self.action_sender.clone();
+                
                 tokio::task::spawn_blocking(move || {
-                    let mut builder = self_update::backends::github::Update::configure();
-                    let builder = builder
-                        .repo_owner("mesamirh")
-                        .repo_name("MovieBox-Tui")
-                        .bin_name("moviebox-tui")
-                        .show_download_progress(false)
-                        .current_version(env!("CARGO_PKG_VERSION"));
-
-                    if let Ok(updater) = builder.build() {
-                        if let Ok(_status) = updater.update() {
-                            update_sender.send(Action::UpdateSuccess).ok();
-                            return;
+                    let os = std::env::consts::OS;
+                    let asset_name = match os {
+                        "macos" => "MovieBox_macOS_Universal.tar.gz",
+                        "windows" => "MovieBox_Windows_x64.zip",
+                        "linux" => "MovieBox_Linux_x64.tar.gz",
+                        _ => return update_sender.send(Action::UpdateFailure("Unsupported OS".into())).unwrap_or(()),
+                    };
+                    
+                    let download_url = format!("https://github.com/mesamirh/MovieBox-Tui/releases/download/v{}/{}", version, asset_name);
+                    
+                    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                    let tmp_dir = std::env::temp_dir().join(format!("moviebox-update-{}", ts));
+                    let _ = std::fs::create_dir_all(&tmp_dir);
+                    
+                    let archive_path = tmp_dir.join(asset_name);
+                    if let Ok(mut archive_file) = std::fs::File::create(&archive_path) {
+                        if self_update::Download::from_url(&download_url).show_progress(false).download_to(&mut archive_file).is_ok() {
+                            let bin_name = if os == "windows" { "MovieBox.exe" } else { "moviebox" };
+                            let archive_kind = if os == "windows" {
+                                self_update::ArchiveKind::Zip
+                            } else {
+                                self_update::ArchiveKind::Tar(Some(self_update::Compression::Gz))
+                            };
+                            
+                            if self_update::Extract::from_source(&archive_path)
+                                .archive(archive_kind)
+                                .extract_file(&tmp_dir, bin_name)
+                                .is_ok() {
+                                    
+                                if let Ok(current_exe) = std::env::current_exe() {
+                                    let tmp_old = current_exe.with_extension("old");
+                                    let _ = std::fs::rename(&current_exe, &tmp_old);
+                                    if std::fs::rename(&tmp_dir.join(bin_name), &current_exe).is_ok() {
+                                        let _ = std::fs::remove_dir_all(&tmp_dir);
+                                        update_sender.send(Action::UpdateSuccess).ok();
+                                        return;
+                                    }
+                                }
+                            }
                         }
                     }
-                    update_sender
-                        .send(Action::UpdateFailure("Failed".into()))
-                        .ok();
+                    
+                    let _ = std::fs::remove_dir_all(&tmp_dir);
+                    update_sender.send(Action::UpdateFailure("Failed".into())).ok();
                 });
 
                 let progress_sender = self.action_sender.clone();
@@ -3053,45 +3123,58 @@ impl App {
             return;
         }
 
+        let mut main_area = frame.area();
+        let mut download_area = None;
+
+        if self.state.download_progress.is_some() {
+            use ratatui::layout::{Constraint, Direction, Layout};
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(3)])
+                .split(main_area);
+            
+            main_area = chunks[0];
+            download_area = Some(chunks[1]);
+        }
+
         match self.state.active_screen {
             Screen::Startup => {
-                super::screens::startup::draw(frame, area, &mut self.state, &self.theme);
+                super::screens::startup::draw(frame, main_area, &mut self.state, &self.theme);
             }
             Screen::Home => {
-                super::screens::home::draw(frame, area, &mut self.state, &self.theme);
+                super::screens::home::draw(frame, main_area, &mut self.state, &self.theme);
             }
             Screen::Details => {
-                super::screens::details::draw(frame, area, &mut self.state, &self.theme);
+                super::screens::details::draw(frame, main_area, &mut self.state, &self.theme);
             }
         }
 
         if self.state.show_help {
-            super::screens::help::draw(frame, area, &self.state, &self.theme);
+            super::screens::help::draw(frame, main_area, &self.state, &self.theme);
         }
 
         if let Some(prog) = self.state.download_progress {
-            use ratatui::layout::{Constraint, Direction, Layout};
-            use ratatui::widgets::{Block, Borders, Gauge};
+            if let Some(dl_area) = download_area {
+                use ratatui::widgets::{Block, Borders, Gauge, Clear};
 
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(0), Constraint::Length(3)])
-                .split(area);
-
-            let status = self
-                .state
-                .download_status
-                .as_deref()
-                .unwrap_or("Downloading...");
-            let gauge = Gauge::default()
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(format!(" Download: {} [X] Cancel ", status)),
-                )
-                .gauge_style(self.theme.accent)
-                .ratio((prog / 100.0).clamp(0.0, 1.0));
-            frame.render_widget(gauge, chunks[1]);
+                let status = self
+                    .state
+                    .download_status
+                    .as_deref()
+                    .unwrap_or("Downloading...");
+                
+                let gauge = Gauge::default()
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(format!(" Download: {} [X] Cancel ", status)),
+                    )
+                    .gauge_style(self.theme.accent)
+                    .ratio((prog / 100.0).clamp(0.0, 1.0));
+                
+                frame.render_widget(Clear, dl_area);
+                frame.render_widget(gauge, dl_area);
+            }
         }
 
         if let Some(msg) = &self.state.toast_message {
