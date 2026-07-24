@@ -367,13 +367,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             frame.render_stateful_widget(seasons_list, area, &mut state.season_list_state);
         }
 
-        let ep_items: Vec<ListItem> = if let Some(season) = state
-            .available_seasons
+        let ep_items: Vec<ListItem> = if let Some(ep_numbers) = state
+            .available_episode_numbers
             .get(state.season_list_state.selected().unwrap_or(0))
         {
-            let max_ep = season.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1);
-            (1..=max_ep)
-                .map(|ep| ListItem::new(format!("Episode {}", ep)).style(theme.text))
+            ep_numbers
+                .iter()
+                .map(|&ep| ListItem::new(format!("Episode {}", ep)).style(theme.text))
                 .collect()
         } else {
             vec![]

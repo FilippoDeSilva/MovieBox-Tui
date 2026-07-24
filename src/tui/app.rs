@@ -83,20 +83,22 @@ impl App {
     }
 
     fn trigger_episode_fetch(&mut self) {
-        if self.state.is_fetching_streams {
-            return;
-        }
-
         if let Some(id) = &self.state.active_subject_id {
             let se_idx = self.state.season_list_state.selected().unwrap_or(0);
             let ep_idx = self.state.episode_list_state.selected().unwrap_or(0);
 
             if let Some(season) = self.state.available_seasons.get(se_idx) {
                 let se = season.get("se").and_then(|s| s.as_i64()).unwrap_or(1) as usize;
-                let ep = ep_idx + 1;
+                let ep = if let Some(ep_numbers) = self.state.available_episode_numbers.get(se_idx) {
+                    ep_numbers.get(ep_idx).copied().unwrap_or(ep_idx + 1)
+                } else {
+                    ep_idx + 1
+                };
                 self.state.selected_season = se;
                 self.state.selected_episode = ep;
                 self.state.resource_list_state.select(None);
+                self.state.selected_resources = None;
+                self.state.is_loading = true;
 
                 self.state.pending_episode_fetch = Some((id.clone(), se, ep));
                 self.state.last_episode_nav = std::time::Instant::now();
@@ -502,6 +504,8 @@ impl App {
                                     } else {
                                         self.state.selected_episode
                                     };
+                                    self.state.selected_season = se;
+                                    self.state.selected_episode = ep;
                                     self.action_sender
                                         .send(Action::FetchEpisodeStreams {
                                             subject_id: id,
@@ -2401,10 +2405,25 @@ impl App {
                     self.state.available_seasons = vec![serde_json::json!({
                         "se": 1,
                         "maxEp": max_ep,
-                        "allEp": format!("1-{}", max_ep)
+                        "allEp": ""
                     })];
                 } else {
                     self.state.available_seasons.clear();
+                }
+
+                self.state.available_episode_numbers.clear();
+                for season in &self.state.available_seasons {
+                    let all_ep_str = season.get("allEp").and_then(|v| v.as_str()).unwrap_or("");
+                    let ep_numbers: Vec<usize> = if !all_ep_str.is_empty() {
+                        all_ep_str
+                            .split(',')
+                            .filter_map(|s| s.trim().parse().ok())
+                            .collect()
+                    } else {
+                        let max_ep = season.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
+                        (1..=max_ep).collect()
+                    };
+                    self.state.available_episode_numbers.push(ep_numbers);
                 }
 
                 self.state.season_list_state.select(Some(0));
@@ -2501,6 +2520,9 @@ impl App {
                     (1usize, 1usize)
                 };
 
+                self.state.selected_season = se;
+                self.state.selected_episode = ep;
+
                 self.action_sender
                     .send(Action::FetchEpisodeStreams {
                         subject_id,
@@ -2529,55 +2551,91 @@ impl App {
                         return None;
                     }
 
-                    let mut episodes_before_target = 0;
-                    for s in &self.state.available_seasons {
-                        let s_se = s.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-                        if s_se < season {
-                            episodes_before_target +=
-                                s.get("maxEp").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-                        }
-                    }
-                    episodes_before_target += episode.saturating_sub(1);
-
-                    let page_estimate = (episodes_before_target / 20) + 1;
-
                     let client = self.client.clone();
                     let sender = self.action_sender.clone();
                     let cancel_token = self.state.fetch_cancel.clone();
                     let id_clone = subject_id.clone();
                     let resolutions = pool.available_resolutions.clone();
+                    let is_movie = season == 0 && episode == 0;
 
                     tokio::spawn(async move {
-                        let mut handles = Vec::new();
-                        for res in resolutions {
-                            let c = client.clone();
-                            let id = id_clone.clone();
-                            let ct = cancel_token.clone();
-
-                            handles.push(tokio::spawn(async move {
-                                if ct.load(std::sync::atomic::Ordering::Relaxed) {
-                                    return (res, page_estimate, Vec::new(), serde_json::json!({}));
-                                }
+                        let mut all_items: Vec<serde_json::Value> = Vec::new();
+                        let mut found_target = false;
+                        
+                        if is_movie {
+                            let mut page = 1usize;
+                            loop {
+                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) { break; }
                                 match tokio::time::timeout(
                                     std::time::Duration::from_secs(15),
-                                    c.fetch_resource_page(&id, res, page_estimate),
+                                    client.fetch_resource_page(&id_clone, 0, page),
                                 )
                                 .await
                                 {
-                                    Ok(Ok((items, pager))) => (res, page_estimate, items, pager),
-                                    _ => (res, page_estimate, Vec::new(), serde_json::json!({})),
+                                    Ok(Ok((items, pager))) => {
+                                        let has_more = pager.get("hasMore").and_then(|v| v.as_bool()).unwrap_or(false);
+                                        all_items.extend(items);
+                                        if !has_more { break; }
+                                        page += 1;
+                                        if page > 10 { break; }
+                                    }
+                                    _ => break,
                                 }
-                            }));
-                        }
+                            }
+                        } else {
+                            let mut page = 1usize;
+                            'outer: loop {
+                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) { break 'outer; }
+                                let mut page_handles = Vec::new();
+                                
+                                let res_to_fetch = if resolutions.is_empty() { vec![0] } else { resolutions.clone() };
+                                
+                                for &res in &res_to_fetch {
+                                    let c = client.clone();
+                                    let id = id_clone.clone();
+                                    let ct = cancel_token.clone();
+                                    page_handles.push(tokio::spawn(async move {
+                                        if ct.load(std::sync::atomic::Ordering::Relaxed) {
+                                            return (Vec::new(), serde_json::json!({}));
+                                        }
+                                        match tokio::time::timeout(
+                                            std::time::Duration::from_secs(15),
+                                            c.fetch_resource_page(&id, res, page),
+                                        )
+                                        .await
+                                        {
+                                            Ok(Ok((items, pager))) => (items, pager),
+                                            _ => (Vec::new(), serde_json::json!({})),
+                                        }
+                                    }));
+                                }
 
-                        let mut all_items = Vec::new();
-                        for h in handles {
-                            if let Ok((_res, _page, items, _pager)) = h.await {
-                                all_items.extend(items);
+                                let mut page_empty = true;
+                                let mut has_more = false;
+                                for handle in page_handles {
+                                    if let Ok((items, pager)) = handle.await {
+                                        if !items.is_empty() { page_empty = false; }
+                                        if pager.get("hasMore").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                            has_more = true;
+                                        }
+                                        for item in &items {
+                                            let se = item.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
+                                            let ep = item.get("ep").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
+                                            if se == season && ep == episode { found_target = true; }
+                                        }
+                                        all_items.extend(items);
+                                    }
+                                }
+
+                                if found_target || page_empty || !has_more { break 'outer; }
+                                page += 1;
+                                if page > 60 { break; } 
                             }
                         }
 
-                        if all_items.is_empty() {
+                        let target_ok = if is_movie { !all_items.is_empty() } else { found_target };
+
+                        if !target_ok || all_items.is_empty() {
                             sender
                                 .send(Action::EpisodeStreamsFailed(
                                     season,
@@ -2598,6 +2656,14 @@ impl App {
                 }
             }
             Action::EpisodeStreamsReady(target_se, target_ep, payload) => {
+                if target_se != self.state.selected_season || target_ep != self.state.selected_episode {
+                    self.state.is_fetching_streams = false;
+                    if self.state.pending_episode_fetch.is_none() {
+                        self.state.is_loading = false;
+                    }
+                    return None;
+                }
+
                 let mut raw_list = payload.as_array().cloned().unwrap_or_default();
 
                 if let Some(subject_id) = &self.state.active_subject_id {
@@ -2643,7 +2709,9 @@ impl App {
                         }
 
                         if !actual_resolutions.is_empty() {
-                            let mut res_vec: Vec<u32> = actual_resolutions.into_iter().collect();
+                            let mut existing: std::collections::HashSet<u32> = pool.available_resolutions.iter().cloned().collect();
+                            existing.extend(actual_resolutions);
+                            let mut res_vec: Vec<u32> = existing.into_iter().collect();
                             res_vec.sort_unstable_by(|a, b| b.cmp(a));
 
                             pool.available_resolutions = res_vec;
@@ -2682,6 +2750,7 @@ impl App {
             Action::EpisodeStreamsFailed(_season, _episode, err) => {
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
+                self.state.selected_resources = None;
                 self.state.status_message = format!("Error: {}", err);
                 self.state.status_timer = 150;
             }

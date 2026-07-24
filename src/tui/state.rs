@@ -83,6 +83,7 @@ pub struct AppState {
     pub episode_list_state: ListState,
     pub language_list_state: ListState,
     pub available_seasons: Vec<serde_json::Value>,
+    pub available_episode_numbers: Vec<Vec<usize>>,
 
     pub search_preview: Option<serde_json::Value>,
     pub preview_loading: bool,
@@ -174,6 +175,7 @@ impl Default for AppState {
             episode_list_state: ListState::default(),
             language_list_state: ListState::default(),
             available_seasons: vec![],
+            available_episode_numbers: vec![],
 
             search_preview: None,
             preview_loading: false,
