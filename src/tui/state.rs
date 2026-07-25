@@ -62,10 +62,8 @@ pub struct AppState {
     pub current_page: usize,
     pub cached_animated_text: String,
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
-    pub search_poster_protocols: std::collections::HashMap<
-        String,
-        ((u16, u16), ratatui_image::protocol::Protocol),
-    >,
+    pub search_poster_protocols:
+        std::collections::HashMap<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
     pub search_list_state: TableState,
 
     pub selected_details: Option<serde_json::Value>,
@@ -73,6 +71,12 @@ pub struct AppState {
     pub selected_resources: Option<serde_json::Value>,
     pub stream_pool: std::collections::HashMap<String, SubjectStreamPool>,
     pub fetch_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub show_season_download_confirm: bool,
+    pub season_download_confirm_yes_selected: bool,
+    pub show_episode_download_confirm: bool,
+    pub episode_download_confirm_yes_selected: bool,
+    pub is_waiting_for_download_stream: bool,
+    pub is_downloading: bool,
     pub is_fetching_streams: bool,
     pub preview_cache: lru::LruCache<String, serde_json::Value>,
     pub resource_list_state: ListState,
@@ -124,6 +128,9 @@ pub struct AppState {
     pub download_status: Option<String>,
     pub cancel_download: std::sync::Arc<std::sync::atomic::AtomicBool>,
 
+    pub download_queue: std::collections::VecDeque<(usize, usize)>,
+    pub download_queue_total: usize,
+
     pub language_chosen: bool,
 
     pub subtitle_popup: bool,
@@ -160,7 +167,8 @@ impl Default for AppState {
                 let is_dumb = term == "dumb" || term == "linux";
                 let is_apple_terminal = term_program == "Apple_Terminal";
                 let is_tmux = std::env::var("TMUX").is_ok();
-                let is_ssh = std::env::var("SSH_TTY").is_ok() || std::env::var("SSH_CLIENT").is_ok();
+                let is_ssh =
+                    std::env::var("SSH_TTY").is_ok() || std::env::var("SSH_CLIENT").is_ok();
                 is_windows || is_dumb || is_apple_terminal || is_tmux || is_ssh
             },
             selected_details: None,
@@ -168,6 +176,12 @@ impl Default for AppState {
             selected_resources: None,
             stream_pool: std::collections::HashMap::new(),
             fetch_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            show_season_download_confirm: false,
+            season_download_confirm_yes_selected: true,
+            show_episode_download_confirm: false,
+            episode_download_confirm_yes_selected: true,
+            is_waiting_for_download_stream: false,
+            is_downloading: false,
             is_fetching_streams: false,
             preview_cache: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             resource_list_state: ListState::default(),
@@ -226,6 +240,8 @@ impl Default for AppState {
             download_progress: None,
             download_status: None,
             cancel_download: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            download_queue: std::collections::VecDeque::new(),
+            download_queue_total: 0,
             language_chosen: false,
 
             subtitle_popup: false,

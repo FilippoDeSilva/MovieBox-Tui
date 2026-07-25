@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
@@ -20,7 +20,11 @@ pub fn get_cache_path(subject_id: &str, season: usize, episode: usize) -> PathBu
     path
 }
 
-pub fn get_stream_cache(subject_id: &str, season: usize, episode: usize) -> Option<serde_json::Value> {
+pub fn get_stream_cache(
+    subject_id: &str,
+    season: usize,
+    episode: usize,
+) -> Option<serde_json::Value> {
     let path = get_cache_path(subject_id, season, episode);
     if path.exists() {
         if let Ok(metadata) = fs::metadata(&path) {
@@ -33,7 +37,7 @@ pub fn get_stream_cache(subject_id: &str, season: usize, episode: usize) -> Opti
                 }
             }
         }
-        
+
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(val) = serde_json::from_str(&content) {
                 return Some(val);
@@ -62,7 +66,7 @@ pub fn get_details_cache(subject_id: &str) -> Option<serde_json::Value> {
                 }
             }
         }
-        
+
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(val) = serde_json::from_str(&content) {
                 return Some(val);
@@ -77,7 +81,11 @@ pub fn get_search_path(query: &str) -> PathBuf {
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
     hasher.update(query.as_bytes());
-    let safe_query: String = hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect();
+    let safe_query: String = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
     path.push(format!("search_{}.json", safe_query));
     path
 }
@@ -95,7 +103,7 @@ pub fn get_search_cache(query: &str) -> Option<serde_json::Value> {
                 }
             }
         }
-        
+
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(val) = serde_json::from_str(&content) {
                 return Some(val);

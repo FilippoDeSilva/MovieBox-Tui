@@ -84,7 +84,9 @@ impl App {
 
     fn trigger_episode_fetch(&mut self) {
         if let Some(id) = &self.state.active_subject_id {
-            let stype = self.state.selected_details
+            let stype = self
+                .state
+                .selected_details
                 .as_ref()
                 .and_then(|d| d.get("subjectType").or_else(|| d.get("stype")))
                 .and_then(|s| s.as_i64())
@@ -93,17 +95,21 @@ impl App {
             let (se, ep) = if stype == 2 {
                 let se_idx = self.state.season_list_state.selected().unwrap_or(0);
                 let ep_idx = self.state.episode_list_state.selected().unwrap_or(0);
-                
-                let season_num = self.state.available_seasons.get(se_idx)
+
+                let season_num = self
+                    .state
+                    .available_seasons
+                    .get(se_idx)
                     .and_then(|s| s.get("se"))
                     .and_then(|s| s.as_i64())
                     .unwrap_or(1) as usize;
-                    
-                let ep_num = if let Some(ep_numbers) = self.state.available_episode_numbers.get(se_idx) {
-                    ep_numbers.get(ep_idx).copied().unwrap_or(ep_idx + 1)
-                } else {
-                    ep_idx + 1
-                };
+
+                let ep_num =
+                    if let Some(ep_numbers) = self.state.available_episode_numbers.get(se_idx) {
+                        ep_numbers.get(ep_idx).copied().unwrap_or(ep_idx + 1)
+                    } else {
+                        ep_idx + 1
+                    };
                 (season_num, ep_num)
             } else {
                 (0, 0)
@@ -123,8 +129,11 @@ impl App {
                     self.state.selected_resources = Some(serde_json::Value::Object(result));
                     self.state.is_loading = false;
                     self.state.is_fetching_streams = false;
-                    self.state.resource_list_state.select(if count > 0 { Some(0) } else { None });
-                    self.state.status_message = format!("Resolved {} direct stream sources (cached).", count);
+                    self.state
+                        .resource_list_state
+                        .select(if count > 0 { Some(0) } else { None });
+                    self.state.status_message =
+                        format!("Resolved {} direct stream sources (cached).", count);
                     self.state.status_timer = 150;
                 }
             }
@@ -173,7 +182,13 @@ impl App {
             .map(|s| s.to_string())
     }
 
-    pub async fn run<B: ratatui::backend::Backend>(&mut self, terminal: &mut ratatui::Terminal<B>) -> std::io::Result<()> where std::io::Error: From<<B as ratatui::backend::Backend>::Error> {
+    pub async fn run<B: ratatui::backend::Backend>(
+        &mut self,
+        terminal: &mut ratatui::Terminal<B>,
+    ) -> std::io::Result<()>
+    where
+        std::io::Error: From<<B as ratatui::backend::Backend>::Error>,
+    {
         if self.state.image_picker.is_none() && self.state.image_supported {
             match ratatui_image::picker::Picker::from_query_stdio() {
                 Ok(picker) => {
@@ -189,8 +204,6 @@ impl App {
                         }
                         self.state.image_picker = Some(picker);
                     }
-
-
                 }
                 Err(_) => {
                     self.state.image_supported = false;
@@ -297,7 +310,8 @@ impl App {
         }
         match action {
             Action::Tick => {
-                let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0) || self.state.tick_count < 15;
+                let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0)
+                    || self.state.tick_count < 15;
                 self.state.tick_count = self.state.tick_count.wrapping_add(1);
                 if self.state.toast_timer > 0 {
                     needs_redraw = true;
@@ -317,7 +331,9 @@ impl App {
                     self.state.dirty = true;
                 }
 
-                if self.state.search_query.is_empty() && matches!(self.state.active_screen, crate::tui::state::Screen::Home) {
+                if self.state.search_query.is_empty()
+                    && matches!(self.state.active_screen, crate::tui::state::Screen::Home)
+                {
                     use chrono::Timelike;
                     let hour = chrono::Local::now().hour();
                     let greeting_time = if hour >= 5 && hour < 12 {
@@ -329,7 +345,11 @@ impl App {
                     } else {
                         "Working late"
                     };
-                    let punct = if greeting_time == "Working late" { "?" } else { "" };
+                    let punct = if greeting_time == "Working late" {
+                        "?"
+                    } else {
+                        ""
+                    };
                     let greeting = format!("{}, {}{}", greeting_time, self.state.username, punct);
 
                     let prompts = [
@@ -345,7 +365,8 @@ impl App {
                     let pause1 = 90;
                     let pause2 = 15;
 
-                    let greeting_cycle = greeting.len() * type_speed + pause1 + greeting.len() * del_speed + pause2;
+                    let greeting_cycle =
+                        greeting.len() * type_speed + pause1 + greeting.len() * del_speed + pause2;
                     let mut total_ticks = 0;
                     for p in prompts.iter() {
                         total_ticks += p.len() * type_speed + pause1 + p.len() * del_speed + pause2;
@@ -363,7 +384,9 @@ impl App {
                         } else if t < t_type + pause1 {
                             greeting.len()
                         } else if t < t_type + pause1 + t_del {
-                            greeting.len().saturating_sub((t - (t_type + pause1)) / del_speed)
+                            greeting
+                                .len()
+                                .saturating_sub((t - (t_type + pause1)) / del_speed)
                         } else {
                             0
                         };
@@ -457,16 +480,12 @@ impl App {
             Action::FocusChange => {
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
-                if self.state.image_picker.is_some() {
-
-                }
+                if self.state.image_picker.is_some() {}
             }
             Action::Resize(_w, _h) => {
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
-                if self.state.image_picker.is_some() {
-
-                }
+                if self.state.image_picker.is_some() {}
             }
             Action::Key(key) => {
                 use crossterm::event::{KeyCode, KeyModifiers};
@@ -509,7 +528,10 @@ impl App {
                                 let action = if selected_suggestion {
                                     Action::SelectSuggestion { query }
                                 } else {
-                                    Action::Search { query, force_refresh: false }
+                                    Action::Search {
+                                        query,
+                                        force_refresh: false,
+                                    }
                                 };
                                 self.action_sender.send(action).ok();
                             }
@@ -592,6 +614,29 @@ impl App {
                             _ => {}
                         },
                         Screen::Details => match key.code {
+                            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                if self.state.show_season_download_confirm {
+                                    self.action_sender.send(Action::ConfirmDownloadSeason).ok();
+                                } else if self.state.show_episode_download_confirm {
+                                    self.action_sender.send(Action::ConfirmDownloadEpisode).ok();
+                                }
+                            }
+                            KeyCode::Char('n') | KeyCode::Char('N') => {
+                                if self.state.show_season_download_confirm {
+                                    self.state.show_season_download_confirm = false;
+                                } else if self.state.show_episode_download_confirm {
+                                    self.state.show_episode_download_confirm = false;
+                                }
+                            }
+                            KeyCode::Esc => {
+                                if self.state.show_season_download_confirm {
+                                    self.state.show_season_download_confirm = false;
+                                } else if self.state.show_episode_download_confirm {
+                                    self.state.show_episode_download_confirm = false;
+                                } else {
+                                    self.action_sender.send(Action::GoBack).ok();
+                                }
+                            }
                             KeyCode::Char('q') => {
                                 self.action_sender.send(Action::Quit).ok();
                             }
@@ -606,7 +651,17 @@ impl App {
                             }
                             KeyCode::Char('d') | KeyCode::Char('D') => {
                                 if !self.state.subtitle_popup && !self.state.player_picker_popup {
-                                    self.action_sender.send(Action::DownloadStream).ok();
+                                    if let crate::tui::state::DetailsPane::Seasons =
+                                        self.state.details_pane
+                                    {
+                                        if !self.state.available_seasons.is_empty() {
+                                            self.action_sender
+                                                .send(Action::PromptDownloadSeason)
+                                                .ok();
+                                        }
+                                    } else {
+                                        self.action_sender.send(Action::PromptDownloadEpisode).ok();
+                                    }
                                 }
                             }
                             KeyCode::Char('r') => {
@@ -615,7 +670,7 @@ impl App {
                             KeyCode::Char('?') => {
                                 self.action_sender.send(Action::ToggleHelp).ok();
                             }
-                            KeyCode::Char('b') | KeyCode::Esc => {
+                            KeyCode::Char('b') => {
                                 self.action_sender.send(Action::GoBack).ok();
                             }
 
@@ -626,16 +681,44 @@ impl App {
                                 self.action_sender.send(Action::MoveDown).ok();
                             }
                             KeyCode::Left | KeyCode::Char('h') => {
-                                self.action_sender.send(Action::MoveLeft).ok();
+                                if self.state.show_season_download_confirm {
+                                    self.state.season_download_confirm_yes_selected = true;
+                                } else if self.state.show_episode_download_confirm {
+                                    self.state.episode_download_confirm_yes_selected = true;
+                                } else {
+                                    self.action_sender.send(Action::MoveLeft).ok();
+                                }
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
-                                self.action_sender.send(Action::MoveRight).ok();
+                                if self.state.show_season_download_confirm {
+                                    self.state.season_download_confirm_yes_selected = false;
+                                } else if self.state.show_episode_download_confirm {
+                                    self.state.episode_download_confirm_yes_selected = false;
+                                } else {
+                                    self.action_sender.send(Action::MoveRight).ok();
+                                }
                             }
                             KeyCode::Enter => {
                                 let open_with = key
                                     .modifiers
                                     .contains(crossterm::event::KeyModifiers::SHIFT);
-                                if self.state.subtitle_popup || self.state.player_picker_popup {
+                                if self.state.show_season_download_confirm {
+                                    if self.state.season_download_confirm_yes_selected {
+                                        self.action_sender.send(Action::ConfirmDownloadSeason).ok();
+                                    } else {
+                                        self.state.show_season_download_confirm = false;
+                                    }
+                                } else if self.state.show_episode_download_confirm {
+                                    if self.state.episode_download_confirm_yes_selected {
+                                        self.action_sender
+                                            .send(Action::ConfirmDownloadEpisode)
+                                            .ok();
+                                    } else {
+                                        self.state.show_episode_download_confirm = false;
+                                    }
+                                } else if self.state.subtitle_popup
+                                    || self.state.player_picker_popup
+                                {
                                     self.action_sender.send(Action::Submit).ok();
                                 } else {
                                     match self.state.details_pane {
@@ -720,45 +803,48 @@ impl App {
                     }
                 }
             }
-            Action::Refresh => {
-                match self.state.active_screen {
-                    Screen::Home => {
-                        let query = self.state.search_query.trim().to_string();
-                        if !query.is_empty() {
-                            self.action_sender.send(Action::Search { query, force_refresh: true }).ok();
-                        }
+            Action::Refresh => match self.state.active_screen {
+                Screen::Home => {
+                    let query = self.state.search_query.trim().to_string();
+                    if !query.is_empty() {
+                        self.action_sender
+                            .send(Action::Search {
+                                query,
+                                force_refresh: true,
+                            })
+                            .ok();
                     }
-                    Screen::Details => {
-                        if let Some(id) = self.state.active_subject_id.clone() {
-                            let se = if self.state.available_seasons.is_empty() {
-                                0
-                            } else {
-                                self.state.selected_season
-                            };
-                            let ep = if self.state.available_seasons.is_empty() {
-                                0
-                            } else {
-                                self.state.selected_episode
-                            };
-                            let id_clone = id.clone();
-                            tokio::task::spawn_blocking(move || {
-                                crate::cache::invalidate_stream_cache(&id_clone, se, ep);
-                            });
-                            self.state.selected_season = se;
-                            self.state.selected_episode = ep;
-                            self.action_sender
-                                .send(Action::FetchEpisodeStreams {
-                                    subject_id: id,
-                                    season: se,
-                                    episode: ep,
-                                    force_refresh: true,
-                                })
-                                .ok();
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                Screen::Details => {
+                    if let Some(id) = self.state.active_subject_id.clone() {
+                        let se = if self.state.available_seasons.is_empty() {
+                            0
+                        } else {
+                            self.state.selected_season
+                        };
+                        let ep = if self.state.available_seasons.is_empty() {
+                            0
+                        } else {
+                            self.state.selected_episode
+                        };
+                        let id_clone = id.clone();
+                        tokio::task::spawn_blocking(move || {
+                            crate::cache::invalidate_stream_cache(&id_clone, se, ep);
+                        });
+                        self.state.selected_season = se;
+                        self.state.selected_episode = ep;
+                        self.action_sender
+                            .send(Action::FetchEpisodeStreams {
+                                subject_id: id,
+                                season: se,
+                                episode: ep,
+                                force_refresh: true,
+                            })
+                            .ok();
+                    }
+                }
+                _ => {}
+            },
             Action::ClearCache => {
                 crate::cache::clear_all_cache();
                 self.state.status_message = "Cache cleared completely.".to_string();
@@ -776,7 +862,9 @@ impl App {
                     self.state.language_chosen = true;
                     self.state.status_message = "Switching language...".to_string();
                     self.state.status_timer = 150;
-                    self.action_sender.send(Action::FetchDetails(next_id, false)).ok();
+                    self.action_sender
+                        .send(Action::FetchDetails(next_id, false))
+                        .ok();
                 }
             }
             Action::Suggest(query) => {
@@ -801,7 +889,9 @@ impl App {
                                 "subjects": suggestions
                             }]
                         });
-                        self.action_sender.send(Action::SuggestSuccess(query, fake_payload)).ok();
+                        self.action_sender
+                            .send(Action::SuggestSuccess(query, fake_payload))
+                            .ok();
                     }
                     return None;
                 }
@@ -867,9 +957,17 @@ impl App {
                 }
             }
             Action::SelectSuggestion { query } => {
-                self.action_sender.send(Action::Search { query, force_refresh: false }).ok();
+                self.action_sender
+                    .send(Action::Search {
+                        query,
+                        force_refresh: false,
+                    })
+                    .ok();
             }
-            Action::Search { query, force_refresh } => {
+            Action::Search {
+                query,
+                force_refresh,
+            } => {
                 let lower_query = query.trim().to_lowercase();
                 if lower_query == "/github" {
                     let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
@@ -1006,7 +1104,7 @@ impl App {
 
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
-                let force_refresh = false; 
+                let force_refresh = false;
 
                 if !force_refresh {
                     if let Some(cached) = crate::cache::get_homepage_cache(&tab_id, page) {
@@ -1201,7 +1299,12 @@ impl App {
                                     {
                                         if let Ok(bytes) = resp.bytes().await {
                                             let bytes_clone = bytes.clone();
-                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes_clone)).await {
+                                            if let Ok(Ok(img)) =
+                                                tokio::task::spawn_blocking(move || {
+                                                    image::load_from_memory(&bytes_clone)
+                                                })
+                                                .await
+                                            {
                                                 tx.send(Action::SearchPosterLoaded(
                                                     id,
                                                     Some(std::sync::Arc::new(img)),
@@ -1390,7 +1493,12 @@ impl App {
                                     {
                                         if let Ok(bytes) = resp.bytes().await {
                                             let bytes_clone = bytes.clone();
-                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes_clone)).await {
+                                            if let Ok(Ok(img)) =
+                                                tokio::task::spawn_blocking(move || {
+                                                    image::load_from_memory(&bytes_clone)
+                                                })
+                                                .await
+                                            {
                                                 tx.send(Action::SearchPosterLoaded(
                                                     id,
                                                     Some(std::sync::Arc::new(img)),
@@ -1814,14 +1922,18 @@ impl App {
                         self.state.status_timer = 150;
 
                         let sender = self.action_sender.clone();
-                        sender.send(Action::FetchDetails(item.id.clone(), false)).ok();
+                        sender
+                            .send(Action::FetchDetails(item.id.clone(), false))
+                            .ok();
                     }
                 }
             }
             Action::FetchDetails(id, force_refresh) => {
                 self.state.poster_protocol = None;
                 self.state.is_loading = true;
-                self.state.fetch_cancel.store(false, std::sync::atomic::Ordering::Relaxed);
+                self.state
+                    .fetch_cancel
+                    .store(false, std::sync::atomic::Ordering::Relaxed);
                 self.state.status_message = "Fetching details...".to_string();
                 self.state.stream_pool.clear();
                 let client = self.client.clone();
@@ -1830,8 +1942,14 @@ impl App {
                 tokio::spawn(async move {
                     if !force_refresh {
                         let id_for_cache = id_clone.clone();
-                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || crate::cache::get_details_cache(&id_for_cache)).await {
-                            sender.send(Action::DetailsSuccess(id_clone.clone(), cached)).ok();
+                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                            crate::cache::get_details_cache(&id_for_cache)
+                        })
+                        .await
+                        {
+                            sender
+                                .send(Action::DetailsSuccess(id_clone.clone(), cached))
+                                .ok();
                             return;
                         }
                     }
@@ -1839,7 +1957,10 @@ impl App {
                         Ok(details) => {
                             let id_for_cache = id_clone.clone();
                             let details_for_cache = details.clone();
-                            let _ = tokio::task::spawn_blocking(move || crate::cache::set_details_cache(&id_for_cache, &details_for_cache)).await;
+                            let _ = tokio::task::spawn_blocking(move || {
+                                crate::cache::set_details_cache(&id_for_cache, &details_for_cache)
+                            })
+                            .await;
                             sender.send(Action::DetailsSuccess(id_clone, details)).ok();
                         }
                         Err(e) => {
@@ -1954,9 +2075,15 @@ impl App {
                             .await
                         {
                             if let Ok(bytes) = resp.bytes().await {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                            let _ = action_tx
-                                .send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                    image::load_from_memory(&bytes)
+                                })
+                                .await
+                                {
+                                    let _ = action_tx.send(Action::PosterSuccess(
+                                        id_clone,
+                                        std::sync::Arc::new(img),
+                                    ));
                                 }
                             }
                         }
@@ -2130,26 +2257,23 @@ impl App {
                         .and_then(|t| t.as_str())
                         .unwrap_or("MovieBox-Tui_Stream")
                         .to_string();
-                    let ext = "mp4";
+                    let stype = self
+                        .state
+                        .selected_details
+                        .as_ref()
+                        .and_then(|d| d.get("stype").or_else(|| d.get("subjectType")))
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(1);
+                    let season = self.state.selected_season;
+                    let episode = self.state.selected_episode;
+
                     let mut sanitized_title = title.replace(" ", "_");
                     for c in &['/', '\\', ':', '*', '?', '"', '<', '>', '|'] {
                         sanitized_title = sanitized_title.replace(*c, "_");
                     }
-                    let filename = format!(
-                        "{}_{}.{}",
-                        sanitized_title,
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs(),
-                        ext
-                    );
-
-                    let filepath = dirs::download_dir()
-                        .unwrap_or_else(|| std::path::PathBuf::from("."))
-                        .join(&filename);
 
                     if let Some(link) = link_opt {
+                        self.state.is_waiting_for_download_stream = false;
                         self.state.toast_message = Some(format!(
                             "{} Starting native download...",
                             if self.state.basic_terminal {
@@ -2174,7 +2298,7 @@ impl App {
                             .unwrap_or_else(|_| self.client.http_client().clone());
                         tokio::spawn(async move {
                             let head_res = client.head(&link).send().await;
-                            let (total_size, supports_ranges) = match head_res {
+                            let (total_size, supports_ranges, ext) = match head_res {
                                 Ok(r) => {
                                     let size = r.content_length().unwrap_or(0);
                                     let ranges = r
@@ -2183,7 +2307,14 @@ impl App {
                                         .and_then(|v| v.to_str().ok())
                                         .unwrap_or("")
                                         == "bytes";
-                                    (size, ranges)
+                                    let ext = r
+                                        .headers()
+                                        .get(reqwest::header::CONTENT_DISPOSITION)
+                                        .and_then(|v| v.to_str().ok())
+                                        .and_then(|s| s.split('.').last())
+                                        .unwrap_or("mp4")
+                                        .to_string();
+                                    (size, ranges, ext)
                                 }
                                 Err(e) => {
                                     sender
@@ -2198,7 +2329,36 @@ impl App {
                                 }
                             };
 
-                            if total_size > 1024 * 1024 && supports_ranges {
+                            let base_dir = dirs::download_dir()
+                                .unwrap_or_else(|| std::path::PathBuf::from("."))
+                                .join("MovieBox-TUI");
+
+                            let (target_dir, base_filename) = if stype == 2 {
+                                let dir = base_dir
+                                    .join("Series")
+                                    .join(&sanitized_title)
+                                    .join(format!("Season {}", season));
+                                let fname =
+                                    format!("{}_S{:02}E{:02}", sanitized_title, season, episode);
+                                (dir, fname)
+                            } else {
+                                let dir = base_dir.join("Movies");
+                                (dir, sanitized_title.clone())
+                            };
+
+                            std::fs::create_dir_all(&target_dir).ok();
+
+                            let mut filename = format!("{}.{}", base_filename, ext);
+                            let mut filepath = target_dir.join(&filename);
+
+                            let mut counter = 2;
+                            while filepath.exists() {
+                                filename = format!("{}_{}.{}", base_filename, counter, ext);
+                                filepath = target_dir.join(&filename);
+                                counter += 1;
+                            }
+
+                            if supports_ranges && total_size > 5 * 1024 * 1024 {
                                 let num_connections = 16;
                                 let chunk_size = total_size / num_connections;
                                 let mut handles = vec![];
@@ -2305,7 +2465,9 @@ impl App {
                                         loop {
                                             match res.chunk().await {
                                                 Ok(Some(chunk)) => {
-                                                    if c_token.load(std::sync::atomic::Ordering::Relaxed) {
+                                                    if c_token
+                                                        .load(std::sync::atomic::Ordering::Relaxed)
+                                                    {
                                                         return Err(());
                                                     }
 
@@ -2313,12 +2475,14 @@ impl App {
                                                         + chunk.len() as u64
                                                         > expected_size
                                                     {
-                                                        &chunk[..(expected_size - part_downloaded) as usize]
+                                                        &chunk[..(expected_size - part_downloaded)
+                                                            as usize]
                                                     } else {
                                                         &chunk[..]
                                                     };
 
-                                                    if file.write_all(chunk_to_write).await.is_err() {
+                                                    if file.write_all(chunk_to_write).await.is_err()
+                                                    {
                                                         return Err(());
                                                     }
                                                     dl_total.fetch_add(
@@ -2357,16 +2521,17 @@ impl App {
                                 ui_handle.abort();
 
                                 if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
-                                    for tmp in &temp_files {
-                                        let _ = tokio::fs::remove_file(tmp).await;
+                                    for file in temp_files {
+                                        let _ = tokio::fs::remove_file(file).await;
                                     }
+                                    let _ = tokio::fs::remove_file(&filepath).await;
                                     sender
                                         .send(Action::UpdateDownload(
                                             None,
                                             Some("Download Cancelled".to_string()),
                                         ))
                                         .ok();
-                                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                                     sender.send(Action::UpdateDownload(None, None)).ok();
                                     return;
                                 }
@@ -2473,14 +2638,19 @@ impl App {
                                             loop {
                                                 match response.chunk().await {
                                                     Ok(Some(chunk)) => {
-                                                        if cancel_token
-                                                            .load(std::sync::atomic::Ordering::Relaxed)
-                                                        {
-                                                            let _ = tokio::fs::remove_file(&filepath).await;
+                                                        if cancel_token.load(
+                                                            std::sync::atomic::Ordering::Relaxed,
+                                                        ) {
+                                                            let _ =
+                                                                tokio::fs::remove_file(&filepath)
+                                                                    .await;
                                                             sender
                                                                 .send(Action::UpdateDownload(
                                                                     None,
-                                                                    Some("Download Cancelled".to_string()),
+                                                                    Some(
+                                                                        "Download Cancelled"
+                                                                            .to_string(),
+                                                                    ),
                                                                 ))
                                                                 .ok();
                                                             tokio::time::sleep(
@@ -2488,15 +2658,24 @@ impl App {
                                                             )
                                                             .await;
                                                             sender
-                                                                .send(Action::UpdateDownload(None, None))
+                                                                .send(Action::UpdateDownload(
+                                                                    None, None,
+                                                                ))
                                                                 .ok();
                                                             return;
                                                         }
-                                                        if buf_writer.write_all(&chunk).await.is_err() {
+                                                        if buf_writer
+                                                            .write_all(&chunk)
+                                                            .await
+                                                            .is_err()
+                                                        {
                                                             sender
                                                                 .send(Action::UpdateDownload(
                                                                     None,
-                                                                    Some("File write error!".to_string()),
+                                                                    Some(
+                                                                        "File write error!"
+                                                                            .to_string(),
+                                                                    ),
                                                                 ))
                                                                 .ok();
                                                             return;
@@ -2504,12 +2683,15 @@ impl App {
                                                         downloaded += chunk.len() as u64;
 
                                                         let now = std::time::Instant::now();
-                                                        if now.duration_since(last_ui_update).as_millis()
+                                                        if now
+                                                            .duration_since(last_ui_update)
+                                                            .as_millis()
                                                             > 200
                                                         {
                                                             last_ui_update = now;
                                                             let progress = if total_size > 0 {
-                                                                (downloaded as f64 / total_size as f64)
+                                                                (downloaded as f64
+                                                                    / total_size as f64)
                                                                     * 100.0
                                                             } else {
                                                                 0.0
@@ -2523,7 +2705,8 @@ impl App {
                                                             } else {
                                                                 0.0
                                                             };
-                                                            let speed_mbps = speed_bps / 1024.0 / 1024.0;
+                                                            let speed_mbps =
+                                                                speed_bps / 1024.0 / 1024.0;
 
                                                             let remaining_bytes = total_size
                                                                 .saturating_sub(downloaded)
@@ -2551,15 +2734,26 @@ impl App {
                                                     }
                                                     Ok(None) => break,
                                                     Err(e) => {
-                                                        let _ = tokio::fs::remove_file(&filepath).await;
+                                                        let _ =
+                                                            tokio::fs::remove_file(&filepath).await;
                                                         sender
                                                             .send(Action::UpdateDownload(
                                                                 None,
-                                                                Some(format!("Stream Error: {}", e)),
+                                                                Some(format!(
+                                                                    "Stream Error: {}",
+                                                                    e
+                                                                )),
                                                             ))
                                                             .ok();
-                                                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                                                        sender.send(Action::UpdateDownload(None, None)).ok();
+                                                        tokio::time::sleep(
+                                                            std::time::Duration::from_secs(3),
+                                                        )
+                                                        .await;
+                                                        sender
+                                                            .send(Action::UpdateDownload(
+                                                                None, None,
+                                                            ))
+                                                            .ok();
                                                         return;
                                                     }
                                                 }
@@ -2573,8 +2767,13 @@ impl App {
                                                         Some("Incomplete download".to_string()),
                                                     ))
                                                     .ok();
-                                                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                                                sender.send(Action::UpdateDownload(None, None)).ok();
+                                                tokio::time::sleep(std::time::Duration::from_secs(
+                                                    3,
+                                                ))
+                                                .await;
+                                                sender
+                                                    .send(Action::UpdateDownload(None, None))
+                                                    .ok();
                                                 return;
                                             }
                                             let _ = buf_writer.flush().await;
@@ -2612,7 +2811,108 @@ impl App {
                                 }
                             }
                         });
+                    } else if self.state.is_fetching_streams {
+                        self.state.toast_message =
+                            Some("Waiting for streams to load...".to_string());
+                        self.state.toast_timer = 60;
+                        self.state.is_waiting_for_download_stream = true;
+                    } else {
+                        self.state.toast_message =
+                            Some("No streams available to download.".to_string());
+                        self.state.toast_timer = 60;
+                        if self.state.download_queue_total > 0 {
+                            self.action_sender.send(Action::ProcessDownloadQueue).ok();
+                        }
                     }
+                }
+            }
+
+            Action::PromptDownloadEpisode => {
+                self.state.show_episode_download_confirm = true;
+                self.state.episode_download_confirm_yes_selected = true;
+            }
+
+            Action::ConfirmDownloadEpisode => {
+                self.state.show_episode_download_confirm = false;
+                self.action_sender.send(Action::DownloadStream).ok();
+            }
+
+            Action::PromptDownloadSeason => {
+                self.state.show_season_download_confirm = true;
+                self.state.season_download_confirm_yes_selected = true;
+            }
+
+            Action::ConfirmDownloadSeason => {
+                self.state.show_season_download_confirm = false;
+                let season_idx = self.state.selected_season;
+                if season_idx > 0 && season_idx <= self.state.available_episode_numbers.len() {
+                    let ep_numbers = &self.state.available_episode_numbers[season_idx - 1];
+                    self.state.download_queue.clear();
+
+                    for &ep in ep_numbers {
+                        self.state.download_queue.push_back((season_idx, ep));
+                    }
+                    self.state.download_queue_total = self.state.download_queue.len();
+                    self.action_sender.send(Action::ProcessDownloadQueue).ok();
+                }
+            }
+
+            Action::ProcessDownloadQueue => {
+                if self.state.download_progress.is_some() {
+                    let sender = self.action_sender.clone();
+                    tokio::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        sender.send(Action::ProcessDownloadQueue).ok();
+                    });
+                    return None;
+                }
+
+                if let Some((season, episode)) = self.state.download_queue.pop_front() {
+                    self.state.selected_season = season;
+                    self.state.selected_episode = episode;
+                    let remaining = self.state.download_queue.len();
+                    let total = self.state.download_queue_total;
+                    let num = total - remaining;
+
+                    self.state.toast_message = Some(format!(
+                        "Preparing S{:02}E{:02} ({}/{})",
+                        season, episode, num, total
+                    ));
+                    self.state.toast_timer = 60;
+
+                    let subject_id = self
+                        .state
+                        .selected_details
+                        .as_ref()
+                        .and_then(|d| d.get("id").or_else(|| d.get("idStr")))
+                        .and_then(|v| {
+                            if let Some(s) = v.as_str() {
+                                Some(s.to_string())
+                            } else if let Some(n) = v.as_i64() {
+                                Some(n.to_string())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
+
+                    self.action_sender
+                        .send(Action::FetchEpisodeStreams {
+                            subject_id,
+                            season,
+                            episode,
+                            force_refresh: false,
+                        })
+                        .ok();
+
+                    self.action_sender.send(Action::DownloadStream).ok();
+                } else if self.state.download_queue_total > 0 {
+                    self.state.toast_message = Some(format!(
+                        "Season download complete! ({} files)",
+                        self.state.download_queue_total
+                    ));
+                    self.state.toast_timer = 100;
+                    self.state.download_queue_total = 0;
                 }
             }
 
@@ -2623,9 +2923,18 @@ impl App {
                         if let Some(final_obj) = final_payload.as_object_mut() {
                             if let Some(existing_obj) = existing.as_object() {
                                 let preserve_keys = [
-                                    "title", "synopsis", "cover", "year", "releaseDate", 
-                                    "duration", "countryName", "genre", "imdbRatingValue", 
-                                    "intro", "description", "dubs"
+                                    "title",
+                                    "synopsis",
+                                    "cover",
+                                    "year",
+                                    "releaseDate",
+                                    "duration",
+                                    "countryName",
+                                    "genre",
+                                    "imdbRatingValue",
+                                    "intro",
+                                    "description",
+                                    "dubs",
                                 ];
                                 for key in preserve_keys {
                                     if let Some(v) = existing_obj.get(key) {
@@ -2636,7 +2945,7 @@ impl App {
                         }
                     }
                 }
-                
+
                 self.state.active_subject_id = Some(id.clone());
                 self.state.selected_details = Some(final_payload.clone());
                 let payload = final_payload;
@@ -2659,12 +2968,16 @@ impl App {
                                 .await
                             {
                                 if let Ok(bytes) = resp.bytes().await {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                    let _ = action_tx.send(Action::PosterSuccess(
-                                        id_clone,
-                                        std::sync::Arc::new(img),
-                                    ));
-                                }
+                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                        image::load_from_memory(&bytes)
+                                    })
+                                    .await
+                                    {
+                                        let _ = action_tx.send(Action::PosterSuccess(
+                                            id_clone,
+                                            std::sync::Arc::new(img),
+                                        ));
+                                    }
                                 }
                             }
                         });
@@ -2710,7 +3023,8 @@ impl App {
                             .filter_map(|s| s.trim().parse().ok())
                             .collect()
                     } else {
-                        let max_ep = season.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
+                        let max_ep =
+                            season.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
                         (1..=max_ep).collect()
                     };
                     self.state.available_episode_numbers.push(ep_numbers);
@@ -2757,9 +3071,10 @@ impl App {
                     } else {
                         self.state.details_pane = crate::tui::state::DetailsPane::Streams;
                     }
-                    
+
                     self.state.is_loading = true;
-                    self.state.fetch_cancel
+                    self.state
+                        .fetch_cancel
                         .store(false, std::sync::atomic::Ordering::Relaxed);
                     self.action_sender.send(Action::InitStreamPool(id)).ok();
                 }
@@ -2782,9 +3097,12 @@ impl App {
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    if let Ok(resolutions) = client.fetch_collection_resolutions(&subject_id).await {
+                    if let Ok(resolutions) = client.fetch_collection_resolutions(&subject_id).await
+                    {
                         if !resolutions.is_empty() {
-                            sender.send(Action::StreamPoolInitialized(subject_id, resolutions)).ok();
+                            sender
+                                .send(Action::StreamPoolInitialized(subject_id, resolutions))
+                                .ok();
                         }
                     }
                 });
@@ -2801,15 +3119,31 @@ impl App {
                         .or_else(|| details.get("stype").and_then(|s| s.as_i64()))
                         .unwrap_or(1);
                     if stype == 2 {
-                        let se = if self.state.selected_season > 0 { self.state.selected_season } else { 1 };
-                        let ep = if self.state.selected_episode > 0 { self.state.selected_episode } else { 1 };
+                        let se = if self.state.selected_season > 0 {
+                            self.state.selected_season
+                        } else {
+                            1
+                        };
+                        let ep = if self.state.selected_episode > 0 {
+                            self.state.selected_episode
+                        } else {
+                            1
+                        };
                         (se, ep)
                     } else {
                         (0usize, 0usize)
                     }
                 } else {
-                    let se = if self.state.selected_season > 0 { self.state.selected_season } else { 1 };
-                    let ep = if self.state.selected_episode > 0 { self.state.selected_episode } else { 1 };
+                    let se = if self.state.selected_season > 0 {
+                        self.state.selected_season
+                    } else {
+                        1
+                    };
+                    let ep = if self.state.selected_episode > 0 {
+                        self.state.selected_episode
+                    } else {
+                        1
+                    };
                     (se, ep)
                 };
                 let _ = (se, ep);
@@ -2853,7 +3187,8 @@ impl App {
                     for s_val in &self.state.available_seasons {
                         let se = s_val.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
                         if se < season {
-                            absolute_episode += s_val.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
+                            absolute_episode +=
+                                s_val.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
                         }
                     }
                     absolute_episode += episode.saturating_sub(1);
@@ -2869,22 +3204,34 @@ impl App {
                     tokio::spawn(async move {
                         if !force_refresh {
                             let id_for_cache = id_clone.clone();
-                            if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || crate::cache::get_stream_cache(&id_for_cache, season, episode)).await {
-                                sender.send(Action::SetStatus("Loaded from cache.".to_string())).ok();
-                                sender.send(Action::EpisodeStreamsReady(season, episode, cached)).ok();
+                            if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                                crate::cache::get_stream_cache(&id_for_cache, season, episode)
+                            })
+                            .await
+                            {
+                                sender
+                                    .send(Action::SetStatus("Loaded from cache.".to_string()))
+                                    .ok();
+                                sender
+                                    .send(Action::EpisodeStreamsReady(season, episode, cached))
+                                    .ok();
                                 return;
                             }
                         }
 
-                        sender.send(Action::SetStatus("Fetching streams...".to_string())).ok();
+                        sender
+                            .send(Action::SetStatus("Fetching streams...".to_string()))
+                            .ok();
 
                         let mut all_items: Vec<serde_json::Value> = Vec::new();
                         let mut found_target = false;
-                        
+
                         if is_movie {
                             let mut page = 1usize;
                             loop {
-                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) { break; }
+                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
+                                    break;
+                                }
                                 match tokio::time::timeout(
                                     std::time::Duration::from_secs(15),
                                     client.fetch_resource_page(&id_clone, 0, page),
@@ -2892,11 +3239,18 @@ impl App {
                                 .await
                                 {
                                     Ok(Ok((items, pager))) => {
-                                        let has_more = pager.get("hasMore").and_then(|v| v.as_bool()).unwrap_or(false);
+                                        let has_more = pager
+                                            .get("hasMore")
+                                            .and_then(|v| v.as_bool())
+                                            .unwrap_or(false);
                                         all_items.extend(items);
-                                        if !has_more { break; }
+                                        if !has_more {
+                                            break;
+                                        }
                                         page += 1;
-                                        if page > 10 { break; }
+                                        if page > 10 {
+                                            break;
+                                        }
                                     }
                                     _ => break,
                                 }
@@ -2904,11 +3258,17 @@ impl App {
                         } else {
                             let mut page = estimated_page;
                             'outer: loop {
-                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) { break 'outer; }
+                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
+                                    break 'outer;
+                                }
                                 let mut page_handles = Vec::new();
-                                
-                                let res_to_fetch = if resolutions.is_empty() { vec![0] } else { resolutions.clone() };
-                                
+
+                                let res_to_fetch = if resolutions.is_empty() {
+                                    vec![0]
+                                } else {
+                                    resolutions.clone()
+                                };
+
                                 for &res in &res_to_fetch {
                                     let c = client.clone();
                                     let id = id_clone.clone();
@@ -2933,26 +3293,50 @@ impl App {
                                 let mut has_more = false;
                                 for handle in page_handles {
                                     if let Ok((items, pager)) = handle.await {
-                                        if !items.is_empty() { page_empty = false; }
-                                        if pager.get("hasMore").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                        if !items.is_empty() {
+                                            page_empty = false;
+                                        }
+                                        if pager
+                                            .get("hasMore")
+                                            .and_then(|v| v.as_bool())
+                                            .unwrap_or(false)
+                                        {
                                             has_more = true;
                                         }
                                         for item in &items {
-                                            let se = item.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-                                            let ep = item.get("ep").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-                                            if se == season && ep == episode { found_target = true; }
+                                            let se = item
+                                                .get("se")
+                                                .and_then(|v| v.as_i64())
+                                                .unwrap_or(0)
+                                                as usize;
+                                            let ep = item
+                                                .get("ep")
+                                                .and_then(|v| v.as_i64())
+                                                .unwrap_or(0)
+                                                as usize;
+                                            if se == season && ep == episode {
+                                                found_target = true;
+                                            }
                                         }
                                         all_items.extend(items);
                                     }
                                 }
 
-                                if found_target || page_empty || !has_more { break 'outer; }
+                                if found_target || page_empty || !has_more {
+                                    break 'outer;
+                                }
                                 page += 1;
-                                if page > 60 { break; } 
+                                if page > 60 {
+                                    break;
+                                }
                             }
                         }
 
-                        let target_ok = if is_movie { !all_items.is_empty() } else { found_target };
+                        let target_ok = if is_movie {
+                            !all_items.is_empty()
+                        } else {
+                            found_target
+                        };
 
                         if !target_ok || all_items.is_empty() {
                             sender
@@ -2975,7 +3359,9 @@ impl App {
                 }
             }
             Action::EpisodeStreamsReady(target_se, target_ep, payload) => {
-                if target_se != self.state.selected_season || target_ep != self.state.selected_episode {
+                if target_se != self.state.selected_season
+                    || target_ep != self.state.selected_episode
+                {
                     return None;
                 }
 
@@ -3024,7 +3410,8 @@ impl App {
                         }
 
                         if !actual_resolutions.is_empty() {
-                            let mut existing: std::collections::HashSet<u32> = pool.available_resolutions.iter().cloned().collect();
+                            let mut existing: std::collections::HashSet<u32> =
+                                pool.available_resolutions.iter().cloned().collect();
                             existing.extend(actual_resolutions);
                             let mut res_vec: Vec<u32> = existing.into_iter().collect();
                             res_vec.sort_unstable_by(|a, b| b.cmp(a));
@@ -3057,11 +3444,16 @@ impl App {
                         let id_clone = subject_id.clone();
                         let payload_clone = array_payload.clone();
                         tokio::task::spawn_blocking(move || {
-                            crate::cache::set_stream_cache(&id_clone, target_se, target_ep, &payload_clone);
+                            crate::cache::set_stream_cache(
+                                &id_clone,
+                                target_se,
+                                target_ep,
+                                &payload_clone,
+                            );
                         });
                     }
                 }
-                
+
                 let mut result = serde_json::Map::new();
                 result.insert("list".to_string(), array_payload);
                 self.state.selected_resources = Some(serde_json::Value::Object(result));
@@ -3072,9 +3464,16 @@ impl App {
                     .select(if count > 0 { Some(0) } else { None });
                 self.state.status_message = format!("{} streams available.", count);
                 self.state.status_timer = 150;
+
+                if self.state.is_waiting_for_download_stream {
+                    self.state.is_waiting_for_download_stream = false;
+                    self.action_sender.send(Action::DownloadStream).ok();
+                }
             }
             Action::EpisodeStreamsFailed(target_se, target_ep, err) => {
-                if target_se != self.state.selected_season || target_ep != self.state.selected_episode {
+                if target_se != self.state.selected_season
+                    || target_ep != self.state.selected_episode
+                {
                     return None;
                 }
                 self.state.is_loading = false;
@@ -3088,6 +3487,11 @@ impl App {
                     self.state.download_progress = prog;
                     self.state.download_status = stat;
                     self.state.dirty = true;
+                }
+                // If the download just finished (cleared to None) and there are more items in queue,
+                // automatically trigger the next download in the sequence.
+                if prog.is_none() && !self.state.download_queue.is_empty() {
+                    self.action_sender.send(Action::ProcessDownloadQueue).ok();
                 }
             }
             Action::CancelDownload => {
@@ -3180,7 +3584,9 @@ impl App {
                                 let mut c = std::process::Command::new("open");
                                 c.arg("-a").arg("IINA");
                                 if let Some(s) = &local_sub {
-                                    c.arg("--args").arg(&link).arg(format!("--mpv-sub-file={}", s));
+                                    c.arg("--args")
+                                        .arg(&link)
+                                        .arg(format!("--mpv-sub-file={}", s));
                                 } else {
                                     c.arg(&link);
                                 }
@@ -3248,14 +3654,20 @@ impl App {
                         .timeout(std::time::Duration::from_secs(10))
                         .build()
                         .unwrap_or_default();
-                    
-                    let result = match client.get("https://github.com/mesamirh/MovieBox-Tui/releases/latest").send().await {
+
+                    let result = match client
+                        .get("https://github.com/mesamirh/MovieBox-Tui/releases/latest")
+                        .send()
+                        .await
+                    {
                         Ok(res) => {
                             let url = res.url().as_str();
                             if let Some(tag) = url.split("/tag/").last() {
                                 let version = tag.trim_start_matches('v');
                                 let current = env!("CARGO_PKG_VERSION");
-                                if self_update::version::bump_is_greater(current, version).unwrap_or(false) {
+                                if self_update::version::bump_is_greater(current, version)
+                                    .unwrap_or(false)
+                                {
                                     Some(version.to_string())
                                 } else {
                                     Some("none".to_string())
@@ -3264,7 +3676,7 @@ impl App {
                                 Some("error".to_string())
                             }
                         }
-                        Err(_) => Some("error".to_string())
+                        Err(_) => Some("error".to_string()),
                     };
 
                     let elapsed = start.elapsed();
@@ -3302,41 +3714,61 @@ impl App {
                 self.state.updater_progress = Some(0.0);
                 self.state.updater_status = Some("Starting update...".to_string());
                 let update_sender = self.action_sender.clone();
-                
+
                 tokio::task::spawn_blocking(move || {
                     let os = std::env::consts::OS;
                     let asset_name = match os {
                         "macos" => "MovieBox_macOS_Universal.tar.gz",
                         "windows" => "MovieBox_Windows_x64.zip",
                         "linux" => "MovieBox_Linux_x64.tar.gz",
-                        _ => return update_sender.send(Action::UpdateFailure("Unsupported OS".into())).unwrap_or(()),
+                        _ => {
+                            return update_sender
+                                .send(Action::UpdateFailure("Unsupported OS".into()))
+                                .unwrap_or(());
+                        }
                     };
-                    
-                    let download_url = format!("https://github.com/mesamirh/MovieBox-Tui/releases/download/v{}/{}", version, asset_name);
-                    
-                    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+
+                    let download_url = format!(
+                        "https://github.com/mesamirh/MovieBox-Tui/releases/download/v{}/{}",
+                        version, asset_name
+                    );
+
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
                     let tmp_dir = std::env::temp_dir().join(format!("moviebox-update-{}", ts));
                     let _ = std::fs::create_dir_all(&tmp_dir);
-                    
+
                     let archive_path = tmp_dir.join(asset_name);
                     if let Ok(mut archive_file) = std::fs::File::create(&archive_path) {
-                        if self_update::Download::from_url(&download_url).show_progress(false).download_to(&mut archive_file).is_ok() {
-                            let bin_name = if os == "windows" { "MovieBox.exe" } else { "moviebox" };
+                        if self_update::Download::from_url(&download_url)
+                            .show_progress(false)
+                            .download_to(&mut archive_file)
+                            .is_ok()
+                        {
+                            let bin_name = if os == "windows" {
+                                "MovieBox.exe"
+                            } else {
+                                "moviebox"
+                            };
                             let archive_kind = if os == "windows" {
                                 self_update::ArchiveKind::Zip
                             } else {
                                 self_update::ArchiveKind::Tar(Some(self_update::Compression::Gz))
                             };
-                            
+
                             if self_update::Extract::from_source(&archive_path)
                                 .archive(archive_kind)
                                 .extract_file(&tmp_dir, bin_name)
-                                .is_ok() {
-                                    
+                                .is_ok()
+                            {
                                 if let Ok(current_exe) = std::env::current_exe() {
                                     let tmp_old = current_exe.with_extension("old");
                                     let _ = std::fs::rename(&current_exe, &tmp_old);
-                                    if std::fs::rename(&tmp_dir.join(bin_name), &current_exe).is_ok() {
+                                    if std::fs::rename(&tmp_dir.join(bin_name), &current_exe)
+                                        .is_ok()
+                                    {
                                         let _ = std::fs::remove_dir_all(&tmp_dir);
                                         update_sender.send(Action::UpdateSuccess).ok();
                                         return;
@@ -3345,9 +3777,11 @@ impl App {
                             }
                         }
                     }
-                    
+
                     let _ = std::fs::remove_dir_all(&tmp_dir);
-                    update_sender.send(Action::UpdateFailure("Failed".into())).ok();
+                    update_sender
+                        .send(Action::UpdateFailure("Failed".into()))
+                        .ok();
                 });
 
                 let progress_sender = self.action_sender.clone();
@@ -3428,7 +3862,7 @@ impl App {
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(3)])
                 .split(main_area);
-            
+
             main_area = chunks[0];
             download_area = Some(chunks[1]);
         }
@@ -3451,23 +3885,35 @@ impl App {
 
         if let Some(prog) = self.state.download_progress {
             if let Some(dl_area) = download_area {
-                use ratatui::widgets::{Block, Borders, Gauge, Clear};
+                use ratatui::widgets::{Block, Borders, Clear, Gauge};
 
                 let status = self
                     .state
                     .download_status
                     .as_deref()
                     .unwrap_or("Downloading...");
-                
-                let gauge = Gauge::default()
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title(format!(" Download: {} [X] Cancel ", status)),
+
+                let title_text = if self.state.download_queue_total > 0 {
+                    let total = self.state.download_queue_total;
+                    let remaining = self.state.download_queue.len();
+                    let current = total - remaining;
+                    format!(
+                        " Download: S{:02}E{:02} ({}/{}) | {} [X] Cancel ",
+                        self.state.selected_season,
+                        self.state.selected_episode,
+                        current,
+                        total,
+                        status
                     )
+                } else {
+                    format!(" Download: {} [X] Cancel ", status)
+                };
+
+                let gauge = Gauge::default()
+                    .block(Block::default().borders(Borders::ALL).title(title_text))
                     .gauge_style(self.theme.accent)
                     .ratio((prog / 100.0).clamp(0.0, 1.0));
-                
+
                 frame.render_widget(Clear, dl_area);
                 frame.render_widget(gauge, dl_area);
             }

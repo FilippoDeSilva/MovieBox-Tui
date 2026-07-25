@@ -4,8 +4,8 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     text::{Line, Span},
     widgets::{
-        Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
-        Wrap,
+        Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Wrap,
     },
 };
 
@@ -464,7 +464,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .and_then(|u| u.as_str())
                             .unwrap_or("Unknown");
                         let size_str = file.get("size").and_then(|s| s.as_str()).unwrap_or("0");
-                        
+
                         let duration = file.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
                         let duration_str = if duration > 0 {
                             let hours = duration / 3600;
@@ -506,7 +506,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         let stream_line = ratatui::text::Line::from(vec![
                             ratatui::text::Span::styled(pointer, theme.accent),
                             ratatui::text::Span::styled(
-                                format!("{:<7} | {:<5} | {} | By: {}", size_formatted, codec.to_uppercase(), duration_str, upload_by),
+                                format!(
+                                    "{:<7} | {:<5} | {} | By: {}",
+                                    size_formatted,
+                                    codec.to_uppercase(),
+                                    duration_str,
+                                    upload_by
+                                ),
                                 stream_style,
                             ),
                         ]);
@@ -712,10 +718,150 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_stateful_widget(list, popup_area, &mut state.player_picker_state);
     }
 
-    let footer_text =
-        "Enter Play      o Open With...      D Download      r Refresh      Esc Back";
+    let footer_text = "Enter Play      o Open With...      d Download      r Refresh      Esc Back";
+
     let footer_p = Paragraph::new(footer_text)
         .alignment(Alignment::Center)
         .style(theme.muted);
     frame.render_widget(footer_p, chunks[3]);
+
+    if state.show_season_download_confirm {
+        let popup_width = 50;
+        let popup_height = 7;
+        let popup_area = Rect::new(
+            (area.width.saturating_sub(popup_width)) / 2,
+            (area.height.saturating_sub(popup_height)) / 2,
+            popup_width,
+            popup_height,
+        );
+        frame.render_widget(Clear, popup_area);
+
+        let season_idx = state.selected_season;
+        let eps_count = if season_idx > 0 && season_idx <= state.available_episode_numbers.len() {
+            state.available_episode_numbers[season_idx - 1].len()
+        } else {
+            0
+        };
+
+        let msg = format!(
+            "Download all {} episodes in Season {}?",
+            eps_count, season_idx
+        );
+        let yes_text = if state.season_download_confirm_yes_selected {
+            "  < Yes >  "
+        } else {
+            "    Yes    "
+        };
+        let no_text = if !state.season_download_confirm_yes_selected {
+            "  < No >  "
+        } else {
+            "    No    "
+        };
+
+        let confirm_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(theme.border_focus)
+            .title(" Season Download ")
+            .title_alignment(Alignment::Center);
+
+        let lines = vec![
+            Line::from(""),
+            Line::from(msg),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    yes_text,
+                    if state.season_download_confirm_yes_selected {
+                        theme.highlight
+                    } else {
+                        theme.text_dim
+                    },
+                ),
+                Span::raw("    "),
+                Span::styled(
+                    no_text,
+                    if !state.season_download_confirm_yes_selected {
+                        theme.highlight
+                    } else {
+                        theme.text_dim
+                    },
+                ),
+            ]),
+        ];
+
+        let p = Paragraph::new(lines)
+            .block(confirm_block)
+            .alignment(Alignment::Center)
+            .style(theme.text);
+
+        frame.render_widget(p, popup_area);
+    } else if state.show_episode_download_confirm {
+        let popup_width = 50;
+        let popup_height = 7;
+        let popup_area = Rect::new(
+            (area.width.saturating_sub(popup_width)) / 2,
+            (area.height.saturating_sub(popup_height)) / 2,
+            popup_width,
+            popup_height,
+        );
+        frame.render_widget(Clear, popup_area);
+
+        let season_idx = state.selected_season;
+        let ep_idx = state.selected_episode;
+
+        let msg = if type_val == 2 {
+            format!("Download Episode {} of Season {}?", ep_idx, season_idx)
+        } else {
+            format!("Download this Movie?")
+        };
+
+        let yes_text = if state.episode_download_confirm_yes_selected {
+            "  < Yes >  "
+        } else {
+            "    Yes    "
+        };
+        let no_text = if !state.episode_download_confirm_yes_selected {
+            "  < No >  "
+        } else {
+            "    No    "
+        };
+
+        let confirm_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(theme.border_focus)
+            .title(" Download ")
+            .title_alignment(Alignment::Center);
+
+        let lines = vec![
+            Line::from(""),
+            Line::from(msg),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    yes_text,
+                    if state.episode_download_confirm_yes_selected {
+                        theme.highlight
+                    } else {
+                        theme.text_dim
+                    },
+                ),
+                Span::raw("    "),
+                Span::styled(
+                    no_text,
+                    if !state.episode_download_confirm_yes_selected {
+                        theme.highlight
+                    } else {
+                        theme.text_dim
+                    },
+                ),
+            ]),
+        ];
+
+        let p = Paragraph::new(lines)
+            .block(confirm_block)
+            .alignment(Alignment::Center)
+            .style(theme.text);
+
+        frame.render_widget(p, popup_area);
+    }
 }

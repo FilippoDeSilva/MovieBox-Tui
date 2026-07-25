@@ -15,11 +15,11 @@ impl EventHandler {
         let event_sender = sender.clone();
 
         let mut tick_interval = tokio::time::interval(tick_rate);
-        
+
         tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
             use futures::StreamExt;
-            
+
             loop {
                 tokio::select! {
                     _ = tick_interval.tick() => {
@@ -47,8 +47,6 @@ impl EventHandler {
                 }
             }
         });
-
-
 
         Self { receiver, sender }
     }

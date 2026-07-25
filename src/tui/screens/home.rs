@@ -254,7 +254,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             })
             .padding(ratatui::widgets::Padding::left(1));
         if let Some(title) = loading_title {
-            search_block = search_block.title_top(title).title_alignment(Alignment::Right);
+            search_block = search_block
+                .title_top(title)
+                .title_alignment(Alignment::Right);
         }
         let search_bar = Paragraph::new(search_content.clone())
             .style(match state.input_mode {
@@ -396,10 +398,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 != Some(target_dims);
                         if needs_protocol {
                             if let Some(picker) = &mut state.image_picker {
-                                let size = ratatui::layout::Size::new(
-                                    target_dims.0,
-                                    target_dims.1,
-                                );
+                                let size = ratatui::layout::Size::new(target_dims.0, target_dims.1);
                                 if let Ok(proto) = picker.new_protocol(
                                     (**img).clone(),
                                     size,
@@ -581,12 +580,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .map(|s| s.len())
             .max()
             .unwrap_or(0) as u16;
-            
+
         let dropdown_width = std::cmp::min(std::cmp::max(max_len + 8, 30), search_area.width);
-        
+
         let text_len = search_content.chars().count() as u16;
         let text_start_x = search_area.x + search_area.width.saturating_sub(text_len) / 2;
-        
+
         let dropdown_x = if is_home_screen {
             text_start_x + 2
         } else {
@@ -624,10 +623,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     )
                 })
                 .collect();
-            let list = ratatui::widgets::List::new(items).block(
-                ratatui::widgets::Block::default()
-                    .borders(ratatui::widgets::Borders::NONE),
-            );
+            let list = ratatui::widgets::List::new(items)
+                .block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::NONE));
             frame.render_widget(list, dropdown_area);
         }
     }

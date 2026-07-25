@@ -1,8 +1,8 @@
 use crate::providers::moviebox::crypto::build_signed_headers;
 use reqwest::Response;
 use serde_json::Value;
-use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
 const HOST_POOL: &[&str] = &[
     "https://api6.aoneroom.com",
     "https://api5.aoneroom.com",
@@ -184,10 +184,14 @@ impl MovieBoxClient {
             Err(e) => return Err(ScraperError::Reqwest(e)),
         };
 
-        let body_val: Value = match tokio::task::spawn_blocking(move || serde_json::from_str(&raw_text)).await.unwrap() {
-            Ok(v) => v,
-            Err(e) => return Err(ScraperError::Json(e)),
-        };
+        let body_val: Value =
+            match tokio::task::spawn_blocking(move || serde_json::from_str(&raw_text))
+                .await
+                .unwrap()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(ScraperError::Json(e)),
+            };
 
         if let Some(data) = body_val.get("data") {
             Ok(data.clone())
