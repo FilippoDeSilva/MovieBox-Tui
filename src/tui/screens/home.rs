@@ -20,19 +20,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             if state.input_mode == InputMode::Editing {
                 if show_cursor {
-                    format!(
-                        "{}{}{}█",
-                        search_prefix,
-                        animated_text,
-                        if animated_text.is_empty() { "" } else { "" }
-                    )
+                    format!("{}{}{}█", search_prefix, animated_text, "")
                 } else {
-                    format!(
-                        "{}{}{} ",
-                        search_prefix,
-                        animated_text,
-                        if animated_text.is_empty() { "" } else { "" }
-                    )
+                    format!("{}{}{} ", search_prefix, animated_text, "")
                 }
             } else {
                 if show_cursor {
@@ -86,26 +76,30 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 ██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ TV
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
-╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝".to_string()
+╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝"
+                    .to_string()
             } else {
                 r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
 ██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
-╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝".to_string()
+╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝"
+                    .to_string()
             }
         } else {
             if state.is_tv_mode {
                 r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
  |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
  | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  TV
- |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ ".to_string()
+ |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ "
+                    .to_string()
             } else {
                 r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
  |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
  | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  
- |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ ".to_string()
+ |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ "
+                    .to_string()
             }
         };
 
@@ -116,8 +110,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             if state.is_tv_mode { 57 } else { 55 }
         };
-
-
 
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -217,16 +209,33 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
 
             let legend_line = ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled("[Ctrl+T] ", theme.shortcut),
-                ratatui::text::Span::styled(if state.is_tv_mode { "TV Mode   " } else { "Streaming Mode   " }, theme.text_dim),
-                ratatui::text::Span::styled("[Type] ", theme.shortcut),
-                ratatui::text::Span::styled("Search   ", theme.text_dim),
-                ratatui::text::Span::styled("[↑↓] ", theme.shortcut),
-                ratatui::text::Span::styled("Browse   ", theme.text_dim),
-                ratatui::text::Span::styled("[?] ", theme.shortcut),
-                ratatui::text::Span::styled("Help   ", theme.text_dim),
-                ratatui::text::Span::styled("[Esc] ", theme.shortcut),
-                ratatui::text::Span::styled("Quit", theme.text_dim),
+                ratatui::text::Span::styled("[", theme.text_dim),
+                ratatui::text::Span::styled("Ctrl+T", theme.shortcut),
+                ratatui::text::Span::styled("] ", theme.text_dim),
+                ratatui::text::Span::styled(
+                    if state.is_tv_mode {
+                        "TV Mode   "
+                    } else {
+                        "Streaming Mode   "
+                    },
+                    theme.text,
+                ),
+                ratatui::text::Span::styled("[", theme.text_dim),
+                ratatui::text::Span::styled("Type", theme.shortcut),
+                ratatui::text::Span::styled("] ", theme.text_dim),
+                ratatui::text::Span::styled("Search   ", theme.text),
+                ratatui::text::Span::styled("[", theme.text_dim),
+                ratatui::text::Span::styled("↑↓", theme.shortcut),
+                ratatui::text::Span::styled("] ", theme.text_dim),
+                ratatui::text::Span::styled("Browse   ", theme.text),
+                ratatui::text::Span::styled("[", theme.text_dim),
+                ratatui::text::Span::styled("?", theme.shortcut),
+                ratatui::text::Span::styled("] ", theme.text_dim),
+                ratatui::text::Span::styled("Help   ", theme.text),
+                ratatui::text::Span::styled("[", theme.text_dim),
+                ratatui::text::Span::styled("q", theme.shortcut),
+                ratatui::text::Span::styled("] ", theme.text_dim),
+                ratatui::text::Span::styled("Quit", theme.text),
             ]);
 
             let legend = Paragraph::new(legend_line).alignment(Alignment::Center);
@@ -341,11 +350,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let row_height = state.poster_rows;
             state.visible_items = (chunks[1].height as usize) / (row_height as usize);
-            let rows: Vec<Row> = state
+            let rows = state
                 .search_results
                 .iter()
-                .map(|_| Row::new(vec![Cell::from("")]).height(row_height))
-                .collect();
+                .map(|_| Row::new(vec![Cell::from("")]).height(row_height));
 
             let table = Table::new(rows, [Constraint::Percentage(100)]).block(list_block);
 
@@ -421,7 +429,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     if state.image_supported {
                         let target_dims = (poster_area.width, state.poster_rows);
                         let needs_protocol =
-                            state.search_poster_protocols.get(&res.id).map(|(d, _)| *d)
+                            state.search_poster_protocols.peek(&res.id).map(|(d, _)| *d)
                                 != Some(target_dims);
                         if needs_protocol {
                             if let Some(picker) = &mut state.image_picker {
@@ -433,11 +441,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 ) {
                                     state
                                         .search_poster_protocols
-                                        .insert(res.id.clone(), (target_dims, proto));
+                                        .put(res.id.clone(), (target_dims, proto));
                                 }
                             }
                         }
-                        if let Some((_, proto)) = state.search_poster_protocols.get(&res.id) {
+                        if let Some((_, proto)) = state.search_poster_protocols.peek(&res.id) {
                             let p_area = Rect {
                                 height: poster_area.height.min(state.poster_rows),
                                 ..poster_area
@@ -661,7 +669,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let content_height = state.tv_wizard_options.len() as u16;
         let max_height = area.height.saturating_sub(17).max(6);
         let popup_height = (content_height + 4).clamp(6, max_height);
-        
+
         let popup_area = ratatui::layout::Rect {
             x: area.width.saturating_sub(44) / 2,
             y: 13.min(area.height.saturating_sub(popup_height)),
@@ -669,60 +677,76 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             height: popup_height,
         };
         let popup_block = ratatui::widgets::Block::default()
-            .title(if state.tv_wizard_step == 0 { " TV Setup: Select Grouping " } else { " TV Setup: Select Items " })
+            .title(if state.tv_wizard_step == 0 {
+                " TV Setup: Select Grouping "
+            } else {
+                " TV Setup: Select Items "
+            })
             .title_alignment(ratatui::layout::Alignment::Center)
             .borders(ratatui::widgets::Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(theme.border_focus)
             .style(ratatui::style::Style::default());
-        
+
         let inner_area = popup_block.inner(popup_area);
         frame.render_widget(popup_block, popup_area);
 
-        let items: Vec<ratatui::widgets::ListItem> = state.tv_wizard_options.iter().map(|opt| {
-            let is_checked = state.tv_wizard_selections.contains(opt);
-            
-            let checkbox = if state.tv_wizard_step == 1 {
-                if is_checked { "[x] " } else { "[ ] " }
-            } else {
-                ""
-            };
-            
-            let line = ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(format!("{}{}", checkbox, opt), theme.text)
-            ]);
-            ratatui::widgets::ListItem::new(line)
-        }).collect();
+        let items: Vec<ratatui::widgets::ListItem> = state
+            .tv_wizard_options
+            .iter()
+            .map(|opt| {
+                let is_checked = state.tv_wizard_selections.contains(opt);
+
+                let checkbox = if state.tv_wizard_step == 1 {
+                    if is_checked { "[x] " } else { "[ ] " }
+                } else {
+                    ""
+                };
+
+                let line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
+                    format!("{}{}", checkbox, opt),
+                    theme.text,
+                )]);
+                ratatui::widgets::ListItem::new(line)
+            })
+            .collect();
 
         let list = ratatui::widgets::List::new(items)
-            .highlight_style(
-                theme.highlight.add_modifier(ratatui::style::Modifier::BOLD)
-            )
+            .highlight_style(theme.highlight.add_modifier(ratatui::style::Modifier::BOLD))
             .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-        
+
         let mut list_area = inner_area;
         list_area.height = list_area.height.saturating_sub(1);
-        
+
         let mut list_state = ratatui::widgets::ListState::default();
         list_state.select(Some(state.tv_wizard_selected_idx));
-        
+
         frame.render_stateful_widget(list, list_area, &mut list_state);
 
-        let scrollbar = ratatui::widgets::Scrollbar::new(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("▲"))
-            .end_symbol(Some("▼"))
-            .track_symbol(Some("│"))
-            .thumb_symbol("█");
-            
-        let mut scrollbar_state = ratatui::widgets::ScrollbarState::new(state.tv_wizard_options.len().saturating_sub(list_area.height as usize))
-            .position(list_state.offset());
-            
+        let scrollbar =
+            ratatui::widgets::Scrollbar::new(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("▲"))
+                .end_symbol(Some("▼"))
+                .track_symbol(Some("│"))
+                .thumb_symbol("█");
+
+        let mut scrollbar_state = ratatui::widgets::ScrollbarState::new(
+            state
+                .tv_wizard_options
+                .len()
+                .saturating_sub(list_area.height as usize),
+        )
+        .position(list_state.offset());
+
         frame.render_stateful_widget(
             scrollbar,
-            list_area.inner(ratatui::layout::Margin { vertical: 0, horizontal: 0 }),
+            list_area.inner(ratatui::layout::Margin {
+                vertical: 0,
+                horizontal: 0,
+            }),
             &mut scrollbar_state,
         );
-        
+
         let hint_area = ratatui::layout::Rect {
             x: inner_area.x,
             y: inner_area.y + inner_area.height.saturating_sub(1),
@@ -738,7 +762,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ratatui::widgets::Paragraph::new(hint)
                 .alignment(ratatui::layout::Alignment::Center)
                 .style(theme.text_dim),
-            hint_area
+            hint_area,
         );
     }
 

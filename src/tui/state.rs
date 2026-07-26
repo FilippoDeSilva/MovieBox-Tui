@@ -63,7 +63,7 @@ pub struct AppState {
     pub cached_animated_text: String,
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
     pub search_poster_protocols:
-        std::collections::HashMap<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
+        lru::LruCache<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
     pub search_list_state: TableState,
 
     pub selected_details: Option<serde_json::Value>,
@@ -143,7 +143,6 @@ pub struct AppState {
     pub basic_terminal: bool,
     pub username: String,
 
-
     pub is_tv_mode: bool,
     pub tv_config_popup: bool,
     pub tv_channels: Vec<crate::providers::iptv_org::m3u::Channel>,
@@ -169,7 +168,7 @@ impl Default for AppState {
             current_tab_id: String::new(),
             current_page: 1,
             search_posters: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
-            search_poster_protocols: std::collections::HashMap::new(),
+            search_poster_protocols: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             search_list_state: TableState::default(),
             basic_terminal: {
                 let term = std::env::var("TERM").unwrap_or_default();
@@ -215,13 +214,11 @@ impl Default for AppState {
             image_supported: {
                 let term = std::env::var("TERM").unwrap_or_default();
                 let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-                if term_program == "Apple_Terminal" || term == "dumb" || term == "linux" {
-                    false
-                } else if std::env::var("TMUX").is_ok() || std::env::var("SSH_TTY").is_ok() {
-                    false
-                } else {
-                    true
-                }
+                !(term_program == "Apple_Terminal"
+                    || term == "dumb"
+                    || term == "linux"
+                    || std::env::var("TMUX").is_ok()
+                    || std::env::var("SSH_TTY").is_ok())
             },
             poster_rows: 3,
             image_cache: lru::LruCache::new(std::num::NonZeroUsize::new(10).unwrap()),
@@ -266,16 +263,19 @@ impl Default for AppState {
                 .or_else(|_| std::env::var("USERNAME"))
                 .unwrap_or_else(|_| "Friend".to_string())
                 .split('\\')
-                .last()
+                .next_back()
                 .unwrap_or("Friend")
                 .to_string(),
-
 
             is_tv_mode: false,
             tv_config_popup: false,
             tv_channels: Vec::new(),
             tv_wizard_step: 0,
-            tv_wizard_options: vec!["Grouped by category".to_string(), "Grouped by language".to_string(), "Grouped by broadcast area".to_string()],
+            tv_wizard_options: vec![
+                "Grouped by category".to_string(),
+                "Grouped by language".to_string(),
+                "Grouped by broadcast area".to_string(),
+            ],
             tv_wizard_selected_idx: 0,
             tv_wizard_selections: std::collections::HashSet::new(),
         }

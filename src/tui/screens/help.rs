@@ -42,22 +42,67 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Select / Submit", theme.text),
         ]),
         Line::from(vec![]),
-        Line::from(vec![Span::styled(
-            "  Stream Controls",
-            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-        )]),
-        Line::from(vec![
-            Span::styled("    [Enter]    ", theme.header),
-            Span::styled(if state.is_tv_mode { "Play Channel" } else { "Play with default player" }, theme.text),
-        ]),
     ];
 
-    if !state.is_tv_mode {
-        help_text.splice(44..44, vec![
+    if state.is_tv_mode {
+        help_text.extend(vec![
+            Line::from(vec![Span::styled(
+                "  TV Controls",
+                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+            )]),
+            Line::from(vec![
+                Span::styled("    [Enter]    ", theme.header),
+                Span::styled("Play Channel", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /list      ", theme.header),
+                Span::styled("Show Available Channels", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /config    ", theme.header),
+                Span::styled("Open TV Config Popup", theme.text),
+            ]),
+            Line::from(vec![]),
+            Line::from(vec![Span::styled(
+                "  System",
+                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+            )]),
+            Line::from(vec![
+                Span::styled("    [r]        ", theme.header),
+                Span::styled("Refresh Channels/Search", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /clear-cache   ", theme.header),
+                Span::styled("Clear App Cache", theme.text),
+            ]),
+        ]);
+    } else {
+        help_text.extend(vec![
+            Line::from(vec![Span::styled(
+                "  Playback & Download",
+                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+            )]),
+            Line::from(vec![
+                Span::styled("    [Enter]    ", theme.header),
+                Span::styled("Play with Default Player", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    [o]        ", theme.header),
+                Span::styled("Open Player Picker", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    [d]        ", theme.header),
+                Span::styled("Download Video", theme.text),
+            ]),
+            Line::from(vec![]),
             Line::from(vec![Span::styled(
                 "  Discover & Search",
                 theme.header.add_modifier(ratatui::style::Modifier::BOLD),
             )]),
+            Line::from(vec![
+                Span::styled("    /home      ", theme.header),
+                Span::styled("Trending & Featured", theme.text),
+            ]),
             Line::from(vec![
                 Span::styled("    /discover  ", theme.header),
                 Span::styled("Trending & Featured", theme.text),
@@ -78,61 +123,29 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("    /github    ", theme.header),
                 Span::styled("Open GitHub Repo", theme.text),
             ]),
-            Line::from(vec![
-                Span::styled("    /update    ", theme.header),
-                Span::styled("Check for updates", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /toggle-update ", theme.header),
-                Span::styled("Toggle auto updates", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /clear-cache   ", theme.header),
-                Span::styled("Clear app cache", theme.text),
-            ]),
             Line::from(vec![]),
-        ]);
-
-        help_text.extend(vec![
-            Line::from(vec![
-                Span::styled("    [o]        ", theme.header),
-                Span::styled("Open Player Picker", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    [d]        ", theme.header),
-                Span::styled("Download Video", theme.text),
-            ]),
-        ]);
-    }
-
-    if state.is_tv_mode {
-        help_text.extend(vec![
             Line::from(vec![Span::styled(
-                "  TV Commands",
+                "  System",
                 theme.header.add_modifier(ratatui::style::Modifier::BOLD),
             )]),
             Line::from(vec![
-                Span::styled("    /list      ", theme.header),
-                Span::styled("Show available channels", theme.text),
+                Span::styled("    [r]        ", theme.header),
+                Span::styled("Refresh Streams/Search", theme.text),
             ]),
             Line::from(vec![
-                Span::styled("    /config    ", theme.header),
-                Span::styled("Open TV Config Popup", theme.text),
+                Span::styled("    /update    ", theme.header),
+                Span::styled("Check for Updates", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /toggle-update ", theme.header),
+                Span::styled("Toggle Auto Updates", theme.text),
             ]),
             Line::from(vec![
                 Span::styled("    /clear-cache   ", theme.header),
-                Span::styled("Clear app cache", theme.text),
+                Span::styled("Clear App Cache", theme.text),
             ]),
-            Line::from(vec![]),
         ]);
     }
-
-    help_text.extend(vec![
-        Line::from(vec![
-            Span::styled("    [r]        ", theme.header),
-            Span::styled("Refresh Streams/Search", theme.text),
-        ]),
-    ]);
 
     let height = help_text.len() as u16 + 2;
     let margin_y = area.height.saturating_sub(height) / 2;

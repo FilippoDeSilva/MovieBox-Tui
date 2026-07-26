@@ -1,7 +1,7 @@
 pub mod action;
 pub mod app;
-pub mod iptv_data;
 pub mod event;
+pub mod iptv_data;
 pub mod state;
 pub mod theme;
 pub mod screens {

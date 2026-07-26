@@ -818,7 +818,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let msg = if type_val == 2 {
             format!("Download Episode {} of Season {}?", ep_idx, season_idx)
         } else {
-            format!("Download this Movie?")
+            "Download this Movie?".to_string()
         };
 
         let yes_text = if state.episode_download_confirm_yes_selected {

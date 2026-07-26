@@ -336,11 +336,11 @@ impl App {
                 {
                     use chrono::Timelike;
                     let hour = chrono::Local::now().hour();
-                    let greeting_time = if hour >= 5 && hour < 12 {
+                    let greeting_time = if (5..12).contains(&hour) {
                         "Good morning"
-                    } else if hour >= 12 && hour < 17 {
+                    } else if (12..17).contains(&hour) {
                         "Good afternoon"
-                    } else if hour >= 17 && hour < 21 {
+                    } else if (17..21).contains(&hour) {
                         "Good evening"
                     } else {
                         "Working late"
@@ -400,7 +400,10 @@ impl App {
                         } else {
                             0
                         };
-                        animated_text = greeting.chars().take(display_len.min(greeting_len)).collect::<String>();
+                        animated_text = greeting
+                            .chars()
+                            .take(display_len.min(greeting_len))
+                            .collect::<String>();
                     } else {
                         let mut t = (tick_u - greeting_cycle) % total_ticks;
                         for p in prompts.iter() {
@@ -418,7 +421,8 @@ impl App {
                                 } else {
                                     0
                                 };
-                                animated_text = p.chars().take(display_len.min(p_len)).collect::<String>();
+                                animated_text =
+                                    p.chars().take(display_len.min(p_len)).collect::<String>();
                                 break;
                             } else {
                                 t -= cycle;
@@ -433,14 +437,16 @@ impl App {
                 let current_query = self.state.search_query.trim().to_string();
                 if current_query != self.state.last_suggest_query
                     && self.state.last_search_edit.elapsed()
-                        >= std::time::Duration::from_millis(100)
+                        >= std::time::Duration::from_millis(350)
                 {
                     self.state.last_suggest_query = current_query.clone();
                     if !current_query.is_empty() {
                         if self.state.is_tv_mode {
-
                             let q = current_query.to_lowercase();
-                            self.state.search_suggestions = self.state.tv_channels.iter()
+                            self.state.search_suggestions = self
+                                .state
+                                .tv_channels
+                                .iter()
                                 .filter(|c| c.name.to_lowercase().contains(&q))
                                 .take(10)
                                 .map(|c| c.name.clone())
@@ -578,9 +584,11 @@ impl App {
                                 Some(i) => i - 1,
                             };
                             self.state.suggest_index = Some(next_idx);
-                            self.state.search_query =
-                                self.state.search_suggestions[next_idx].clone();
-                            self.state.last_suggest_query = self.state.search_query.trim().to_string();
+                            if let Some(sug) = self.state.search_suggestions.get(next_idx) {
+                                self.state.search_query = sug.clone();
+                                self.state.last_suggest_query =
+                                    self.state.search_query.trim().to_string();
+                            }
                         }
                         KeyCode::Down if !self.state.search_suggestions.is_empty() => {
                             let max_idx = self.state.search_suggestions.len() - 1;
@@ -590,9 +598,11 @@ impl App {
                                 Some(i) => i + 1,
                             };
                             self.state.suggest_index = Some(next_idx);
-                            self.state.search_query =
-                                self.state.search_suggestions[next_idx].clone();
-                            self.state.last_suggest_query = self.state.search_query.trim().to_string();
+                            if let Some(sug) = self.state.search_suggestions.get(next_idx) {
+                                self.state.search_query = sug.clone();
+                                self.state.last_suggest_query =
+                                    self.state.search_query.trim().to_string();
+                            }
                         }
                         _ => {}
                     },
@@ -605,7 +615,11 @@ impl App {
                                         if self.state.tv_wizard_step == 1 {
                                             self.state.tv_wizard_step = 0;
                                             self.state.tv_wizard_selected_idx = 0;
-                                            self.state.tv_wizard_options = vec!["Grouped by category".to_string(), "Grouped by language".to_string(), "Grouped by broadcast area".to_string()];
+                                            self.state.tv_wizard_options = vec![
+                                                "Grouped by category".to_string(),
+                                                "Grouped by language".to_string(),
+                                                "Grouped by broadcast area".to_string(),
+                                            ];
                                         } else {
                                             self.state.tv_config_popup = false;
                                         }
@@ -614,11 +628,17 @@ impl App {
                                         if self.state.tv_wizard_selected_idx > 0 {
                                             self.state.tv_wizard_selected_idx -= 1;
                                         } else {
-                                            self.state.tv_wizard_selected_idx = self.state.tv_wizard_options.len().saturating_sub(1);
+                                            self.state.tv_wizard_selected_idx = self
+                                                .state
+                                                .tv_wizard_options
+                                                .len()
+                                                .saturating_sub(1);
                                         }
                                     }
                                     KeyCode::Down => {
-                                        if self.state.tv_wizard_selected_idx < self.state.tv_wizard_options.len().saturating_sub(1) {
+                                        if self.state.tv_wizard_selected_idx
+                                            < self.state.tv_wizard_options.len().saturating_sub(1)
+                                        {
                                             self.state.tv_wizard_selected_idx += 1;
                                         } else {
                                             self.state.tv_wizard_selected_idx = 0;
@@ -626,63 +646,112 @@ impl App {
                                     }
                                     KeyCode::Char(' ') => {
                                         if self.state.tv_wizard_step == 1 {
-                                            let opt = self.state.tv_wizard_options[self.state.tv_wizard_selected_idx].clone();
-                                            if self.state.tv_wizard_selections.contains(&opt) {
-                                                self.state.tv_wizard_selections.remove(&opt);
-                                            } else {
-                                                self.state.tv_wizard_selections.insert(opt);
+                                            if let Some(opt) = self
+                                                .state
+                                                .tv_wizard_options
+                                                .get(self.state.tv_wizard_selected_idx)
+                                                .cloned()
+                                            {
+                                                if self.state.tv_wizard_selections.contains(&opt) {
+                                                    self.state.tv_wizard_selections.remove(&opt);
+                                                } else {
+                                                    self.state.tv_wizard_selections.insert(opt);
+                                                }
                                             }
                                         }
                                     }
                                     KeyCode::Enter => {
                                         if self.state.tv_wizard_step == 0 {
-                                            let selected_group = self.state.tv_wizard_options[self.state.tv_wizard_selected_idx].clone();
-                                            self.state.tv_wizard_step = 1;
-                                            self.state.tv_wizard_selected_idx = 0;
-                                            if selected_group == "Grouped by category" {
-                                                self.state.tv_wizard_options = crate::tui::iptv_data::CATEGORIES.iter().map(|s| s.to_string()).collect();
-                                            } else if selected_group == "Grouped by language" {
-                                                self.state.tv_wizard_options = crate::tui::iptv_data::LANGUAGES.iter().map(|(n, _)| n.to_string()).collect();
-                                            } else {
-                                                self.state.tv_wizard_options = crate::tui::iptv_data::COUNTRIES.iter().map(|(n, _)| n.to_string()).collect();
+                                            if let Some(selected_group) = self
+                                                .state
+                                                .tv_wizard_options
+                                                .get(self.state.tv_wizard_selected_idx)
+                                                .cloned()
+                                            {
+                                                self.state.tv_wizard_step = 1;
+                                                self.state.tv_wizard_selected_idx = 0;
+                                                if selected_group == "Grouped by category" {
+                                                    self.state.tv_wizard_options =
+                                                        crate::tui::iptv_data::CATEGORIES
+                                                            .iter()
+                                                            .map(|s| s.to_string())
+                                                            .collect();
+                                                } else if selected_group == "Grouped by language" {
+                                                    self.state.tv_wizard_options =
+                                                        crate::tui::iptv_data::LANGUAGES
+                                                            .iter()
+                                                            .map(|(n, _)| n.to_string())
+                                                            .collect();
+                                                } else {
+                                                    self.state.tv_wizard_options =
+                                                        crate::tui::iptv_data::COUNTRIES
+                                                            .iter()
+                                                            .map(|(n, _)| n.to_string())
+                                                            .collect();
+                                                }
                                             }
                                         } else {
                                             self.state.tv_config_popup = false;
-                                            
+
                                             self.state.is_loading = true;
-                                            self.state.status_message = "Fetching TV channels...".to_string();
+                                            self.state.status_message =
+                                                "Fetching TV channels...".to_string();
                                             self.state.status_timer = 150;
-                                            
+
                                             let mut urls_to_fetch = Vec::new();
                                             for sel in &self.state.tv_wizard_selections {
-                                                if crate::tui::iptv_data::CATEGORIES.contains(&sel.as_str()) {
+                                                if crate::tui::iptv_data::CATEGORIES
+                                                    .contains(&sel.as_str())
+                                                {
                                                     urls_to_fetch.push(format!("https://iptv-org.github.io/iptv/categories/{}.m3u", sel.to_lowercase()));
-                                                } else if let Some((_, code)) = crate::tui::iptv_data::LANGUAGES.iter().find(|(n, _)| n == sel) {
+                                                } else if let Some((_, code)) =
+                                                    crate::tui::iptv_data::LANGUAGES
+                                                        .iter()
+                                                        .find(|(n, _)| n == sel)
+                                                {
                                                     urls_to_fetch.push(format!("https://iptv-org.github.io/iptv/languages/{}.m3u", code));
-                                                } else if let Some((_, code)) = crate::tui::iptv_data::COUNTRIES.iter().find(|(n, _)| n == sel) {
+                                                } else if let Some((_, code)) =
+                                                    crate::tui::iptv_data::COUNTRIES
+                                                        .iter()
+                                                        .find(|(n, _)| n == sel)
+                                                {
                                                     urls_to_fetch.push(format!("https://iptv-org.github.io/iptv/countries/{}.m3u", code));
                                                 }
                                             }
-                                            
+
                                             let sender = self.action_sender.clone();
                                             tokio::spawn(async move {
-                                                let mut config_path = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-                                                config_path.push(".moviebox");
+                                                let mut config_path = dirs::config_dir()
+                                                    .unwrap_or_else(|| {
+                                                        std::path::PathBuf::from(".")
+                                                    });
+                                                config_path.push("moviebox-tui");
                                                 std::fs::create_dir_all(&config_path).ok();
                                                 config_path.push("tv_config.json");
-                                                if let Ok(json) = serde_json::to_string(&urls_to_fetch) {
+                                                if let Ok(json) =
+                                                    serde_json::to_string(&urls_to_fetch)
+                                                {
                                                     std::fs::write(&config_path, json).ok();
                                                 }
 
-                                                let parser = crate::providers::iptv_org::m3u::M3UParser::new();
+                                                let parser =
+                                                    crate::providers::iptv_org::m3u::M3UParser::new(
+                                                    );
                                                 let mut all_channels = Vec::new();
                                                 for url in urls_to_fetch {
-                                                    let filename = url.split('/').last().unwrap_or("playlist.m3u");
-                                                    if let Ok(channels) = parser.fetch_playlist(&url, filename).await {
+                                                    let filename = url
+                                                        .split('/')
+                                                        .next_back()
+                                                        .unwrap_or("playlist.m3u");
+                                                    if let Ok(channels) =
+                                                        parser.fetch_playlist(&url, filename).await
+                                                    {
                                                         all_channels.extend(channels);
                                                     }
                                                 }
-                                                sender.send(Action::TvChannelsLoaded(all_channels)).ok();
+                                                sender
+                                                    .send(Action::TvChannelsLoaded(all_channels))
+                                                    .ok();
                                             });
                                         }
                                     }
@@ -715,24 +784,32 @@ impl App {
                                 KeyCode::Char('q') => {
                                     self.action_sender.send(Action::Quit).ok();
                                 }
-                            KeyCode::Char('r') => {
-                                self.action_sender.send(Action::Refresh).ok();
-                            }
-                            KeyCode::Char('o') | KeyCode::Char('O') if self.state.input_mode == InputMode::Normal && self.state.is_tv_mode => {
-                                let idx_opt = self.state.search_list_state.selected();
-                                if let Some(idx) = idx_opt {
-                                    if let Some(item) = self.state.search_results.get(idx) {
-                                        self.action_sender.send(Action::ShowPlayerPicker(item.id.clone(), None)).ok();
+                                KeyCode::Char('r') => {
+                                    self.action_sender.send(Action::Refresh).ok();
+                                }
+                                KeyCode::Char('o') | KeyCode::Char('O')
+                                    if self.state.input_mode == InputMode::Normal
+                                        && self.state.is_tv_mode =>
+                                {
+                                    let idx_opt = self.state.search_list_state.selected();
+                                    if let Some(idx) = idx_opt {
+                                        if let Some(item) = self.state.search_results.get(idx) {
+                                            self.action_sender
+                                                .send(Action::ShowPlayerPicker(
+                                                    item.id.clone(),
+                                                    None,
+                                                ))
+                                                .ok();
+                                        }
                                     }
                                 }
-                            }
                                 KeyCode::Char(c)
                                     if (key.modifiers.is_empty()
                                         || key.modifiers == KeyModifiers::SHIFT) =>
                                 {
                                     self.state.input_mode = InputMode::Editing;
                                     self.state.search_query.push(c);
-    
+
                                     self.state.search_suggestions.clear();
                                     self.state.suggest_index = None;
                                     self.state.status_message = String::new();
@@ -898,13 +975,14 @@ impl App {
                     self.state.search_results.clear();
                     self.state.status_message = "Initializing Moviebox TV Mode...".to_string();
                     self.state.status_timer = 200;
-                    
+
                     let sender = self.action_sender.clone();
                     tokio::spawn(async move {
-                        let mut config_path = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-                        config_path.push(".moviebox");
+                        let mut config_path =
+                            dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+                        config_path.push("moviebox-tui");
                         config_path.push("tv_config.json");
-                        
+
                         let mut loaded_urls = Vec::new();
                         if let Ok(content) = std::fs::read_to_string(&config_path) {
                             if let Ok(urls) = serde_json::from_str::<Vec<String>>(&content) {
@@ -918,7 +996,7 @@ impl App {
                             let parser = crate::providers::iptv_org::m3u::M3UParser::new();
                             let mut all_channels = Vec::new();
                             for url in loaded_urls {
-                                let filename = url.split('/').last().unwrap_or("playlist.m3u");
+                                let filename = url.split('/').next_back().unwrap_or("playlist.m3u");
                                 if let Ok(channels) = parser.fetch_playlist(&url, filename).await {
                                     all_channels.extend(channels);
                                 }
@@ -944,7 +1022,8 @@ impl App {
             Action::TvChannelsLoaded(channels) => {
                 self.state.tv_channels = channels;
                 self.state.is_loading = false;
-                self.state.status_message = format!("Loaded {} TV channels.", self.state.tv_channels.len());
+                self.state.status_message =
+                    format!("Loaded {} TV channels.", self.state.tv_channels.len());
                 self.state.status_timer = 150;
             }
             Action::GoBack => {
@@ -997,10 +1076,16 @@ impl App {
                     let query = self.state.search_query.trim().to_string();
                     if self.state.is_tv_mode {
                         if query.is_empty() {
-                            self.state.status_message = "TV Mode channels are loaded from local config.".to_string();
+                            self.state.status_message =
+                                "TV Mode channels are loaded from local config.".to_string();
                             self.state.status_timer = 150;
                         } else {
-                            self.action_sender.send(Action::Search { query, force_refresh: true }).ok();
+                            self.action_sender
+                                .send(Action::Search {
+                                    query,
+                                    force_refresh: true,
+                                })
+                                .ok();
                         }
                     } else if !query.is_empty() {
                         self.action_sender
@@ -1065,17 +1150,19 @@ impl App {
             }
             Action::Suggest(query) => {
                 if query.starts_with('/') {
-                    let mut commands = vec![
-                        "/discover",
-                        "/movies",
-                        "/tvshows",
-                        "/search",
-                        "/clear-cache",
-                        "/quit",
-                    ];
+                    let mut commands = vec!["/clear-cache", "/update", "/toggle-update", "/github"];
                     if self.state.is_tv_mode {
                         commands.push("/list");
                         commands.push("/config");
+                    } else {
+                        commands.extend(vec![
+                            "/discover",
+                            "/home",
+                            "/movies",
+                            "/shows",
+                            "/tvshows",
+                            "/anime",
+                        ]);
                     }
                     let mut suggestions = vec![];
                     for cmd in commands {
@@ -1095,7 +1182,7 @@ impl App {
                     }
                     return None;
                 }
-                
+
                 if self.state.is_tv_mode {
                     return None;
                 }
@@ -1234,16 +1321,27 @@ impl App {
                         self.state.search_query.clear();
                         return None;
                     }
-                    if matches!(lower_query.as_str(), "/home" | "/discover" | "/movies" | "/shows" | "/anime") {
-                        self.state.status_message = "Switch to streaming mode to use this command".to_string();
+                    if matches!(
+                        lower_query.as_str(),
+                        "/home" | "/discover" | "/movies" | "/shows" | "/tvshows" | "/anime"
+                    ) {
+                        self.state.status_message =
+                            "Switch to streaming mode to use this command".to_string();
                         self.state.status_timer = 150;
                         self.state.search_query.clear();
                         return None;
                     }
 
                     let q = lower_query.clone();
-                    self.state.search_results = self.state.tv_channels.iter()
-                        .filter(|c| q == "/list" || c.name.to_lowercase().contains(&q) || c.group.to_lowercase().contains(&q))
+                    self.state.search_results = self
+                        .state
+                        .tv_channels
+                        .iter()
+                        .filter(|c| {
+                            q == "/list"
+                                || c.name.to_lowercase().contains(&q)
+                                || c.group.to_lowercase().contains(&q)
+                        })
                         .map(|c| SearchResult {
                             id: c.stream_url.clone(),
                             title: c.name.clone(),
@@ -1254,10 +1352,20 @@ impl App {
                         })
                         .collect();
                     self.state.is_loading = false;
-                    self.state.search_list_state.select(if self.state.search_results.is_empty() { None } else { Some(0) });
-                    
+                    self.state
+                        .search_list_state
+                        .select(if self.state.search_results.is_empty() {
+                            None
+                        } else {
+                            Some(0)
+                        });
+
                     if !self.state.search_results.is_empty() {
-                        let results_to_fetch = self.state.search_results.iter().take(15)
+                        let results_to_fetch = self
+                            .state
+                            .search_results
+                            .iter()
+                            .take(15)
                             .map(|r| (r.id.clone(), r.stype, r.cover_url.clone()))
                             .collect::<Vec<_>>();
                         let sender = self.action_sender.clone();
@@ -1266,17 +1374,33 @@ impl App {
                             let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
                             for (id, _stype, cover_url) in results_to_fetch {
                                 if let Some(url) = cover_url {
-                                    if url.is_empty() { continue; }
+                                    if url.is_empty() {
+                                        continue;
+                                    }
                                     let permit = sem.clone().acquire_owned().await.ok();
                                     let tx = sender.clone();
                                     let client = req_client.clone();
                                     tokio::spawn(async move {
                                         let _permit = permit;
-                                        if let Ok(resp) = client.get(&url).header("User-Agent", "MovieBox-Tui/1.0").send().await {
+                                        if let Ok(resp) = client
+                                            .get(&url)
+                                            .header("User-Agent", "MovieBox-Tui/1.0")
+                                            .send()
+                                            .await
+                                        {
                                             if let Ok(bytes) = resp.bytes().await {
                                                 let bytes_clone = bytes.clone();
-                                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes_clone)).await {
-                                                    tx.send(Action::SearchPosterLoaded(id, Some(std::sync::Arc::new(img)))).ok();
+                                                if let Ok(Ok(img)) =
+                                                    tokio::task::spawn_blocking(move || {
+                                                        image::load_from_memory(&bytes_clone)
+                                                    })
+                                                    .await
+                                                {
+                                                    tx.send(Action::SearchPosterLoaded(
+                                                        id,
+                                                        Some(std::sync::Arc::new(img)),
+                                                    ))
+                                                    .ok();
                                                 }
                                             }
                                         }
@@ -1291,7 +1415,7 @@ impl App {
                 let tab_id = match lower_query.as_str() {
                     "/home" | "/discover" => Some("0"),
                     "/movies" => Some("2"),
-                    "/shows" => Some("5"),
+                    "/shows" | "/tvshows" => Some("5"),
                     "/anime" => Some("8"),
                     _ => None,
                 };
@@ -1389,7 +1513,12 @@ impl App {
                 tokio::spawn(async move {
                     match client.get_homepage(&tab_id, page).await {
                         Ok(res) => {
-                            crate::cache::set_homepage_cache(&tab_id, page, &res);
+                            let r_clone = res.clone();
+                            let t_clone = tab_id.clone();
+                            let p_clone = page;
+                            tokio::task::spawn_blocking(move || {
+                                crate::cache::set_homepage_cache(&t_clone, p_clone, &r_clone);
+                            });
                             sender
                                 .send(Action::HomepageSuccess {
                                     tab_id,
@@ -1943,7 +2072,10 @@ impl App {
                                     .send(Action::FetchPreview(res.id.clone()))
                                     .ok();
                             }
-                        } else if !self.state.is_tv_mode && !self.state.is_loading && !self.state.search_results.is_empty() {
+                        } else if !self.state.is_tv_mode
+                            && !self.state.is_loading
+                            && !self.state.search_results.is_empty()
+                        {
                             let next_page = self.state.current_page + 1;
                             if self.state.is_homepage_mode {
                                 self.action_sender
@@ -2006,7 +2138,9 @@ impl App {
                         crate::tui::state::DetailsPane::Episodes => {
                             let current = self.state.episode_list_state.selected().unwrap_or(0);
                             if let Some(season_idx) = self.state.season_list_state.selected() {
-                                if let Some(ep_numbers) = self.state.available_episode_numbers.get(season_idx) {
+                                if let Some(ep_numbers) =
+                                    self.state.available_episode_numbers.get(season_idx)
+                                {
                                     if current + 1 < ep_numbers.len() {
                                         self.state.episode_list_state.select(Some(current + 1));
                                         self.trigger_episode_fetch();
@@ -2171,12 +2305,14 @@ impl App {
                     let sub_name = self.state.subtitle_list.get(idx).map(|(n, _)| n.clone());
                     let sub_url = self.state.subtitle_list.get(idx).map(|(_, u)| u.clone());
                     let sub_url_final = sub_url.filter(|s| !s.is_empty());
-                    
+
                     if self.state.download_queue_total > 0 {
                         self.state.season_subtitle_preference = sub_name.filter(|n| n != "None");
                     }
-                    
-                    self.action_sender.send(Action::DownloadStream(sub_url_final)).ok();
+
+                    self.action_sender
+                        .send(Action::DownloadStream(sub_url_final))
+                        .ok();
                     return None;
                 }
                 if self.state.active_screen == Screen::Home {
@@ -2185,7 +2321,9 @@ impl App {
                         idx_opt.and_then(|idx| self.state.search_results.get(idx).cloned());
                     if let Some(item) = item_opt {
                         if self.state.is_tv_mode || item.stype == 3 {
-                            self.action_sender.send(Action::LaunchMpv(item.id.clone(), None)).ok();
+                            self.action_sender
+                                .send(Action::LaunchMpv(item.id.clone(), None))
+                                .ok();
                             return None;
                         }
                         self.state.active_screen = Screen::Details;
@@ -2254,17 +2392,33 @@ impl App {
                 if self.state.is_tv_mode {
                     self.state.preview_loading = false;
                     if !self.state.image_cache.contains(&id) {
-                        if let Some(channel) = self.state.tv_channels.iter().find(|c| c.stream_url == id) {
+                        if let Some(channel) =
+                            self.state.tv_channels.iter().find(|c| c.stream_url == id)
+                        {
                             let cover_url = channel.logo.clone();
                             if !cover_url.is_empty() {
                                 let tx = self.action_sender.clone();
                                 let client = self.client.http_client().clone();
                                 let id2 = id.clone();
                                 tokio::spawn(async move {
-                                    if let Ok(resp) = client.get(&cover_url).header("User-Agent", "MovieBox-Tui/1.0").send().await {
+                                    if let Ok(resp) = client
+                                        .get(&cover_url)
+                                        .header("User-Agent", "MovieBox-Tui/1.0")
+                                        .send()
+                                        .await
+                                    {
                                         if let Ok(bytes) = resp.bytes().await {
-                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                                tx.send(Action::SearchPosterLoaded(id2, Some(std::sync::Arc::new(img)))).ok();
+                                            if let Ok(Ok(img)) =
+                                                tokio::task::spawn_blocking(move || {
+                                                    image::load_from_memory(&bytes)
+                                                })
+                                                .await
+                                            {
+                                                tx.send(Action::SearchPosterLoaded(
+                                                    id2,
+                                                    Some(std::sync::Arc::new(img)),
+                                                ))
+                                                .ok();
                                             }
                                         }
                                     }
@@ -2646,7 +2800,7 @@ impl App {
                                         .headers()
                                         .get(reqwest::header::CONTENT_DISPOSITION)
                                         .and_then(|v| v.to_str().ok())
-                                        .and_then(|s| s.split('.').last())
+                                        .and_then(|s| s.split('.').next_back())
                                         .unwrap_or("mp4")
                                         .to_string();
                                     (size, ranges, ext)
@@ -2694,15 +2848,15 @@ impl App {
                             }
 
                             if let Some(sub_url) = subtitle_url {
-                                let sub_ext = sub_url.split('.').last().unwrap_or("srt");
+                                let sub_ext = sub_url.split('.').next_back().unwrap_or("srt");
                                 let sub_ext = if sub_ext.len() <= 4 { sub_ext } else { "srt" };
-                                
+
                                 let mut sub_filename = filename.clone();
                                 if let Some(dot_idx) = sub_filename.rfind('.') {
                                     sub_filename.truncate(dot_idx);
                                 }
                                 sub_filename.push_str(&format!(".{}", sub_ext));
-                                
+
                                 let sub_target = target_dir.join(&sub_filename);
                                 let sub_client = client.clone();
                                 tokio::spawn(async move {
@@ -3190,7 +3344,7 @@ impl App {
 
             Action::ConfirmDownloadEpisode => {
                 self.state.show_episode_download_confirm = false;
-                
+
                 let subject_id = self
                     .state
                     .selected_details
@@ -3234,16 +3388,16 @@ impl App {
                 self.state.show_season_download_confirm = false;
                 self.state.season_subtitle_preference = None;
                 let season_num = self.state.selected_season;
-                
+
                 let season_array_idx = self.state.available_seasons.iter().position(|s| {
                     s.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize == season_num
                 });
-                
+
                 if let Some(idx) = season_array_idx {
                     if idx < self.state.available_episode_numbers.len() {
                         let ep_numbers = self.state.available_episode_numbers[idx].clone();
                         self.state.download_queue.clear();
-    
+
                         for ep in ep_numbers {
                             self.state.download_queue.push_back((season_num, ep));
                         }
@@ -3284,10 +3438,8 @@ impl App {
                         .and_then(|v| {
                             if let Some(s) = v.as_str() {
                                 Some(s.to_string())
-                            } else if let Some(n) = v.as_i64() {
-                                Some(n.to_string())
                             } else {
-                                None
+                                v.as_i64().map(|n| n.to_string())
                             }
                         })
                         .unwrap_or_default();
@@ -3489,8 +3641,10 @@ impl App {
                 self.state.status_timer = 150;
             }
             Action::InitStreamPool(subject_id) => {
-                let mut pool = crate::tui::state::SubjectStreamPool::default();
-                pool.available_resolutions = vec![];
+                let pool = crate::tui::state::SubjectStreamPool {
+                    available_resolutions: vec![],
+                    ..Default::default()
+                };
                 self.state.stream_pool.insert(subject_id.clone(), pool);
                 self.trigger_episode_fetch();
 
@@ -3508,8 +3662,10 @@ impl App {
                 });
             }
             Action::StreamPoolInitialized(subject_id, resolutions) => {
-                let mut pool = crate::tui::state::SubjectStreamPool::default();
-                pool.available_resolutions = resolutions;
+                let pool = crate::tui::state::SubjectStreamPool {
+                    available_resolutions: resolutions,
+                    ..Default::default()
+                };
                 self.state.stream_pool.insert(subject_id.clone(), pool);
 
                 let (se, ep) = if let Some(details) = &self.state.selected_details {
@@ -3568,6 +3724,7 @@ impl App {
             } => {
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
+                self.state.selected_resources = None;
 
                 if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
                     if !force_refresh {
@@ -3614,7 +3771,12 @@ impl App {
                                     .send(Action::SetStatus("Loaded from cache.".to_string()))
                                     .ok();
                                 sender
-                                    .send(Action::EpisodeStreamsReady(subject_id.clone(), season, episode, cached))
+                                    .send(Action::EpisodeStreamsReady(
+                                        subject_id.clone(),
+                                        season,
+                                        episode,
+                                        cached,
+                                    ))
                                     .ok();
                                 return;
                             }
@@ -3873,16 +4035,23 @@ impl App {
 
                 if self.state.is_waiting_for_download_stream {
                     self.state.is_waiting_for_download_stream = false;
-                    
+
                     let is_season_queue = self.state.download_queue_total > 0;
                     if is_season_queue {
-                        let subject_id = self.state.selected_details.as_ref().and_then(|d| d.get("id")).and_then(|i| i.as_str()).unwrap_or("").to_string();
+                        let subject_id = self
+                            .state
+                            .selected_details
+                            .as_ref()
+                            .and_then(|d| d.get("id"))
+                            .and_then(|i| i.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         if let Some(rid) = self.get_selected_resource_id() {
                             let client = self.client.clone();
                             let sender = self.action_sender.clone();
                             let pref = self.state.season_subtitle_preference.clone();
                             let no_pref = pref.is_none();
-                            
+
                             tokio::spawn(async move {
                                 if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
                                     if no_pref {
@@ -3891,7 +4060,10 @@ impl App {
                                         let mut sub_url = None;
                                         if let Some(list) = res.as_array() {
                                             for sub in list {
-                                                if let (Some(lang), Some(url)) = (sub.get("language").and_then(|l| l.as_str()), sub.get("url").and_then(|u| u.as_str())) {
+                                                if let (Some(lang), Some(url)) = (
+                                                    sub.get("language").and_then(|l| l.as_str()),
+                                                    sub.get("url").and_then(|u| u.as_str()),
+                                                ) {
                                                     if lang == pref_lang {
                                                         sub_url = Some(url.to_string());
                                                         break;
@@ -3908,7 +4080,7 @@ impl App {
                             return None;
                         }
                     }
-                    
+
                     self.action_sender.send(Action::DownloadStream(None)).ok();
                 }
             }
@@ -3980,7 +4152,9 @@ impl App {
                 self.state.player_picker_popup = false;
                 tokio::spawn(async move {
                     let mut local_sub = sub.clone();
-                    if kind == crate::tui::state::PlayerKind::Vlc || kind == crate::tui::state::PlayerKind::Iina {
+                    if kind == crate::tui::state::PlayerKind::Vlc
+                        || kind == crate::tui::state::PlayerKind::Iina
+                    {
                         if let Some(s_url) = sub {
                             if let Ok(resp) = reqwest::get(&s_url).await {
                                 if let Ok(bytes) = resp.bytes().await {
@@ -3991,7 +4165,7 @@ impl App {
                                             .unwrap_or_default()
                                             .as_millis()
                                     ));
-                                    if std::fs::write(&temp_path, bytes).is_ok() {
+                                    if tokio::fs::write(&temp_path, bytes).await.is_ok() {
                                         local_sub = Some(temp_path.to_string_lossy().to_string());
                                     }
                                 }
@@ -4250,8 +4424,9 @@ impl App {
                 self.state.updater_done = true;
                 self.state.updater_progress = Some(1.0);
 
-                let exe = std::env::current_exe().unwrap();
-                let _ = std::process::Command::new(exe).spawn();
+                if let Ok(exe) = std::env::current_exe() {
+                    let _ = std::process::Command::new(exe).spawn();
+                }
                 return Some(());
             }
             Action::UpdateFailure(_err) => {

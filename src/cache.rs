@@ -5,7 +5,7 @@ use std::time::SystemTime;
 const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60;
 
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
-    let mut path = dirs::cache_dir().unwrap_or_else(|| std::env::temp_dir());
+    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
     path.push("moviebox-tui");
     path.push(subdir);
     if !path.exists() {
@@ -143,7 +143,7 @@ pub fn invalidate_stream_cache(subject_id: &str, season: usize, episode: usize) 
 }
 
 pub fn clear_all_cache() {
-    let mut path = dirs::cache_dir().unwrap_or_else(|| std::env::temp_dir());
+    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
     path.push("moviebox-tui");
     if path.exists() {
         let _ = fs::remove_dir_all(&path);

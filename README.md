@@ -2,7 +2,7 @@
 
 # MovieBox-Tui
 
-Stream and download movies, TV shows, and anime from the terminal.
+Stream and download movies, TV shows, anime, and watch live TV from the terminal.
 
 [![Crates.io](https://img.shields.io/crates/v/moviebox-tui.svg?logo=rust)](https://crates.io/crates/moviebox-tui)
 [![Downloads](https://img.shields.io/crates/d/moviebox-tui.svg)](https://crates.io/crates/moviebox-tui)
@@ -23,7 +23,7 @@ Stream and download movies, TV shows, and anime from the terminal.
 
 ## What is this?
 
-**MovieBox-Tui** is a terminal-based streaming client. It interfaces with the MovieBox API to search catalogs, resolve stream URLs, and open them in your local video player (`mpv`, `IINA`, or `VLC`). 
+**MovieBox-Tui** is a terminal-based streaming client. It interfaces with the MovieBox to search catalogs, resolve stream URLs, and open them in your local video player (`mpv`, `IINA`, or `VLC`). 
 
 No browser or configuration is required. Search for a title, select a video quality, and press enter to play or download the stream.
 
@@ -78,6 +78,7 @@ No browser or configuration is required. Search for a title, select a video qual
   - Download videos straight to your disk using multiple connections to max out your internet speed. You get live speed and ETA updates while you wait.
   - **Subtitles included:** It automatically grabs the `.srt` subtitle files to match your video.
   - **Download entire seasons:** Queue up a whole season at once. Just tell it what language you want for the subtitles, and it handles the rest automatically.
+- **Live TV Mode:** Press `Ctrl+T` to switch to TV mode and watch thousands of live IPTV channels from around the world straight from your terminal.
 - **Works on your terminal:** Whether you're on macOS, Linux, or Windows, it just works. If your terminal supports it, you'll get actual image posters; otherwise, it falls back nicely to text.
 
 ---
@@ -150,17 +151,26 @@ Here's how to get around:
 - **Select:** Press <kbd>Enter</kbd> to view details, pick episodes, or start playing a video.
 - **Switch Player:** Press <kbd>o</kbd> on a stream if you want to open it in a different video player.
 - **Download:** Press <kbd>d</kbd> on any episode or season to save it to your disk (you'll get to pick your subtitles first).
+- **Live TV:** Press <kbd>Ctrl+T</kbd> to toggle Live TV mode and browse IPTV channels.
 - **Refresh:** Press <kbd>r</kbd> if a stream link expires and needs to be re-fetched.
 - **Help:** Need a quick reminder? Press <kbd>?</kbd> anywhere to see the cheat sheet.
-- **Quit:** Press <kbd>q</kbd> or mash <kbd>Esc</kbd> to exit.
+- **Quit:** Press <kbd>q</kbd> to exit (use <kbd>Esc</kbd> to go back or clear search).
 
 ### Handy Slash Commands
 You can type these special commands straight into the search bar:
-- `/discover` or `/home` - See what's trending right now.
-- `/movies`, `/shows`, `/anime` - Jump straight to a specific category.
+
+**General commands:**
 - `/clear-cache` - Free up disk space by wiping downloaded images and cache.
 - `/update` - Check to see if there's a new version of the app.
 - `/toggle-update` - Turn automatic background update checking on or off.
+
+**Streaming Mode commands:**
+- `/discover` or `/home` - See what's trending right now.
+- `/movies`, `/shows`, `/anime` - Jump straight to a specific category.
+
+**Live TV Mode commands:**
+- `/list` - Show the list of available live channels.
+- `/config` - Open the TV configuration menu to add your own m3u playlists.
 
 ---
 
@@ -175,6 +185,12 @@ cargo build
 ```
 
 Just try to follow [Conventional Commits](https://www.conventionalcommits.org/) and make sure `cargo fmt` and `cargo clippy` are happy before you open a PR. You can check out [CONTRIBUTING.md](CONTRIBUTING.md) for the full rundown.
+
+---
+
+## Credits
+
+Live TV channel playlists are graciously provided by [iptv-org/iptv](https://github.com/iptv-org/iptv).
 
 ---
 

@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use std::fs;
-use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
@@ -17,16 +17,26 @@ pub struct M3UParser {
     cache_dir: PathBuf,
 }
 
+impl Default for M3UParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl M3UParser {
     pub fn new() -> Self {
-        let mut cache_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        cache_dir.push(".moviebox");
+        let mut cache_dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("."));
+        cache_dir.push("moviebox-tui");
         cache_dir.push("tv_playlists");
-        fs::create_dir_all(&cache_dir).ok();
+        std::fs::create_dir_all(&cache_dir).ok();
         Self { cache_dir }
     }
 
-    pub async fn fetch_playlist(&self, url: &str, filename: &str) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
+    pub async fn fetch_playlist(
+        &self,
+        url: &str,
+        filename: &str,
+    ) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
         let file_path = self.cache_dir.join(filename);
         let mut needs_download = true;
 
@@ -83,7 +93,7 @@ impl M3UParser {
                 if let Some(caps) = group_title_re.captures(line) {
                     current_channel.group = caps.get(1).map_or("", |m| m.as_str()).to_string();
                 }
-                
+
                 if let Some(idx) = line.rfind(',') {
                     current_channel.name = line[idx + 1..].trim().to_string();
                 }
