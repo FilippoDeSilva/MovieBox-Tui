@@ -741,4 +741,50 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             hint_area
         );
     }
+
+    if state.player_picker_popup {
+        let popup_width = 24;
+        let popup_height = std::cmp::min(15, state.available_players.len() as u16 + 2);
+
+        let area = frame.area();
+        let popup_area = ratatui::layout::Rect {
+            x: area.width.saturating_sub(popup_width) / 2,
+            y: area.height.saturating_sub(popup_height) / 2,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+
+        let items: Vec<ratatui::widgets::ListItem> = state
+            .available_players
+            .iter()
+            .map(|k| {
+                let text = match k {
+                    crate::tui::state::PlayerKind::Mpv => "mpv",
+                    crate::tui::state::PlayerKind::Iina => "IINA",
+                    crate::tui::state::PlayerKind::Vlc => "VLC",
+                };
+                ratatui::widgets::ListItem::new(text)
+            })
+            .collect();
+
+        let list = ratatui::widgets::List::new(items)
+            .block(
+                ratatui::widgets::Block::default()
+                    .title(" Open With ")
+                    .title_style(theme.title)
+                    .borders(ratatui::widgets::Borders::ALL)
+                    .border_type(if state.basic_terminal {
+                        ratatui::widgets::BorderType::Plain
+                    } else {
+                        ratatui::widgets::BorderType::Rounded
+                    })
+                    .border_style(theme.border),
+            )
+            .highlight_style(theme.highlight)
+            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
+
+        frame.render_stateful_widget(list, popup_area, &mut state.player_picker_state);
+    }
 }

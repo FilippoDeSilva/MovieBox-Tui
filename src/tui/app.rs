@@ -722,7 +722,7 @@ impl App {
                                 let idx_opt = self.state.search_list_state.selected();
                                 if let Some(idx) = idx_opt {
                                     if let Some(item) = self.state.search_results.get(idx) {
-                                        self.action_sender.send(Action::ShowPlayerPicker(item.id.clone(), Some(item.title.clone()))).ok();
+                                        self.action_sender.send(Action::ShowPlayerPicker(item.id.clone(), None)).ok();
                                     }
                                 }
                             }
