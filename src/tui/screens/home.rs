@@ -467,12 +467,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     display_title.push_str("...");
                 }
 
-                let type_tag = if res.stype == 1 {
+                let type_tag = if state.is_tv_mode || res.stype == 3 {
+                    "TV Channel"
+                } else if res.stype == 1 {
                     "Movie"
                 } else if res.stype == 2 {
-                    "TV Series"
+                    "Series"
                 } else {
-                    "Other"
+                    "Unknown"
                 };
 
                 let title_line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
@@ -657,13 +659,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
     if state.tv_config_popup {
         let content_height = state.tv_wizard_options.len() as u16;
-        let popup_height = (content_height + 4).clamp(6, area.height.saturating_sub(4).max(6));
+        let max_height = area.height.saturating_sub(17).max(6);
+        let popup_height = (content_height + 4).clamp(6, max_height);
         
-        let y_pos = (area.height.saturating_sub(popup_height) / 2 + 5).min(area.height.saturating_sub(popup_height));
         let popup_area = ratatui::layout::Rect {
-            x: area.width.saturating_sub(60) / 2,
-            y: y_pos,
-            width: 60,
+            x: area.width.saturating_sub(44) / 2,
+            y: 13.min(area.height.saturating_sub(popup_height)),
+            width: 44,
             height: popup_height,
         };
         let popup_block = ratatui::widgets::Block::default()
@@ -705,6 +707,21 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         list_state.select(Some(state.tv_wizard_selected_idx));
         
         frame.render_stateful_widget(list, list_area, &mut list_state);
+
+        let scrollbar = ratatui::widgets::Scrollbar::new(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("▲"))
+            .end_symbol(Some("▼"))
+            .track_symbol(Some("│"))
+            .thumb_symbol("█");
+            
+        let mut scrollbar_state = ratatui::widgets::ScrollbarState::new(state.tv_wizard_options.len().saturating_sub(list_area.height as usize))
+            .position(list_state.offset());
+            
+        frame.render_stateful_widget(
+            scrollbar,
+            list_area.inner(ratatui::layout::Margin { vertical: 0, horizontal: 0 }),
+            &mut scrollbar_state,
+        );
         
         let hint_area = ratatui::layout::Rect {
             x: inner_area.x,

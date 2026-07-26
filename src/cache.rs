@@ -81,11 +81,12 @@ pub fn get_search_path(query: &str) -> PathBuf {
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
     hasher.update(query.as_bytes());
-    let safe_query: String = hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect();
+    let result = hasher.finalize();
+    let mut safe_query = String::with_capacity(32);
+    for b in result {
+        use std::fmt::Write;
+        let _ = write!(&mut safe_query, "{:02x}", b);
+    }
     path.push(format!("search_{}.json", safe_query));
     path
 }
