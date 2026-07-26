@@ -11,15 +11,10 @@ Stream and download movies, TV shows, anime, and watch live TV from the terminal
 
 <br>
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/01-home.jpg" alt="MovieBox-Tui home screen" width="88%"/>
-</p>
-
-**[Watch the demo on YouTube](https://youtu.be/0L1Wc3cwMCc)**
+**[See what's new in v0.1.6 on YouTube](https://youtu.be/TlDxCFttoAU)**
 
 </div>
 
----
 
 ## What is this?
 
@@ -29,7 +24,6 @@ No browser or configuration is required. Search for a title, select a video qual
 
 > **Disclaimer:** This project is a third-party client. It does not host, store, or redistribute any media. It strictly resolves links provided by the upstream API. It is intended for educational and personal use only. You are responsible for complying with copyright law in your jurisdiction.
 
----
 
 ## Screenshots
 
@@ -56,18 +50,46 @@ No browser or configuration is required. Search for a title, select a video qual
 </details>
 
 <details>
-<summary><b>Discover feeds</b></summary>
+<summary><b>Playback and Subtitles</b></summary>
 <br>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/05-discover-movies.jpg" alt="Discover movies" width="32%">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/06-discover-series.jpg" alt="Discover series" width="32%">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/07-discover-anime.jpg" alt="Discover anime" width="32%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/06-player.jpg" alt="Player Selection" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/05-subtitle.jpg" alt="Subtitle Selection" width="49%">
 </p>
 
 </details>
 
----
+<details>
+<summary><b>Live TV Channels</b></summary>
+<br>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/07-channel-list.jpg" alt="TV Channels" width="88%">
+</p>
+
+</details>
+
+<details>
+<summary><b>Live TV Mode</b></summary>
+<br>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/08-tv-home.jpg" alt="Live TV Home" width="88%">
+</p>
+
+</details>
+
+<details>
+<summary><b>Help and Configuration</b></summary>
+<br>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/09-help.jpg" alt="Help screen" width="88%">
+</p>
+
+</details>
+
 
 ## Features
 
@@ -81,7 +103,6 @@ No browser or configuration is required. Search for a title, select a video qual
 - **Live TV Mode:** Press `Ctrl+T` to switch to TV mode and watch thousands of live IPTV channels from around the world straight from your terminal.
 - **Works on your terminal:** Whether you're on macOS, Linux, or Windows, it just works. If your terminal supports it, you'll get actual image posters; otherwise, it falls back nicely to text.
 
----
 
 ## What you'll need
 
@@ -118,7 +139,6 @@ choco install mpv
 
 </details>
 
----
 
 ## Installation
 
@@ -139,7 +159,6 @@ powershell -c "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/
 cargo install moviebox-tui
 ```
 
----
 
 ## Getting Started
 
@@ -172,7 +191,6 @@ You can type these special commands straight into the search bar:
 - `/list` - Show the list of available live channels.
 - `/config` - Open the TV configuration menu to add your own m3u playlists.
 
----
 
 ## Contributing
 
@@ -186,13 +204,11 @@ cargo build
 
 Just try to follow [Conventional Commits](https://www.conventionalcommits.org/) and make sure `cargo fmt` and `cargo clippy` are happy before you open a PR. You can check out [CONTRIBUTING.md](CONTRIBUTING.md) for the full rundown.
 
----
 
 ## Credits
 
 Live TV channel playlists are graciously provided by [iptv-org/iptv](https://github.com/iptv-org/iptv).
 
----
 
 ## Support
 
