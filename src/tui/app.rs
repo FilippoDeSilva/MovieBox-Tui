@@ -3672,7 +3672,7 @@ impl App {
                 self.state.player_picker_popup = false;
                 tokio::spawn(async move {
                     let mut local_sub = sub.clone();
-                    if kind == crate::tui::state::PlayerKind::Vlc {
+                    if kind == crate::tui::state::PlayerKind::Vlc || kind == crate::tui::state::PlayerKind::Iina {
                         if let Some(s_url) = sub {
                             if let Ok(resp) = reqwest::get(&s_url).await {
                                 if let Ok(bytes) = resp.bytes().await {
@@ -3722,7 +3722,7 @@ impl App {
                                 if let Some(s) = &local_sub {
                                     c.arg("--args")
                                         .arg(&link)
-                                        .arg(format!("--mpv-sub-file={}", s));
+                                        .arg(format!("--mpv-sub-files={}", s));
                                 } else {
                                     c.arg(&link);
                                 }
