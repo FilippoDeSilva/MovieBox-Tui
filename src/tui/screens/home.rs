@@ -65,7 +65,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let is_narrow = area.width < 60 || state.basic_terminal;
         let is_wide = area.width >= 100 && !state.basic_terminal;
-        let mut logo_height = if is_narrow {
+        let logo_height = if is_narrow {
             2
         } else if is_wide {
             6
@@ -73,39 +73,51 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             4
         };
 
-        if state.is_tv_mode {
-            logo_height += 1;
-        }
-
-        let mut logo_text = if is_narrow {
-            "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █".to_string()
+        let logo_text = if is_narrow {
+            if state.is_tv_mode {
+                "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █TV".to_string()
+            } else {
+                "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █".to_string()
+            }
         } else if is_wide {
-            r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
+            if state.is_tv_mode {
+                r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
+████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
+██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
+██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ TV
+██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
+╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝".to_string()
+            } else {
+                r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
 ██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝".to_string()
+            }
         } else {
-            r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
+            if state.is_tv_mode {
+                r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
+ |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
+ | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  TV
+ |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ ".to_string()
+            } else {
+                r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
  |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
  | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  
  |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ ".to_string()
+            }
         };
 
         let logo_width: u16 = if is_narrow {
-            31
+            if state.is_tv_mode { 33 } else { 31 }
         } else if is_wide {
-            73
+            if state.is_tv_mode { 75 } else { 73 }
         } else {
-            55
+            if state.is_tv_mode { 57 } else { 55 }
         };
 
-        if state.is_tv_mode {
-            let padding = logo_width.saturating_sub(11) / 2;
-            let pad_str = " ".repeat(padding as usize);
-            logo_text.push_str(&format!("\n{}[ TV MODE ]", pad_str));
-        }
+
 
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -200,11 +212,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     InputMode::Normal => theme.text_dim,
                 });
 
-            frame.render_widget(search_bar, search_bar_area);
+            if !state.tv_config_popup {
+                frame.render_widget(search_bar, search_bar_area);
+            }
 
             let legend_line = ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(" [Ctrl+T] ", theme.shortcut),
-                ratatui::text::Span::styled("TV Mode   ", theme.text_dim),
+                ratatui::text::Span::styled("[Ctrl+T] ", theme.shortcut),
+                ratatui::text::Span::styled(if state.is_tv_mode { "TV Mode   " } else { "Streaming Mode   " }, theme.text_dim),
                 ratatui::text::Span::styled("[Type] ", theme.shortcut),
                 ratatui::text::Span::styled("Search   ", theme.text_dim),
                 ratatui::text::Span::styled("[↑↓] ", theme.shortcut),
@@ -645,41 +659,44 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let content_height = state.tv_wizard_options.len() as u16;
         let popup_height = (content_height + 4).clamp(6, area.height.saturating_sub(4).max(6));
         
+        let y_pos = (area.height.saturating_sub(popup_height) / 2 + 5).min(area.height.saturating_sub(popup_height));
         let popup_area = ratatui::layout::Rect {
             x: area.width.saturating_sub(60) / 2,
-            y: area.height.saturating_sub(popup_height) / 2,
+            y: y_pos,
             width: 60,
             height: popup_height,
         };
         let popup_block = ratatui::widgets::Block::default()
             .title(if state.tv_wizard_step == 0 { " TV Setup: Select Grouping " } else { " TV Setup: Select Items " })
+            .title_alignment(ratatui::layout::Alignment::Center)
             .borders(ratatui::widgets::Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(theme.border_focus)
-            .style(ratatui::style::Style::default().bg(theme.base));
+            .style(ratatui::style::Style::default());
         
         let inner_area = popup_block.inner(popup_area);
-        frame.render_widget(ratatui::widgets::Clear, popup_area);
         frame.render_widget(popup_block, popup_area);
 
-        let items: Vec<ratatui::widgets::ListItem> = state.tv_wizard_options.iter().enumerate().map(|(i, opt)| {
-            let is_selected = i == state.tv_wizard_selected_idx;
+        let items: Vec<ratatui::widgets::ListItem> = state.tv_wizard_options.iter().map(|opt| {
             let is_checked = state.tv_wizard_selections.contains(opt);
             
-            let prefix = if is_selected { "> " } else { "  " };
             let checkbox = if state.tv_wizard_step == 1 {
                 if is_checked { "[x] " } else { "[ ] " }
             } else {
                 ""
             };
             
-            let style = if is_selected { theme.highlight } else { theme.text };
             let line = ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(format!("{}{}{}", prefix, checkbox, opt), style)
+                ratatui::text::Span::styled(format!("{}{}", checkbox, opt), theme.text)
             ]);
             ratatui::widgets::ListItem::new(line)
         }).collect();
 
-        let list = ratatui::widgets::List::new(items);
+        let list = ratatui::widgets::List::new(items)
+            .highlight_style(
+                theme.highlight.add_modifier(ratatui::style::Modifier::BOLD)
+            )
+            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
         
         let mut list_area = inner_area;
         list_area.height = list_area.height.saturating_sub(1);

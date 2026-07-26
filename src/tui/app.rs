@@ -352,14 +352,25 @@ impl App {
                     };
                     let greeting = format!("{}, {}{}", greeting_time, self.state.username, punct);
 
-                    let prompts = [
-                        "What are you in the mood to watch?",
-                        "Try 'Oppenheimer', 'Titanic', or 'Interstellar'...",
-                        "Discover your next binge-worthy masterpiece...",
-                        "Search for blockbuster movies, hit shows, or anime...",
-                        "Feeling nostalgic? Search timeless classics...",
-                        "Explore trending titles for your movie night...",
-                    ];
+                    let prompts = if self.state.is_tv_mode {
+                        vec![
+                            "What live channel are you looking for?",
+                            "Try 'BBC', 'CNN', or 'ESPN'...",
+                            "Discover news, sports, or entertainment...",
+                            "Search your selected broadcast areas...",
+                            "Feeling bored? Find a live stream...",
+                            "Search live broadcast channels...",
+                        ]
+                    } else {
+                        vec![
+                            "What are you in the mood to watch?",
+                            "Try 'Oppenheimer', 'Titanic', or 'Interstellar'...",
+                            "Discover your next binge-worthy masterpiece...",
+                            "Search for blockbuster movies, hit shows, or anime...",
+                            "Feeling nostalgic? Search timeless classics...",
+                            "Explore trending titles for your movie night...",
+                        ]
+                    };
                     let type_speed = 3;
                     let del_speed = 1;
                     let pause1 = 90;
@@ -592,9 +603,9 @@ impl App {
                                         if self.state.tv_wizard_step == 1 {
                                             self.state.tv_wizard_step = 0;
                                             self.state.tv_wizard_selected_idx = 0;
+                                            self.state.tv_wizard_options = vec!["Grouped by category".to_string(), "Grouped by language".to_string(), "Grouped by broadcast area".to_string()];
                                         } else {
                                             self.state.tv_config_popup = false;
-                                            self.state.is_tv_mode = false;
                                         }
                                     }
                                     KeyCode::Up => {
@@ -623,11 +634,19 @@ impl App {
                                     }
                                     KeyCode::Enter => {
                                         if self.state.tv_wizard_step == 0 {
+                                            let selected_group = self.state.tv_wizard_options[self.state.tv_wizard_selected_idx].clone();
                                             self.state.tv_wizard_step = 1;
                                             self.state.tv_wizard_selected_idx = 0;
-                                            self.state.tv_wizard_options = vec!["us".to_string(), "uk".to_string(), "ca".to_string(), "news".to_string(), "sports".to_string()];
+                                            if selected_group == "Grouped by category" {
+                                                self.state.tv_wizard_options = vec!["Animation", "Business", "Classic", "Comedy", "Documentary", "Education", "Entertainment", "Kids", "Movies", "Music", "News", "Sports"].into_iter().map(|s| s.to_string()).collect();
+                                            } else if selected_group == "Grouped by language" {
+                                                self.state.tv_wizard_options = vec!["English", "Spanish", "French", "German", "Italian", "Portuguese", "Russian", "Arabic", "Hindi", "Chinese", "Japanese"].into_iter().map(|s| s.to_string()).collect();
+                                            } else {
+                                                self.state.tv_wizard_options = vec!["US", "UK", "CA", "AU", "DE", "FR", "IT", "ES", "IN", "BR", "MX"].into_iter().map(|s| s.to_string()).collect();
+                                            }
                                         } else {
                                             self.state.tv_config_popup = false;
+                                            self.state.input_mode = crate::tui::state::InputMode::Editing;
                                             
                                             self.state.is_loading = true;
                                             self.state.status_message = "Fetching TV channels...".to_string();
@@ -840,14 +859,29 @@ impl App {
             }
             Action::ToggleTvMode => {
                 self.state.is_tv_mode = !self.state.is_tv_mode;
+                self.state.tick_count = 0; // Reset animation
                 if self.state.is_tv_mode {
-                    self.state.tv_config_popup = true;
+                    self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
+                    self.state.status_message = "Initializing Moviebox TV Mode...".to_string();
+                    self.state.status_timer = 200;
+                    
+                    let sender = self.action_sender.clone();
+                    tokio::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+                        sender.send(Action::ShowTvWizard).ok();
+                    });
                 } else {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
+                }
+            }
+            Action::ShowTvWizard => {
+                if self.state.is_tv_mode {
+                    self.state.tv_config_popup = true;
+                    self.state.input_mode = crate::tui::state::InputMode::Normal;
                 }
             }
             Action::TvChannelsLoaded(channels) => {
@@ -982,7 +1016,7 @@ impl App {
             }
             Action::Suggest(query) => {
                 if query.starts_with('/') {
-                    let commands = vec![
+                    let mut commands = vec![
                         "/discover",
                         "/movies",
                         "/tvshows",
@@ -990,6 +1024,10 @@ impl App {
                         "/clear-cache",
                         "/quit",
                     ];
+                    if self.state.is_tv_mode {
+                        commands.push("/list");
+                        commands.push("/config");
+                    }
                     let mut suggestions = vec![];
                     for cmd in commands {
                         if cmd.starts_with(&query) {
@@ -1081,25 +1119,14 @@ impl App {
                 query,
                 force_refresh,
             } => {
-                if self.state.is_tv_mode {
-                    let q = query.to_lowercase();
-                    self.state.search_results = self.state.tv_channels.iter()
-                        .filter(|c| c.name.to_lowercase().contains(&q) || c.group.to_lowercase().contains(&q))
-                        .map(|c| SearchResult {
-                            id: c.id.clone(),
-                            title: c.name.clone(),
-                            stype: 1,
-                            release_year: c.group.clone(),
-                            cover_url: Some(c.logo.clone()),
-                            season: 1,
-                        })
-                        .collect();
-                    self.state.is_loading = false;
-                    self.state.search_list_state.select(if self.state.search_results.is_empty() { None } else { Some(0) });
+                let lower_query = query.trim().to_lowercase();
+
+                if lower_query == "/clear-cache" {
+                    self.action_sender.send(Action::ClearCache).ok();
+                    self.state.search_query.clear();
                     return None;
                 }
 
-                let lower_query = query.trim().to_lowercase();
                 if lower_query == "/github" {
                     let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
                     self.state.search_query.clear();
@@ -1148,9 +1175,27 @@ impl App {
                     return None;
                 }
 
-                if lower_query == "/clear-cache" {
-                    self.action_sender.send(Action::ClearCache).ok();
-                    self.state.search_query.clear();
+                if self.state.is_tv_mode {
+                    if lower_query == "/config" {
+                        self.action_sender.send(Action::ShowTvWizard).ok();
+                        self.state.search_query.clear();
+                        return None;
+                    }
+
+                    let q = lower_query.clone();
+                    self.state.search_results = self.state.tv_channels.iter()
+                        .filter(|c| q == "/list" || c.name.to_lowercase().contains(&q) || c.group.to_lowercase().contains(&q))
+                        .map(|c| SearchResult {
+                            id: c.id.clone(),
+                            title: c.name.clone(),
+                            stype: 1,
+                            release_year: c.group.clone(),
+                            cover_url: Some(c.logo.clone()),
+                            season: 1,
+                        })
+                        .collect();
+                    self.state.is_loading = false;
+                    self.state.search_list_state.select(if self.state.search_results.is_empty() { None } else { Some(0) });
                     return None;
                 }
 

@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
-    let help_text = vec![
+    let mut help_text = vec![
         Line::from(vec![Span::styled(
             "  Global",
             theme.header.add_modifier(ratatui::style::Modifier::BOLD),
@@ -43,63 +43,96 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![]),
         Line::from(vec![Span::styled(
-            "  Discover & Search",
-            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-        )]),
-        Line::from(vec![
-            Span::styled("    /discover  ", theme.header),
-            Span::styled("Trending & Featured", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /movies    ", theme.header),
-            Span::styled("Discover Movies", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /shows     ", theme.header),
-            Span::styled("Discover TV Shows", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /anime     ", theme.header),
-            Span::styled("Discover Anime", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /github    ", theme.header),
-            Span::styled("Open GitHub Repo", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /update    ", theme.header),
-            Span::styled("Check for updates", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /toggle-update ", theme.header),
-            Span::styled("Toggle auto updates", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    /clear-cache   ", theme.header),
-            Span::styled("Clear app cache", theme.text),
-        ]),
-        Line::from(vec![]),
-        Line::from(vec![Span::styled(
             "  Stream Controls",
             theme.header.add_modifier(ratatui::style::Modifier::BOLD),
         )]),
         Line::from(vec![
             Span::styled("    [Enter]    ", theme.header),
-            Span::styled("Play with default player", theme.text),
+            Span::styled(if state.is_tv_mode { "Play Channel" } else { "Play with default player" }, theme.text),
         ]),
-        Line::from(vec![
-            Span::styled("    [o]        ", theme.header),
-            Span::styled("Open Player Picker", theme.text),
-        ]),
+    ];
+
+    if !state.is_tv_mode {
+        help_text.splice(44..44, vec![
+            Line::from(vec![Span::styled(
+                "  Discover & Search",
+                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+            )]),
+            Line::from(vec![
+                Span::styled("    /discover  ", theme.header),
+                Span::styled("Trending & Featured", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /movies    ", theme.header),
+                Span::styled("Discover Movies", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /shows     ", theme.header),
+                Span::styled("Discover TV Shows", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /anime     ", theme.header),
+                Span::styled("Discover Anime", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /github    ", theme.header),
+                Span::styled("Open GitHub Repo", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /update    ", theme.header),
+                Span::styled("Check for updates", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /toggle-update ", theme.header),
+                Span::styled("Toggle auto updates", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /clear-cache   ", theme.header),
+                Span::styled("Clear app cache", theme.text),
+            ]),
+            Line::from(vec![]),
+        ]);
+
+        help_text.extend(vec![
+            Line::from(vec![
+                Span::styled("    [o]        ", theme.header),
+                Span::styled("Open Player Picker", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    [d]        ", theme.header),
+                Span::styled("Download Video", theme.text),
+            ]),
+        ]);
+    }
+
+    if state.is_tv_mode {
+        help_text.extend(vec![
+            Line::from(vec![Span::styled(
+                "  TV Commands",
+                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+            )]),
+            Line::from(vec![
+                Span::styled("    /list      ", theme.header),
+                Span::styled("Show available channels", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /config    ", theme.header),
+                Span::styled("Open TV Config Popup", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /clear-cache   ", theme.header),
+                Span::styled("Clear app cache", theme.text),
+            ]),
+            Line::from(vec![]),
+        ]);
+    }
+
+    help_text.extend(vec![
         Line::from(vec![
             Span::styled("    [r]        ", theme.header),
             Span::styled("Refresh Streams/Search", theme.text),
         ]),
-        Line::from(vec![
-            Span::styled("    [d]        ", theme.header),
-            Span::styled("Download Video", theme.text),
-        ]),
-    ];
+    ]);
 
     let height = help_text.len() as u16 + 2;
     let margin_y = area.height.saturating_sub(height) / 2;

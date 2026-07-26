@@ -11,6 +11,7 @@ pub enum Action {
     Resize(u16, u16),
     ToggleHelp,
     ToggleTvMode,
+    ShowTvWizard,
     TvChannelsLoaded(Vec<crate::providers::iptv_org::m3u::Channel>),
     Search {
         query: String,
