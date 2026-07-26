@@ -134,6 +134,8 @@ pub struct AppState {
     pub language_chosen: bool,
 
     pub subtitle_popup: bool,
+    pub is_download_subtitle_popup: bool,
+    pub season_subtitle_preference: Option<String>,
     pub subtitle_list: Vec<(String, String)>,
     pub subtitle_list_state: ListState,
     pub pending_play_link: Option<String>,
@@ -245,6 +247,8 @@ impl Default for AppState {
             language_chosen: false,
 
             subtitle_popup: false,
+            is_download_subtitle_popup: false,
+            season_subtitle_preference: None,
             subtitle_list: Vec::new(),
             subtitle_list_state: ListState::default(),
             pending_play_link: None,

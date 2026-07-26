@@ -718,6 +718,7 @@ impl App {
                                     }
                                 } else if self.state.subtitle_popup
                                     || self.state.player_picker_popup
+                                    || self.state.is_download_subtitle_popup
                                 {
                                     self.action_sender.send(Action::Submit).ok();
                                 } else {
@@ -766,8 +767,9 @@ impl App {
                     self.state.player_picker_subtitle = None;
                     return None;
                 }
-                if self.state.subtitle_popup {
+                if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
                     self.state.subtitle_popup = false;
+                    self.state.is_download_subtitle_popup = false;
                     self.state.pending_play_link = None;
                     return None;
                 }
@@ -1547,7 +1549,7 @@ impl App {
                     };
                     self.state.player_picker_state.select(Some(i));
                     return None;
-                } else if self.state.subtitle_popup {
+                } else if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
                     let current = self.state.subtitle_list_state.selected().unwrap_or(0);
                     if current > 0 {
                         self.state.subtitle_list_state.select(Some(current - 1));
@@ -1656,7 +1658,7 @@ impl App {
                     };
                     self.state.player_picker_state.select(Some(i));
                     return None;
-                } else if self.state.subtitle_popup {
+                } else if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
                     let current = self.state.subtitle_list_state.selected().unwrap_or(0);
                     if current + 1 < self.state.subtitle_list.len() {
                         self.state.subtitle_list_state.select(Some(current + 1));
@@ -1900,6 +1902,19 @@ impl App {
                                 .ok();
                         }
                     }
+                    return None;
+                } else if self.state.is_download_subtitle_popup {
+                    self.state.is_download_subtitle_popup = false;
+                    let idx = self.state.subtitle_list_state.selected().unwrap_or(0);
+                    let sub_name = self.state.subtitle_list.get(idx).map(|(n, _)| n.clone());
+                    let sub_url = self.state.subtitle_list.get(idx).map(|(_, u)| u.clone());
+                    let sub_url_final = sub_url.filter(|s| !s.is_empty());
+                    
+                    if self.state.download_queue_total > 0 {
+                        self.state.season_subtitle_preference = sub_name.filter(|n| n != "None");
+                    }
+                    
+                    self.action_sender.send(Action::DownloadStream(sub_url_final)).ok();
                     return None;
                 }
                 if self.state.active_screen == Screen::Home {
@@ -2206,6 +2221,37 @@ impl App {
                     }
                 }
             }
+            Action::ShowDownloadSubtitlePopup(ext_captions) => {
+                let mut options = vec![("None".to_string(), "".to_string())];
+
+                if let Some(captions_list) =
+                    ext_captions.get("extCaptions").and_then(|c| c.as_array())
+                {
+                    for cap in captions_list {
+                        let name = cap
+                            .get("lanName")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+                        let url = cap
+                            .get("url")
+                            .and_then(|u| u.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if !url.is_empty() {
+                            options.push((name, url));
+                        }
+                    }
+                }
+
+                if options.len() > 1 {
+                    self.state.is_download_subtitle_popup = true;
+                    self.state.subtitle_list = options;
+                    self.state.subtitle_list_state.select(Some(0));
+                } else {
+                    self.action_sender.send(Action::DownloadStream(None)).ok();
+                }
+            }
             Action::LaunchMpv(link, subtitle_url) => {
                 let player = self.state.available_players.first().cloned();
                 match player {
@@ -2243,7 +2289,7 @@ impl App {
                     }
                 }
             }
-            Action::DownloadStream => {
+            Action::DownloadStream(subtitle_url) => {
                 if self.state.download_progress.is_some() {
                     return None;
                 }
@@ -2356,6 +2402,27 @@ impl App {
                                 filename = format!("{}_{}.{}", base_filename, counter, ext);
                                 filepath = target_dir.join(&filename);
                                 counter += 1;
+                            }
+
+                            if let Some(sub_url) = subtitle_url {
+                                let sub_ext = sub_url.split('.').last().unwrap_or("srt");
+                                let sub_ext = if sub_ext.len() <= 4 { sub_ext } else { "srt" };
+                                
+                                let mut sub_filename = filename.clone();
+                                if let Some(dot_idx) = sub_filename.rfind('.') {
+                                    sub_filename.truncate(dot_idx);
+                                }
+                                sub_filename.push_str(&format!(".{}", sub_ext));
+                                
+                                let sub_target = target_dir.join(&sub_filename);
+                                let sub_client = client.clone();
+                                tokio::spawn(async move {
+                                    if let Ok(res) = sub_client.get(&sub_url).send().await {
+                                        if let Ok(bytes) = res.bytes().await {
+                                            let _ = tokio::fs::write(sub_target, bytes).await;
+                                        }
+                                    }
+                                });
                             }
 
                             if supports_ranges && total_size > 5 * 1024 * 1024 {
@@ -2834,7 +2901,39 @@ impl App {
 
             Action::ConfirmDownloadEpisode => {
                 self.state.show_episode_download_confirm = false;
-                self.action_sender.send(Action::DownloadStream).ok();
+                
+                let subject_id = self
+                    .state
+                    .selected_details
+                    .as_ref()
+                    .and_then(|d| d.get("id"))
+                    .and_then(|i| i.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let resource_id = self.get_selected_resource_id();
+
+                if let Some(rid) = resource_id {
+                    self.state.toast_message = Some(format!(
+                        "{} Fetching subtitles...",
+                        if self.state.basic_terminal {
+                            "[OK]"
+                        } else {
+                            "✓"
+                        }
+                    ));
+                    self.state.toast_timer = 40;
+                    let client = self.client.clone();
+                    let sender = self.action_sender.clone();
+                    tokio::spawn(async move {
+                        if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
+                            sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
+                        } else {
+                            sender.send(Action::DownloadStream(None)).ok();
+                        }
+                    });
+                } else {
+                    self.action_sender.send(Action::DownloadStream(None)).ok();
+                }
             }
 
             Action::PromptDownloadSeason => {
@@ -2844,6 +2943,7 @@ impl App {
 
             Action::ConfirmDownloadSeason => {
                 self.state.show_season_download_confirm = false;
+                self.state.season_subtitle_preference = None;
                 let season_idx = self.state.selected_season;
                 if season_idx > 0 && season_idx <= self.state.available_episode_numbers.len() {
                     let ep_numbers = &self.state.available_episode_numbers[season_idx - 1];
@@ -2905,7 +3005,7 @@ impl App {
                         })
                         .ok();
 
-                    self.action_sender.send(Action::DownloadStream).ok();
+                    self.action_sender.send(Action::DownloadStream(None)).ok();
                 } else if self.state.download_queue_total > 0 {
                     self.state.toast_message = Some(format!(
                         "Season download complete! ({} files)",
@@ -3467,7 +3567,43 @@ impl App {
 
                 if self.state.is_waiting_for_download_stream {
                     self.state.is_waiting_for_download_stream = false;
-                    self.action_sender.send(Action::DownloadStream).ok();
+                    
+                    let is_season_queue = self.state.download_queue_total > 0;
+                    if is_season_queue {
+                        let subject_id = self.state.selected_details.as_ref().and_then(|d| d.get("id")).and_then(|i| i.as_str()).unwrap_or("").to_string();
+                        if let Some(rid) = self.get_selected_resource_id() {
+                            let client = self.client.clone();
+                            let sender = self.action_sender.clone();
+                            let pref = self.state.season_subtitle_preference.clone();
+                            let no_pref = pref.is_none();
+                            
+                            tokio::spawn(async move {
+                                if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
+                                    if no_pref {
+                                        sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
+                                    } else if let Some(pref_lang) = pref {
+                                        let mut sub_url = None;
+                                        if let Some(list) = res.as_array() {
+                                            for sub in list {
+                                                if let (Some(lang), Some(url)) = (sub.get("language").and_then(|l| l.as_str()), sub.get("url").and_then(|u| u.as_str())) {
+                                                    if lang == pref_lang {
+                                                        sub_url = Some(url.to_string());
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        sender.send(Action::DownloadStream(sub_url)).ok();
+                                    }
+                                } else {
+                                    sender.send(Action::DownloadStream(None)).ok();
+                                }
+                            });
+                            return None;
+                        }
+                    }
+                    
+                    self.action_sender.send(Action::DownloadStream(None)).ok();
                 }
             }
             Action::EpisodeStreamsFailed(target_se, target_ep, err) => {

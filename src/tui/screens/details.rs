@@ -633,7 +633,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if !state.selected_resources.is_some() {
         frame.render_widget(streams_block, streams_area);
     }
-    if state.subtitle_popup {
+    if state.subtitle_popup || state.is_download_subtitle_popup {
         let popup_width = 50;
         let popup_height = std::cmp::min(15, state.subtitle_list.len() as u16 + 2);
 
@@ -653,10 +653,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .map(|(name, _)| ratatui::widgets::ListItem::new(name.clone()))
             .collect();
 
+        let title = if state.is_download_subtitle_popup {
+            " Select Subtitle to Download "
+        } else {
+            " Select Subtitle "
+        };
+
         let list = ratatui::widgets::List::new(items)
             .block(
                 ratatui::widgets::Block::default()
-                    .title(" Select Subtitle ")
+                    .title(title)
                     .title_style(theme.title)
                     .borders(ratatui::widgets::Borders::ALL)
                     .border_type(if state.basic_terminal {
