@@ -25,8 +25,10 @@ if [ "$OS" = "Darwin" ]; then
 elif [ "$OS" = "Linux" ]; then
     if [ "$ARCH" = "x86_64" ]; then
         FILE="MovieBox_Linux_x64.tar.gz"
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+        FILE="MovieBox_Linux_arm64.tar.gz"
     else
-        echo -e "${RED}Error: Unsupported Linux architecture ($ARCH). Only x86_64 is supported.${NC}"
+        echo -e "${RED}Error: Unsupported Linux architecture ($ARCH). Only x86_64 and arm64 are supported.${NC}"
         exit 1
     fi
 else

@@ -32,7 +32,14 @@ else
   CROSS_CONTAINER_OPTS="--platform linux/amd64" cross build --target x86_64-unknown-linux-musl --release
   cp target/x86_64-unknown-linux-musl/release/moviebox-tui .tmp_build/moviebox
   tar -czf dist/MovieBox_Linux_x64.tar.gz -C .tmp_build moviebox
-  echo "Linux build complete!"
+  
+  echo "Building Linux ARM64 Binary (via Docker)..."
+  cargo clean
+  CROSS_CONTAINER_OPTS="--platform linux/amd64" cross build --target aarch64-unknown-linux-musl --release
+  cp target/aarch64-unknown-linux-musl/release/moviebox-tui .tmp_build/moviebox
+  tar -czf dist/MovieBox_Linux_arm64.tar.gz -C .tmp_build moviebox
+  
+  echo "Linux builds complete!"
 fi
 
 rm -rf .tmp_build
