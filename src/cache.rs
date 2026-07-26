@@ -1,8 +1,28 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::SystemTime;
 
 const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60;
+
+fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value> {
+    if path.exists() {
+        if let Ok(metadata) = fs::metadata(path) {
+            if let Ok(modified) = metadata.modified() {
+                if let Ok(elapsed) = modified.elapsed() {
+                    if elapsed.as_secs() > expiry_secs {
+                        let _ = fs::remove_file(path);
+                        return None;
+                    }
+                }
+            }
+        }
+        if let Ok(content) = fs::read_to_string(path) {
+            if let Ok(val) = serde_json::from_str(&content) {
+                return Some(val);
+            }
+        }
+    }
+    None
+}
 
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
     let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
@@ -25,26 +45,10 @@ pub fn get_stream_cache(
     season: usize,
     episode: usize,
 ) -> Option<serde_json::Value> {
-    let path = get_cache_path(subject_id, season, episode);
-    if path.exists() {
-        if let Ok(metadata) = fs::metadata(&path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(duration) = SystemTime::now().duration_since(modified) {
-                    if duration.as_secs() > CACHE_EXPIRY_SECS {
-                        let _ = fs::remove_file(&path);
-                        return None;
-                    }
-                }
-            }
-        }
-
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(val) = serde_json::from_str(&content) {
-                return Some(val);
-            }
-        }
-    }
-    None
+    read_json_cache(
+        &get_cache_path(subject_id, season, episode),
+        CACHE_EXPIRY_SECS,
+    )
 }
 
 pub fn get_details_path(subject_id: &str) -> PathBuf {
@@ -54,26 +58,7 @@ pub fn get_details_path(subject_id: &str) -> PathBuf {
 }
 
 pub fn get_details_cache(subject_id: &str) -> Option<serde_json::Value> {
-    let path = get_details_path(subject_id);
-    if path.exists() {
-        if let Ok(metadata) = fs::metadata(&path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(duration) = SystemTime::now().duration_since(modified) {
-                    if duration.as_secs() > CACHE_EXPIRY_SECS {
-                        let _ = fs::remove_file(&path);
-                        return None;
-                    }
-                }
-            }
-        }
-
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(val) = serde_json::from_str(&content) {
-                return Some(val);
-            }
-        }
-    }
-    None
+    read_json_cache(&get_details_path(subject_id), CACHE_EXPIRY_SECS)
 }
 
 pub fn get_search_path(query: &str) -> PathBuf {
@@ -92,26 +77,7 @@ pub fn get_search_path(query: &str) -> PathBuf {
 }
 
 pub fn get_search_cache(query: &str) -> Option<serde_json::Value> {
-    let path = get_search_path(query);
-    if path.exists() {
-        if let Ok(metadata) = fs::metadata(&path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(duration) = SystemTime::now().duration_since(modified) {
-                    if duration.as_secs() > CACHE_EXPIRY_SECS {
-                        let _ = fs::remove_file(&path);
-                        return None;
-                    }
-                }
-            }
-        }
-
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(val) = serde_json::from_str(&content) {
-                return Some(val);
-            }
-        }
-    }
-    None
+    read_json_cache(&get_search_path(query), CACHE_EXPIRY_SECS)
 }
 
 pub fn set_search_cache(query: &str, data: &serde_json::Value) {
@@ -157,25 +123,7 @@ fn get_homepage_path(tab_id: &str, page: usize) -> PathBuf {
 }
 
 pub fn get_homepage_cache(tab_id: &str, page: usize) -> Option<serde_json::Value> {
-    let path = get_homepage_path(tab_id, page);
-    if path.exists() {
-        if let Ok(metadata) = fs::metadata(&path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(elapsed) = modified.elapsed() {
-                    if elapsed.as_secs() > 3600 {
-                        let _ = fs::remove_file(&path);
-                        return None;
-                    }
-                }
-            }
-        }
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(val) = serde_json::from_str(&content) {
-                return Some(val);
-            }
-        }
-    }
-    None
+    read_json_cache(&get_homepage_path(tab_id, page), 3600)
 }
 
 pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {

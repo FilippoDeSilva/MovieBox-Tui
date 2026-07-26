@@ -1,4 +1,3 @@
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -74,9 +73,15 @@ impl M3UParser {
             stream_url: String::new(),
         };
 
-        let tvg_id_re = Regex::new(r#"tvg-id="([^"]*)""#).unwrap();
-        let tvg_logo_re = Regex::new(r#"tvg-logo="([^"]*)""#).unwrap();
-        let group_title_re = Regex::new(r#"group-title="([^"]*)""#).unwrap();
+        let extract_attr = |line: &str, attr: &str| -> String {
+            if let Some(idx) = line.find(attr) {
+                let start = idx + attr.len();
+                if let Some(end) = line[start..].find('"') {
+                    return line[start..start + end].to_string();
+                }
+            }
+            String::new()
+        };
 
         for line in content.lines() {
             let line = line.trim();
@@ -84,15 +89,9 @@ impl M3UParser {
                 continue;
             }
             if line.starts_with("#EXTINF:") {
-                if let Some(caps) = tvg_id_re.captures(line) {
-                    current_channel.id = caps.get(1).map_or("", |m| m.as_str()).to_string();
-                }
-                if let Some(caps) = tvg_logo_re.captures(line) {
-                    current_channel.logo = caps.get(1).map_or("", |m| m.as_str()).to_string();
-                }
-                if let Some(caps) = group_title_re.captures(line) {
-                    current_channel.group = caps.get(1).map_or("", |m| m.as_str()).to_string();
-                }
+                current_channel.id = extract_attr(line, "tvg-id=\"");
+                current_channel.logo = extract_attr(line, "tvg-logo=\"");
+                current_channel.group = extract_attr(line, "group-title=\"");
 
                 if let Some(idx) = line.rfind(',') {
                     current_channel.name = line[idx + 1..].trim().to_string();

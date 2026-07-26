@@ -334,23 +334,7 @@ impl App {
                 if self.state.search_query.is_empty()
                     && matches!(self.state.active_screen, crate::tui::state::Screen::Home)
                 {
-                    use chrono::Timelike;
-                    let hour = chrono::Local::now().hour();
-                    let greeting_time = if (5..12).contains(&hour) {
-                        "Good morning"
-                    } else if (12..17).contains(&hour) {
-                        "Good afternoon"
-                    } else if (17..21).contains(&hour) {
-                        "Good evening"
-                    } else {
-                        "Working late"
-                    };
-                    let punct = if greeting_time == "Working late" {
-                        "?"
-                    } else {
-                        ""
-                    };
-                    let greeting = format!("{}, {}{}", greeting_time, self.state.username, punct);
+                    let greeting = format!("Welcome back, {}", self.state.username);
 
                     let prompts = if self.state.is_tv_mode {
                         vec![
@@ -1268,7 +1252,18 @@ impl App {
                 }
 
                 if lower_query == "/github" {
-                    let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
+                    #[cfg(target_os = "windows")]
+                    let _ = std::process::Command::new("cmd")
+                        .args(["/C", "start", "https://github.com/mesamirh/MovieBox-Tui"])
+                        .spawn();
+                    #[cfg(target_os = "macos")]
+                    let _ = std::process::Command::new("open")
+                        .arg("https://github.com/mesamirh/MovieBox-Tui")
+                        .spawn();
+                    #[cfg(all(target_os = "linux", not(target_os = "android")))]
+                    let _ = std::process::Command::new("xdg-open")
+                        .arg("https://github.com/mesamirh/MovieBox-Tui")
+                        .spawn();
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
                     return None;
