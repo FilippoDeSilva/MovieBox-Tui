@@ -65,7 +65,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let is_narrow = area.width < 60 || state.basic_terminal;
         let is_wide = area.width >= 100 && !state.basic_terminal;
-        let logo_height = if is_narrow {
+        let mut logo_height = if is_narrow {
             2
         } else if is_wide {
             6
@@ -73,21 +73,39 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             4
         };
 
-        let logo_text = if is_narrow {
-            "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █"
+        if state.is_tv_mode {
+            logo_height += 1;
+        }
+
+        let mut logo_text = if is_narrow {
+            "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █".to_string()
         } else if is_wide {
             r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
 ██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
-╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝"
+╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝".to_string()
         } else {
             r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
  |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
  | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  
- |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ "
+ |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ ".to_string()
         };
+
+        let logo_width: u16 = if is_narrow {
+            31
+        } else if is_wide {
+            73
+        } else {
+            55
+        };
+
+        if state.is_tv_mode {
+            let padding = logo_width.saturating_sub(11) / 2;
+            let pad_str = " ".repeat(padding as usize);
+            logo_text.push_str(&format!("\n{}[ TV MODE ]", pad_str));
+        }
 
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -104,13 +122,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(area);
 
-        let logo_width = if is_narrow {
-            31
-        } else if is_wide {
-            73
-        } else {
-            55
-        };
         let pad = area.width.saturating_sub(logo_width) / 2;
         let horizontal_chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -192,7 +203,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             frame.render_widget(search_bar, search_bar_area);
 
             let legend_line = ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(" [Type] ", theme.shortcut),
+                ratatui::text::Span::styled(" [Ctrl+T] ", theme.shortcut),
+                ratatui::text::Span::styled("TV Mode   ", theme.text_dim),
+                ratatui::text::Span::styled("[Type] ", theme.shortcut),
                 ratatui::text::Span::styled("Search   ", theme.text_dim),
                 ratatui::text::Span::styled("[↑↓] ", theme.shortcut),
                 ratatui::text::Span::styled("Browse   ", theme.text_dim),
@@ -627,5 +640,71 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::NONE));
             frame.render_widget(list, dropdown_area);
         }
+    }
+    if state.tv_config_popup {
+        let content_height = state.tv_wizard_options.len() as u16;
+        let popup_height = (content_height + 4).clamp(6, area.height.saturating_sub(4).max(6));
+        
+        let popup_area = ratatui::layout::Rect {
+            x: area.width.saturating_sub(60) / 2,
+            y: area.height.saturating_sub(popup_height) / 2,
+            width: 60,
+            height: popup_height,
+        };
+        let popup_block = ratatui::widgets::Block::default()
+            .title(if state.tv_wizard_step == 0 { " TV Setup: Select Grouping " } else { " TV Setup: Select Items " })
+            .borders(ratatui::widgets::Borders::ALL)
+            .border_style(theme.border_focus)
+            .style(ratatui::style::Style::default().bg(theme.base));
+        
+        let inner_area = popup_block.inner(popup_area);
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+        frame.render_widget(popup_block, popup_area);
+
+        let items: Vec<ratatui::widgets::ListItem> = state.tv_wizard_options.iter().enumerate().map(|(i, opt)| {
+            let is_selected = i == state.tv_wizard_selected_idx;
+            let is_checked = state.tv_wizard_selections.contains(opt);
+            
+            let prefix = if is_selected { "> " } else { "  " };
+            let checkbox = if state.tv_wizard_step == 1 {
+                if is_checked { "[x] " } else { "[ ] " }
+            } else {
+                ""
+            };
+            
+            let style = if is_selected { theme.highlight } else { theme.text };
+            let line = ratatui::text::Line::from(vec![
+                ratatui::text::Span::styled(format!("{}{}{}", prefix, checkbox, opt), style)
+            ]);
+            ratatui::widgets::ListItem::new(line)
+        }).collect();
+
+        let list = ratatui::widgets::List::new(items);
+        
+        let mut list_area = inner_area;
+        list_area.height = list_area.height.saturating_sub(1);
+        
+        let mut list_state = ratatui::widgets::ListState::default();
+        list_state.select(Some(state.tv_wizard_selected_idx));
+        
+        frame.render_stateful_widget(list, list_area, &mut list_state);
+        
+        let hint_area = ratatui::layout::Rect {
+            x: inner_area.x,
+            y: inner_area.y + inner_area.height.saturating_sub(1),
+            width: inner_area.width,
+            height: 1,
+        };
+        let hint = if state.tv_wizard_step == 0 {
+            " [Enter] Select   [Esc] Cancel "
+        } else {
+            " [Space] Toggle   [Enter] Confirm   [Esc] Back "
+        };
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(hint)
+                .alignment(ratatui::layout::Alignment::Center)
+                .style(theme.text_dim),
+            hint_area
+        );
     }
 }

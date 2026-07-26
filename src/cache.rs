@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
+const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60;
 
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
     let mut path = dirs::cache_dir().unwrap_or_else(|| std::env::temp_dir());

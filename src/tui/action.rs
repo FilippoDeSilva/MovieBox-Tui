@@ -10,6 +10,8 @@ pub enum Action {
     SelectLanguage(usize),
     Resize(u16, u16),
     ToggleHelp,
+    ToggleTvMode,
+    TvChannelsLoaded(Vec<crate::providers::iptv_org::m3u::Channel>),
     Search {
         query: String,
         force_refresh: bool,

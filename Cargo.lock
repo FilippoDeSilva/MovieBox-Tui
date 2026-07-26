@@ -1969,6 +1969,7 @@ dependencies = [
  "rand 0.10.2",
  "ratatui",
  "ratatui-image",
+ "regex",
  "reqwest",
  "self_update",
  "serde",

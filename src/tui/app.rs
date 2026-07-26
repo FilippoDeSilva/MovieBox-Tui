@@ -426,7 +426,17 @@ impl App {
                 {
                     self.state.last_suggest_query = current_query.clone();
                     if !current_query.is_empty() {
-                        self.action_sender.send(Action::Suggest(current_query)).ok();
+                        if self.state.is_tv_mode {
+
+                            let q = current_query.to_lowercase();
+                            self.state.search_suggestions = self.state.tv_channels.iter()
+                                .filter(|c| c.name.to_lowercase().contains(&q))
+                                .take(10)
+                                .map(|c| c.name.clone())
+                                .collect();
+                        } else {
+                            self.action_sender.send(Action::Suggest(current_query)).ok();
+                        }
                     } else {
                         self.state.search_suggestions.clear();
                     }
@@ -494,6 +504,10 @@ impl App {
                     if let KeyCode::Char('c') = key.code {
                         self.action_sender.send(Action::Quit).ok();
                         return Some(());
+                    }
+                    if let KeyCode::Char('t') = key.code {
+                        self.action_sender.send(Action::ToggleTvMode).ok();
+                        return None;
                     }
                 }
 
@@ -571,48 +585,112 @@ impl App {
                     },
                     InputMode::Normal => match self.state.active_screen {
                         Screen::Startup => {}
-                        Screen::Home => match key.code {
-                            KeyCode::Esc => {
-                                self.action_sender.send(Action::GoBack).ok();
+                        Screen::Home => {
+                            if self.state.tv_config_popup {
+                                match key.code {
+                                    KeyCode::Esc => {
+                                        if self.state.tv_wizard_step == 1 {
+                                            self.state.tv_wizard_step = 0;
+                                            self.state.tv_wizard_selected_idx = 0;
+                                        } else {
+                                            self.state.tv_config_popup = false;
+                                            self.state.is_tv_mode = false;
+                                        }
+                                    }
+                                    KeyCode::Up => {
+                                        if self.state.tv_wizard_selected_idx > 0 {
+                                            self.state.tv_wizard_selected_idx -= 1;
+                                        } else {
+                                            self.state.tv_wizard_selected_idx = self.state.tv_wizard_options.len().saturating_sub(1);
+                                        }
+                                    }
+                                    KeyCode::Down => {
+                                        if self.state.tv_wizard_selected_idx < self.state.tv_wizard_options.len().saturating_sub(1) {
+                                            self.state.tv_wizard_selected_idx += 1;
+                                        } else {
+                                            self.state.tv_wizard_selected_idx = 0;
+                                        }
+                                    }
+                                    KeyCode::Char(' ') => {
+                                        if self.state.tv_wizard_step == 1 {
+                                            let opt = self.state.tv_wizard_options[self.state.tv_wizard_selected_idx].clone();
+                                            if self.state.tv_wizard_selections.contains(&opt) {
+                                                self.state.tv_wizard_selections.remove(&opt);
+                                            } else {
+                                                self.state.tv_wizard_selections.insert(opt);
+                                            }
+                                        }
+                                    }
+                                    KeyCode::Enter => {
+                                        if self.state.tv_wizard_step == 0 {
+                                            self.state.tv_wizard_step = 1;
+                                            self.state.tv_wizard_selected_idx = 0;
+                                            self.state.tv_wizard_options = vec!["us".to_string(), "uk".to_string(), "ca".to_string(), "news".to_string(), "sports".to_string()];
+                                        } else {
+                                            self.state.tv_config_popup = false;
+                                            
+                                            self.state.is_loading = true;
+                                            self.state.status_message = "Fetching TV channels...".to_string();
+                                            self.state.status_timer = 150;
+                                            
+                                            let sender = self.action_sender.clone();
+                                            tokio::spawn(async move {
+                                                let parser = crate::providers::iptv_org::m3u::M3UParser::new();
+                                                let mut all_channels = Vec::new();
+                                                if let Ok(channels) = parser.fetch_playlist("https://iptv-org.github.io/iptv/countries/us.m3u", "us.m3u").await {
+                                                    all_channels.extend(channels);
+                                                }
+                                                sender.send(Action::TvChannelsLoaded(all_channels)).ok();
+                                            });
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                                return None;
                             }
-                            KeyCode::Up => {
-                                self.action_sender.send(Action::MoveUp).ok();
-                            }
-                            KeyCode::Down => {
-                                self.action_sender.send(Action::MoveDown).ok();
-                            }
-                            KeyCode::Left => {
-                                self.action_sender.send(Action::MoveLeft).ok();
-                            }
-                            KeyCode::Right => {
-                                self.action_sender.send(Action::MoveRight).ok();
-                            }
-                            KeyCode::Enter => {
-                                self.action_sender.send(Action::Submit).ok();
-                            }
-                            KeyCode::Char('?') => {
-                                self.action_sender.send(Action::ToggleHelp).ok();
-                            }
-                            KeyCode::Char('q') => {
-                                self.action_sender.send(Action::Quit).ok();
-                            }
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.action_sender.send(Action::GoBack).ok();
+                                }
+                                KeyCode::Up => {
+                                    self.action_sender.send(Action::MoveUp).ok();
+                                }
+                                KeyCode::Down => {
+                                    self.action_sender.send(Action::MoveDown).ok();
+                                }
+                                KeyCode::Left => {
+                                    self.action_sender.send(Action::MoveLeft).ok();
+                                }
+                                KeyCode::Right => {
+                                    self.action_sender.send(Action::MoveRight).ok();
+                                }
+                                KeyCode::Enter => {
+                                    self.action_sender.send(Action::Submit).ok();
+                                }
+                                KeyCode::Char('?') => {
+                                    self.action_sender.send(Action::ToggleHelp).ok();
+                                }
+                                KeyCode::Char('q') => {
+                                    self.action_sender.send(Action::Quit).ok();
+                                }
                             KeyCode::Char('r') => {
                                 self.action_sender.send(Action::Refresh).ok();
                             }
-                            KeyCode::Char(c)
-                                if (key.modifiers.is_empty()
-                                    || key.modifiers == KeyModifiers::SHIFT) =>
-                            {
-                                self.state.input_mode = InputMode::Editing;
-                                self.state.search_query.push(c);
-
-                                self.state.search_suggestions.clear();
-                                self.state.suggest_index = None;
-                                self.state.status_message = String::new();
-                                self.state.status_timer = 150;
+                                KeyCode::Char(c)
+                                    if (key.modifiers.is_empty()
+                                        || key.modifiers == KeyModifiers::SHIFT) =>
+                                {
+                                    self.state.input_mode = InputMode::Editing;
+                                    self.state.search_query.push(c);
+    
+                                    self.state.search_suggestions.clear();
+                                    self.state.suggest_index = None;
+                                    self.state.status_message = String::new();
+                                    self.state.status_timer = 150;
+                                }
+                                _ => {}
                             }
-                            _ => {}
-                        },
+                        }
                         Screen::Details => match key.code {
                             KeyCode::Char('y') | KeyCode::Char('Y') => {
                                 if self.state.show_season_download_confirm {
@@ -759,6 +837,39 @@ impl App {
                 if matches!(self.state.active_screen, Screen::Home | Screen::Details) {
                     self.state.show_help = !self.state.show_help;
                 }
+            }
+            Action::ToggleTvMode => {
+                self.state.is_tv_mode = !self.state.is_tv_mode;
+                if self.state.is_tv_mode {
+                    self.state.tv_config_popup = true;
+                    self.state.search_query.clear();
+                    self.state.search_results.clear();
+                } else {
+                    self.state.tv_config_popup = false;
+                    self.state.search_query.clear();
+                    self.state.search_results.clear();
+                }
+            }
+            Action::TvChannelsLoaded(channels) => {
+                self.state.tv_channels = channels;
+                self.state.is_loading = false;
+                self.state.status_message = format!("Loaded {} TV channels.", self.state.tv_channels.len());
+                self.state.status_timer = 150;
+                
+
+
+                self.state.search_results = self.state.tv_channels.iter()
+                    .take(20)
+                    .map(|c| SearchResult {
+                        id: c.id.clone(),
+                        title: c.name.clone(),
+                        stype: 1,
+                        release_year: c.group.clone(),
+                        cover_url: Some(c.logo.clone()),
+                        season: 1,
+                    })
+                    .collect();
+                self.state.search_list_state.select(if self.state.search_results.is_empty() { None } else { Some(0) });
             }
             Action::GoBack => {
                 if self.state.player_picker_popup {
@@ -970,6 +1081,24 @@ impl App {
                 query,
                 force_refresh,
             } => {
+                if self.state.is_tv_mode {
+                    let q = query.to_lowercase();
+                    self.state.search_results = self.state.tv_channels.iter()
+                        .filter(|c| c.name.to_lowercase().contains(&q) || c.group.to_lowercase().contains(&q))
+                        .map(|c| SearchResult {
+                            id: c.id.clone(),
+                            title: c.name.clone(),
+                            stype: 1,
+                            release_year: c.group.clone(),
+                            cover_url: Some(c.logo.clone()),
+                            season: 1,
+                        })
+                        .collect();
+                    self.state.is_loading = false;
+                    self.state.search_list_state.select(if self.state.search_results.is_empty() { None } else { Some(0) });
+                    return None;
+                }
+
                 let lower_query = query.trim().to_lowercase();
                 if lower_query == "/github" {
                     let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
@@ -1334,6 +1463,7 @@ impl App {
                     }
                 }
             }
+
             Action::SearchFailure(err) => {
                 self.state.is_loading = false;
                 self.state.status_message = format!("Search failed: {}", err);
@@ -1944,6 +2074,14 @@ impl App {
                 }
             }
             Action::FetchDetails(id, force_refresh) => {
+                if self.state.is_tv_mode {
+                    if let Some(channel) = self.state.tv_channels.iter().find(|c| c.id == id) {
+                        let stream_url = channel.stream_url.clone();
+                        self.action_sender.send(Action::ShowPlayerPicker(stream_url, Some(channel.name.clone()))).ok();
+                    }
+                    return None;
+                }
+                
                 self.state.poster_protocol = None;
                 self.state.is_loading = true;
                 self.state
@@ -3624,8 +3762,7 @@ impl App {
                     self.state.download_status = stat;
                     self.state.dirty = true;
                 }
-                // If the download just finished (cleared to None) and there are more items in queue,
-                // automatically trigger the next download in the sequence.
+
                 if prog.is_none() && !self.state.download_queue.is_empty() {
                     self.action_sender.send(Action::ProcessDownloadQueue).ok();
                 }

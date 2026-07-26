@@ -142,6 +142,15 @@ pub struct AppState {
     pub pending_open_with: bool,
     pub basic_terminal: bool,
     pub username: String,
+
+
+    pub is_tv_mode: bool,
+    pub tv_config_popup: bool,
+    pub tv_channels: Vec<crate::providers::iptv_org::m3u::Channel>,
+    pub tv_wizard_step: usize,
+    pub tv_wizard_options: Vec<String>,
+    pub tv_wizard_selected_idx: usize,
+    pub tv_wizard_selections: std::collections::HashSet<String>,
 }
 
 impl Default for AppState {
@@ -211,7 +220,7 @@ impl Default for AppState {
                 } else if std::env::var("TMUX").is_ok() || std::env::var("SSH_TTY").is_ok() {
                     false
                 } else {
-                    true // Let ratatui_image::picker::Picker query the terminal itself
+                    true
                 }
             },
             poster_rows: 3,
@@ -260,6 +269,15 @@ impl Default for AppState {
                 .last()
                 .unwrap_or("Friend")
                 .to_string(),
+
+
+            is_tv_mode: false,
+            tv_config_popup: false,
+            tv_channels: Vec::new(),
+            tv_wizard_step: 0,
+            tv_wizard_options: vec!["Grouped by category".to_string(), "Grouped by language".to_string(), "Grouped by broadcast area".to_string()],
+            tv_wizard_selected_idx: 0,
+            tv_wizard_selections: std::collections::HashSet::new(),
         }
     }
 }
