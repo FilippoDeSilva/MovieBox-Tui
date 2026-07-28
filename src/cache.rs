@@ -51,7 +51,12 @@ pub fn get_provider_stream_path(
     episode: usize,
 ) -> PathBuf {
     let mut path = get_provider_cache_dir(provider, "streams");
-    path.push(format!("{}_{}_{}.json", subject_id, season, episode));
+    let schema = if provider == ProviderKind::FourKHdHub {
+        "v2_"
+    } else {
+        ""
+    };
+    path.push(format!("{schema}{subject_id}_{season}_{episode}.json"));
     path
 }
 
@@ -84,7 +89,12 @@ pub fn get_details_path(subject_id: &str) -> PathBuf {
 
 pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(provider, "details");
-    path.push(format!("details_{}.json", subject_id));
+    let schema = if provider == ProviderKind::FourKHdHub {
+        "v2_"
+    } else {
+        ""
+    };
+    path.push(format!("details_{schema}{subject_id}.json"));
     path
 }
 

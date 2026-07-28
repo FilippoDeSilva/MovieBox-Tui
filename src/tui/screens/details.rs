@@ -117,6 +117,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         })
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "N/A".to_string());
+    let tagline = details_json
+        .get("tagline")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.is_empty());
 
     let details_block = Block::default()
         .borders(Borders::ALL)
@@ -215,10 +219,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         format!(" • {}", duration)
     };
 
-    let meta_line = Line::from(vec![Span::styled(
-        format!("{} • {} • {}{}", type_str, year, country, duration_str),
-        theme.text,
-    )]);
+    let mut metadata = vec![type_str.to_string()];
+    if year != "N/A" {
+        metadata.push(year.to_string());
+    }
+    if country != "N/A" {
+        metadata.push(country.to_string());
+    }
+    if !duration_str.is_empty() {
+        metadata.push(duration.to_string());
+    }
+    let meta_line = Line::from(vec![Span::styled(metadata.join(" • "), theme.text)]);
 
     let genre_line = Line::from(vec![Span::styled(genres.to_string(), theme.text_dim)]);
 
@@ -226,7 +237,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         title_line,
         meta_line,
         genre_line,
-        Line::from(vec![]),
+        Line::from(vec![Span::styled(
+            tagline.unwrap_or_default(),
+            theme
+                .text_dim
+                .add_modifier(ratatui::style::Modifier::ITALIC),
+        )]),
         Line::from(vec![Span::styled("Synopsis", theme.text)]),
     ];
 
@@ -503,18 +519,36 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             theme.text_dim
                         };
 
+                        let is_fourk = file.get("_fourk_release").is_some();
+                        let language = file
+                            .get("language")
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("Unknown");
+                        let source_count = file
+                            .get("sourceCount")
+                            .and_then(|value| value.as_u64())
+                            .unwrap_or(0);
+                        let metadata = if is_fourk {
+                            format!(
+                                "{:<7} | {:<5} | {} | {} mirror{}",
+                                size_formatted,
+                                codec.to_uppercase(),
+                                language,
+                                source_count,
+                                if source_count == 1 { "" } else { "s" }
+                            )
+                        } else {
+                            format!(
+                                "{:<7} | {:<5} | {} | By: {}",
+                                size_formatted,
+                                codec.to_uppercase(),
+                                duration_str,
+                                upload_by
+                            )
+                        };
                         let stream_line = ratatui::text::Line::from(vec![
                             ratatui::text::Span::styled(pointer, theme.accent),
-                            ratatui::text::Span::styled(
-                                format!(
-                                    "{:<7} | {:<5} | {} | By: {}",
-                                    size_formatted,
-                                    codec.to_uppercase(),
-                                    duration_str,
-                                    upload_by
-                                ),
-                                stream_style,
-                            ),
+                            ratatui::text::Span::styled(metadata, stream_style),
                         ]);
 
                         let mut lines = vec![];

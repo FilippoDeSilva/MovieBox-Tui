@@ -69,20 +69,27 @@ pub fn parse_details(id: &str, html: &str) -> Result<MediaDetails, FourKHdHubErr
     } else {
         MediaType::Movie
     };
-    let description = meta_content(&document, "meta[name=\"description\"]");
+    let description = document
+        .select(&selector(".content-section p.mt-4")?)
+        .find_map(|node| text_of(Some(node)))
+        .or_else(|| meta_content(&document, "meta[name=\"description\"]"));
+    let tagline = document
+        .select(&selector(".movie-tagline")?)
+        .find_map(|node| text_of(Some(node)));
+    let imdb_rating = document
+        .select(&selector(".imdb-score")?)
+        .find_map(|node| text_of(Some(node)));
     let poster_url = meta_content(&document, "meta[property=\"og:image\"]");
     let year = find_metadata(&document, "Release:")
         .and_then(|value| first_four_digit_year(&value))
+        .or_else(|| {
+            find_metadata(&document, "Last Air:").and_then(|value| first_four_digit_year(&value))
+        })
         .or_else(|| first_four_digit_year(&raw_title));
     let genres = document
         .select(&selector(".badge-outline a")?)
         .filter_map(|node| text_of(Some(node)))
-        .filter(|value| {
-            !matches!(
-                value.as_str(),
-                "Movies" | "Series" | "Hindi" | "English" | "Hollywood"
-            )
-        })
+        .filter(|value| is_genre(value))
         .collect();
     let seasons = parse_seasons(&document)?;
 
@@ -95,6 +102,12 @@ pub fn parse_details(id: &str, html: &str) -> Result<MediaDetails, FourKHdHubErr
         media_type,
         year,
         description,
+        tagline,
+        imdb_rating,
+        director: find_metadata(&document, "Director:"),
+        stars: find_metadata(&document, "Stars:"),
+        prints: find_metadata(&document, "Prints:").or_else(|| find_metadata(&document, "Print:")),
+        audios: find_metadata(&document, "Audios:"),
         poster_url,
         genres,
         seasons,
@@ -244,6 +257,12 @@ pub fn details_to_moviebox_json(details: &MediaDetails) -> serde_json::Value {
         "subjectType": if details.media_type == MediaType::Series { 2 } else { 1 },
         "releaseDate": details.year,
         "description": details.description,
+        "tagline": details.tagline,
+        "imdbRatingValue": details.imdb_rating,
+        "director": details.director,
+        "stars": details.stars,
+        "prints": details.prints,
+        "audios": details.audios,
         "cover": { "url": details.poster_url },
         "genre": details.genres,
         "seasons": { "seasons": seasons }
@@ -268,7 +287,9 @@ pub fn releases_to_moviebox_json(releases: &[Release]) -> serde_json::Value {
                 "size": release.size_bytes.map(|size| size.to_string()),
                 "resolution": resolution,
                 "codecName": release.codec,
-                "uploadBy": format!("{} sources", release.mirrors.len()),
+                "language": release.language,
+                "sourceCount": release.mirrors.len(),
+                "uploadBy": "4KHDHub",
                 "se": release.season.unwrap_or_default(),
                 "ep": release.episode.unwrap_or_default(),
                 "_fourk_release": release
@@ -314,6 +335,31 @@ fn first_four_digit_year(value: &str) -> Option<String> {
         .find(|window| window.iter().all(u8::is_ascii_digit) && matches!(window[0], b'1' | b'2'))
         .and_then(|window| std::str::from_utf8(window).ok())
         .map(str::to_string)
+}
+
+fn is_genre(value: &str) -> bool {
+    matches!(
+        value.to_ascii_lowercase().as_str(),
+        "action"
+            | "adventure"
+            | "animation"
+            | "comedy"
+            | "crime"
+            | "documentary"
+            | "drama"
+            | "family"
+            | "fantasy"
+            | "history"
+            | "horror"
+            | "music"
+            | "mystery"
+            | "romance"
+            | "science fiction"
+            | "sci-fi"
+            | "thriller"
+            | "war"
+            | "western"
+    )
 }
 
 fn strip_trailing_year(value: &str) -> String {
@@ -402,14 +448,20 @@ fn detect_quality(value: &str) -> Option<String> {
 }
 
 fn detect_codec(value: &str) -> Option<String> {
-    ["HEVC", "x265", "x264", "AV1", "REMUX"]
-        .into_iter()
-        .find(|codec| {
-            value
-                .to_ascii_lowercase()
-                .contains(&codec.to_ascii_lowercase())
-        })
-        .map(str::to_string)
+    let lower = value.to_ascii_lowercase();
+    if lower.contains("av1") {
+        Some("AV1".into())
+    } else if lower.contains("h.265") || lower.contains("h265") || lower.contains("x265") {
+        Some("H.265".into())
+    } else if lower.contains("hevc") {
+        Some("HEVC".into())
+    } else if lower.contains("h.264") || lower.contains("h264") || lower.contains("x264") {
+        Some("H.264".into())
+    } else if lower.contains("remux") {
+        Some("REMUX".into())
+    } else {
+        None
+    }
 }
 
 fn detect_language(value: &str) -> Option<String> {
@@ -464,6 +516,52 @@ mod tests {
     fn archive_detection_excludes_packs() {
         assert!(is_archive("Show S01 Complete Season.zip"));
         assert!(!is_archive("Show S01E01.mkv"));
+    }
+
+    #[test]
+    fn parses_provider_metadata_without_technical_badges_as_genres() {
+        let html = r#"
+          <meta property="og:image" content="https://image.example/poster.jpg">
+          <h1 class="page-title">Off Campus</h1>
+          <p class="movie-tagline">Love was never part of the deal.</p>
+          <span class="imdb-score">8.2</span>
+          <span class="badge-outline"><a>2160p</a></span>
+          <span class="badge-outline"><a>Drama</a></span>
+          <span class="badge-outline"><a>Romance</a></span>
+          <div class="content-section">
+            <p class="mt-4">The real provider synopsis.</p>
+            <div class="metadata-item">
+              <span class="metadata-label">Last Air:</span>
+              <span class="metadata-value">2026-05-13</span>
+            </div>
+            <div class="metadata-item">
+              <span class="metadata-label">Audios:</span>
+              <span class="metadata-value">Hindi | English</span>
+            </div>
+          </div>
+          <div id="episodes"></div>
+        "#;
+        let details = parse_details("/off-campus-series-1/", html).expect("details");
+        assert_eq!(
+            details.description.as_deref(),
+            Some("The real provider synopsis.")
+        );
+        assert_eq!(details.imdb_rating.as_deref(), Some("8.2"));
+        assert_eq!(details.year.as_deref(), Some("2026"));
+        assert_eq!(details.genres, ["Drama", "Romance"]);
+        assert_eq!(details.audios.as_deref(), Some("Hindi | English"));
+    }
+
+    #[test]
+    fn normalizes_dotted_video_codecs() {
+        assert_eq!(
+            detect_codec("Show.1080p.H.265.mkv").as_deref(),
+            Some("H.265")
+        );
+        assert_eq!(
+            detect_codec("Show.1080p.H.264.mkv").as_deref(),
+            Some("H.264")
+        );
     }
 
     #[test]
