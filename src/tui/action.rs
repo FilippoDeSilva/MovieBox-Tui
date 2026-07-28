@@ -2,6 +2,7 @@
 pub enum Action {
     FocusChange,
     ShowPlayerPicker(String, Option<String>),
+    ShowPlaybackPicker(crate::providers::models::PlaybackSource),
     LaunchPlayer(crate::tui::state::PlayerKind, String, Option<String>),
     Tick,
     Key(crossterm::event::KeyEvent),
@@ -11,6 +12,7 @@ pub enum Action {
     Resize(u16, u16),
     ToggleHelp,
     ToggleTvMode,
+    SwitchProvider(crate::providers::models::ProviderKind),
     ShowTvWizard,
     TvChannelsLoaded(Vec<crate::providers::iptv_org::m3u::Channel>),
     Search {
@@ -21,10 +23,11 @@ pub enum Action {
         query: String,
     },
     SearchSuccess {
+        context: crate::providers::models::RequestContext,
         query: String,
         payload: serde_json::Value,
     },
-    SearchFailure(String),
+    SearchFailure(crate::providers::models::RequestContext, String),
     FetchHomepage {
         tab_id: String,
         page: usize,
@@ -60,8 +63,12 @@ pub enum Action {
     ConfirmDownloadSeason,
     ProcessDownloadQueue,
     FetchDetails(String, bool),
-    DetailsSuccess(String, serde_json::Value),
-    DetailsFailure(String),
+    DetailsSuccess(
+        crate::providers::models::RequestContext,
+        String,
+        serde_json::Value,
+    ),
+    DetailsFailure(crate::providers::models::RequestContext, String),
     InitStreamPool(String),
     StreamPoolInitialized(String, Vec<u32>),
     FetchEpisodeStreams {
@@ -70,8 +77,20 @@ pub enum Action {
         episode: usize,
         force_refresh: bool,
     },
-    EpisodeStreamsReady(String, usize, usize, serde_json::Value),
-    EpisodeStreamsFailed(String, usize, usize, String),
+    EpisodeStreamsReady(
+        crate::providers::models::RequestContext,
+        String,
+        usize,
+        usize,
+        serde_json::Value,
+    ),
+    EpisodeStreamsFailed(
+        crate::providers::models::RequestContext,
+        String,
+        usize,
+        usize,
+        String,
+    ),
     PosterSuccess(String, std::sync::Arc<image::DynamicImage>),
     SearchPosterLoaded(String, Option<std::sync::Arc<image::DynamicImage>>),
     UpdateAvailable(String),
@@ -83,4 +102,8 @@ pub enum Action {
     SetStatus(String),
     Refresh,
     ClearCache,
+    LaunchPlayback(
+        crate::tui::state::PlayerKind,
+        crate::providers::models::PlaybackSource,
+    ),
 }

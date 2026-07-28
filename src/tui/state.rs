@@ -1,3 +1,4 @@
+use crate::providers::models::ProviderKind;
 use ratatui::widgets::{ListState, TableState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +49,8 @@ pub struct SubjectStreamPool {
 }
 
 pub struct AppState {
+    pub active_provider: ProviderKind,
+    pub provider_generation: u64,
     pub active_screen: Screen,
     pub dirty: bool,
     pub input_mode: InputMode,
@@ -111,6 +114,7 @@ pub struct AppState {
     pub player_picker_state: ListState,
     pub player_picker_link: Option<String>,
     pub player_picker_subtitle: Option<String>,
+    pub player_picker_playback: Option<crate::providers::models::PlaybackSource>,
     pub available_players: Vec<PlayerKind>,
     pub is_loading: bool,
     pub status_message: String,
@@ -155,6 +159,8 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
+            active_provider: ProviderKind::MovieBox,
+            provider_generation: 0,
             active_screen: Screen::Startup,
             input_mode: InputMode::Normal,
             cached_animated_text: String::new(),
@@ -231,6 +237,7 @@ impl Default for AppState {
             player_picker_state: ListState::default(),
             player_picker_link: None,
             player_picker_subtitle: None,
+            player_picker_playback: None,
             available_players: Vec::new(),
             dirty: true,
             is_loading: false,

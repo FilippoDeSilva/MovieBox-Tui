@@ -24,6 +24,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("    [Esc]      ", theme.header),
             Span::styled("Go Back / Clear", theme.text),
         ]),
+        Line::from(vec![
+            Span::styled("    [Ctrl+P]   ", theme.header),
+            Span::styled(
+                format!(
+                    "Switch Provider (active: {})",
+                    state.active_provider.label()
+                ),
+                theme.text,
+            ),
+        ]),
         Line::from(vec![]),
         Line::from(vec![Span::styled(
             "  Navigation",

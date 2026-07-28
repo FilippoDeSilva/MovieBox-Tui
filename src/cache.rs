@@ -1,3 +1,4 @@
+use crate::providers::models::ProviderKind;
 use std::fs;
 use std::path::PathBuf;
 
@@ -25,8 +26,13 @@ fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value
 }
 
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
+    get_provider_cache_dir(ProviderKind::MovieBox, subdir)
+}
+
+pub fn get_provider_cache_dir(provider: ProviderKind, subdir: &str) -> PathBuf {
     let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
     path.push("moviebox-tui");
+    path.push(provider.cache_key());
     path.push(subdir);
     if !path.exists() {
         let _ = fs::create_dir_all(&path);
@@ -35,7 +41,16 @@ pub fn get_cache_dir(subdir: &str) -> PathBuf {
 }
 
 pub fn get_cache_path(subject_id: &str, season: usize, episode: usize) -> PathBuf {
-    let mut path = get_cache_dir("streams");
+    get_provider_stream_path(ProviderKind::MovieBox, subject_id, season, episode)
+}
+
+pub fn get_provider_stream_path(
+    provider: ProviderKind,
+    subject_id: &str,
+    season: usize,
+    episode: usize,
+) -> PathBuf {
+    let mut path = get_provider_cache_dir(provider, "streams");
     path.push(format!("{}_{}_{}.json", subject_id, season, episode));
     path
 }
@@ -51,8 +66,24 @@ pub fn get_stream_cache(
     )
 }
 
+pub fn get_provider_stream_cache(
+    provider: ProviderKind,
+    subject_id: &str,
+    season: usize,
+    episode: usize,
+) -> Option<serde_json::Value> {
+    read_json_cache(
+        &get_provider_stream_path(provider, subject_id, season, episode),
+        CACHE_EXPIRY_SECS,
+    )
+}
+
 pub fn get_details_path(subject_id: &str) -> PathBuf {
-    let mut path = get_cache_dir("details");
+    get_provider_details_path(ProviderKind::MovieBox, subject_id)
+}
+
+pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> PathBuf {
+    let mut path = get_provider_cache_dir(provider, "details");
     path.push(format!("details_{}.json", subject_id));
     path
 }
@@ -61,8 +92,22 @@ pub fn get_details_cache(subject_id: &str) -> Option<serde_json::Value> {
     read_json_cache(&get_details_path(subject_id), CACHE_EXPIRY_SECS)
 }
 
+pub fn get_provider_details_cache(
+    provider: ProviderKind,
+    subject_id: &str,
+) -> Option<serde_json::Value> {
+    read_json_cache(
+        &get_provider_details_path(provider, subject_id),
+        CACHE_EXPIRY_SECS,
+    )
+}
+
 pub fn get_search_path(query: &str) -> PathBuf {
-    let mut path = get_cache_dir("search");
+    get_provider_search_path(ProviderKind::MovieBox, query)
+}
+
+pub fn get_provider_search_path(provider: ProviderKind, query: &str) -> PathBuf {
+    let mut path = get_provider_cache_dir(provider, "search");
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
     hasher.update(query.as_bytes());
@@ -80,11 +125,42 @@ pub fn get_search_cache(query: &str) -> Option<serde_json::Value> {
     read_json_cache(&get_search_path(query), CACHE_EXPIRY_SECS)
 }
 
+pub fn get_provider_search_cache(provider: ProviderKind, query: &str) -> Option<serde_json::Value> {
+    let path = get_provider_search_path(provider, query);
+    let value = read_json_cache(&path, CACHE_EXPIRY_SECS)?;
+    if search_payload_has_results(&value) {
+        Some(value)
+    } else {
+        let _ = fs::remove_file(path);
+        None
+    }
+}
+
 pub fn set_search_cache(query: &str, data: &serde_json::Value) {
     let path = get_search_path(query);
     if let Ok(content) = serde_json::to_string(data) {
         let _ = fs::write(&path, content);
     }
+}
+
+pub fn set_provider_search_cache(provider: ProviderKind, query: &str, data: &serde_json::Value) {
+    let path = get_provider_search_path(provider, query);
+    if !search_payload_has_results(data) {
+        let _ = fs::remove_file(path);
+        return;
+    }
+    if let Ok(content) = serde_json::to_string(data) {
+        let _ = fs::write(path, content);
+    }
+}
+
+fn search_payload_has_results(data: &serde_json::Value) -> bool {
+    data.get("results")
+        .and_then(|results| results.as_array())
+        .and_then(|results| results.first())
+        .and_then(|result| result.get("subjects"))
+        .and_then(|subjects| subjects.as_array())
+        .is_some_and(|subjects| !subjects.is_empty())
 }
 
 pub fn set_details_cache(subject_id: &str, data: &serde_json::Value) {
@@ -94,10 +170,34 @@ pub fn set_details_cache(subject_id: &str, data: &serde_json::Value) {
     }
 }
 
+pub fn set_provider_details_cache(
+    provider: ProviderKind,
+    subject_id: &str,
+    data: &serde_json::Value,
+) {
+    let path = get_provider_details_path(provider, subject_id);
+    if let Ok(content) = serde_json::to_string(data) {
+        let _ = fs::write(path, content);
+    }
+}
+
 pub fn set_stream_cache(subject_id: &str, season: usize, episode: usize, data: &serde_json::Value) {
     let path = get_cache_path(subject_id, season, episode);
     if let Ok(content) = serde_json::to_string(data) {
         let _ = fs::write(&path, content);
+    }
+}
+
+pub fn set_provider_stream_cache(
+    provider: ProviderKind,
+    subject_id: &str,
+    season: usize,
+    episode: usize,
+    data: &serde_json::Value,
+) {
+    let path = get_provider_stream_path(provider, subject_id, season, episode);
+    if let Ok(content) = serde_json::to_string(data) {
+        let _ = fs::write(path, content);
     }
 }
 
@@ -117,7 +217,7 @@ pub fn clear_all_cache() {
 }
 
 fn get_homepage_path(tab_id: &str, page: usize) -> PathBuf {
-    let mut path = get_cache_dir("homepage");
+    let mut path = get_provider_cache_dir(ProviderKind::MovieBox, "homepage");
     path.push(format!("{}_{}.json", tab_id, page));
     path
 }
@@ -130,5 +230,29 @@ pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
     let path = get_homepage_path(tab_id, page);
     if let Ok(content) = serde_json::to_string(data) {
         let _ = fs::write(&path, content);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provider_cache_paths_are_isolated() {
+        let moviebox = get_provider_search_path(ProviderKind::MovieBox, "same");
+        let fourk = get_provider_search_path(ProviderKind::FourKHdHub, "same");
+        assert_ne!(moviebox, fourk);
+        assert!(moviebox.to_string_lossy().contains("moviebox"));
+        assert!(fourk.to_string_lossy().contains("fourkhdhub"));
+    }
+
+    #[test]
+    fn empty_search_payloads_are_not_cacheable() {
+        assert!(!search_payload_has_results(
+            &serde_json::json!({ "results": [{ "subjects": [] }] })
+        ));
+        assert!(search_payload_has_results(
+            &serde_json::json!({ "results": [{ "subjects": [{ "subjectId": "1" }] }] })
+        ));
     }
 }

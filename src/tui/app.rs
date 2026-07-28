@@ -2,13 +2,32 @@ use ratatui::Frame;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use crate::providers::moviebox::client::MovieBoxClient;
+use crate::providers::{
+    fourkhdhub::{
+        FourKHdHubClient, details_to_moviebox_json, releases_to_moviebox_json,
+        search_to_moviebox_json,
+    },
+    models::{ProviderKind, Release, RequestContext},
+    moviebox::client::MovieBoxClient,
+};
 use crate::tui::{
     action::Action,
     event::EventHandler,
     state::{AppState, InputMode, Screen, SearchResult},
     theme::Theme,
 };
+
+fn configure_mpv_window(command: &mut std::process::Command, iina: bool) {
+    let prefix = if iina { "--mpv-" } else { "--" };
+    command
+        .arg(format!("{prefix}autofit=960x540"))
+        .arg(format!("{prefix}autofit-larger=640x360"))
+        .arg(format!("{prefix}geometry=50%:50%"));
+}
+
+fn configure_vlc_window(command: &mut std::process::Command) {
+    command.arg("--width=960").arg("--height=540");
+}
 
 pub fn clean_moviebox_title(raw_title: &str) -> String {
     let mut end = raw_title.len();
@@ -39,6 +58,7 @@ pub struct App {
     state: AppState,
     theme: Theme,
     client: MovieBoxClient,
+    fourk_client: FourKHdHubClient,
     action_sender: mpsc::UnboundedSender<Action>,
     action_receiver: mpsc::UnboundedReceiver<Action>,
 }
@@ -69,6 +89,11 @@ impl App {
                     {
                         state.last_update_check = last_check;
                     }
+                    if config_json.get("active_provider").and_then(|v| v.as_str())
+                        == Some(ProviderKind::FourKHdHub.cache_key())
+                    {
+                        state.active_provider = ProviderKind::FourKHdHub;
+                    }
                 }
             }
         }
@@ -77,9 +102,87 @@ impl App {
             state,
             theme: Theme::new(),
             client: MovieBoxClient::new(),
+            fourk_client: FourKHdHubClient::new(),
             action_sender,
             action_receiver,
         }
+    }
+
+    fn request_context(&self) -> RequestContext {
+        RequestContext {
+            provider: self.state.active_provider,
+            generation: self.state.provider_generation,
+        }
+    }
+
+    fn context_is_current(&self, context: RequestContext) -> bool {
+        context.provider == self.state.active_provider
+            && context.generation == self.state.provider_generation
+    }
+
+    fn persist_config(&self) {
+        if let Some(config_dir) = dirs::config_dir() {
+            let app_dir = config_dir.join("moviebox-tui");
+            let _ = std::fs::create_dir_all(&app_dir);
+            let config = serde_json::json!({
+                "auto_update": self.state.auto_update,
+                "last_update_check": self.state.last_update_check,
+                "active_provider": self.state.active_provider.cache_key()
+            });
+            let _ = std::fs::write(app_dir.join("config.json"), config.to_string());
+        }
+    }
+
+    fn switch_provider(&mut self, provider: ProviderKind) {
+        if provider == self.state.active_provider {
+            return;
+        }
+        self.state
+            .fetch_cancel
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.state.fetch_cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
+        self.state.active_provider = provider;
+        self.state.active_screen = Screen::Home;
+        self.state.is_homepage_mode = false;
+        self.state.is_tv_mode = false;
+        self.state.is_loading = false;
+        self.state.is_fetching_streams = false;
+        self.state.search_results.clear();
+        self.state.search_suggestions.clear();
+        self.state.search_preview = None;
+        self.state.selected_details = None;
+        self.state.selected_resources = None;
+        self.state.active_subject_id = None;
+        self.state.available_seasons.clear();
+        self.state.available_episode_numbers.clear();
+        self.state.stream_pool.clear();
+        self.state.poster_image = None;
+        self.state.poster_protocol = None;
+        self.state.search_poster_protocols.clear();
+        self.state.search_list_state.select(None);
+        self.state.resource_list_state.select(None);
+        self.state.status_message = format!(
+            "{} selected. Search uses only this provider.",
+            provider.label()
+        );
+        self.state.status_timer = 180;
+        self.persist_config();
+        if provider == ProviderKind::MovieBox {
+            let client = self.client.clone();
+            tokio::spawn(async move {
+                let _ = client.init().await;
+            });
+        }
+    }
+
+    fn cycle_provider(&mut self) {
+        let current = ProviderKind::ENABLED
+            .iter()
+            .position(|provider| *provider == self.state.active_provider)
+            .unwrap_or(0);
+        let next = ProviderKind::ENABLED[(current + 1) % ProviderKind::ENABLED.len()];
+        self.switch_provider(next);
     }
 
     fn trigger_episode_fetch(&mut self) {
@@ -120,7 +223,9 @@ impl App {
             self.state.resource_list_state.select(None);
 
             let mut found_cached = false;
-            if let Some(cached) = crate::cache::get_stream_cache(id, se, ep) {
+            if let Some(cached) =
+                crate::cache::get_provider_stream_cache(self.state.active_provider, id, se, ep)
+            {
                 found_cached = true;
                 if let Some(arr) = cached.as_array() {
                     let count = arr.len();
@@ -182,6 +287,17 @@ impl App {
             .map(|s| s.to_string())
     }
 
+    fn get_selected_release(&self) -> Option<Release> {
+        self.state
+            .selected_resources
+            .as_ref()?
+            .get("list")?
+            .as_array()?
+            .get(self.state.resource_list_state.selected().unwrap_or(0))?
+            .get("_fourk_release")
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+    }
+
     pub async fn run<B: ratatui::backend::Backend>(
         &mut self,
         terminal: &mut ratatui::Terminal<B>,
@@ -213,16 +329,12 @@ impl App {
 
         let mut events = EventHandler::new(Duration::from_millis(100));
 
-        let _init_sender = self.action_sender.clone();
-        let client_clone = self.client.clone();
-        tokio::spawn(async move {
-            match client_clone.init().await {
-                Ok(_) => {
-                    let _ = _init_sender;
-                }
-                Err(_e) => {}
-            }
-        });
+        if self.state.active_provider == ProviderKind::MovieBox {
+            let client = self.client.clone();
+            tokio::spawn(async move {
+                let _ = client.init().await;
+            });
+        }
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -231,15 +343,7 @@ impl App {
 
         if self.state.auto_update && now.saturating_sub(self.state.last_update_check) > 3600 {
             self.state.last_update_check = now;
-            if let Some(config_dir) = dirs::config_dir() {
-                let config_path = config_dir.join("moviebox-tui").join("config.json");
-                let _ = std::fs::create_dir_all(config_dir.join("moviebox-tui"));
-                let config_json = serde_json::json!({
-                    "auto_update": self.state.auto_update,
-                    "last_update_check": now
-                });
-                let _ = std::fs::write(config_path, config_json.to_string());
-            }
+            self.persist_config();
             self.action_sender.send(Action::CheckForUpdates).ok();
         } else {
             self.state.active_screen = Screen::Home;
@@ -498,6 +602,7 @@ impl App {
                 self.state.search_poster_protocols.clear();
                 if self.state.image_picker.is_some() {}
             }
+            Action::SwitchProvider(provider) => self.switch_provider(provider),
             Action::Key(key) => {
                 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -508,6 +613,10 @@ impl App {
                     }
                     if let KeyCode::Char('t') = key.code {
                         self.action_sender.send(Action::ToggleTvMode).ok();
+                        return None;
+                    }
+                    if let KeyCode::Char('p') = key.code {
+                        self.cycle_provider();
                         return None;
                     }
                 }
@@ -1170,6 +1279,10 @@ impl App {
                 if self.state.is_tv_mode {
                     return None;
                 }
+                if self.state.active_provider != ProviderKind::MovieBox {
+                    self.state.search_suggestions.clear();
+                    return None;
+                }
 
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
@@ -1282,15 +1395,7 @@ impl App {
                 }
                 if lower_query == "/toggle-update" {
                     self.state.auto_update = !self.state.auto_update;
-                    if let Some(config_dir) = dirs::config_dir() {
-                        let config_path = config_dir.join("moviebox-tui").join("config.json");
-                        let _ = std::fs::create_dir_all(config_dir.join("moviebox-tui"));
-                        let config_json = serde_json::json!({
-                            "auto_update": self.state.auto_update,
-                            "last_update_check": self.state.last_update_check
-                        });
-                        let _ = std::fs::write(config_path, config_json.to_string());
-                    }
+                    self.persist_config();
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
                     self.state.toast_message = Some(format!(
@@ -1416,6 +1521,12 @@ impl App {
                 };
 
                 if let Some(tid) = tab_id {
+                    if self.state.active_provider != ProviderKind::MovieBox {
+                        self.state.status_message =
+                            "4KHDHub has no discover feed; enter a title to search.".into();
+                        self.state.status_timer = 180;
+                        return None;
+                    }
                     self.action_sender
                         .send(Action::FetchHomepage {
                             tab_id: tid.to_string(),
@@ -1441,11 +1552,16 @@ impl App {
                 let query_clone = query.clone();
                 let sender = self.action_sender.clone();
                 let client = self.client.clone();
+                let fourk_client = self.fourk_client.clone();
+                let context = self.request_context();
                 tokio::spawn(async move {
                     if !force_refresh {
-                        if let Some(cached) = crate::cache::get_search_cache(&query_clone) {
+                        if let Some(cached) =
+                            crate::cache::get_provider_search_cache(context.provider, &query_clone)
+                        {
                             sender
                                 .send(Action::SearchSuccess {
+                                    context,
                                     query: query_clone.clone(),
                                     payload: cached,
                                 })
@@ -1453,24 +1569,47 @@ impl App {
                             return;
                         }
                     }
-                    match client.search(&query_clone, 1).await {
+                    let result = match context.provider {
+                        ProviderKind::MovieBox => client
+                            .search(&query_clone, 1)
+                            .await
+                            .map_err(|error| format!("{error:?}")),
+                        ProviderKind::FourKHdHub => fourk_client
+                            .search(&query_clone)
+                            .await
+                            .map(|items| search_to_moviebox_json(&items))
+                            .map_err(|error| error.to_string()),
+                    };
+                    match result {
                         Ok(res) => {
-                            crate::cache::set_search_cache(&query_clone, &res);
+                            crate::cache::set_provider_search_cache(
+                                context.provider,
+                                &query_clone,
+                                &res,
+                            );
                             sender
                                 .send(Action::SearchSuccess {
+                                    context,
                                     query: query_clone,
                                     payload: res,
                                 })
                                 .ok();
                         }
                         Err(e) => {
-                            sender.send(Action::SearchFailure(format!("{:?}", e))).ok();
+                            sender.send(Action::SearchFailure(context, e)).ok();
                         }
                     }
                 });
             }
             Action::FetchHomepage { tab_id, page } => {
                 if self.state.is_tv_mode {
+                    return None;
+                }
+                if self.state.active_provider != ProviderKind::MovieBox {
+                    self.state.is_loading = false;
+                    self.state.status_message =
+                        "This provider exposes search, not a shared MovieBox homepage.".into();
+                    self.state.status_timer = 180;
                     return None;
                 }
                 self.state.is_homepage_mode = true;
@@ -1530,15 +1669,18 @@ impl App {
                     }
                 });
             }
-            Action::SearchSuccess { query, payload } => {
-                if query != self.state.search_query.trim() {
+            Action::SearchSuccess {
+                context,
+                query,
+                payload,
+            } => {
+                if !self.context_is_current(context) || query != self.state.search_query.trim() {
                     return None;
                 }
                 self.state.is_loading = false;
                 if self.state.current_page <= 1 {
                     self.state.search_results.clear();
                 }
-                let mut count = 0;
                 let subjects_opt = payload
                     .get("results")
                     .and_then(|r| r.as_array())
@@ -1641,7 +1783,6 @@ impl App {
                                 cover_url,
                                 season,
                             });
-                            count += 1;
                         }
                     }
                     let query_lower = query.to_lowercase();
@@ -1711,7 +1852,19 @@ impl App {
                     });
                 }
 
-                self.state.status_message = format!("Found {} results.", count);
+                self.state.status_message = if self.state.search_results.is_empty() {
+                    format!(
+                        "No matches for '{}' on {}. Press Ctrl+P to try another provider.",
+                        query,
+                        context.provider.label()
+                    )
+                } else {
+                    format!(
+                        "Found {} results on {}.",
+                        self.state.search_results.len(),
+                        context.provider.label()
+                    )
+                };
                 self.state.status_timer = 150;
                 if self.state.current_page <= 1 {
                     if let Some(res) = self.state.search_results.first() {
@@ -1725,7 +1878,10 @@ impl App {
                 }
             }
 
-            Action::SearchFailure(err) => {
+            Action::SearchFailure(context, err) => {
+                if !self.context_is_current(context) {
+                    return None;
+                }
                 self.state.is_loading = false;
                 self.state.status_message = format!("Search failed: {}", err);
                 self.state.status_timer = 150;
@@ -2083,24 +2239,36 @@ impl App {
                                 self.state.current_page = next_page;
                                 let query = self.state.search_query.clone();
                                 let client = self.client.clone();
+                                let fourk_client = self.fourk_client.clone();
                                 let sender = self.action_sender.clone();
+                                let context = self.request_context();
                                 self.state.is_loading = true;
                                 self.state.status_message =
                                     format!("Loading page {}...", next_page);
                                 tokio::spawn(async move {
-                                    match client.search(&query, next_page).await {
+                                    let result = match context.provider {
+                                        ProviderKind::MovieBox => client
+                                            .search(&query, next_page)
+                                            .await
+                                            .map_err(|error| format!("{error:?}")),
+                                        ProviderKind::FourKHdHub => fourk_client
+                                            .search(&query)
+                                            .await
+                                            .map(|items| search_to_moviebox_json(&items))
+                                            .map_err(|error| error.to_string()),
+                                    };
+                                    match result {
                                         Ok(res) => {
                                             sender
                                                 .send(Action::SearchSuccess {
+                                                    context,
                                                     query,
                                                     payload: res,
                                                 })
                                                 .ok();
                                         }
                                         Err(e) => {
-                                            sender
-                                                .send(Action::SearchFailure(format!("{:?}", e)))
-                                                .ok();
+                                            sender.send(Action::SearchFailure(context, e)).ok();
                                         }
                                     }
                                 });
@@ -2268,7 +2436,11 @@ impl App {
                     self.state.player_picker_popup = false;
                     let idx = self.state.player_picker_state.selected().unwrap_or(0);
                     if let Some(player) = self.state.available_players.get(idx).copied() {
-                        if let Some(link) = self.state.player_picker_link.take() {
+                        if let Some(source) = self.state.player_picker_playback.take() {
+                            self.action_sender
+                                .send(Action::LaunchPlayback(player, source))
+                                .ok();
+                        } else if let Some(link) = self.state.player_picker_link.take() {
                             let sub = self.state.player_picker_subtitle.take();
                             self.action_sender
                                 .send(Action::LaunchPlayer(player, link, sub))
@@ -2351,34 +2523,56 @@ impl App {
                 self.state.status_message = "Fetching details...".to_string();
                 self.state.stream_pool.clear();
                 let client = self.client.clone();
+                let fourk_client = self.fourk_client.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
+                let context = self.request_context();
                 tokio::spawn(async move {
                     if !force_refresh {
                         let id_for_cache = id_clone.clone();
                         if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                            crate::cache::get_details_cache(&id_for_cache)
+                            crate::cache::get_provider_details_cache(
+                                context.provider,
+                                &id_for_cache,
+                            )
                         })
                         .await
                         {
                             sender
-                                .send(Action::DetailsSuccess(id_clone.clone(), cached))
+                                .send(Action::DetailsSuccess(context, id_clone.clone(), cached))
                                 .ok();
                             return;
                         }
                     }
-                    match client.get_details(&id_clone).await {
+                    let result = match context.provider {
+                        ProviderKind::MovieBox => client
+                            .get_details(&id_clone)
+                            .await
+                            .map_err(|error| format!("{error:?}")),
+                        ProviderKind::FourKHdHub => fourk_client
+                            .details(&id_clone)
+                            .await
+                            .map(|details| details_to_moviebox_json(&details))
+                            .map_err(|error| error.to_string()),
+                    };
+                    match result {
                         Ok(details) => {
                             let id_for_cache = id_clone.clone();
                             let details_for_cache = details.clone();
                             let _ = tokio::task::spawn_blocking(move || {
-                                crate::cache::set_details_cache(&id_for_cache, &details_for_cache)
+                                crate::cache::set_provider_details_cache(
+                                    context.provider,
+                                    &id_for_cache,
+                                    &details_for_cache,
+                                )
                             })
                             .await;
-                            sender.send(Action::DetailsSuccess(id_clone, details)).ok();
+                            sender
+                                .send(Action::DetailsSuccess(context, id_clone, details))
+                                .ok();
                         }
                         Err(e) => {
-                            sender.send(Action::DetailsFailure(format!("{:?}", e))).ok();
+                            sender.send(Action::DetailsFailure(context, e)).ok();
                         }
                     }
                 });
@@ -2421,6 +2615,11 @@ impl App {
                             }
                         }
                     }
+                    return None;
+                }
+                if self.state.active_provider == ProviderKind::FourKHdHub {
+                    self.state.preview_loading = false;
+                    self.state.search_preview = None;
                     return None;
                 }
                 if let Some(cached) = self.state.preview_cache.get(&id).cloned() {
@@ -2570,6 +2769,37 @@ impl App {
             }
 
             Action::PlayStream(open_with) => {
+                if self.state.active_provider == ProviderKind::FourKHdHub {
+                    if let Some(release) = self.get_selected_release() {
+                        self.state.toast_message = Some("Resolving selected mirror...".into());
+                        self.state.toast_timer = 80;
+                        let client = self.fourk_client.clone();
+                        let sender = self.action_sender.clone();
+                        tokio::spawn(async move {
+                            match client.resolve_release(&release).await {
+                                Ok(source) if open_with => {
+                                    sender.send(Action::ShowPlaybackPicker(source)).ok();
+                                }
+                                Ok(source) => {
+                                    sender
+                                        .send(Action::LaunchPlayback(
+                                            crate::tui::state::PlayerKind::Mpv,
+                                            source,
+                                        ))
+                                        .ok();
+                                }
+                                Err(error) => {
+                                    sender
+                                        .send(Action::SetStatus(format!(
+                                            "Error: 4KHDHub source failed: {error}"
+                                        )))
+                                        .ok();
+                                }
+                            }
+                        });
+                    }
+                    return None;
+                }
                 if self.state.active_screen == Screen::Details
                     && let Some(link) = self.get_selected_link()
                 {
@@ -3333,6 +3563,12 @@ impl App {
             }
 
             Action::PromptDownloadEpisode => {
+                if self.state.active_provider != ProviderKind::MovieBox {
+                    self.state.status_message =
+                        "Downloads require a verified direct-file mirror; none is active.".into();
+                    self.state.status_timer = 180;
+                    return None;
+                }
                 self.state.show_episode_download_confirm = true;
                 self.state.episode_download_confirm_yes_selected = true;
             }
@@ -3375,6 +3611,12 @@ impl App {
             }
 
             Action::PromptDownloadSeason => {
+                if self.state.active_provider != ProviderKind::MovieBox {
+                    self.state.status_message =
+                        "Season downloads are unavailable for this provider.".into();
+                    self.state.status_timer = 180;
+                    return None;
+                }
                 self.state.show_season_download_confirm = true;
                 self.state.season_download_confirm_yes_selected = true;
             }
@@ -3459,8 +3701,9 @@ impl App {
                 }
             }
 
-            Action::DetailsSuccess(id, payload) => {
-                if self.state.active_screen != Screen::Details {
+            Action::DetailsSuccess(context, id, payload) => {
+                if !self.context_is_current(context) || self.state.active_screen != Screen::Details
+                {
                     return None;
                 }
                 self.state.is_loading = false;
@@ -3626,12 +3869,19 @@ impl App {
                     self.action_sender.send(Action::InitStreamPool(id)).ok();
                 }
             }
-            Action::DetailsFailure(err) => {
+            Action::DetailsFailure(context, err) => {
+                if !self.context_is_current(context) {
+                    return None;
+                }
                 self.state.is_loading = false;
                 self.state.status_message = format!("Details fetch failed: {}", err);
                 self.state.status_timer = 150;
             }
             Action::SetStatus(msg) => {
+                if msg.starts_with("Error:") {
+                    self.state.toast_message = Some(msg.clone());
+                    self.state.toast_timer = 180;
+                }
                 self.state.status_message = msg;
                 self.state.status_timer = 150;
             }
@@ -3643,6 +3893,9 @@ impl App {
                 self.state.stream_pool.insert(subject_id.clone(), pool);
                 self.trigger_episode_fetch();
 
+                if self.state.active_provider != ProviderKind::MovieBox {
+                    return None;
+                }
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
@@ -3720,12 +3973,58 @@ impl App {
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
                 self.state.selected_resources = None;
+                let context = self.request_context();
+
+                if context.provider == ProviderKind::FourKHdHub {
+                    let sender = self.action_sender.clone();
+                    let client = self.fourk_client.clone();
+                    let id = subject_id.clone();
+                    tokio::spawn(async move {
+                        match client.releases(&id, season, episode).await {
+                            Ok(releases) if !releases.is_empty() => {
+                                sender
+                                    .send(Action::EpisodeStreamsReady(
+                                        context,
+                                        id,
+                                        season,
+                                        episode,
+                                        releases_to_moviebox_json(&releases),
+                                    ))
+                                    .ok();
+                            }
+                            Ok(_) => {
+                                sender
+                                    .send(Action::EpisodeStreamsFailed(
+                                        context,
+                                        id,
+                                        season,
+                                        episode,
+                                        "No exact release found".into(),
+                                    ))
+                                    .ok();
+                            }
+                            Err(error) => {
+                                sender
+                                    .send(Action::EpisodeStreamsFailed(
+                                        context,
+                                        id,
+                                        season,
+                                        episode,
+                                        error.to_string(),
+                                    ))
+                                    .ok();
+                            }
+                        }
+                    });
+                    return None;
+                }
 
                 if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
                     if !force_refresh {
                         if let Some(cached) = pool.episode_index.get(&(season, episode)) {
                             self.action_sender
                                 .send(Action::EpisodeStreamsReady(
+                                    context,
                                     subject_id.clone(),
                                     season,
                                     episode,
@@ -3758,7 +4057,12 @@ impl App {
                         if !force_refresh {
                             let id_for_cache = id_clone.clone();
                             if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                                crate::cache::get_stream_cache(&id_for_cache, season, episode)
+                                crate::cache::get_provider_stream_cache(
+                                    context.provider,
+                                    &id_for_cache,
+                                    season,
+                                    episode,
+                                )
                             })
                             .await
                             {
@@ -3767,6 +4071,7 @@ impl App {
                                     .ok();
                                 sender
                                     .send(Action::EpisodeStreamsReady(
+                                        context,
                                         subject_id.clone(),
                                         season,
                                         episode,
@@ -3899,6 +4204,7 @@ impl App {
                         if !target_ok || all_items.is_empty() {
                             sender
                                 .send(Action::EpisodeStreamsFailed(
+                                    context,
                                     id_clone,
                                     season,
                                     episode,
@@ -3908,6 +4214,7 @@ impl App {
                         } else {
                             sender
                                 .send(Action::EpisodeStreamsReady(
+                                    context,
                                     id_clone,
                                     season,
                                     episode,
@@ -3918,8 +4225,10 @@ impl App {
                     });
                 }
             }
-            Action::EpisodeStreamsReady(subject_id, target_se, target_ep, payload) => {
-                if Some(&subject_id) != self.state.active_subject_id.as_ref() {
+            Action::EpisodeStreamsReady(context, subject_id, target_se, target_ep, payload) => {
+                if !self.context_is_current(context)
+                    || Some(&subject_id) != self.state.active_subject_id.as_ref()
+                {
                     return None;
                 }
                 if target_se != self.state.selected_season
@@ -4007,7 +4316,8 @@ impl App {
                         let id_clone = subject_id.clone();
                         let payload_clone = array_payload.clone();
                         tokio::task::spawn_blocking(move || {
-                            crate::cache::set_stream_cache(
+                            crate::cache::set_provider_stream_cache(
+                                context.provider,
                                 &id_clone,
                                 target_se,
                                 target_ep,
@@ -4079,8 +4389,10 @@ impl App {
                     self.action_sender.send(Action::DownloadStream(None)).ok();
                 }
             }
-            Action::EpisodeStreamsFailed(subject_id, target_se, target_ep, err) => {
-                if Some(&subject_id) != self.state.active_subject_id.as_ref() {
+            Action::EpisodeStreamsFailed(context, subject_id, target_se, target_ep, err) => {
+                if !self.context_is_current(context)
+                    || Some(&subject_id) != self.state.active_subject_id.as_ref()
+                {
                     return None;
                 }
                 if target_se != self.state.selected_season
@@ -4124,6 +4436,20 @@ impl App {
             Action::PlayersDetected(players) => {
                 self.state.available_players = players;
             }
+            Action::ShowPlaybackPicker(source) => {
+                if self.state.available_players.is_empty() {
+                    self.state.status_message =
+                        "No media player found. Install mpv, IINA, or VLC.".into();
+                    self.state.status_timer = 150;
+                    return None;
+                }
+                self.state.player_picker_popup = true;
+                self.state.player_picker_playback = Some(source);
+                self.state.player_picker_link = None;
+                self.state.player_picker_subtitle = None;
+                self.state.player_picker_state.select(Some(0));
+                self.state.subtitle_popup = false;
+            }
             Action::ShowPlayerPicker(link, subtitle) => {
                 if self.state.available_players.is_empty() {
                     self.state.toast_message = Some(format!(
@@ -4138,6 +4464,7 @@ impl App {
                     return None;
                 }
                 self.state.player_picker_popup = true;
+                self.state.player_picker_playback = None;
                 self.state.player_picker_link = Some(link);
                 self.state.player_picker_subtitle = subtitle;
                 self.state.player_picker_state.select(Some(0));
@@ -4185,6 +4512,7 @@ impl App {
                             } else {
                                 std::process::Command::new("mpv")
                             };
+                            configure_mpv_window(&mut c, false);
                             c.arg(&link);
                             if let Some(s) = local_sub {
                                 c.arg(format!("--sub-file={}", s));
@@ -4195,11 +4523,10 @@ impl App {
                             #[cfg(target_os = "macos")]
                             {
                                 let mut c = std::process::Command::new("open");
-                                c.arg("-a").arg("IINA");
+                                c.arg("-a").arg("IINA").arg("--args");
+                                configure_mpv_window(&mut c, true);
                                 if let Some(s) = &local_sub {
-                                    c.arg("--args")
-                                        .arg(&link)
-                                        .arg(format!("--mpv-sub-files={}", s));
+                                    c.arg(&link).arg(format!("--mpv-sub-files={}", s));
                                 } else {
                                     c.arg(&link);
                                 }
@@ -4208,6 +4535,7 @@ impl App {
                             #[cfg(not(target_os = "macos"))]
                             {
                                 let mut c = std::process::Command::new("mpv");
+                                configure_mpv_window(&mut c, false);
                                 c.arg(&link);
                                 if let Some(s) = local_sub {
                                     c.arg(format!("--sub-file={}", s));
@@ -4239,6 +4567,7 @@ impl App {
                             } else {
                                 std::process::Command::new("vlc")
                             };
+                            configure_vlc_window(&mut c);
                             c.arg(&link);
                             if let Some(s) = local_sub {
                                 c.arg(format!("--sub-file={}", s));
@@ -4255,6 +4584,104 @@ impl App {
                         cmd.process_group(0);
                     }
 
+                    let _ = cmd.spawn();
+                });
+            }
+            Action::LaunchPlayback(kind, source) => {
+                self.state.player_picker_popup = false;
+                if kind == crate::tui::state::PlayerKind::Vlc
+                    && source.headers.iter().any(|(name, _)| {
+                        !name.eq_ignore_ascii_case("referer")
+                            && !name.eq_ignore_ascii_case("user-agent")
+                    })
+                {
+                    self.state.status_message =
+                        "This source needs headers VLC cannot provide; use mpv or IINA.".into();
+                    self.state.status_timer = 180;
+                    return None;
+                }
+                tokio::spawn(async move {
+                    let header_fields = source
+                        .headers
+                        .iter()
+                        .map(|(name, value)| format!("{name}: {value}"))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    let mut cmd = match kind {
+                        crate::tui::state::PlayerKind::Mpv => {
+                            let executable =
+                                if std::path::Path::new("/Applications/mpv.app/Contents/MacOS/mpv")
+                                    .exists()
+                                {
+                                    "/Applications/mpv.app/Contents/MacOS/mpv"
+                                } else {
+                                    "mpv"
+                                };
+                            let mut command = std::process::Command::new(executable);
+                            configure_mpv_window(&mut command, false);
+                            command.arg(&source.url);
+                            if !header_fields.is_empty() {
+                                command.arg(format!("--http-header-fields={header_fields}"));
+                            }
+                            if let Some(subtitle) = &source.subtitle {
+                                command.arg(format!("--sub-file={subtitle}"));
+                            }
+                            command
+                        }
+                        crate::tui::state::PlayerKind::Iina => {
+                            #[cfg(target_os = "macos")]
+                            let mut command = {
+                                let mut command = std::process::Command::new("open");
+                                command.arg("-a").arg("IINA").arg("--args");
+                                configure_mpv_window(&mut command, true);
+                                command.arg(&source.url);
+                                command
+                            };
+                            #[cfg(not(target_os = "macos"))]
+                            let mut command = {
+                                let mut command = std::process::Command::new("mpv");
+                                configure_mpv_window(&mut command, false);
+                                command.arg(&source.url);
+                                command
+                            };
+                            if !header_fields.is_empty() {
+                                command.arg(format!("--mpv-http-header-fields={header_fields}"));
+                            }
+                            if let Some(subtitle) = &source.subtitle {
+                                command.arg(format!("--mpv-sub-files={subtitle}"));
+                            }
+                            command
+                        }
+                        crate::tui::state::PlayerKind::Vlc => {
+                            let executable =
+                                if std::path::Path::new("/Applications/VLC.app").exists() {
+                                    "/Applications/VLC.app/Contents/MacOS/VLC"
+                                } else {
+                                    "vlc"
+                                };
+                            let mut command = std::process::Command::new(executable);
+                            configure_vlc_window(&mut command);
+                            command.arg(&source.url);
+                            for (name, value) in &source.headers {
+                                if name.eq_ignore_ascii_case("referer") {
+                                    command.arg(format!("--http-referrer={value}"));
+                                } else if name.eq_ignore_ascii_case("user-agent") {
+                                    command.arg(format!("--http-user-agent={value}"));
+                                }
+                            }
+                            if let Some(subtitle) = &source.subtitle {
+                                command.arg(format!("--sub-file={subtitle}"));
+                            }
+                            command
+                        }
+                    };
+                    cmd.stdout(std::process::Stdio::null());
+                    cmd.stderr(std::process::Stdio::null());
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::process::CommandExt;
+                        cmd.process_group(0);
+                    }
                     let _ = cmd.spawn();
                 });
             }
@@ -4496,7 +4923,6 @@ impl App {
         if self.state.show_help {
             super::screens::help::draw(frame, main_area, &self.state, &self.theme);
         }
-
         if let Some(prog) = self.state.download_progress {
             if let Some(dl_area) = download_area {
                 use ratatui::widgets::{Block, Borders, Clear, Gauge};

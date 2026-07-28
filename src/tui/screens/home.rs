@@ -210,6 +210,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let legend_line = ratatui::text::Line::from(vec![
                 ratatui::text::Span::styled("[", theme.text_dim),
+                ratatui::text::Span::styled("Ctrl+P", theme.shortcut),
+                ratatui::text::Span::styled("] ", theme.text_dim),
+                ratatui::text::Span::styled(
+                    format!("{}   ", state.active_provider.label()),
+                    theme.accent,
+                ),
+                ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("Ctrl+T", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
                 ratatui::text::Span::styled(
