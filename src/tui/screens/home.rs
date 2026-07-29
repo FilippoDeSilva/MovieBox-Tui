@@ -718,8 +718,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             }
                         }
                         if let Some((_, proto)) = state.search_poster_protocols.peek(&res.id) {
+                            let img_height = poster_area.height.min(state.poster_rows);
+                            let img_y_offset = item_area.height.saturating_sub(img_height) / 2;
                             let p_area = Rect {
-                                height: poster_area.height.min(state.poster_rows),
+                                y: poster_area.y + img_y_offset,
+                                height: img_height,
                                 ..poster_area
                             };
                             frame.render_widget(ratatui_image::Image::new(proto), p_area);
@@ -869,7 +872,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     {
         let search_area = search_bar_area;
         let visible_count = state.search_suggestions.len().min(6);
-        let dropdown_height = visible_count as u16 + 3;
+        let dropdown_height = visible_count as u16 + 4;
         let selected_index = state.suggest_index.unwrap_or(0);
         let suggestion_offset = selected_index
             .saturating_add(1)
@@ -903,10 +906,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let dropdown_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(1),
-                    Constraint::Length(visible_count as u16),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
+                    Constraint::Length(1), // Header
+                    Constraint::Length(visible_count as u16), // List
+                    Constraint::Length(1), // Separator
+                    Constraint::Length(1), // Footer text
+                    Constraint::Length(1), // Pad below footer
                 ])
                 .split(dropdown_area);
             let items: Vec<ratatui::widgets::ListItem> = state
