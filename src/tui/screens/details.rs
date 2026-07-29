@@ -185,10 +185,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let show_poster = !matches!(tier, DetailsLayoutTier::Tiny)
         && inner_area.height >= 6
         && inner_area.width >= 60;
-    let poster_width = if show_poster && state.image_supported {
-        ((inner_area.height as f32 * 0.78).ceil() as u16).clamp(8, 18)
-    } else if show_poster {
-        16.min(inner_area.width / 4)
+    let poster_width = if show_poster {
+        ((inner_area.height as f32 * 1.33).ceil() as u16)
+            .clamp(10, 22)
+            .min(inner_area.width / 3)
     } else {
         0
     };
@@ -203,8 +203,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         .split(inner_area);
 
     let poster_height = ((poster_width as f32) / 1.33).ceil() as u16;
+    let poster_height = h_chunks[0].height.min(poster_height);
     let poster_area = ratatui::layout::Rect {
-        height: h_chunks[0].height.min(poster_height),
+        y: h_chunks[0].y + h_chunks[0].height.saturating_sub(poster_height) / 2,
+        height: poster_height,
         ..h_chunks[0]
     };
     let right_area = h_chunks[2];
@@ -914,94 +916,62 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(streams_block, streams_area);
     }
     if state.subtitle_popup || state.is_download_subtitle_popup {
-        let popup_width = 50;
-        let popup_height = std::cmp::min(15, state.subtitle_list.len() as u16 + 2);
-
-        let area = frame.area();
-        let popup_area = ratatui::layout::Rect {
-            x: area.width.saturating_sub(popup_width) / 2,
-            y: area.height.saturating_sub(popup_height) / 2,
-            width: popup_width,
-            height: popup_height,
-        };
-
-        crate::tui::clear_area(frame, popup_area, theme);
-
-        let items: Vec<ratatui::widgets::ListItem> = state
+        let items = state
             .subtitle_list
             .iter()
-            .map(|(name, _)| ratatui::widgets::ListItem::new(name.clone()))
-            .collect();
-
-        let title = if state.is_download_subtitle_popup {
-            " Select Subtitle to Download "
-        } else {
-            " Select Subtitle "
-        };
-
-        let list = ratatui::widgets::List::new(items)
-            .block(
-                ratatui::widgets::Block::default()
-                    .title(title)
-                    .title_style(theme.title)
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
-                    .border_style(theme.border),
-            )
-            .highlight_style(theme.highlight)
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-
-        frame.render_stateful_widget(list, popup_area, &mut state.subtitle_list_state);
+            .map(|(name, _)| {
+                if name == "None" {
+                    "No subtitles".to_string()
+                } else {
+                    name.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        crate::tui::overlay::picker(
+            frame,
+            area,
+            &items,
+            &mut state.subtitle_list_state,
+            crate::tui::overlay::PickerSpec {
+                title: "Subtitles",
+                confirm_label: if state.is_download_subtitle_popup {
+                    "Download"
+                } else {
+                    "Use"
+                },
+                minimum_width: 32,
+            },
+            theme,
+            state.basic_terminal,
+        );
     }
 
     if state.player_picker_popup {
-        let popup_width = 24;
-        let popup_height = std::cmp::min(15, state.available_players.len() as u16 + 2);
-
-        let area = frame.area();
-        let popup_area = ratatui::layout::Rect {
-            x: area.width.saturating_sub(popup_width) / 2,
-            y: area.height.saturating_sub(popup_height) / 2,
-            width: popup_width,
-            height: popup_height,
-        };
-
-        crate::tui::clear_area(frame, popup_area, theme);
-
-        let items: Vec<ratatui::widgets::ListItem> = state
+        let items = state
             .available_players
             .iter()
             .map(|k| {
-                let text = match k {
+                match k {
                     crate::tui::state::PlayerKind::Mpv => "mpv",
                     crate::tui::state::PlayerKind::Iina => "IINA",
                     crate::tui::state::PlayerKind::Vlc => "VLC",
-                };
-                ratatui::widgets::ListItem::new(text)
+                }
+                .to_string()
             })
-            .collect();
-
-        let list = ratatui::widgets::List::new(items)
-            .block(
-                ratatui::widgets::Block::default()
-                    .title(" Open With ")
-                    .title_style(theme.title)
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
-                    .border_style(theme.border),
-            )
-            .highlight_style(theme.highlight)
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-
-        frame.render_stateful_widget(list, popup_area, &mut state.player_picker_state);
+            .collect::<Vec<_>>();
+        crate::tui::overlay::picker(
+            frame,
+            area,
+            &items,
+            &mut state.player_picker_state,
+            crate::tui::overlay::PickerSpec {
+                title: "Open with",
+                confirm_label: "Open",
+                minimum_width: 24,
+            },
+            theme,
+            state.basic_terminal,
+        );
     }
 
     let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);
@@ -1018,144 +988,87 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     frame.render_widget(footer_p, chunks[3]);
 
     if state.show_season_download_confirm {
-        let popup_width = 50;
-        let popup_height = 7;
-        let popup_area = Rect::new(
-            (area.width.saturating_sub(popup_width)) / 2,
-            (area.height.saturating_sub(popup_height)) / 2,
-            popup_width,
-            popup_height,
-        );
-        crate::tui::clear_area(frame, popup_area, theme);
-
         let season_idx = state.selected_season;
         let eps_count = if season_idx > 0 && season_idx <= state.available_episode_numbers.len() {
             state.available_episode_numbers[season_idx - 1].len()
         } else {
             0
         };
-
-        let msg = format!(
-            "Download all {} episodes in Season {}?",
-            eps_count, season_idx
+        crate::tui::overlay::confirmation(
+            frame,
+            area,
+            "Download season",
+            &[
+                Line::from(format!("Season {season_idx}")),
+                Line::from(format!("{eps_count} episodes")),
+            ],
+            state.season_download_confirm_yes_selected,
+            theme,
+            state.basic_terminal,
         );
-        let yes_text = if state.season_download_confirm_yes_selected {
-            "  < Yes >  "
-        } else {
-            "    Yes    "
-        };
-        let no_text = if !state.season_download_confirm_yes_selected {
-            "  < No >  "
-        } else {
-            "    No    "
-        };
-
-        let confirm_block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(theme.border_focus)
-            .title(" Season Download ")
-            .title_alignment(Alignment::Center);
-
-        let lines = vec![
-            Line::from(""),
-            Line::from(msg),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    yes_text,
-                    if state.season_download_confirm_yes_selected {
-                        theme.highlight
-                    } else {
-                        theme.text_dim
-                    },
-                ),
-                Span::raw("    "),
-                Span::styled(
-                    no_text,
-                    if !state.season_download_confirm_yes_selected {
-                        theme.highlight
-                    } else {
-                        theme.text_dim
-                    },
-                ),
-            ]),
-        ];
-
-        let p = Paragraph::new(lines)
-            .block(confirm_block)
-            .alignment(Alignment::Center)
-            .style(theme.text);
-
-        frame.render_widget(p, popup_area);
     } else if state.show_episode_download_confirm {
-        let popup_width = 50;
-        let popup_height = 7;
-        let popup_area = Rect::new(
-            (area.width.saturating_sub(popup_width)) / 2,
-            (area.height.saturating_sub(popup_height)) / 2,
-            popup_width,
-            popup_height,
-        );
-        crate::tui::clear_area(frame, popup_area, theme);
-
         let season_idx = state.selected_season;
         let ep_idx = state.selected_episode;
-
-        let msg = if type_val == 2 {
-            format!("Download Episode {} of Season {}?", ep_idx, season_idx)
+        let mut summary = if type_val == 2 {
+            vec![Line::from(format!(
+                "Season {season_idx} · Episode {ep_idx}"
+            ))]
         } else {
-            "Download this Movie?".to_string()
+            vec![Line::from("Download this movie")]
         };
-
-        let yes_text = if state.episode_download_confirm_yes_selected {
-            "  < Yes >  "
-        } else {
-            "    Yes    "
-        };
-        let no_text = if !state.episode_download_confirm_yes_selected {
-            "  < No >  "
-        } else {
-            "    No    "
-        };
-
-        let confirm_block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(theme.border_focus)
-            .title(" Download ")
-            .title_alignment(Alignment::Center);
-
-        let lines = vec![
-            Line::from(""),
-            Line::from(msg),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    yes_text,
-                    if state.episode_download_confirm_yes_selected {
-                        theme.highlight
-                    } else {
-                        theme.text_dim
-                    },
-                ),
-                Span::raw("    "),
-                Span::styled(
-                    no_text,
-                    if !state.episode_download_confirm_yes_selected {
-                        theme.highlight
-                    } else {
-                        theme.text_dim
-                    },
-                ),
-            ]),
-        ];
-
-        let p = Paragraph::new(lines)
-            .block(confirm_block)
-            .alignment(Alignment::Center)
-            .style(theme.text);
-
-        frame.render_widget(p, popup_area);
+        if let Some(stream) = selected_stream_summary(state) {
+            summary.push(Line::from(stream));
+        }
+        crate::tui::overlay::confirmation(
+            frame,
+            area,
+            if type_val == 2 {
+                "Download episode"
+            } else {
+                "Download movie"
+            },
+            &summary,
+            state.episode_download_confirm_yes_selected,
+            theme,
+            state.basic_terminal,
+        );
     }
+}
+
+fn selected_stream_summary(state: &AppState) -> Option<String> {
+    let resource = state
+        .selected_resources
+        .as_ref()?
+        .get("list")?
+        .as_array()?
+        .get(state.resource_list_state.selected().unwrap_or(0))?;
+    let resolution = resource
+        .get("resolution")
+        .and_then(|value| value.as_i64())
+        .filter(|value| *value > 0)
+        .map(|value| format!("{value}p"));
+    let codec = resource
+        .get("codecName")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.is_empty())
+        .map(str::to_uppercase);
+    let size = resource
+        .get("size")
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.parse::<f64>().ok())
+        .map(|bytes| {
+            let megabytes = bytes / 1024.0 / 1024.0;
+            if megabytes > 1024.0 {
+                format!("{:.1} GB", megabytes / 1024.0)
+            } else {
+                format!("{megabytes:.0} MB")
+            }
+        });
+    let fields = [size, resolution, codec]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    (!fields.is_empty()).then(|| fields.join(" · "))
 }
 
 fn truncate_with_ellipsis(value: &str, capacity: usize) -> String {

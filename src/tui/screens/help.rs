@@ -1,7 +1,7 @@
 use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
@@ -165,28 +165,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]);
     }
 
-    let height = help_text.len() as u16 + 2;
-    let margin_y = area.height.saturating_sub(height) / 2;
+    let content_width = help_text.iter().map(Line::width).max().unwrap_or(42);
+    let popup_chunk = crate::tui::overlay::centered(
+        area,
+        content_width.saturating_add(4) as u16,
+        help_text.len() as u16 + 2,
+        46,
+        64,
+    );
 
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(margin_y),
-            Constraint::Length(height),
-            Constraint::Min(0),
-        ])
-        .split(area);
-
-    let popup_chunk = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(25),
-            Constraint::Min(45),
-            Constraint::Percentage(25),
-        ])
-        .split(popup_layout[1])[1];
-
-    crate::tui::clear_area(frame, popup_chunk, theme);
+    crate::tui::overlay::clear_modal_area(frame, area, popup_chunk, theme);
 
     let block = Block::default()
         .title(" Keybindings Help ")

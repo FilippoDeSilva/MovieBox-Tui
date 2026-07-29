@@ -13,6 +13,7 @@ use crate::providers::{
 use crate::tui::{
     action::Action,
     event::EventHandler,
+    overlay::NotificationKind,
     state::{AppState, InputMode, Screen, SearchResult},
     theme::Theme,
 };
@@ -344,11 +345,18 @@ impl App {
         let Some(link) = self.get_selected_link() else {
             if self.state.is_fetching_streams {
                 self.state.is_waiting_for_download_stream = true;
-                self.state.toast_message = Some("Waiting for stream details...".into());
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Preparing download",
+                    "Waiting for stream details.",
+                );
             } else {
-                self.state.toast_message = Some("No downloadable stream selected.".into());
+                self.state.notify(
+                    NotificationKind::Warning,
+                    "Download unavailable",
+                    "Select a downloadable stream first.",
+                );
             }
-            self.state.toast_timer = 120;
             return;
         };
 
@@ -421,8 +429,11 @@ impl App {
         self.state
             .cancel_download
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        self.state.toast_message = Some("Download started. Partial data will be preserved.".into());
-        self.state.toast_timer = 80;
+        self.state.notify(
+            NotificationKind::Info,
+            "Download started",
+            "Partial data will be preserved.",
+        );
 
         let cancel = self.state.cancel_download.clone();
         let sender = self.action_sender.clone();
@@ -610,12 +621,9 @@ impl App {
                 let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0)
                     || self.state.tick_count < 15;
                 self.state.tick_count = self.state.tick_count.wrapping_add(1);
-                if self.state.toast_timer > 0 {
+                if !self.state.notifications.is_empty() {
                     needs_redraw = true;
-                    self.state.toast_timer -= 1;
-                    if self.state.toast_timer == 0 {
-                        self.state.toast_message = None;
-                    }
+                    self.state.expire_notifications();
                 }
                 if self.state.status_timer > 0 {
                     needs_redraw = true;
@@ -1257,6 +1265,14 @@ impl App {
             Action::ToggleHelp => {
                 if matches!(self.state.active_screen, Screen::Home | Screen::Details) {
                     self.state.show_help = !self.state.show_help;
+                    if self.state.show_help {
+                        self.state.tv_config_popup = false;
+                        self.state.player_picker_popup = false;
+                        self.state.subtitle_popup = false;
+                        self.state.is_download_subtitle_popup = false;
+                        self.state.show_season_download_confirm = false;
+                        self.state.show_episode_download_confirm = false;
+                    }
                 }
             }
             Action::ToggleTvMode => {
@@ -1308,6 +1324,10 @@ impl App {
             }
             Action::ShowTvWizard => {
                 if self.state.is_tv_mode {
+                    self.state.show_help = false;
+                    self.state.player_picker_popup = false;
+                    self.state.subtitle_popup = false;
+                    self.state.is_download_subtitle_popup = false;
                     self.state.tv_config_popup = true;
                     self.state.input_mode = crate::tui::state::InputMode::Normal;
                 }
@@ -1599,20 +1619,15 @@ impl App {
                     self.persist_config();
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
-                    self.state.toast_message = Some(format!(
-                        "{} Auto Update is now {}",
-                        if self.state.basic_terminal {
-                            "[!]"
-                        } else {
-                            "!"
-                        },
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Automatic updates",
                         if self.state.auto_update {
                             "Enabled"
                         } else {
                             "Disabled"
-                        }
-                    ));
-                    self.state.toast_timer = 50;
+                        },
+                    );
                     return None;
                 }
 
@@ -2885,8 +2900,11 @@ impl App {
             Action::PlayStream(open_with) => {
                 if self.state.active_provider == ProviderKind::FourKHdHub {
                     if let Some(release) = self.get_selected_release() {
-                        self.state.toast_message = Some("Resolving selected mirror...".into());
-                        self.state.toast_timer = 80;
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Preparing playback",
+                            "Resolving the selected mirror.",
+                        );
                         let client = self.fourk_client.clone();
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
@@ -2928,15 +2946,11 @@ impl App {
                     let resource_id = self.get_selected_resource_id();
 
                     if let Some(rid) = resource_id {
-                        self.state.toast_message = Some(format!(
-                            "{} Fetching subtitles...",
-                            if self.state.basic_terminal {
-                                "[OK]"
-                            } else {
-                                "✓"
-                            }
-                        ));
-                        self.state.toast_timer = 40;
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Preparing playback",
+                            "Fetching subtitles.",
+                        );
                         let client = self.client.clone();
                         let sender = self.action_sender.clone();
                         let link_clone = link.clone();
@@ -2988,6 +3002,9 @@ impl App {
                 }
 
                 if options.len() > 1 {
+                    self.state.show_help = false;
+                    self.state.player_picker_popup = false;
+                    self.state.is_download_subtitle_popup = false;
                     self.state.subtitle_popup = true;
                     self.state.subtitle_list = options;
                     self.state.subtitle_list_state.select(Some(0));
@@ -3027,6 +3044,9 @@ impl App {
                 }
 
                 if options.len() > 1 {
+                    self.state.show_help = false;
+                    self.state.player_picker_popup = false;
+                    self.state.subtitle_popup = false;
                     self.state.is_download_subtitle_popup = true;
                     self.state.subtitle_list = options;
                     self.state.subtitle_list_state.select(Some(0));
@@ -3038,15 +3058,11 @@ impl App {
                 let player = self.state.available_players.first().cloned();
                 match player {
                     None => {
-                        self.state.toast_message = Some(format!(
-                            "{} No media player found. Install mpv, IINA, or VLC.",
-                            if self.state.basic_terminal {
-                                "[X]"
-                            } else {
-                                "✗"
-                            }
-                        ));
-                        self.state.toast_timer = 150;
+                        self.state.notify(
+                            NotificationKind::Error,
+                            "Player unavailable",
+                            "Install mpv, IINA, or VLC.",
+                        );
                     }
                     Some(kind) => {
                         let player_name = match kind {
@@ -3054,16 +3070,11 @@ impl App {
                             crate::tui::state::PlayerKind::Iina => "IINA",
                             crate::tui::state::PlayerKind::Vlc => "VLC",
                         };
-                        self.state.toast_message = Some(format!(
-                            "{} Launching {}...",
-                            if self.state.basic_terminal {
-                                "[OK]"
-                            } else {
-                                "✓"
-                            },
-                            player_name
-                        ));
-                        self.state.toast_timer = 40;
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Opening player",
+                            format!("Launching {player_name}."),
+                        );
 
                         self.action_sender
                             .send(Action::LaunchPlayer(kind, link, subtitle_url))
@@ -3083,7 +3094,7 @@ impl App {
                     return None;
                 }
                 self.state.show_episode_download_confirm = true;
-                self.state.episode_download_confirm_yes_selected = true;
+                self.state.episode_download_confirm_yes_selected = false;
             }
 
             Action::ConfirmDownloadEpisode => {
@@ -3100,15 +3111,11 @@ impl App {
                 let resource_id = self.get_selected_resource_id();
 
                 if let Some(rid) = resource_id {
-                    self.state.toast_message = Some(format!(
-                        "{} Fetching subtitles...",
-                        if self.state.basic_terminal {
-                            "[OK]"
-                        } else {
-                            "✓"
-                        }
-                    ));
-                    self.state.toast_timer = 40;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Preparing download",
+                        "Fetching subtitles.",
+                    );
                     let client = self.client.clone();
                     let sender = self.action_sender.clone();
                     tokio::spawn(async move {
@@ -3131,7 +3138,7 @@ impl App {
                     return None;
                 }
                 self.state.show_season_download_confirm = true;
-                self.state.season_download_confirm_yes_selected = true;
+                self.state.season_download_confirm_yes_selected = false;
             }
 
             Action::ConfirmDownloadSeason => {
@@ -3174,11 +3181,11 @@ impl App {
                     let total = self.state.download_queue_total;
                     let num = total - remaining;
 
-                    self.state.toast_message = Some(format!(
-                        "Preparing S{:02}E{:02} ({}/{})",
-                        season, episode, num, total
-                    ));
-                    self.state.toast_timer = 60;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Preparing episode",
+                        format!("S{season:02}E{episode:02} · {num}/{total}"),
+                    );
 
                     let subject_id = self
                         .state
@@ -3205,11 +3212,11 @@ impl App {
 
                     self.action_sender.send(Action::DownloadStream(None)).ok();
                 } else if self.state.download_queue_total > 0 {
-                    self.state.toast_message = Some(format!(
-                        "Season download complete! ({} files)",
-                        self.state.download_queue_total
-                    ));
-                    self.state.toast_timer = 100;
+                    self.state.notify(
+                        NotificationKind::Success,
+                        "Season downloaded",
+                        format!("{} files completed.", self.state.download_queue_total),
+                    );
                     self.state.download_queue_total = 0;
                 }
             }
@@ -3392,11 +3399,15 @@ impl App {
             }
             Action::SetStatus(msg) => {
                 if msg.starts_with("Error:") {
-                    self.state.toast_message = Some(msg.clone());
-                    self.state.toast_timer = 180;
+                    self.state.notify(
+                        NotificationKind::Error,
+                        "Operation failed",
+                        msg.trim_start_matches("Error:").trim(),
+                    );
+                } else {
+                    self.state.status_message = msg;
+                    self.state.status_timer = 150;
                 }
-                self.state.status_message = msg;
-                self.state.status_timer = 150;
             }
             Action::InitStreamPool(subject_id) => {
                 let pool = crate::tui::state::SubjectStreamPool {
@@ -3929,8 +3940,11 @@ impl App {
             Action::DownloadCompleted(path) => {
                 self.state.download_progress = Some(100.0);
                 self.state.download_status = Some("Completed".into());
-                self.state.toast_message = Some(format!("Downloaded to {path}"));
-                self.state.toast_timer = 120;
+                self.state.notify(
+                    NotificationKind::Success,
+                    "Download complete",
+                    format!("Saved to {path}"),
+                );
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -3942,22 +3956,22 @@ impl App {
                 self.state.download_status = None;
                 self.state.download_queue.clear();
                 self.state.download_queue_total = 0;
-                self.state.toast_message =
-                    Some(format!("Download failed; partial preserved: {error}"));
-                self.state.toast_timer = 240;
-                self.state.status_message =
-                    format!("Download failed; retry to resume. Reason: {error}");
-                self.state.status_timer = 240;
+                self.state.notify(
+                    NotificationKind::Error,
+                    "Download failed",
+                    format!("Partial file preserved. {error}"),
+                );
             }
             Action::DownloadPaused(path) => {
                 self.state.download_progress = None;
                 self.state.download_status = None;
                 self.state.download_queue.clear();
                 self.state.download_queue_total = 0;
-                self.state.toast_message = Some(format!(
-                    "Download paused. Start again to resume: {path}.part"
-                ));
-                self.state.toast_timer = 240;
+                self.state.notify(
+                    NotificationKind::Warning,
+                    "Download paused",
+                    format!("Start again to resume {path}.part"),
+                );
             }
             Action::ClearDownload => {
                 self.state.download_progress = None;
@@ -3965,11 +3979,11 @@ impl App {
                 if !self.state.download_queue.is_empty() {
                     self.action_sender.send(Action::ProcessDownloadQueue).ok();
                 } else if self.state.download_queue_total > 0 {
-                    self.state.toast_message = Some(format!(
-                        "Season download complete! ({} files)",
-                        self.state.download_queue_total
-                    ));
-                    self.state.toast_timer = 120;
+                    self.state.notify(
+                        NotificationKind::Success,
+                        "Season downloaded",
+                        format!("{} files completed.", self.state.download_queue_total),
+                    );
                     self.state.download_queue_total = 0;
                 }
             }
@@ -3978,15 +3992,11 @@ impl App {
                     .cancel_download
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 self.state.download_status = Some("Cancelling...".to_string());
-                self.state.toast_message = Some(format!(
-                    "{} Cancelling download...",
-                    if self.state.basic_terminal {
-                        "[X]"
-                    } else {
-                        "✗"
-                    }
-                ));
-                self.state.toast_timer = 40;
+                self.state.notify(
+                    NotificationKind::Warning,
+                    "Cancelling download",
+                    "Partial data will be preserved.",
+                );
             }
 
             Action::PlayersDetected(players) => {
@@ -3999,6 +4009,8 @@ impl App {
                     self.state.status_timer = 150;
                     return None;
                 }
+                self.state.show_help = false;
+                self.state.tv_config_popup = false;
                 self.state.player_picker_popup = true;
                 self.state.player_picker_playback = Some(source);
                 self.state.player_picker_link = None;
@@ -4008,17 +4020,15 @@ impl App {
             }
             Action::ShowPlayerPicker(link, subtitle) => {
                 if self.state.available_players.is_empty() {
-                    self.state.toast_message = Some(format!(
-                        "{} No media player found. Install mpv, IINA, or VLC.",
-                        if self.state.basic_terminal {
-                            "[X]"
-                        } else {
-                            "✗"
-                        }
-                    ));
-                    self.state.toast_timer = 150;
+                    self.state.notify(
+                        NotificationKind::Error,
+                        "Player unavailable",
+                        "Install mpv, IINA, or VLC.",
+                    );
                     return None;
                 }
+                self.state.show_help = false;
+                self.state.tv_config_popup = false;
                 self.state.player_picker_popup = true;
                 self.state.player_picker_playback = None;
                 self.state.player_picker_link = Some(link);
@@ -4120,9 +4130,11 @@ impl App {
                 if version == "none" {
                     if self.state.active_screen == Screen::Startup {
                         self.state.active_screen = Screen::Home;
-                        self.state.toast_message =
-                            Some("You are on the latest version!".to_string());
-                        self.state.toast_timer = 40;
+                        self.state.notify(
+                            NotificationKind::Success,
+                            "Up to date",
+                            "You are using the latest version.",
+                        );
                     }
                 } else {
                     self.state.update_available = Some(version);
@@ -4133,14 +4145,11 @@ impl App {
                             }
                             Err(error) => {
                                 self.state.active_screen = Screen::Home;
-                                self.state.toast_message = Some(format!(
-                                    "Update available, but automatic install needs permission: {error}"
-                                ));
-                                self.state.toast_timer = 300;
-                                self.state.status_message =
-                                    "Run the platform installer to update this installation."
-                                        .into();
-                                self.state.status_timer = 300;
+                                self.state.notify(
+                                    NotificationKind::Warning,
+                                    "Update needs permission",
+                                    error,
+                                );
                             }
                         }
                     }
@@ -4187,11 +4196,8 @@ impl App {
                 self.state.updater_progress = None;
                 self.state.updater_status = None;
                 self.state.active_screen = Screen::Home;
-                self.state.toast_message = Some(format!("Update failed: {error}"));
-                self.state.toast_timer = 300;
-                self.state.status_message =
-                    "Automatic update failed. See the message above or reinstall manually.".into();
-                self.state.status_timer = 300;
+                self.state
+                    .notify(NotificationKind::Error, "Update failed", error);
             }
         }
         None
@@ -4298,37 +4304,12 @@ impl App {
             }
         }
 
-        if let Some(msg) = &self.state.toast_message {
-            use ratatui::layout::{Constraint, Direction, Layout};
-
-            use ratatui::widgets::Paragraph;
-
-            let inner_area = area.inner(ratatui::layout::Margin {
-                vertical: 1,
-                horizontal: 2,
-            });
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1), Constraint::Min(0)])
-                .split(inner_area);
-
-            let toast_area = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Min(0),
-                    Constraint::Length(msg.chars().count() as u16 + 2),
-                ])
-                .split(chunks[0])[1];
-
-            let color = if self.state.toast_timer < 10 {
-                self.theme.muted
-            } else {
-                self.theme.success
-            };
-
-            let p = Paragraph::new(msg.clone())
-                .style(color.add_modifier(ratatui::style::Modifier::BOLD));
-            frame.render_widget(p, toast_area);
-        }
+        crate::tui::overlay::notifications(
+            frame,
+            area,
+            &self.state.notifications,
+            &self.theme,
+            self.state.basic_terminal,
+        );
     }
 }

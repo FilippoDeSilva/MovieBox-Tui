@@ -2,6 +2,7 @@ pub mod action;
 pub mod app;
 pub mod event;
 pub mod iptv_data;
+pub mod overlay;
 pub mod player;
 pub mod state;
 pub mod terminal;

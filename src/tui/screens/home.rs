@@ -703,15 +703,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
     if state.tv_config_popup {
         let content_height = state.tv_wizard_options.len() as u16;
-        let max_height = area.height.saturating_sub(17).max(6);
-        let popup_height = (content_height + 4).clamp(6, max_height);
-
-        let popup_area = ratatui::layout::Rect {
-            x: area.width.saturating_sub(44) / 2,
-            y: 13.min(area.height.saturating_sub(popup_height)),
-            width: 44,
-            height: popup_height,
-        };
+        let content_width = state
+            .tv_wizard_options
+            .iter()
+            .map(|option| crate::tui::text::width(option))
+            .max()
+            .unwrap_or(32)
+            .max(crate::tui::text::width(
+                "[Space] Toggle  [Enter] Confirm  [Esc] Back",
+            ));
+        let popup_area = crate::tui::overlay::centered(
+            area,
+            content_width.saturating_add(6) as u16,
+            content_height.min(8) + 3,
+            36,
+            64,
+        );
+        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
         let popup_block = ratatui::widgets::Block::default()
             .title(if state.tv_wizard_step == 0 {
                 " TV Setup: Select Grouping "
@@ -803,49 +811,31 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     if state.player_picker_popup {
-        let popup_width = 24;
-        let popup_height = std::cmp::min(15, state.available_players.len() as u16 + 2);
-
-        let area = frame.area();
-        let popup_area = ratatui::layout::Rect {
-            x: area.width.saturating_sub(popup_width) / 2,
-            y: area.height.saturating_sub(popup_height) / 2,
-            width: popup_width,
-            height: popup_height,
-        };
-
-        crate::tui::clear_area(frame, popup_area, theme);
-
-        let items: Vec<ratatui::widgets::ListItem> = state
+        let items = state
             .available_players
             .iter()
             .map(|k| {
-                let text = match k {
+                match k {
                     crate::tui::state::PlayerKind::Mpv => "mpv",
                     crate::tui::state::PlayerKind::Iina => "IINA",
                     crate::tui::state::PlayerKind::Vlc => "VLC",
-                };
-                ratatui::widgets::ListItem::new(text)
+                }
+                .to_string()
             })
-            .collect();
-
-        let list = ratatui::widgets::List::new(items)
-            .block(
-                ratatui::widgets::Block::default()
-                    .title(" Open With ")
-                    .title_style(theme.title)
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
-                    .border_style(theme.border),
-            )
-            .highlight_style(theme.highlight)
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-
-        frame.render_stateful_widget(list, popup_area, &mut state.player_picker_state);
+            .collect::<Vec<_>>();
+        crate::tui::overlay::picker(
+            frame,
+            area,
+            &items,
+            &mut state.player_picker_state,
+            crate::tui::overlay::PickerSpec {
+                title: "Open with",
+                confirm_label: "Open",
+                minimum_width: 24,
+            },
+            theme,
+            state.basic_terminal,
+        );
     }
 }
 

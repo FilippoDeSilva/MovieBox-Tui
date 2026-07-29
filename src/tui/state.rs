@@ -120,8 +120,7 @@ pub struct AppState {
     pub is_loading: bool,
     pub status_message: String,
     pub status_timer: usize,
-    pub toast_message: Option<String>,
-    pub toast_timer: usize,
+    pub notifications: std::collections::VecDeque<crate::tui::overlay::Notification>,
     pub update_available: Option<String>,
     pub updater_progress: Option<f64>,
     pub updater_status: Option<String>,
@@ -184,9 +183,9 @@ impl Default for AppState {
             stream_pool: std::collections::HashMap::new(),
             fetch_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             show_season_download_confirm: false,
-            season_download_confirm_yes_selected: true,
+            season_download_confirm_yes_selected: false,
             show_episode_download_confirm: false,
-            episode_download_confirm_yes_selected: true,
+            episode_download_confirm_yes_selected: false,
             is_waiting_for_download_stream: false,
             is_downloading: false,
             is_fetching_streams: false,
@@ -227,8 +226,7 @@ impl Default for AppState {
             is_loading: false,
             status_message: String::new(),
             status_timer: 0,
-            toast_message: None,
-            toast_timer: 0,
+            notifications: std::collections::VecDeque::new(),
             update_available: None,
             updater_progress: None,
             updater_status: None,
@@ -270,5 +268,32 @@ impl Default for AppState {
             tv_wizard_selected_idx: 0,
             tv_wizard_selections: std::collections::HashSet::new(),
         }
+    }
+}
+
+impl AppState {
+    pub fn notify(
+        &mut self,
+        kind: crate::tui::overlay::NotificationKind,
+        title: impl Into<String>,
+        message: impl Into<String>,
+    ) {
+        if self.notifications.len() >= 3 {
+            let removable = self
+                .notifications
+                .iter()
+                .position(|notification| {
+                    notification.kind != crate::tui::overlay::NotificationKind::Error
+                })
+                .unwrap_or(0);
+            self.notifications.remove(removable);
+        }
+        self.notifications
+            .push_back(crate::tui::overlay::Notification::new(kind, title, message));
+    }
+
+    pub fn expire_notifications(&mut self) {
+        self.notifications
+            .retain(|notification| !notification.expired());
     }
 }
