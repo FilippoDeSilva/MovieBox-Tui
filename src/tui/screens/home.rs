@@ -105,6 +105,123 @@ fn centered_width(area: Rect, maximum: u16) -> Rect {
     }
 }
 
+fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
+    let query_width = if state.search_query.is_empty() {
+        crate::tui::text::width("Search movies and series…") as u16
+    } else {
+        crate::tui::text::width(&state.search_query) as u16
+    };
+    let minimum = if landing { 38 } else { 48 };
+    let maximum = if landing && area.width >= 120 {
+        88
+    } else if landing {
+        72
+    } else {
+        104
+    }
+    .min(area.width.saturating_sub(4));
+
+    query_width
+        .saturating_add(10)
+        .max(minimum.min(maximum))
+        .min(maximum)
+}
+
+fn render_search_state(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    theme: &Theme,
+    view: SearchViewState,
+) {
+    if area.height < 3 || area.width < 20 {
+        return;
+    }
+
+    let card_width = area.width.min(64);
+    let card = Rect {
+        x: area.x + area.width.saturating_sub(card_width) / 2,
+        y: area.y + area.height.saturating_sub(3) / 2,
+        width: card_width,
+        height: 3,
+    };
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(card);
+
+    let pulse = match (state.tick_count / 4) % 4 {
+        0 => "·",
+        1 | 3 => "◦",
+        _ => "○",
+    };
+    let query = crate::tui::text::truncate_width(
+        &state.search_query,
+        card_width.saturating_sub(10) as usize,
+    );
+
+    let (symbol, title, title_style, detail) = match view {
+        SearchViewState::Loading => (
+            search_spinner(state).to_string(),
+            "Searching",
+            theme.lavender,
+            format!("Looking for “{query}”"),
+        ),
+        SearchViewState::NoResults => (
+            if state.basic_terminal { "-" } else { pulse }.to_string(),
+            "No matches",
+            if (state.tick_count / 4) % 2 == 0 {
+                theme.lavender
+            } else {
+                theme.subtext1
+            },
+            format!("Nothing found for “{query}”"),
+        ),
+        SearchViewState::Error => (
+            if state.basic_terminal { "!" } else { "×" }.to_string(),
+            "Search failed",
+            theme.error,
+            crate::tui::text::truncate_width(
+                &state.status_message,
+                card_width.saturating_sub(4) as usize,
+            ),
+        ),
+        _ => return,
+    };
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(format!("{symbol} "), title_style),
+            Span::styled(title, title_style.add_modifier(Modifier::BOLD)),
+        ]))
+        .alignment(Alignment::Center),
+        rows[0],
+    );
+    frame.render_widget(
+        Paragraph::new(detail)
+            .style(theme.text_dim)
+            .alignment(Alignment::Center),
+        rows[1],
+    );
+
+    let guidance = match view {
+        SearchViewState::Loading => "Please wait",
+        SearchViewState::NoResults => "Type to edit  ·  Enter to retry",
+        SearchViewState::Error => "Enter to retry  ·  Type to edit",
+        _ => "",
+    };
+    frame.render_widget(
+        Paragraph::new(guidance)
+            .style(theme.overlay0)
+            .alignment(Alignment::Center),
+        rows[2],
+    );
+}
+
 fn search_content(
     state: &AppState,
     view: SearchViewState,
@@ -165,19 +282,14 @@ fn render_search_bar(
     frame.render_widget(paragraph, rows[0]);
 
     let status = match view {
-        SearchViewState::Loading => format!(" {} Searching… ", search_spinner(state)),
         SearchViewState::Results => format!(" {} results ", state.search_results.len()),
-        SearchViewState::NoResults => " No results ".to_string(),
-        SearchViewState::Error => " Search failed ".to_string(),
         _ => String::new(),
     };
     let status_width = crate::tui::text::width(&status) as u16;
     let rule_width = area.width.saturating_sub(status_width);
     let rule = if state.basic_terminal { "-" } else { "─" };
     let rule_text = rule.repeat(rule_width as usize);
-    let status_style = if view == SearchViewState::Error {
-        theme.error.add_modifier(Modifier::BOLD)
-    } else if view == SearchViewState::Results {
+    let status_style = if view == SearchViewState::Results {
         theme.accent
     } else {
         theme.text_dim
@@ -270,6 +382,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 Constraint::Length(logo_height),
                 Constraint::Length(1),
                 Constraint::Length(2),
+                Constraint::Length(2),
                 Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Min(0),
@@ -348,14 +461,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(version, version_chunks[1]);
 
         if state.tick_count >= 3 {
-            let search_width = if is_wide {
-                64
-            } else if is_narrow {
-                area.width.saturating_sub(4)
-            } else {
-                56
-            };
-            search_bar_area = centered_width(vertical_chunks[3], search_width);
+            let search_width = search_deck_width(area, state, true);
+            search_bar_area = centered_width(vertical_chunks[4], search_width);
             suggestion_area = Rect {
                 x: search_bar_area.x,
                 y: search_bar_area.bottom(),
@@ -386,14 +493,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let context_area = if suggestions_open {
                 Rect::default()
             } else if view == SearchViewState::Empty {
-                vertical_chunks[4]
+                vertical_chunks[5]
             } else {
                 frame.render_widget(
                     Paragraph::new(search_hint(view, search_bar_area.width, theme))
                         .alignment(Alignment::Center),
-                    vertical_chunks[4],
+                    vertical_chunks[5],
                 );
-                vertical_chunks[5]
+                vertical_chunks[6]
             };
             if context_area.width > 0 {
                 frame.render_widget(
@@ -415,7 +522,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ]);
             frame.render_widget(
                 Paragraph::new(footer).alignment(Alignment::Center),
-                vertical_chunks[7],
+                vertical_chunks[8],
             );
         }
     } else {
@@ -425,26 +532,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else {
                 0
             };
-        let feedback_height = u16::from(matches!(
-            view,
-            SearchViewState::NoResults | SearchViewState::Error
-        ));
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(2),
                 Constraint::Length(1),
                 Constraint::Length(suggestion_height),
-                Constraint::Length(feedback_height),
+                Constraint::Length(0),
                 Constraint::Min(0),
             ])
             .split(area);
 
-        let search_width = if area.width >= 120 {
-            88
-        } else {
-            area.width.saturating_sub(4)
-        };
+        let search_width = search_deck_width(area, state, false);
         search_bar_area = centered_width(chunks[0], search_width);
         suggestion_area = chunks[2];
         render_search_bar(
@@ -467,31 +566,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
 
         let list_block = Block::default();
-        if feedback_height > 0 {
-            let feedback = match view {
-                SearchViewState::NoResults => format!(
-                    "No matches for “{}” · Type to edit or press Esc to clear",
-                    state.search_query
-                ),
-                SearchViewState::Error => {
-                    "Search failed · Press Enter to retry or type to edit".to_string()
-                }
-                _ => String::new(),
-            };
-            frame.render_widget(
-                Paragraph::new(feedback).style(if view == SearchViewState::Error {
-                    theme.error
-                } else if view == SearchViewState::NoResults {
-                    theme.text_dim
-                } else {
-                    theme.accent
-                }),
-                chunks[3],
-            );
-        }
-
         if state.is_loading && state.search_results.is_empty() {
-            frame.render_widget(list_block, chunks[4]);
+            render_search_state(frame, chunks[4], state, theme, SearchViewState::Loading);
         } else if !state.search_results.is_empty() {
             let poster_width = if state.image_supported {
                 (state.poster_rows.saturating_mul(2) / 3).max(5)
@@ -745,7 +821,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 frame.render_stateful_widget(scrollbar, sb_area, &mut scrollbar_state);
             }
         } else {
-            frame.render_widget(list_block, chunks[4]);
+            render_search_state(frame, chunks[4], state, theme, view);
         }
     }
 
@@ -847,15 +923,27 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .style(Style::default().bg(surface));
             frame.render_widget(list, dropdown_rows[1]);
 
-            let footer = Line::from(vec![
-                Span::styled(" [", theme.text_dim),
-                Span::styled("↑↓", theme.shortcut),
-                Span::styled("] Move   [", theme.text_dim),
-                Span::styled("Enter", theme.shortcut),
-                Span::styled("] Use   [", theme.text_dim),
-                Span::styled("Esc", theme.shortcut),
-                Span::styled("] Close", theme.text_dim),
-            ])
+            let footer = if dropdown_area.width >= 50 {
+                Line::from(vec![
+                    Span::styled(" [", theme.text_dim),
+                    Span::styled("↑↓", theme.shortcut),
+                    Span::styled("] Move   [", theme.text_dim),
+                    Span::styled("Enter", theme.shortcut),
+                    Span::styled("] Use   [", theme.text_dim),
+                    Span::styled("Esc", theme.shortcut),
+                    Span::styled("] Close", theme.text_dim),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(" [", theme.text_dim),
+                    Span::styled("↑↓", theme.shortcut),
+                    Span::styled("] Move  [", theme.text_dim),
+                    Span::styled("Enter", theme.shortcut),
+                    Span::styled("] Use  [", theme.text_dim),
+                    Span::styled("Esc", theme.shortcut),
+                    Span::styled("]", theme.text_dim),
+                ])
+            }
             .centered();
             frame.render_widget(
                 Paragraph::new(footer).style(Style::default().bg(surface)),
