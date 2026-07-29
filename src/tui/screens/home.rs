@@ -107,7 +107,11 @@ fn centered_width(area: Rect, maximum: u16) -> Rect {
 
 fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
     let query_width = if state.search_query.is_empty() {
-        crate::tui::text::width("Search movies and series…") as u16
+        crate::tui::text::width(if state.is_tv_mode {
+            "Search live channels…"
+        } else {
+            "Search movies and series…"
+        }) as u16
     } else {
         crate::tui::text::width(&state.search_query) as u16
     };
@@ -242,7 +246,11 @@ fn search_content(
         .saturating_sub(crate::tui::text::width(prefix) as u16)
         .saturating_sub(cursor_width as u16) as usize;
     let content = if state.search_query.is_empty() {
-        "Search movies and series…".to_string()
+        if state.is_tv_mode {
+            "Search live channels…".to_string()
+        } else {
+            "Search movies and series…".to_string()
+        }
     } else {
         crate::tui::text::truncate_width(&state.search_query, available)
     };
@@ -503,14 +511,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 );
             }
 
-            let context = Line::from(vec![
-                Span::styled(state.active_provider.label().to_string(), theme.accent),
-                Span::styled(" • ", theme.muted),
-                Span::styled(
-                    if state.is_tv_mode { "TV" } else { "Streaming" },
-                    theme.text_dim,
-                ),
-            ]);
+            let context = if state.is_tv_mode {
+                Line::from(vec![
+                    Span::styled("Live TV", theme.accent),
+                    Span::styled(" • ", theme.muted),
+                    Span::styled("Local playlists", theme.text_dim),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(state.active_provider.label().to_string(), theme.accent),
+                    Span::styled(" • ", theme.muted),
+                    Span::styled("Streaming", theme.text_dim),
+                ])
+            };
             let context_area = if suggestions_open {
                 Rect::default()
             } else if view == SearchViewState::Empty {

@@ -123,6 +123,9 @@ impl App {
     }
 
     fn switch_provider(&mut self, provider: ProviderKind) {
+        if self.state.is_tv_mode {
+            return;
+        }
         if provider == self.state.active_provider {
             return;
         }
@@ -1682,6 +1685,12 @@ impl App {
                             }
                         });
                     }
+                    self.state.status_message = if self.state.search_results.is_empty() {
+                        format!("No matches for '{}'.", query)
+                    } else {
+                        format!("Found {} channels.", self.state.search_results.len())
+                    };
+                    self.state.status_timer = 150;
                     return None;
                 }
 

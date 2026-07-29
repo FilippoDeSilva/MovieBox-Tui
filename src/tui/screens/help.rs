@@ -65,6 +65,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![]),
     ];
+    if state.is_tv_mode {
+        help_text.remove(4);
+    }
 
     if state.is_tv_mode {
         help_text.extend(vec![
