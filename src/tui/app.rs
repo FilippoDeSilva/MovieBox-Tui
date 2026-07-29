@@ -770,7 +770,7 @@ impl App {
 
                 if key.code == KeyCode::F(1) {
                     self.action_sender.send(Action::ToggleHelp).ok();
-                    return Some(());
+                    return None;
                 }
 
                 match self.state.input_mode {
@@ -4072,6 +4072,7 @@ impl App {
                 self.state.player_picker_popup = false;
                 tokio::spawn(async move {
                     let mut local_sub = sub.clone();
+                    let mut sub_temp_path = None;
                     if kind == crate::tui::state::PlayerKind::Vlc
                         || kind == crate::tui::state::PlayerKind::Iina
                     {
@@ -4087,6 +4088,7 @@ impl App {
                                     ));
                                     if tokio::fs::write(&temp_path, bytes).await.is_ok() {
                                         local_sub = Some(temp_path.to_string_lossy().to_string());
+                                        sub_temp_path = Some(temp_path);
                                     }
                                 }
                             }
@@ -4105,6 +4107,10 @@ impl App {
                     }
 
                     let _ = cmd.spawn();
+
+                    if let Some(path) = sub_temp_path {
+                        let _ = tokio::fs::remove_file(path).await;
+                    }
                 });
             }
             Action::LaunchPlayback(kind, source) => {

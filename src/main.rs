@@ -1,5 +1,18 @@
 use moviebox_tui::tui::app::App;
 
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = crossterm::terminal::disable_raw_mode();
+        let _ = crossterm::execute!(
+            std::io::stdout(),
+            crossterm::terminal::LeaveAlternateScreen,
+            crossterm::event::DisableFocusChange
+        );
+    }
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let stdout = std::io::stdout();
@@ -13,15 +26,8 @@ async fn main() -> std::io::Result<()> {
         crossterm::event::EnableFocusChange
     )?;
 
+    let _guard = TerminalGuard;
+
     let mut app = App::new();
-    let result = app.run(&mut terminal).await;
-
-    crossterm::terminal::disable_raw_mode()?;
-    crossterm::execute!(
-        std::io::stdout(),
-        crossterm::terminal::LeaveAlternateScreen,
-        crossterm::event::DisableFocusChange
-    )?;
-
-    result
+    app.run(&mut terminal).await
 }
