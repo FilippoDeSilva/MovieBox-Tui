@@ -370,15 +370,5 @@ fn notification_style(
 }
 
 fn middle_truncate(value: &str, maximum_width: usize) -> String {
-    if crate::tui::text::width(value) <= maximum_width {
-        return value.to_string();
-    }
-    let side = maximum_width.saturating_sub(1) / 2;
-    let start = crate::tui::text::truncate_width(value, side);
-    let reversed = value.chars().rev().collect::<String>();
-    let end = crate::tui::text::truncate_width(&reversed, side)
-        .chars()
-        .rev()
-        .collect::<String>();
-    format!("{start}…{end}")
+    crate::tui::text::truncate_middle_width(value, maximum_width)
 }
