@@ -132,6 +132,8 @@ pub fn parse_releases(
     };
     let link_selector = selector("a[href]")?;
     let size_selector = selector(".badge-size, .badge")?;
+    let page_language =
+        find_metadata(&document, "Audios:").and_then(|value| normalize_language_label(&value));
     let mut grouped: HashMap<String, Release> = HashMap::new();
 
     for item in document.select(&item_selector) {
@@ -171,7 +173,7 @@ pub fn parse_releases(
             provider: ProviderKind::FourKHdHub,
             quality: detect_quality(&filename),
             codec: detect_codec(&filename),
-            language: detect_language(&filename),
+            language: detect_language(&filename).or_else(|| page_language.clone()),
             size_bytes: size_text.as_deref().and_then(parse_size_bytes),
             season: parsed_episode.map(|value| value.0),
             episode: parsed_episode.map(|value| value.1),
@@ -470,7 +472,31 @@ fn detect_language(value: &str) -> Option<String> {
         (true, true) => Some("Hindi, English".into()),
         (true, false) => Some("Hindi".into()),
         (false, true) => Some("English".into()),
+        _ if lower.contains("dual audio") => Some("Dual Audio".into()),
+        _ if lower.contains("multi audio") || lower.contains("multi-audio") => {
+            Some("Multi Audio".into())
+        }
         _ => None,
+    }
+}
+
+fn normalize_language_label(value: &str) -> Option<String> {
+    let value = value
+        .split(['|', '/', '+'])
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
+    if value.is_empty()
+        || value.len() > 80
+        || matches!(
+            value.to_ascii_lowercase().as_str(),
+            "n/a" | "na" | "unknown"
+        )
+    {
+        None
+    } else {
+        Some(value)
     }
 }
 
@@ -588,6 +614,42 @@ mod tests {
         assert_eq!(releases.len(), 1);
         assert_eq!(releases[0].mirrors.len(), 2);
         assert_eq!(releases[0].episode, Some(1));
+    }
+
+    #[test]
+    fn release_language_falls_back_to_page_audio_metadata() {
+        let html = r#"
+          <div class="metadata-item">
+            <span class="metadata-label">Audios:</span>
+            <span class="metadata-value">English</span>
+          </div>
+          <div id="episodes">
+            <div class="episode-download-item">
+              <div class="episode-file-title">Show.S01E01.2160p.DDP5.1.H.265.mkv</div>
+              <a href="https://hubcloud.ist/drive/english">HubCloud</a>
+            </div>
+          </div>
+        "#;
+        let releases = parse_releases(html, 1, 1).expect("fixture parses");
+        assert_eq!(releases[0].language.as_deref(), Some("English"));
+    }
+
+    #[test]
+    fn filename_language_takes_priority_over_page_audio_metadata() {
+        let html = r#"
+          <div class="metadata-item">
+            <span class="metadata-label">Audios:</span>
+            <span class="metadata-value">Hindi | English</span>
+          </div>
+          <div id="episodes">
+            <div class="episode-download-item">
+              <div class="episode-file-title">Show.S01E01.1080p.English.H.264.mkv</div>
+              <a href="https://hubcloud.ist/drive/english">HubCloud</a>
+            </div>
+          </div>
+        "#;
+        let releases = parse_releases(html, 1, 1).expect("fixture parses");
+        assert_eq!(releases[0].language.as_deref(), Some("English"));
     }
 
     #[test]
