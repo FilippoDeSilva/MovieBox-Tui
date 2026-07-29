@@ -513,14 +513,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                 let title_style = if is_selected { theme.title } else { theme.text };
                 let max_title_width = text_area.width.saturating_sub(4) as usize;
-                let mut display_title = res.title.clone();
-                if display_title.chars().count() > max_title_width && max_title_width > 3 {
-                    display_title = display_title
-                        .chars()
-                        .take(max_title_width - 3)
-                        .collect::<String>();
-                    display_title.push_str("...");
-                }
+                let display_title = crate::tui::text::truncate_width(&res.title, max_title_width);
 
                 let type_tag = if state.is_tv_mode || res.stype == 3 {
                     "TV Channel"
@@ -661,13 +654,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let max_len = state
             .search_suggestions
             .iter()
-            .map(|s| s.len())
+            .map(|s| crate::tui::text::width(s))
             .max()
             .unwrap_or(0) as u16;
 
         let dropdown_width = std::cmp::min(std::cmp::max(max_len + 8, 30), search_area.width);
 
-        let text_len = search_content.chars().count() as u16;
+        let text_len = crate::tui::text::width(&search_content) as u16;
         let text_start_x = search_area.x + search_area.width.saturating_sub(text_len) / 2;
 
         let dropdown_x = if is_home_screen {

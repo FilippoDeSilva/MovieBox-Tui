@@ -4,27 +4,14 @@ fn env(name: &str) -> String {
 
 pub fn uses_basic_ui() -> bool {
     let term = env("TERM");
-    let term_program = env("TERM_PROGRAM");
 
-    cfg!(target_os = "windows")
-        || term == "dumb"
-        || term == "linux"
-        || term_program == "Apple_Terminal"
-        || std::env::var_os("TMUX").is_some()
-        || std::env::var_os("SSH_TTY").is_some()
-        || std::env::var_os("SSH_CLIENT").is_some()
+    term == "dumb" || term == "linux"
 }
 
 pub fn should_query_images() -> bool {
     let term = env("TERM");
-    let term_program = env("TERM_PROGRAM");
 
-    term != "dumb"
-        && term != "linux"
-        && term_program != "Apple_Terminal"
-        && std::env::var_os("TMUX").is_none()
-        && std::env::var_os("SSH_TTY").is_none()
-        && std::env::var_os("SSH_CLIENT").is_none()
+    term != "dumb" && term != "linux"
 }
 
 pub fn background_is_light() -> bool {

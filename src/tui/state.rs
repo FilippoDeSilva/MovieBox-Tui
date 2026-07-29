@@ -101,6 +101,7 @@ pub struct AppState {
     pub poster_protocol: Option<(ratatui::layout::Rect, ratatui_image::protocol::Protocol)>,
     pub image_picker: Option<ratatui_image::picker::Picker>,
     pub image_supported: bool,
+    pub clear_terminal_before_draw: bool,
     pub poster_rows: u16,
     pub image_cache: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
 
@@ -208,6 +209,7 @@ impl Default for AppState {
             poster_protocol: None,
             image_picker: None,
             image_supported: crate::tui::terminal::should_query_images(),
+            clear_terminal_before_draw: false,
             poster_rows: 3,
             image_cache: lru::LruCache::new(std::num::NonZeroUsize::new(10).unwrap()),
             show_help: false,

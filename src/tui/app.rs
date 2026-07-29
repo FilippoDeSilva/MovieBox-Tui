@@ -17,18 +17,6 @@ use crate::tui::{
     theme::Theme,
 };
 
-fn configure_mpv_window(command: &mut std::process::Command, iina: bool) {
-    let prefix = if iina { "--mpv-" } else { "--" };
-    command
-        .arg(format!("{prefix}autofit=960x540"))
-        .arg(format!("{prefix}autofit-larger=640x360"))
-        .arg(format!("{prefix}geometry=50%:50%"));
-}
-
-fn configure_vlc_window(command: &mut std::process::Command) {
-    command.arg("--width=960").arg("--height=540");
-}
-
 pub fn clean_moviebox_title(raw_title: &str) -> String {
     let mut end = raw_title.len();
 
@@ -137,6 +125,7 @@ impl App {
         if provider == self.state.active_provider {
             return;
         }
+        self.prepare_sixel_redraw();
         self.state
             .fetch_cancel
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -183,6 +172,17 @@ impl App {
             .unwrap_or(0);
         let next = ProviderKind::ENABLED[(current + 1) % ProviderKind::ENABLED.len()];
         self.switch_provider(next);
+    }
+
+    fn prepare_sixel_redraw(&mut self) {
+        if self.state.image_picker.as_ref().is_some_and(|picker| {
+            matches!(
+                picker.protocol_type(),
+                ratatui_image::picker::ProtocolType::Sixel
+            )
+        }) {
+            self.state.clear_terminal_before_draw = true;
+        }
     }
 
     fn trigger_episode_fetch(&mut self) {
@@ -531,43 +531,17 @@ impl App {
 
         let player_sender = self.action_sender.clone();
         tokio::task::spawn_blocking(move || {
-            let mut players = Vec::new();
-            let which_cmd = if cfg!(target_os = "windows") {
-                "where"
-            } else {
-                "which"
-            };
-            let check_player = |cmd: &str| -> bool {
-                std::process::Command::new(which_cmd)
-                    .arg(cmd)
-                    .output()
-                    .map(|o| o.status.success())
-                    .unwrap_or(false)
-            };
-
-            #[cfg(target_os = "macos")]
-            {
-                if std::path::Path::new("/Applications/IINA.app").exists() || check_player("iina") {
-                    players.push(crate::tui::state::PlayerKind::Iina);
-                }
-            }
-            if std::path::Path::new("/Applications/mpv.app").exists()
-                || std::path::Path::new("C:\\Program Files\\mpv\\mpv.exe").exists()
-                || check_player("mpv")
-            {
-                players.push(crate::tui::state::PlayerKind::Mpv);
-            }
-            if std::path::Path::new("/Applications/VLC.app").exists()
-                || std::path::Path::new("C:\\Program Files\\VideoLAN\\VLC\\vlc.exe").exists()
-                || std::path::Path::new("C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe").exists()
-                || check_player("vlc")
-            {
-                players.push(crate::tui::state::PlayerKind::Vlc);
-            }
-            player_sender.send(Action::PlayersDetected(players)).ok();
+            player_sender
+                .send(Action::PlayersDetected(crate::tui::player::detect()))
+                .ok();
         });
 
         loop {
+            if self.state.clear_terminal_before_draw {
+                terminal.clear()?;
+                self.state.clear_terminal_before_draw = false;
+                self.state.dirty = true;
+            }
             if self.state.dirty {
                 terminal.draw(|frame| self.draw(frame))?;
                 self.state.dirty = false;
@@ -644,11 +618,15 @@ impl App {
                     let pause1 = 90;
                     let pause2 = 15;
 
-                    let greeting_cycle =
-                        greeting.len() * type_speed + pause1 + greeting.len() * del_speed + pause2;
+                    let greeting_graphemes = crate::tui::text::grapheme_count(&greeting);
+                    let greeting_cycle = greeting_graphemes * type_speed
+                        + pause1
+                        + greeting_graphemes * del_speed
+                        + pause2;
                     let mut total_ticks = 0;
                     for p in prompts.iter() {
-                        total_ticks += p.len() * type_speed + pause1 + p.len() * del_speed + pause2;
+                        let count = crate::tui::text::grapheme_count(p);
+                        total_ticks += count * type_speed + pause1 + count * del_speed + pause2;
                     }
 
                     let tick_u = self.state.tick_count as usize;
@@ -656,7 +634,7 @@ impl App {
 
                     if tick_u < greeting_cycle {
                         let t = tick_u;
-                        let greeting_len = greeting.chars().count();
+                        let greeting_len = greeting_graphemes;
                         let t_type = greeting_len * type_speed;
                         let t_del = greeting_len * del_speed;
                         let display_len = if t < t_type {
@@ -668,14 +646,14 @@ impl App {
                         } else {
                             0
                         };
-                        animated_text = greeting
-                            .chars()
-                            .take(display_len.min(greeting_len))
-                            .collect::<String>();
+                        animated_text = crate::tui::text::take_graphemes(
+                            &greeting,
+                            display_len.min(greeting_len),
+                        );
                     } else {
                         let mut t = (tick_u - greeting_cycle) % total_ticks;
                         for p in prompts.iter() {
-                            let p_len = p.chars().count();
+                            let p_len = crate::tui::text::grapheme_count(p);
                             let t_type = p_len * type_speed;
                             let t_del = p_len * del_speed;
                             let cycle = t_type + pause1 + t_del + pause2;
@@ -690,7 +668,7 @@ impl App {
                                     0
                                 };
                                 animated_text =
-                                    p.chars().take(display_len.min(p_len)).collect::<String>();
+                                    crate::tui::text::take_graphemes(p, display_len.min(p_len));
                                 break;
                             } else {
                                 t -= cycle;
@@ -773,11 +751,13 @@ impl App {
                 return Some(());
             }
             Action::FocusChange => {
+                self.prepare_sixel_redraw();
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 if self.state.image_picker.is_some() {}
             }
             Action::Resize(_w, _h) => {
+                self.prepare_sixel_redraw();
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 if self.state.image_picker.is_some() {}
@@ -841,7 +821,7 @@ impl App {
                             }
                         }
                         KeyCode::Backspace => {
-                            self.state.search_query.pop();
+                            crate::tui::text::remove_last_grapheme(&mut self.state.search_query);
                             self.state.suggest_index = None;
                             self.state.last_search_edit = std::time::Instant::now();
                         }
@@ -1300,6 +1280,7 @@ impl App {
                 self.state.status_timer = 150;
             }
             Action::GoBack => {
+                self.prepare_sixel_redraw();
                 if self.state.player_picker_popup {
                     self.state.player_picker_popup = false;
                     self.state.player_picker_link = None;
@@ -2263,6 +2244,9 @@ impl App {
                 self.state.status_timer = 150;
             }
             Action::MoveUp => {
+                if self.state.active_screen == Screen::Home {
+                    self.prepare_sixel_redraw();
+                }
                 if self.state.player_picker_popup {
                     let i = match self.state.player_picker_state.selected() {
                         Some(i) => {
@@ -2372,6 +2356,9 @@ impl App {
                 }
             }
             Action::MoveDown => {
+                if self.state.active_screen == Screen::Home {
+                    self.prepare_sixel_redraw();
+                }
                 if self.state.player_picker_popup {
                     let i = match self.state.player_picker_state.selected() {
                         Some(i) => {
@@ -4117,86 +4104,8 @@ impl App {
                         }
                     }
 
-                    let mut cmd = match kind {
-                        crate::tui::state::PlayerKind::Mpv => {
-                            let mut c = if std::path::Path::new("C:\\Program Files\\mpv\\mpv.exe")
-                                .exists()
-                            {
-                                std::process::Command::new("C:\\Program Files\\mpv\\mpv.exe")
-                            } else if std::path::Path::new(
-                                "/Applications/mpv.app/Contents/MacOS/mpv",
-                            )
-                            .exists()
-                            {
-                                std::process::Command::new(
-                                    "/Applications/mpv.app/Contents/MacOS/mpv",
-                                )
-                            } else {
-                                std::process::Command::new("mpv")
-                            };
-                            configure_mpv_window(&mut c, false);
-                            c.arg(&link);
-                            if let Some(s) = local_sub {
-                                c.arg(format!("--sub-file={}", s));
-                            }
-                            c
-                        }
-                        crate::tui::state::PlayerKind::Iina => {
-                            #[cfg(target_os = "macos")]
-                            {
-                                let mut c = std::process::Command::new("open");
-                                c.arg("-a").arg("IINA").arg("--args");
-                                configure_mpv_window(&mut c, true);
-                                if let Some(s) = &local_sub {
-                                    c.arg(&link).arg(format!("--mpv-sub-files={}", s));
-                                } else {
-                                    c.arg(&link);
-                                }
-                                c
-                            }
-                            #[cfg(not(target_os = "macos"))]
-                            {
-                                let mut c = std::process::Command::new("mpv");
-                                configure_mpv_window(&mut c, false);
-                                c.arg(&link);
-                                if let Some(s) = local_sub {
-                                    c.arg(format!("--sub-file={}", s));
-                                }
-                                c
-                            }
-                        }
-                        crate::tui::state::PlayerKind::Vlc => {
-                            let mut c = if std::path::Path::new("/Applications/VLC.app").exists() {
-                                std::process::Command::new(
-                                    "/Applications/VLC.app/Contents/MacOS/VLC",
-                                )
-                            } else if std::path::Path::new(
-                                "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
-                            )
-                            .exists()
-                            {
-                                std::process::Command::new(
-                                    "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
-                                )
-                            } else if std::path::Path::new(
-                                "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
-                            )
-                            .exists()
-                            {
-                                std::process::Command::new(
-                                    "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
-                                )
-                            } else {
-                                std::process::Command::new("vlc")
-                            };
-                            configure_vlc_window(&mut c);
-                            c.arg(&link);
-                            if let Some(s) = local_sub {
-                                c.arg(format!("--sub-file={}", s));
-                            }
-                            c
-                        }
-                    };
+                    let mut cmd =
+                        crate::tui::player::command(kind, &link, local_sub.as_deref(), &[]);
                     cmd.stdout(std::process::Stdio::null());
                     cmd.stderr(std::process::Stdio::null());
 
@@ -4211,92 +4120,19 @@ impl App {
             }
             Action::LaunchPlayback(kind, source) => {
                 self.state.player_picker_popup = false;
-                if kind == crate::tui::state::PlayerKind::Vlc
-                    && source.headers.iter().any(|(name, _)| {
-                        !name.eq_ignore_ascii_case("referer")
-                            && !name.eq_ignore_ascii_case("user-agent")
-                    })
-                {
+                if !crate::tui::player::supports_headers(kind, &source.headers) {
                     self.state.status_message =
                         "This source needs headers VLC cannot provide; use mpv or IINA.".into();
                     self.state.status_timer = 180;
                     return None;
                 }
                 tokio::spawn(async move {
-                    let header_fields = source
-                        .headers
-                        .iter()
-                        .map(|(name, value)| format!("{name}: {value}"))
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    let mut cmd = match kind {
-                        crate::tui::state::PlayerKind::Mpv => {
-                            let executable =
-                                if std::path::Path::new("/Applications/mpv.app/Contents/MacOS/mpv")
-                                    .exists()
-                                {
-                                    "/Applications/mpv.app/Contents/MacOS/mpv"
-                                } else {
-                                    "mpv"
-                                };
-                            let mut command = std::process::Command::new(executable);
-                            configure_mpv_window(&mut command, false);
-                            command.arg(&source.url);
-                            if !header_fields.is_empty() {
-                                command.arg(format!("--http-header-fields={header_fields}"));
-                            }
-                            if let Some(subtitle) = &source.subtitle {
-                                command.arg(format!("--sub-file={subtitle}"));
-                            }
-                            command
-                        }
-                        crate::tui::state::PlayerKind::Iina => {
-                            #[cfg(target_os = "macos")]
-                            let mut command = {
-                                let mut command = std::process::Command::new("open");
-                                command.arg("-a").arg("IINA").arg("--args");
-                                configure_mpv_window(&mut command, true);
-                                command.arg(&source.url);
-                                command
-                            };
-                            #[cfg(not(target_os = "macos"))]
-                            let mut command = {
-                                let mut command = std::process::Command::new("mpv");
-                                configure_mpv_window(&mut command, false);
-                                command.arg(&source.url);
-                                command
-                            };
-                            if !header_fields.is_empty() {
-                                command.arg(format!("--mpv-http-header-fields={header_fields}"));
-                            }
-                            if let Some(subtitle) = &source.subtitle {
-                                command.arg(format!("--mpv-sub-files={subtitle}"));
-                            }
-                            command
-                        }
-                        crate::tui::state::PlayerKind::Vlc => {
-                            let executable =
-                                if std::path::Path::new("/Applications/VLC.app").exists() {
-                                    "/Applications/VLC.app/Contents/MacOS/VLC"
-                                } else {
-                                    "vlc"
-                                };
-                            let mut command = std::process::Command::new(executable);
-                            configure_vlc_window(&mut command);
-                            command.arg(&source.url);
-                            for (name, value) in &source.headers {
-                                if name.eq_ignore_ascii_case("referer") {
-                                    command.arg(format!("--http-referrer={value}"));
-                                } else if name.eq_ignore_ascii_case("user-agent") {
-                                    command.arg(format!("--http-user-agent={value}"));
-                                }
-                            }
-                            if let Some(subtitle) = &source.subtitle {
-                                command.arg(format!("--sub-file={subtitle}"));
-                            }
-                            command
-                        }
-                    };
+                    let mut cmd = crate::tui::player::command(
+                        kind,
+                        &source.url,
+                        source.subtitle.as_deref(),
+                        &source.headers,
+                    );
                     cmd.stdout(std::process::Stdio::null());
                     cmd.stderr(std::process::Stdio::null());
                     #[cfg(unix)]

@@ -290,20 +290,43 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let is_series = type_val == 2 && !state.available_seasons.is_empty();
 
-    let mut c = Vec::new();
+    let auxiliary_count = usize::from(has_languages) + if is_series { 2 } else { 0 };
+    let compact_panels = auxiliary_count > 0 && bottom_area.width < 110;
+    let (panel_area, streams_area) = if compact_panels {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(6), Constraint::Min(1)])
+            .split(bottom_area);
+        (rows[0], rows[1])
+    } else {
+        (bottom_area, Rect::default())
+    };
+
+    let mut panel_constraints = Vec::new();
     if has_languages {
-        c.push(Constraint::Length(22));
+        panel_constraints.push(if compact_panels {
+            Constraint::Ratio(1, auxiliary_count as u32)
+        } else {
+            Constraint::Length(22)
+        });
     }
     if is_series {
-        c.push(Constraint::Length(18));
-        c.push(Constraint::Length(18));
+        for _ in 0..2 {
+            panel_constraints.push(if compact_panels {
+                Constraint::Ratio(1, auxiliary_count as u32)
+            } else {
+                Constraint::Length(18)
+            });
+        }
     }
-    c.push(Constraint::Min(1));
+    if !compact_panels {
+        panel_constraints.push(Constraint::Min(1));
+    }
 
     let bottom_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(c)
-        .split(bottom_area);
+        .constraints(panel_constraints)
+        .split(panel_area);
 
     let mut chunk_idx = 0;
     let mut lang_area = None;
@@ -320,7 +343,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         eps_area = Some(bottom_chunks[chunk_idx]);
         chunk_idx += 1;
     }
-    let streams_area = bottom_chunks[chunk_idx];
+    let streams_area = if compact_panels {
+        streams_area
+    } else {
+        bottom_chunks[chunk_idx]
+    };
 
     if has_languages {
         use ratatui::widgets::{List, ListItem};
@@ -549,23 +576,34 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("sourceCount")
                             .and_then(|value| value.as_u64())
                             .unwrap_or(0);
-                        let metadata = if is_fourk {
+                        let stream_width = streams_area.width.saturating_sub(6) as usize;
+                        let codec = codec.to_uppercase();
+                        let metadata = if is_fourk && stream_width >= 58 {
                             format!(
-                                "{:<7} | {:<5} | {} | {} mirror{}",
-                                size_formatted,
-                                codec.to_uppercase(),
-                                language,
-                                source_count,
+                                "{size_formatted:<7} | {codec:<5} | {language} | {source_count} mirror{}",
                                 if source_count == 1 { "" } else { "s" }
                             )
-                        } else {
+                        } else if is_fourk && stream_width >= 38 {
+                            format!("{size_formatted:<7} | {codec:<5} | {language}")
+                        } else if is_fourk {
+                            format!("{size_formatted} | {codec}")
+                        } else if stream_width >= 64 {
+                            let fixed_width =
+                                crate::tui::text::width(&size_formatted)
+                                    + crate::tui::text::width(&codec)
+                                    + crate::tui::text::width(&duration_str)
+                                    + 16;
+                            let uploader = crate::tui::text::truncate_width(
+                                upload_by,
+                                stream_width.saturating_sub(fixed_width).max(4),
+                            );
                             format!(
-                                "{:<7} | {:<5} | {} | By: {}",
-                                size_formatted,
-                                codec.to_uppercase(),
-                                duration_str,
-                                upload_by
+                                "{size_formatted:<7} | {codec:<5} | {duration_str} | By: {uploader}"
                             )
+                        } else if stream_width >= 38 {
+                            format!("{size_formatted:<7} | {codec:<5} | {duration_str}")
+                        } else {
+                            format!("{size_formatted} | {codec}")
                         };
                         let stream_line = ratatui::text::Line::from(vec![
                             ratatui::text::Span::styled(pointer, theme.accent),

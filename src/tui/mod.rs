@@ -2,8 +2,10 @@ pub mod action;
 pub mod app;
 pub mod event;
 pub mod iptv_data;
+pub mod player;
 pub mod state;
 pub mod terminal;
+pub mod text;
 pub mod theme;
 
 pub fn clear_area(frame: &mut ratatui::Frame, area: ratatui::layout::Rect, _theme: &theme::Theme) {
