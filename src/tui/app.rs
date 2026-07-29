@@ -4109,7 +4109,10 @@ impl App {
                     let _ = cmd.spawn();
 
                     if let Some(path) = sub_temp_path {
-                        let _ = tokio::fs::remove_file(path).await;
+                        tokio::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                            let _ = tokio::fs::remove_file(path).await;
+                        });
                     }
                 });
             }
