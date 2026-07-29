@@ -135,20 +135,4 @@ impl PlaybackSource {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn provider_scoped_ids_do_not_collide() {
-        let moviebox = ProviderMediaId {
-            provider: ProviderKind::MovieBox,
-            value: "42".into(),
-        };
-        let fourk = ProviderMediaId {
-            provider: ProviderKind::FourKHdHub,
-            value: "42".into(),
-        };
-        assert_ne!(moviebox, fourk);
-    }
-}

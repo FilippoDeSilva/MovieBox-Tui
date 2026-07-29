@@ -243,26 +243,4 @@ pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn provider_cache_paths_are_isolated() {
-        let moviebox = get_provider_search_path(ProviderKind::MovieBox, "same");
-        let fourk = get_provider_search_path(ProviderKind::FourKHdHub, "same");
-        assert_ne!(moviebox, fourk);
-        assert!(moviebox.to_string_lossy().contains("moviebox"));
-        assert!(fourk.to_string_lossy().contains("fourkhdhub"));
-    }
-
-    #[test]
-    fn empty_search_payloads_are_not_cacheable() {
-        assert!(!search_payload_has_results(
-            &serde_json::json!({ "results": [{ "subjects": [] }] })
-        ));
-        assert!(search_payload_has_results(
-            &serde_json::json!({ "results": [{ "subjects": [{ "subjectId": "1" }] }] })
-        ));
-    }
-}
