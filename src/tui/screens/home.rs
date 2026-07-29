@@ -121,8 +121,15 @@ fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
     }
     .min(area.width.saturating_sub(4));
 
+    let status_width = if !landing && !state.search_results.is_empty() {
+        crate::tui::text::width(&format!("{} results", state.search_results.len())) as u16 + 4
+    } else {
+        0
+    };
+
     query_width
         .saturating_add(10)
+        .saturating_add(status_width)
         .max(minimum.min(maximum))
         .min(maximum)
 }
@@ -267,38 +274,52 @@ fn render_search_bar(
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
-    let mut paragraph = Paragraph::new(search_content(state, view, show_cursor, area.width)).style(
-        if view == SearchViewState::Editing {
-            theme.text
-        } else if state.search_query.is_empty() {
-            theme.text_dim
-        } else {
-            theme.text
-        },
-    );
+    let result_status = if view == SearchViewState::Results {
+        Some(format!("{} results", state.search_results.len()))
+    } else {
+        None
+    };
+    let status_width = result_status
+        .as_deref()
+        .map(crate::tui::text::width)
+        .unwrap_or(0) as u16;
+    let content_row = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(1),
+            Constraint::Length(status_width.saturating_add(u16::from(status_width > 0) * 2)),
+        ])
+        .split(rows[0]);
+    let mut paragraph = Paragraph::new(search_content(
+        state,
+        view,
+        show_cursor,
+        content_row[0].width,
+    ))
+    .style(if view == SearchViewState::Editing {
+        theme.text
+    } else if state.search_query.is_empty() {
+        theme.text_dim
+    } else {
+        theme.text
+    });
     if centered {
         paragraph = paragraph.alignment(Alignment::Center);
     }
-    frame.render_widget(paragraph, rows[0]);
+    frame.render_widget(paragraph, content_row[0]);
+    if let Some(status) = result_status {
+        frame.render_widget(
+            Paragraph::new(status)
+                .style(theme.accent)
+                .alignment(Alignment::Right),
+            content_row[1],
+        );
+    }
 
-    let status = match view {
-        SearchViewState::Results => format!(" {} results ", state.search_results.len()),
-        _ => String::new(),
-    };
-    let status_width = crate::tui::text::width(&status) as u16;
-    let rule_width = area.width.saturating_sub(status_width);
     let rule = if state.basic_terminal { "-" } else { "─" };
-    let rule_text = rule.repeat(rule_width as usize);
-    let status_style = if view == SearchViewState::Results {
-        theme.accent
-    } else {
-        theme.text_dim
-    };
+    let rule_text = rule.repeat(area.width as usize);
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(rule_text, rule_style),
-            Span::styled(status, status_style),
-        ])),
+        Paragraph::new(Line::from(Span::styled(rule_text, rule_style))),
         rows[1],
     );
 }
@@ -526,26 +547,35 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             );
         }
     } else {
+        let has_results = !state.search_results.is_empty();
         let suggestion_height =
             if state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty() {
                 state.search_suggestions.len().min(6) as u16 + 2
             } else {
                 0
             };
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(2),
-                Constraint::Length(1),
-                Constraint::Length(suggestion_height),
-                Constraint::Length(0),
-                Constraint::Min(0),
-            ])
-            .split(area);
+        let chunks = if has_results {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(2), Constraint::Min(0)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(2),
+                    Constraint::Length(1),
+                    Constraint::Length(suggestion_height),
+                    Constraint::Length(0),
+                    Constraint::Min(0),
+                ])
+                .split(area)
+        };
 
         let search_width = search_deck_width(area, state, false);
         search_bar_area = centered_width(chunks[0], search_width);
-        suggestion_area = chunks[2];
+        let results_chunk = if has_results { chunks[1] } else { chunks[4] };
+        suggestion_area = if has_results { chunks[1] } else { chunks[2] };
         render_search_bar(
             frame,
             search_bar_area,
@@ -557,37 +587,28 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         );
         let suggestions_open =
             state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
-        if !suggestions_open {
+        if !suggestions_open && !has_results {
             frame.render_widget(
                 Paragraph::new(search_hint(view, search_bar_area.width, theme))
                     .alignment(Alignment::Center),
-                chunks[1],
+                if has_results { chunks[0] } else { chunks[1] },
             );
         }
 
         let list_block = Block::default();
         if state.is_loading && state.search_results.is_empty() {
-            render_search_state(frame, chunks[4], state, theme, SearchViewState::Loading);
+            render_search_state(frame, results_chunk, state, theme, SearchViewState::Loading);
         } else if !state.search_results.is_empty() {
             let poster_width = if state.image_supported {
                 (state.poster_rows.saturating_mul(2) / 3).max(5)
             } else {
                 12
             };
-            let content_width = state
-                .search_results
-                .iter()
-                .map(|result| crate::tui::text::width(&result.title) as u16)
-                .max()
-                .unwrap_or(0)
-                .saturating_add(poster_width)
-                .saturating_add(18)
-                .clamp(48, 104);
-            let results_area = centered_width(chunks[4], content_width);
+            let results_area = results_chunk;
             let selected_idx = state.search_list_state.selected();
             let offset = state.search_list_state.offset();
 
-            let row_height = state.poster_rows.max(3);
+            let row_height = state.poster_rows.max(3) + 1;
             state.visible_items = (results_area.height as usize) / (row_height as usize);
             let rows = state
                 .search_results
@@ -716,6 +737,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .constraints([
                         Constraint::Length(1),
                         Constraint::Length(1),
+                        Constraint::Length(1),
                         Constraint::Min(0),
                     ])
                     .split(text_area);
@@ -734,10 +756,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     "Unknown"
                 };
 
-                let title_line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
-                    display_title,
-                    title_style,
-                )]);
+                let title_line = ratatui::text::Line::from(vec![
+                    ratatui::text::Span::raw(" "),
+                    ratatui::text::Span::styled(display_title, title_style),
+                ]);
                 if text_layout[0].height > 0 {
                     frame.render_widget(Paragraph::new(title_line), text_layout[0]);
                 }
@@ -793,10 +815,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     info_spans.push(ratatui::text::Span::styled(type_tag, theme.text));
                 }
 
-                if text_layout[1].height > 0 && !info_spans.is_empty() {
+                if text_layout[2].height > 0 && !info_spans.is_empty() {
+                    let mut padded = vec![ratatui::text::Span::raw(" ")];
+                    padded.extend(info_spans);
                     frame.render_widget(
-                        Paragraph::new(ratatui::text::Line::from(info_spans)),
-                        text_layout[1],
+                        Paragraph::new(ratatui::text::Line::from(padded)),
+                        text_layout[2],
                     );
                 }
 
