@@ -550,7 +550,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let has_results = !state.search_results.is_empty();
         let suggestion_height =
             if state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty() {
-                state.search_suggestions.len().min(6) as u16 + 2
+                state.search_suggestions.len().min(6) as u16 + 3
             } else {
                 0
             };
@@ -856,7 +856,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     {
         let search_area = search_bar_area;
         let visible_count = state.search_suggestions.len().min(6);
-        let dropdown_height = visible_count as u16 + 2;
+        let dropdown_height = visible_count as u16 + 3;
         let selected_index = state.suggest_index.unwrap_or(0);
         let suggestion_offset = selected_index
             .saturating_add(1)
@@ -892,6 +892,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .constraints([
                     Constraint::Length(1),
                     Constraint::Length(visible_count as u16),
+                    Constraint::Length(1),
                     Constraint::Length(1),
                 ])
                 .split(dropdown_area);
@@ -970,9 +971,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ])
             }
             .centered();
+            let separator_symbol = if state.basic_terminal { "-" } else { "─" };
+            let separator = separator_symbol.repeat(dropdown_rows[2].width as usize);
+            frame.render_widget(
+                Paragraph::new(separator)
+                    .style(theme.surface1.bg(surface))
+                    .alignment(Alignment::Center),
+                dropdown_rows[2],
+            );
             frame.render_widget(
                 Paragraph::new(footer).style(Style::default().bg(surface)),
-                dropdown_rows[2],
+                dropdown_rows[3],
             );
             if state.search_suggestions.len() > visible_count {
                 let mut scrollbar_state = ratatui::widgets::ScrollbarState::default()

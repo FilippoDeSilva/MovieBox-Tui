@@ -80,6 +80,7 @@ pub struct AppState {
     pub is_waiting_for_download_stream: bool,
     pub is_downloading: bool,
     pub is_fetching_streams: bool,
+    pub stream_error: Option<String>,
     pub preview_cache: lru::LruCache<String, serde_json::Value>,
     pub resource_list_state: ListState,
 
@@ -188,6 +189,7 @@ impl Default for AppState {
             is_waiting_for_download_stream: false,
             is_downloading: false,
             is_fetching_streams: false,
+            stream_error: None,
             preview_cache: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             resource_list_state: ListState::default(),
 

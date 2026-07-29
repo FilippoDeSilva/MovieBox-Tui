@@ -138,6 +138,7 @@ impl App {
         self.state.is_tv_mode = false;
         self.state.is_loading = false;
         self.state.is_fetching_streams = false;
+        self.state.stream_error = None;
         self.state.search_results.clear();
         self.state.search_suggestions.clear();
         self.state.search_preview = None;
@@ -261,6 +262,7 @@ impl App {
             self.state.selected_season = se;
             self.state.selected_episode = ep;
             self.state.resource_list_state.select(None);
+            self.state.stream_error = None;
             self.state.active_resource_request = self.state.active_resource_request.wrapping_add(1);
 
             let memory_cached = self
@@ -277,19 +279,31 @@ impl App {
             let cached = memory_cached.or_else(|| disk_cached.flatten());
 
             if let Some(streams) = cached {
-                let count = streams.len();
                 if let Some(pool) = self.state.stream_pool.get_mut(&id) {
                     pool.episode_index.insert((se, ep), streams.clone());
                 }
-                let mut result = serde_json::Map::new();
-                result.insert("list".to_string(), serde_json::Value::Array(streams));
-                self.state.selected_resources = Some(serde_json::Value::Object(result));
-                self.state.is_loading = false;
-                self.state.is_fetching_streams = false;
-                self.state.resource_list_state.select(Some(0));
-                self.state.status_message = format!("{count} streams loaded from cache.");
+                self.state.selected_resources = None;
+                self.state.is_loading = true;
+                self.state.is_fetching_streams = true;
+                self.state.status_message = "Loading streams...".to_string();
                 self.state.status_timer = 90;
                 self.state.pending_episode_fetch = None;
+                let sender = self.action_sender.clone();
+                let context = self.request_context();
+                let request_id = self.state.active_resource_request;
+                tokio::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+                    sender
+                        .send(Action::EpisodeStreamsReady(
+                            context,
+                            request_id,
+                            id,
+                            se,
+                            ep,
+                            serde_json::Value::Array(streams),
+                        ))
+                        .ok();
+                });
             } else {
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
@@ -2568,6 +2582,9 @@ impl App {
                         self.state.active_screen = Screen::Details;
                         self.state.selected_details = None;
                         self.state.selected_resources = None;
+                        self.state.is_loading = true;
+                        self.state.is_fetching_streams = false;
+                        self.state.stream_error = None;
                         self.state.resource_list_state.select(None);
                         self.state.language_list_state.select(Some(0));
                         self.state.season_list_state.select(Some(0));
@@ -3466,6 +3483,7 @@ impl App {
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
                 self.state.selected_resources = None;
+                self.state.stream_error = None;
                 let context = self.request_context();
 
                 if context.provider == ProviderKind::FourKHdHub {
@@ -3518,16 +3536,22 @@ impl App {
                 if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
                     if !force_refresh {
                         if let Some(cached) = pool.episode_index.get(&(season, episode)) {
-                            self.action_sender
-                                .send(Action::EpisodeStreamsReady(
-                                    context,
-                                    request_id,
-                                    subject_id.clone(),
-                                    season,
-                                    episode,
-                                    serde_json::Value::Array(cached.clone()),
-                                ))
-                                .ok();
+                            let sender = self.action_sender.clone();
+                            let cached = cached.clone();
+                            let cached_subject_id = subject_id.clone();
+                            tokio::spawn(async move {
+                                tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+                                sender
+                                    .send(Action::EpisodeStreamsReady(
+                                        context,
+                                        request_id,
+                                        cached_subject_id,
+                                        season,
+                                        episode,
+                                        serde_json::Value::Array(cached),
+                                    ))
+                                    .ok();
+                            });
                             return None;
                         }
                     }
@@ -3563,6 +3587,7 @@ impl App {
                             })
                             .await
                             {
+                                tokio::time::sleep(std::time::Duration::from_millis(120)).await;
                                 sender
                                     .send(Action::SetStatus("Loaded from cache.".to_string()))
                                     .ok();
@@ -3842,6 +3867,7 @@ impl App {
                 self.state.selected_resources = Some(serde_json::Value::Object(result));
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
+                self.state.stream_error = None;
                 self.state
                     .resource_list_state
                     .select(if count > 0 { Some(0) } else { None });
@@ -3923,6 +3949,7 @@ impl App {
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
                 self.state.selected_resources = None;
+                self.state.stream_error = Some(err.clone());
                 self.state.status_message = format!("Error: {}", err);
                 self.state.status_timer = 150;
             }

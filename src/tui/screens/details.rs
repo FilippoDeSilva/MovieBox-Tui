@@ -31,13 +31,47 @@ impl DetailsLayoutTier {
         }
     }
 
-    fn header_height(self, area: Rect) -> u16 {
-        match self {
-            Self::Wide => area.height.saturating_sub(18).clamp(10, 12),
-            Self::Medium => area.height.saturating_sub(17).clamp(9, 11),
-            Self::Narrow => area.height.saturating_sub(16).clamp(7, 9),
-            Self::Tiny => area.height.saturating_sub(12).clamp(4, 6),
-        }
+    fn header_height(self, area: Rect, details: Option<&serde_json::Value>) -> u16 {
+        let (minimum, maximum, synopsis_limit, reserved_width) = match self {
+            Self::Wide => (9, 12, 3, 30),
+            Self::Medium => (8, 11, 2, 24),
+            Self::Narrow => (7, 9, 2, 4),
+            Self::Tiny => (4, 6, 1, 4),
+        };
+        let available_maximum = area.height.saturating_sub(match self {
+            Self::Wide => 18,
+            Self::Medium => 17,
+            Self::Narrow => 16,
+            Self::Tiny => 12,
+        });
+        let maximum = maximum.min(available_maximum.max(minimum));
+
+        let Some(details) = details else {
+            return minimum.min(maximum);
+        };
+        let synopsis = details
+            .get("description")
+            .and_then(|value| value.as_str())
+            .or_else(|| details.get("intro").and_then(|value| value.as_str()))
+            .unwrap_or_default();
+        let text_width = area.width.saturating_sub(reserved_width).max(20) as usize;
+        let title = details
+            .get("title")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        let title_rows = (crate::tui::text::width(title) + 14)
+            .div_ceil(text_width)
+            .clamp(1, 2);
+        let synopsis_rows = crate::tui::text::width(synopsis)
+            .div_ceil(text_width)
+            .clamp(1, synopsis_limit);
+        let metadata_rows = match self {
+            Self::Wide | Self::Medium => 5,
+            Self::Narrow => 4,
+            Self::Tiny => 3,
+        };
+        let content_rows = metadata_rows + title_rows.saturating_sub(1) + synopsis_rows;
+        (content_rows as u16 + 2).clamp(minimum, maximum)
     }
 
     fn footer_height(self) -> u16 {
@@ -47,7 +81,7 @@ impl DetailsLayoutTier {
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
     let tier = DetailsLayoutTier::for_area(area);
-    let header_height = tier.header_height(area);
+    let header_height = tier.header_height(area, state.selected_details.as_ref());
     let footer_height = tier.footer_height();
     let chunks = Layout::vertical([
         Constraint::Length(header_height),
@@ -186,9 +220,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         && inner_area.height >= 6
         && inner_area.width >= 60;
     let poster_width = if show_poster {
-        ((inner_area.height as f32 * 1.33).ceil() as u16)
-            .clamp(10, 22)
-            .min(inner_area.width / 3)
+        let width_for_height = state
+            .poster_image
+            .as_ref()
+            .zip(state.image_picker.as_ref())
+            .map(|(image, picker)| {
+                let font = picker.font_size();
+                let target_pixel_height =
+                    u64::from(inner_area.height) * u64::from(font.height.max(1));
+                let target_pixel_width = target_pixel_height * u64::from(image.width())
+                    / u64::from(image.height().max(1));
+                target_pixel_width.div_ceil(u64::from(font.width.max(1))) as u16
+            })
+            .unwrap_or_else(|| (inner_area.height as f32 * 1.5).ceil() as u16);
+        width_for_height.clamp(10, 26).min(inner_area.width / 3)
     } else {
         0
     };
@@ -202,13 +247,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         ])
         .split(inner_area);
 
-    let poster_height = ((poster_width as f32) / 1.33).ceil() as u16;
-    let poster_height = h_chunks[0].height.min(poster_height);
-    let poster_area = ratatui::layout::Rect {
-        y: h_chunks[0].y + h_chunks[0].height.saturating_sub(poster_height) / 2,
-        height: poster_height,
-        ..h_chunks[0]
-    };
+    let poster_area = h_chunks[0];
     let right_area = h_chunks[2];
 
     if show_poster && state.image_supported {
@@ -331,13 +370,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     } else if matches!(tier, DetailsLayoutTier::Narrow) {
         top_meta.truncate(4);
     }
+    let title_width = crate::tui::text::width(&title)
+        + crate::tui::text::width(&format!("   ★ IMDb {}", imdb_rating));
+    let title_rows = title_width
+        .div_ceil(right_area.width.max(1) as usize)
+        .clamp(1, 2);
+    let metadata_height = (top_meta.len() + title_rows.saturating_sub(1)) as u16;
 
     let meta_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(top_meta.len() as u16),
-            Constraint::Min(0),
-        ])
+        .constraints([Constraint::Length(metadata_height), Constraint::Min(0)])
         .split(right_area);
 
     let meta_p = Paragraph::new(top_meta).wrap(Wrap { trim: true });
@@ -922,9 +964,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .and_then(|d| d.as_array())
                 .is_some_and(|a| a.len() > 1);
 
-            let is_busy = state.is_loading || state.is_fetching_streams;
+            let waiting_for_language = has_multiple_dubs && !state.language_chosen;
+            let has_error = state.stream_error.is_some();
 
-            let msg = if is_busy {
+            let msg = if waiting_for_language {
+                "Choose an audio track to load streams.".to_string()
+            } else if let Some(error) = &state.stream_error {
+                format!("{error} — press r to retry.")
+            } else {
                 let spinner = if state.basic_terminal {
                     let frames = ['-', '\\', '|', '/'];
                     frames[(state.tick_count as usize) % frames.len()]
@@ -933,20 +980,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     frames[(state.tick_count as usize) % frames.len()]
                 };
                 format!("{} Loading streams...", spinner)
-            } else if has_multiple_dubs && !state.language_chosen {
-                "Choose an audio track to load streams.".to_string()
-            } else if state.status_message.to_lowercase().contains("no streams")
-                || state.status_message.to_lowercase().contains("error")
-            {
-                state.status_message.clone()
-            } else {
-                "No streams found — press r to retry.".to_string()
             };
 
-            let style = if is_busy || (has_multiple_dubs && !state.language_chosen) {
-                theme.text_dim
-            } else {
+            let style = if has_error {
                 theme.error
+            } else {
+                theme.text_dim
             };
 
             if !msg.is_empty() {
