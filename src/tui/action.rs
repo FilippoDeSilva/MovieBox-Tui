@@ -84,6 +84,7 @@ pub enum Action {
     },
     EpisodeStreamsReady(
         crate::providers::models::RequestContext,
+        u64,
         String,
         usize,
         usize,
@@ -91,6 +92,7 @@ pub enum Action {
     ),
     EpisodeStreamsFailed(
         crate::providers::models::RequestContext,
+        u64,
         String,
         usize,
         usize,

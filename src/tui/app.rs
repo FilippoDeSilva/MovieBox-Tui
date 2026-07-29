@@ -3344,30 +3344,29 @@ impl App {
                 }
             }
             Action::InitStreamPool(subject_id) => {
-                let pool = crate::tui::state::SubjectStreamPool {
-                    available_resolutions: vec![],
-                    ..Default::default()
-                };
-                self.state.stream_pool.insert(subject_id.clone(), pool);
-                self.trigger_episode_fetch();
-
                 if self.state.active_provider != ProviderKind::MovieBox {
+                    self.state
+                        .stream_pool
+                        .insert(subject_id.clone(), Default::default());
+                    self.trigger_episode_fetch();
                     return None;
                 }
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    if let Ok(resolutions) = client.fetch_collection_resolutions(&subject_id).await
-                    {
-                        if !resolutions.is_empty() {
-                            sender
-                                .send(Action::StreamPoolInitialized(subject_id, resolutions))
-                                .ok();
-                        }
-                    }
+                    let resolutions = client
+                        .fetch_collection_resolutions(&subject_id)
+                        .await
+                        .unwrap_or_default();
+                    sender
+                        .send(Action::StreamPoolInitialized(subject_id, resolutions))
+                        .ok();
                 });
             }
             Action::StreamPoolInitialized(subject_id, resolutions) => {
+                if Some(&subject_id) != self.state.active_subject_id.as_ref() {
+                    return None;
+                }
                 let pool = crate::tui::state::SubjectStreamPool {
                     available_resolutions: resolutions,
                     ..Default::default()
@@ -3413,12 +3412,25 @@ impl App {
                 self.state.selected_season = se;
                 self.state.selected_episode = ep;
 
+                let already_loaded = self
+                    .state
+                    .selected_resources
+                    .as_ref()
+                    .and_then(|resources| resources.get("list"))
+                    .and_then(|list| list.as_array())
+                    .is_some_and(|list| !list.is_empty());
+                if already_loaded {
+                    self.state.is_loading = false;
+                    self.state.is_fetching_streams = false;
+                    return None;
+                }
+
                 self.action_sender
                     .send(Action::FetchEpisodeStreams {
                         subject_id,
                         season: se,
                         episode: ep,
-                        force_refresh: true,
+                        force_refresh: false,
                     })
                     .ok();
             }
@@ -3428,6 +3440,9 @@ impl App {
                 episode,
                 force_refresh,
             } => {
+                self.state.active_resource_request =
+                    self.state.active_resource_request.wrapping_add(1);
+                let request_id = self.state.active_resource_request;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
                 self.state.selected_resources = None;
@@ -3443,6 +3458,7 @@ impl App {
                                 sender
                                     .send(Action::EpisodeStreamsReady(
                                         context,
+                                        request_id,
                                         id,
                                         season,
                                         episode,
@@ -3454,6 +3470,7 @@ impl App {
                                 sender
                                     .send(Action::EpisodeStreamsFailed(
                                         context,
+                                        request_id,
                                         id,
                                         season,
                                         episode,
@@ -3465,6 +3482,7 @@ impl App {
                                 sender
                                     .send(Action::EpisodeStreamsFailed(
                                         context,
+                                        request_id,
                                         id,
                                         season,
                                         episode,
@@ -3483,6 +3501,7 @@ impl App {
                             self.action_sender
                                 .send(Action::EpisodeStreamsReady(
                                     context,
+                                    request_id,
                                     subject_id.clone(),
                                     season,
                                     episode,
@@ -3530,6 +3549,7 @@ impl App {
                                 sender
                                     .send(Action::EpisodeStreamsReady(
                                         context,
+                                        request_id,
                                         subject_id.clone(),
                                         season,
                                         episode,
@@ -3663,6 +3683,7 @@ impl App {
                             sender
                                 .send(Action::EpisodeStreamsFailed(
                                     context,
+                                    request_id,
                                     id_clone,
                                     season,
                                     episode,
@@ -3673,6 +3694,7 @@ impl App {
                             sender
                                 .send(Action::EpisodeStreamsReady(
                                     context,
+                                    request_id,
                                     id_clone,
                                     season,
                                     episode,
@@ -3683,7 +3705,17 @@ impl App {
                     });
                 }
             }
-            Action::EpisodeStreamsReady(context, subject_id, target_se, target_ep, payload) => {
+            Action::EpisodeStreamsReady(
+                context,
+                request_id,
+                subject_id,
+                target_se,
+                target_ep,
+                payload,
+            ) => {
+                if request_id != self.state.active_resource_request {
+                    return None;
+                }
                 if !self.context_is_current(context)
                     || Some(&subject_id) != self.state.active_subject_id.as_ref()
                 {
@@ -3847,7 +3879,17 @@ impl App {
                     self.action_sender.send(Action::DownloadStream(None)).ok();
                 }
             }
-            Action::EpisodeStreamsFailed(context, subject_id, target_se, target_ep, err) => {
+            Action::EpisodeStreamsFailed(
+                context,
+                request_id,
+                subject_id,
+                target_se,
+                target_ep,
+                err,
+            ) => {
+                if request_id != self.state.active_resource_request {
+                    return None;
+                }
                 if !self.context_is_current(context)
                     || Some(&subject_id) != self.state.active_subject_id.as_ref()
                 {
