@@ -185,6 +185,45 @@ impl App {
         }
     }
 
+    fn cycle_details_pane(&mut self, forward: bool) {
+        use crate::tui::state::DetailsPane;
+
+        if self.state.active_screen != Screen::Details {
+            return;
+        }
+
+        let has_languages = self
+            .state
+            .selected_details
+            .as_ref()
+            .and_then(|details| details.get("dubs"))
+            .and_then(|dubs| dubs.as_array())
+            .is_some_and(|dubs| dubs.len() > 1);
+        let is_series = !self.state.available_seasons.is_empty();
+        let mut panes = Vec::new();
+        if has_languages {
+            panes.push(DetailsPane::Languages);
+        }
+        if is_series {
+            panes.push(DetailsPane::Seasons);
+            panes.push(DetailsPane::Episodes);
+        }
+        panes.push(DetailsPane::Streams);
+
+        let current = panes
+            .iter()
+            .position(|pane| *pane == self.state.details_pane)
+            .unwrap_or(0);
+        let next = if forward {
+            (current + 1) % panes.len()
+        } else if current == 0 {
+            panes.len() - 1
+        } else {
+            current - 1
+        };
+        self.state.details_pane = panes[next];
+    }
+
     fn trigger_episode_fetch(&mut self) {
         if let Some(id) = &self.state.active_subject_id {
             let stype = self
@@ -1073,6 +1112,12 @@ impl App {
                             }
                         }
                         Screen::Details => match key.code {
+                            KeyCode::Tab => {
+                                self.action_sender.send(Action::TabPane).ok();
+                            }
+                            KeyCode::BackTab => {
+                                self.action_sender.send(Action::BackTabPane).ok();
+                            }
                             KeyCode::Char('y') | KeyCode::Char('Y') => {
                                 if self.state.show_season_download_confirm {
                                     self.action_sender.send(Action::ConfirmDownloadSeason).ok();
@@ -1133,28 +1178,24 @@ impl App {
                                 self.action_sender.send(Action::GoBack).ok();
                             }
 
-                            KeyCode::Up | KeyCode::Char('k') => {
+                            KeyCode::Up => {
                                 self.action_sender.send(Action::MoveUp).ok();
                             }
-                            KeyCode::Down | KeyCode::Char('j') => {
+                            KeyCode::Down => {
                                 self.action_sender.send(Action::MoveDown).ok();
                             }
-                            KeyCode::Left | KeyCode::Char('h') => {
+                            KeyCode::Left => {
                                 if self.state.show_season_download_confirm {
                                     self.state.season_download_confirm_yes_selected = true;
                                 } else if self.state.show_episode_download_confirm {
                                     self.state.episode_download_confirm_yes_selected = true;
-                                } else {
-                                    self.action_sender.send(Action::MoveLeft).ok();
                                 }
                             }
-                            KeyCode::Right | KeyCode::Char('l') => {
+                            KeyCode::Right => {
                                 if self.state.show_season_download_confirm {
                                     self.state.season_download_confirm_yes_selected = false;
                                 } else if self.state.show_episode_download_confirm {
                                     self.state.episode_download_confirm_yes_selected = false;
-                                } else {
-                                    self.action_sender.send(Action::MoveRight).ok();
                                 }
                             }
                             KeyCode::Enter => {
@@ -1188,11 +1229,10 @@ impl App {
                                                 .ok();
                                         }
                                         crate::tui::state::DetailsPane::Seasons => {
-                                            self.action_sender.send(Action::MoveRight).ok();
+                                            self.trigger_episode_fetch();
                                         }
                                         crate::tui::state::DetailsPane::Episodes => {
                                             self.trigger_episode_fetch();
-                                            self.action_sender.send(Action::MoveRight).ok();
                                         }
                                         crate::tui::state::DetailsPane::Languages => {
                                             let idx = self
@@ -2315,45 +2355,10 @@ impl App {
                 }
             }
             Action::TabPane => {
-                if self.state.active_screen == Screen::Details {
-                    use crate::tui::state::DetailsPane;
-                    let has_languages = self
-                        .state
-                        .selected_details
-                        .as_ref()
-                        .and_then(|d| d.get("dubs"))
-                        .and_then(|d| d.as_array())
-                        .is_some_and(|a| a.len() > 1);
-
-                    let is_series = self
-                        .state
-                        .selected_details
-                        .as_ref()
-                        .and_then(|d| d.get("stype").or_else(|| d.get("subjectType")))
-                        .and_then(|t| t.as_i64())
-                        .is_some_and(|t| t == 2);
-
-                    self.state.details_pane = match self.state.details_pane {
-                        DetailsPane::Languages => {
-                            if is_series {
-                                DetailsPane::Seasons
-                            } else {
-                                DetailsPane::Streams
-                            }
-                        }
-                        DetailsPane::Seasons => DetailsPane::Episodes,
-                        DetailsPane::Episodes => DetailsPane::Streams,
-                        DetailsPane::Streams => {
-                            if has_languages {
-                                DetailsPane::Languages
-                            } else if is_series {
-                                DetailsPane::Seasons
-                            } else {
-                                DetailsPane::Streams
-                            }
-                        }
-                    };
-                }
+                self.cycle_details_pane(true);
+            }
+            Action::BackTabPane => {
+                self.cycle_details_pane(false);
             }
             Action::MoveDown => {
                 if self.state.active_screen == Screen::Home {
@@ -2511,34 +2516,6 @@ impl App {
                             .send(Action::FetchPreview(res.id.clone()))
                             .ok();
                     }
-                } else if self.state.active_screen == Screen::Details {
-                    let has_languages = self
-                        .state
-                        .selected_details
-                        .as_ref()
-                        .and_then(|d| d.get("dubs"))
-                        .and_then(|d| d.as_array())
-                        .is_some_and(|a| a.len() > 1);
-                    let is_series = !self.state.available_seasons.is_empty();
-
-                    match self.state.details_pane {
-                        crate::tui::state::DetailsPane::Streams => {
-                            if is_series {
-                                self.state.details_pane = crate::tui::state::DetailsPane::Episodes;
-                            } else if has_languages {
-                                self.state.details_pane = crate::tui::state::DetailsPane::Languages;
-                            }
-                        }
-                        crate::tui::state::DetailsPane::Episodes => {
-                            self.state.details_pane = crate::tui::state::DetailsPane::Seasons;
-                        }
-                        crate::tui::state::DetailsPane::Seasons => {
-                            if has_languages {
-                                self.state.details_pane = crate::tui::state::DetailsPane::Languages;
-                            }
-                        }
-                        crate::tui::state::DetailsPane::Languages => {}
-                    }
                 }
             }
             Action::MoveRight => {
@@ -2559,36 +2536,6 @@ impl App {
                         self.action_sender
                             .send(Action::FetchPreview(res.id.clone()))
                             .ok();
-                    }
-                } else if self.state.active_screen == Screen::Details {
-                    let has_languages = self
-                        .state
-                        .selected_details
-                        .as_ref()
-                        .and_then(|d| d.get("dubs"))
-                        .and_then(|d| d.as_array())
-                        .is_some_and(|a| a.len() > 1);
-                    let is_series = !self.state.available_seasons.is_empty();
-
-                    match self.state.details_pane {
-                        crate::tui::state::DetailsPane::Languages => {
-                            if !has_languages || self.state.language_chosen {
-                                if is_series {
-                                    self.state.details_pane =
-                                        crate::tui::state::DetailsPane::Seasons;
-                                } else {
-                                    self.state.details_pane =
-                                        crate::tui::state::DetailsPane::Streams;
-                                }
-                            }
-                        }
-                        crate::tui::state::DetailsPane::Seasons => {
-                            self.state.details_pane = crate::tui::state::DetailsPane::Episodes;
-                        }
-                        crate::tui::state::DetailsPane::Episodes => {
-                            self.state.details_pane = crate::tui::state::DetailsPane::Streams;
-                        }
-                        crate::tui::state::DetailsPane::Streams => {}
                     }
                 }
             }
@@ -4145,65 +4092,57 @@ impl App {
             }
             Action::CheckForUpdates => {
                 let update_sender = self.action_sender.clone();
-                tokio::spawn(async move {
+                tokio::task::spawn_blocking(move || {
                     let start = std::time::Instant::now();
-
-                    let client = reqwest::Client::builder()
-                        .timeout(std::time::Duration::from_secs(10))
-                        .build()
-                        .unwrap_or_default();
-
-                    let result = match client
-                        .get("https://github.com/mesamirh/MovieBox-Tui/releases/latest")
-                        .send()
-                        .await
-                    {
-                        Ok(res) => {
-                            let url = res.url().as_str();
-                            if let Some(tag) = url.split("/tag/").last() {
-                                let version = tag.trim_start_matches('v');
-                                let current = env!("CARGO_PKG_VERSION");
-                                if self_update::version::bump_is_greater(current, version)
-                                    .unwrap_or(false)
-                                {
-                                    Some(version.to_string())
-                                } else {
-                                    Some("none".to_string())
-                                }
-                            } else {
-                                Some("error".to_string())
-                            }
-                        }
-                        Err(_) => Some("error".to_string()),
-                    };
+                    let result = crate::tui::updater::check(env!("CARGO_PKG_VERSION"));
 
                     let elapsed = start.elapsed();
                     if elapsed.as_millis() < 1500 {
-                        tokio::time::sleep(std::time::Duration::from_millis(1500) - elapsed).await;
+                        std::thread::sleep(std::time::Duration::from_millis(1500) - elapsed);
                     }
 
-                    if let Some(res) = result {
-                        update_sender.send(Action::UpdateAvailable(res)).ok();
+                    match result {
+                        Ok(Some(version)) => {
+                            update_sender.send(Action::UpdateAvailable(version)).ok();
+                        }
+                        Ok(None) => {
+                            update_sender
+                                .send(Action::UpdateAvailable("none".into()))
+                                .ok();
+                        }
+                        Err(error) => {
+                            update_sender.send(Action::UpdateFailure(error)).ok();
+                        }
                     }
                 });
             }
             Action::UpdateAvailable(version) => {
-                if version == "none" || version == "error" {
+                if version == "none" {
                     if self.state.active_screen == Screen::Startup {
                         self.state.active_screen = Screen::Home;
-                        if version == "none" {
-                            self.state.toast_message =
-                                Some("You are on the latest version!".to_string());
-                        } else {
-                            self.state.toast_message =
-                                Some("Failed to check for updates.".to_string());
-                        }
+                        self.state.toast_message =
+                            Some("You are on the latest version!".to_string());
                         self.state.toast_timer = 40;
                     }
                 } else {
                     self.state.update_available = Some(version);
                     if self.state.active_screen == Screen::Startup {
-                        self.action_sender.send(Action::StartUpdate).ok();
+                        match crate::tui::updater::replacement_access() {
+                            Ok(()) => {
+                                self.action_sender.send(Action::StartUpdate).ok();
+                            }
+                            Err(error) => {
+                                self.state.active_screen = Screen::Home;
+                                self.state.toast_message = Some(format!(
+                                    "Update available, but automatic install needs permission: {error}"
+                                ));
+                                self.state.toast_timer = 300;
+                                self.state.status_message =
+                                    "Run the platform installer to update this installation."
+                                        .into();
+                                self.state.status_timer = 300;
+                            }
+                        }
                     }
                 }
             }
@@ -4214,90 +4153,25 @@ impl App {
                 let update_sender = self.action_sender.clone();
 
                 tokio::task::spawn_blocking(move || {
-                    let os = std::env::consts::OS;
-                    let asset_name = match os {
-                        "macos" => "MovieBox_macOS_Universal.tar.gz",
-                        "windows" => "MovieBox_Windows_x64.zip",
-                        "linux" => "MovieBox_Linux_x64.tar.gz",
-                        _ => {
-                            return update_sender
-                                .send(Action::UpdateFailure("Unsupported OS".into()))
-                                .unwrap_or(());
+                    let result = crate::tui::updater::install(&version, |progress, status| {
+                        update_sender
+                            .send(Action::UpdateProgress(progress, status.into()))
+                            .ok();
+                    });
+                    match result {
+                        Ok(()) => {
+                            update_sender.send(Action::UpdateSuccess).ok();
                         }
-                    };
-
-                    let download_url = format!(
-                        "https://github.com/mesamirh/MovieBox-Tui/releases/download/v{}/{}",
-                        version, asset_name
-                    );
-
-                    let ts = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs();
-                    let tmp_dir = std::env::temp_dir().join(format!("moviebox-update-{}", ts));
-                    let _ = std::fs::create_dir_all(&tmp_dir);
-
-                    let archive_path = tmp_dir.join(asset_name);
-                    if let Ok(mut archive_file) = std::fs::File::create(&archive_path) {
-                        if self_update::Download::from_url(&download_url)
-                            .show_progress(false)
-                            .download_to(&mut archive_file)
-                            .is_ok()
-                        {
-                            let bin_name = if os == "windows" {
-                                "MovieBox.exe"
-                            } else {
-                                "moviebox"
-                            };
-                            let archive_kind = if os == "windows" {
-                                self_update::ArchiveKind::Zip
-                            } else {
-                                self_update::ArchiveKind::Tar(Some(self_update::Compression::Gz))
-                            };
-
-                            if self_update::Extract::from_source(&archive_path)
-                                .archive(archive_kind)
-                                .extract_file(&tmp_dir, bin_name)
-                                .is_ok()
-                            {
-                                if let Ok(current_exe) = std::env::current_exe() {
-                                    let tmp_old = current_exe.with_extension("old");
-                                    let _ = std::fs::rename(&current_exe, &tmp_old);
-                                    let new_bin = tmp_dir.join(bin_name);
-                                    if std::fs::copy(&new_bin, &current_exe).is_ok() {
-                                        let _ = std::fs::remove_file(&new_bin);
-                                        let _ = std::fs::remove_dir_all(&tmp_dir);
-                                        update_sender.send(Action::UpdateSuccess).ok();
-                                        return;
-                                    }
-                                }
-                            }
+                        Err(error) => {
+                            update_sender.send(Action::UpdateFailure(error)).ok();
                         }
-                    }
-
-                    let _ = std::fs::remove_dir_all(&tmp_dir);
-                    update_sender
-                        .send(Action::UpdateFailure("Failed".into()))
-                        .ok();
-                });
-
-                let progress_sender = self.action_sender.clone();
-                tokio::spawn(async move {
-                    let mut p = 0.0;
-                    loop {
-                        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-                        p += 0.01;
-                        if p > 0.98 {
-                            p = 0.98;
-                        }
-                        progress_sender.send(Action::UpdateProgress(p)).ok();
                     }
                 });
             }
-            Action::UpdateProgress(p) => {
+            Action::UpdateProgress(p, status) => {
                 if !self.state.updater_done {
                     self.state.updater_progress = Some(p);
+                    self.state.updater_status = Some(status);
                 }
             }
             Action::UpdateSuccess => {
@@ -4309,8 +4183,15 @@ impl App {
                 }
                 return Some(());
             }
-            Action::UpdateFailure(_err) => {
+            Action::UpdateFailure(error) => {
+                self.state.updater_progress = None;
+                self.state.updater_status = None;
                 self.state.active_screen = Screen::Home;
+                self.state.toast_message = Some(format!("Update failed: {error}"));
+                self.state.toast_timer = 300;
+                self.state.status_message =
+                    "Automatic update failed. See the message above or reinstall manually.".into();
+                self.state.status_timer = 300;
             }
         }
         None

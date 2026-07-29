@@ -2,6 +2,7 @@ use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::Modifier,
     text::{Line, Span},
     widgets::{
         Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
@@ -9,16 +10,53 @@ use ratatui::{
     },
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DetailsLayoutTier {
+    Wide,
+    Medium,
+    Narrow,
+    Tiny,
+}
+
+impl DetailsLayoutTier {
+    fn for_area(area: Rect) -> Self {
+        if area.width < 60 || area.height < 24 {
+            Self::Tiny
+        } else if area.width < 80 {
+            Self::Narrow
+        } else if area.width < 120 {
+            Self::Medium
+        } else {
+            Self::Wide
+        }
+    }
+
+    fn header_height(self, area: Rect) -> u16 {
+        match self {
+            Self::Wide => area.height.saturating_sub(18).clamp(10, 12),
+            Self::Medium => area.height.saturating_sub(17).clamp(9, 11),
+            Self::Narrow => area.height.saturating_sub(16).clamp(7, 9),
+            Self::Tiny => area.height.saturating_sub(12).clamp(4, 6),
+        }
+    }
+
+    fn footer_height(self) -> u16 {
+        if matches!(self, Self::Wide) { 1 } else { 2 }
+    }
+}
+
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(12),
-            Constraint::Length(1),
-            Constraint::Min(10),
-            Constraint::Length(1),
-        ])
-        .split(area);
+    let tier = DetailsLayoutTier::for_area(area);
+    let header_height = tier.header_height(area);
+    let footer_height = tier.footer_height();
+    let chunks = Layout::vertical([
+        Constraint::Length(header_height),
+        Constraint::Length(1),
+        Constraint::Min(5),
+        Constraint::Length(footer_height),
+    ])
+    .split(area);
+    let workflow_area = chunks[1];
     let bottom_area = chunks[2];
 
     let details_json = match &state.selected_details {
@@ -130,22 +168,36 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ratatui::widgets::BorderType::Rounded
         })
         .border_style(theme.border)
-        .padding(ratatui::widgets::Padding::new(2, 2, 1, 1));
+        .padding(ratatui::widgets::Padding::new(
+            if matches!(tier, DetailsLayoutTier::Wide) {
+                2
+            } else {
+                1
+            },
+            1,
+            0,
+            0,
+        ));
 
     let inner_area = details_block.inner(chunks[0]);
     frame.render_widget(details_block.clone(), chunks[0]);
 
-    let poster_width = if state.image_supported {
-        (inner_area.height as f32 * 1.33).ceil() as u16
+    let show_poster = !matches!(tier, DetailsLayoutTier::Tiny)
+        && inner_area.height >= 6
+        && inner_area.width >= 60;
+    let poster_width = if show_poster && state.image_supported {
+        ((inner_area.height as f32 * 0.78).ceil() as u16).clamp(8, 18)
+    } else if show_poster {
+        16.min(inner_area.width / 4)
     } else {
-        20
+        0
     };
 
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(poster_width),
-            Constraint::Length(2),
+            Constraint::Length(if show_poster { 2 } else { 0 }),
             Constraint::Min(1),
         ])
         .split(inner_area);
@@ -157,7 +209,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     };
     let right_area = h_chunks[2];
 
-    if state.image_supported {
+    if show_poster && state.image_supported {
         if let Some(img) = &state.poster_image {
             if state.poster_protocol.as_ref().map(|(r, _)| *r) != Some(poster_area)
                 && let Some(picker) = &mut state.image_picker
@@ -204,7 +256,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .block(placeholder_block);
             frame.render_widget(placeholder, poster_area);
         }
-    } else {
+    } else if show_poster {
         let placeholder_block = Block::default()
             .borders(Borders::ALL)
             .border_style(theme.muted);
@@ -254,7 +306,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let genre_line = Line::from(vec![Span::styled(genres.to_string(), theme.text_dim)]);
 
-    let top_meta = vec![
+    let mut top_meta = vec![
         title_line,
         meta_line,
         genre_line,
@@ -266,17 +318,28 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         )]),
         Line::from(vec![Span::styled("Synopsis", theme.text)]),
     ];
+    if matches!(tier, DetailsLayoutTier::Tiny) {
+        top_meta.truncate(3);
+    } else if matches!(tier, DetailsLayoutTier::Narrow) {
+        top_meta.truncate(4);
+    }
 
     let meta_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(5), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(top_meta.len() as u16),
+            Constraint::Min(0),
+        ])
         .split(right_area);
 
     let meta_p = Paragraph::new(top_meta).wrap(Wrap { trim: true });
     frame.render_widget(meta_p, meta_chunks[0]);
 
+    let synopsis_capacity =
+        (meta_chunks[1].width as usize).saturating_mul(meta_chunks[1].height as usize);
+    let synopsis = truncate_with_ellipsis(intro, synopsis_capacity);
     let syn_lines = vec![Line::from(vec![Span::styled(
-        intro,
+        synopsis,
         theme.text_dim.add_modifier(ratatui::style::Modifier::DIM),
     )])];
     let intro_p = Paragraph::new(syn_lines).wrap(Wrap { trim: true });
@@ -289,65 +352,96 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     };
 
     let is_series = type_val == 2 && !state.available_seasons.is_empty();
+    let streams_count = state
+        .selected_resources
+        .as_ref()
+        .and_then(|resources| resources.get("list"))
+        .and_then(|list| list.as_array())
+        .map_or(0, Vec::len);
 
-    let auxiliary_count = usize::from(has_languages) + if is_series { 2 } else { 0 };
-    let compact_panels = auxiliary_count > 0 && bottom_area.width < 110;
-    let (panel_area, streams_area) = if compact_panels {
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Min(1)])
-            .split(bottom_area);
-        (rows[0], rows[1])
-    } else {
-        (bottom_area, Rect::default())
-    };
+    render_workflow(
+        frame,
+        workflow_area,
+        state,
+        details_json,
+        has_languages,
+        is_series,
+        streams_count,
+        theme,
+    );
 
-    let mut panel_constraints = Vec::new();
+    let mut available_selector_panes = Vec::new();
     if has_languages {
-        panel_constraints.push(if compact_panels {
-            Constraint::Ratio(1, auxiliary_count as u32)
-        } else {
-            Constraint::Length(22)
-        });
+        available_selector_panes.push(crate::tui::state::DetailsPane::Languages);
     }
     if is_series {
-        for _ in 0..2 {
-            panel_constraints.push(if compact_panels {
-                Constraint::Ratio(1, auxiliary_count as u32)
-            } else {
-                Constraint::Length(18)
-            });
-        }
-    }
-    if !compact_panels {
-        panel_constraints.push(Constraint::Min(1));
+        available_selector_panes.push(crate::tui::state::DetailsPane::Seasons);
+        available_selector_panes.push(crate::tui::state::DetailsPane::Episodes);
     }
 
-    let bottom_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(panel_constraints)
-        .split(panel_area);
+    let visible_selector_panes =
+        if matches!(tier, DetailsLayoutTier::Narrow | DetailsLayoutTier::Tiny) {
+            available_selector_panes
+                .iter()
+                .copied()
+                .filter(|pane| *pane == state.details_pane)
+                .collect::<Vec<_>>()
+        } else {
+            available_selector_panes
+        };
 
-    let mut chunk_idx = 0;
+    let selector_height = if visible_selector_panes.is_empty() {
+        0
+    } else {
+        let episode_count = state
+            .available_episode_numbers
+            .get(state.season_list_state.selected().unwrap_or(0))
+            .map_or(0, Vec::len);
+        let language_count = details_json
+            .get("dubs")
+            .and_then(|dubs| dubs.as_array())
+            .map_or(0, Vec::len);
+        language_count
+            .max(state.available_seasons.len())
+            .max(episode_count)
+            .min(4) as u16
+            + 2
+    };
+
+    let lower_chunks = Layout::vertical([Constraint::Length(selector_height), Constraint::Min(3)])
+        .split(bottom_area);
+    let selector_area = lower_chunks[0];
+    let streams_area = lower_chunks[1];
+
+    let selector_chunks = if visible_selector_panes.is_empty() {
+        Vec::new()
+    } else {
+        Layout::horizontal(vec![
+            Constraint::Ratio(
+                1,
+                visible_selector_panes.len() as u32
+            );
+            visible_selector_panes.len()
+        ])
+        .split(selector_area)
+        .to_vec()
+    };
+
     let mut lang_area = None;
     let mut seasons_area = None;
     let mut eps_area = None;
-
-    if has_languages {
-        lang_area = Some(bottom_chunks[chunk_idx]);
-        chunk_idx += 1;
+    for (pane, pane_area) in visible_selector_panes
+        .iter()
+        .copied()
+        .zip(selector_chunks.iter().copied())
+    {
+        match pane {
+            crate::tui::state::DetailsPane::Languages => lang_area = Some(pane_area),
+            crate::tui::state::DetailsPane::Seasons => seasons_area = Some(pane_area),
+            crate::tui::state::DetailsPane::Episodes => eps_area = Some(pane_area),
+            crate::tui::state::DetailsPane::Streams => {}
+        }
     }
-    if is_series {
-        seasons_area = Some(bottom_chunks[chunk_idx]);
-        chunk_idx += 1;
-        eps_area = Some(bottom_chunks[chunk_idx]);
-        chunk_idx += 1;
-    }
-    let streams_area = if compact_panels {
-        streams_area
-    } else {
-        bottom_chunks[chunk_idx]
-    };
 
     if has_languages {
         use ratatui::widgets::{List, ListItem};
@@ -370,8 +464,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
             }
         }
+        let language_count = lang_items.len();
 
-        let lang_border = if state.details_pane == crate::tui::state::DetailsPane::Languages {
+        let language_focused = state.details_pane == crate::tui::state::DetailsPane::Languages;
+        let lang_border = if language_focused {
             theme.border_focus
         } else {
             theme.border
@@ -385,15 +481,33 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     } else {
                         ratatui::widgets::BorderType::Rounded
                     })
-                    .title(" Audio ")
+                    .title(pane_title(
+                        "Audio",
+                        language_count,
+                        crate::tui::state::DetailsPane::Languages,
+                        language_focused,
+                        state,
+                    ))
+                    .title_style(if language_focused {
+                        theme.accent
+                    } else {
+                        theme.text_dim
+                    })
                     .border_style(lang_border)
                     .padding(ratatui::widgets::Padding::horizontal(1)),
             )
-            .highlight_style(theme.highlight)
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
+            .highlight_style(selection_style(language_focused, theme))
+            .highlight_symbol(selection_symbol(language_focused, state.basic_terminal));
 
         if let Some(area) = lang_area {
             frame.render_stateful_widget(lang_list, area, &mut state.language_list_state);
+            render_scroll_indicator(
+                frame,
+                area,
+                language_count,
+                state.language_list_state.selected().unwrap_or(0),
+                theme,
+            );
         }
     }
 
@@ -408,7 +522,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             })
             .collect();
 
-        let seasons_border = if state.details_pane == crate::tui::state::DetailsPane::Seasons {
+        let seasons_focused = state.details_pane == crate::tui::state::DetailsPane::Seasons;
+        let seasons_border = if seasons_focused {
             theme.border_focus
         } else {
             theme.border
@@ -422,15 +537,33 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     } else {
                         ratatui::widgets::BorderType::Rounded
                     })
-                    .title(" Seasons ")
+                    .title(pane_title(
+                        "Seasons",
+                        state.available_seasons.len(),
+                        crate::tui::state::DetailsPane::Seasons,
+                        seasons_focused,
+                        state,
+                    ))
+                    .title_style(if seasons_focused {
+                        theme.accent
+                    } else {
+                        theme.text_dim
+                    })
                     .border_style(seasons_border)
                     .padding(ratatui::widgets::Padding::horizontal(1)),
             )
-            .highlight_style(theme.highlight)
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
+            .highlight_style(selection_style(seasons_focused, theme))
+            .highlight_symbol(selection_symbol(seasons_focused, state.basic_terminal));
 
         if let Some(area) = seasons_area {
             frame.render_stateful_widget(seasons_list, area, &mut state.season_list_state);
+            render_scroll_indicator(
+                frame,
+                area,
+                state.available_seasons.len(),
+                state.season_list_state.selected().unwrap_or(0),
+                theme,
+            );
         }
 
         let ep_items: Vec<ListItem> = if let Some(ep_numbers) = state
@@ -444,8 +577,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             vec![]
         };
+        let episode_count = ep_items.len();
 
-        let eps_border = if state.details_pane == crate::tui::state::DetailsPane::Episodes {
+        let episodes_focused = state.details_pane == crate::tui::state::DetailsPane::Episodes;
+        let eps_border = if episodes_focused {
             theme.border_focus
         } else {
             theme.border
@@ -459,15 +594,37 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     } else {
                         ratatui::widgets::BorderType::Rounded
                     })
-                    .title(" Episodes ")
+                    .title(pane_title(
+                        "Episodes",
+                        episode_count,
+                        crate::tui::state::DetailsPane::Episodes,
+                        episodes_focused,
+                        state,
+                    ))
+                    .title_style(if episodes_focused {
+                        theme.accent
+                    } else {
+                        theme.text_dim
+                    })
                     .border_style(eps_border)
                     .padding(ratatui::widgets::Padding::horizontal(1)),
             )
-            .highlight_style(theme.highlight)
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
+            .highlight_style(selection_style(episodes_focused, theme))
+            .highlight_symbol(selection_symbol(episodes_focused, state.basic_terminal));
 
         if let Some(area) = eps_area {
             frame.render_stateful_widget(eps_list, area, &mut state.episode_list_state);
+            let episode_count = state
+                .available_episode_numbers
+                .get(state.season_list_state.selected().unwrap_or(0))
+                .map_or(0, Vec::len);
+            render_scroll_indicator(
+                frame,
+                area,
+                episode_count,
+                state.episode_list_state.selected().unwrap_or(0),
+                theme,
+            );
         }
     }
 
@@ -477,15 +634,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         theme.border
     };
 
-    let mut streams_count = 0;
-    if let Some(res) = &state.selected_resources {
-        if let Some(list) = res.get("list").and_then(|l| l.as_array()) {
-            streams_count = list.len();
-        }
-    }
-
     let streams_title = if streams_count > 0 {
-        format!(" Streams • {} Available ", streams_count)
+        let selected = state
+            .resource_list_state
+            .selected()
+            .unwrap_or(0)
+            .min(streams_count.saturating_sub(1));
+        format!(
+            " Streams · {} available · {}/{} ",
+            streams_count,
+            selected + 1,
+            streams_count
+        )
     } else {
         " Streams ".to_string()
     };
@@ -498,7 +658,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ratatui::widgets::BorderType::Rounded
         })
         .title(ratatui::text::Line::from(streams_title).alignment(Alignment::Left))
-        .title_style(theme.title)
+        .title_style(
+            if state.details_pane == crate::tui::state::DetailsPane::Streams {
+                theme.accent
+            } else {
+                theme.text_dim
+            },
+        )
         .border_style(streams_border)
         .padding(ratatui::widgets::Padding::horizontal(1));
 
@@ -507,6 +673,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             if let Some(list) = res.get("list").and_then(|l| l.as_array()) {
                 let mut prev_quality = String::new();
                 let selected_idx = state.resource_list_state.selected();
+                let mut quality_counts = std::collections::HashMap::new();
+                for file in list {
+                    let resolution = file
+                        .get("resolution")
+                        .and_then(|value| value.as_i64())
+                        .unwrap_or(0);
+                    *quality_counts.entry(resolution).or_insert(0usize) += 1;
+                }
 
                 let list_items: Vec<ListItem> = list
                     .iter()
@@ -562,7 +736,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         };
 
                         let stream_style = if is_selected {
-                            theme.highlight
+                            selection_style(
+                                state.details_pane
+                                    == crate::tui::state::DetailsPane::Streams,
+                                theme,
+                            )
                         } else {
                             theme.text_dim
                         };
@@ -580,33 +758,32 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         let codec = codec.to_uppercase();
                         let metadata = if is_fourk && stream_width >= 58 {
                             format!(
-                                "{size_formatted:<7} | {codec:<5} | {language} | {source_count} mirror{}",
+                                "{size_formatted:<9}{codec:<8}{language:<16}{source_count} mirror{}",
                                 if source_count == 1 { "" } else { "s" }
                             )
                         } else if is_fourk && stream_width >= 38 {
-                            format!("{size_formatted:<7} | {codec:<5} | {language}")
+                            format!("{size_formatted:<9}{codec:<8}{language}")
                         } else if is_fourk {
-                            format!("{size_formatted} | {codec}")
+                            format!("{size_formatted:<9}{codec}")
                         } else if stream_width >= 64 {
-                            let fixed_width =
-                                crate::tui::text::width(&size_formatted)
-                                    + crate::tui::text::width(&codec)
-                                    + crate::tui::text::width(&duration_str)
-                                    + 16;
+                            let fixed_width = 9 + 8 + 12;
                             let uploader = crate::tui::text::truncate_width(
                                 upload_by,
                                 stream_width.saturating_sub(fixed_width).max(4),
                             );
-                            format!(
-                                "{size_formatted:<7} | {codec:<5} | {duration_str} | By: {uploader}"
-                            )
+                            format!("{size_formatted:<9}{codec:<8}{duration_str:<12}{uploader}")
                         } else if stream_width >= 38 {
-                            format!("{size_formatted:<7} | {codec:<5} | {duration_str}")
+                            format!("{size_formatted:<9}{codec:<8}{duration_str}")
                         } else {
-                            format!("{size_formatted} | {codec}")
+                            format!("{size_formatted:<9}{codec}")
+                        };
+                        let metadata = if is_selected {
+                            format!("{metadata:<width$}", width = stream_width.saturating_sub(2))
+                        } else {
+                            metadata
                         };
                         let stream_line = ratatui::text::Line::from(vec![
-                            ratatui::text::Span::styled(pointer, theme.accent),
+                            ratatui::text::Span::styled(pointer, stream_style),
                             ratatui::text::Span::styled(metadata, stream_style),
                         ]);
 
@@ -615,10 +792,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             if i > 0 {
                                 lines.push(ratatui::text::Line::from(""));
                             }
-                            lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(
-                                quality_str,
-                                theme.accent,
-                            )));
+                            let option_count =
+                                quality_counts.get(&resolution).copied().unwrap_or(1);
+                            lines.push(ratatui::text::Line::from(
+                                ratatui::text::Span::styled(
+                                    format!(
+                                        "{} · {} option{}",
+                                        quality_str,
+                                        option_count,
+                                        if option_count == 1 { "" } else { "s" }
+                                    ),
+                                    theme.accent,
+                                ),
+                            ));
                         }
 
                         lines.push(stream_line);
@@ -626,30 +812,31 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     })
                     .collect();
 
-                let l = List::new(list_items)
-                    .block(streams_block.clone())
-                    .highlight_symbol("");
-
-                let mut scrollbar_state = ScrollbarState::default()
-                    .content_length(
-                        streams_count
-                            .saturating_sub(streams_area.height.saturating_sub(2) as usize),
-                    )
-                    .position(state.resource_list_state.selected().unwrap_or(0));
-
-                let scrollbar = Scrollbar::default()
-                    .orientation(ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(Some("▲"))
-                    .end_symbol(Some("▼"));
+                let content_height = list_items.iter().map(ListItem::height).sum();
+                let l = List::new(list_items).block(streams_block.clone());
 
                 frame.render_stateful_widget(l, streams_area, &mut state.resource_list_state);
-                frame.render_stateful_widget(
-                    scrollbar,
-                    streams_area.inner(ratatui::layout::Margin {
-                        vertical: 1,
-                        horizontal: 0,
-                    }),
-                    &mut scrollbar_state,
+                let rendered_position = selected_idx.map_or(0, |selected| {
+                    let mut headings = 0;
+                    let mut previous = None;
+                    for file in list.iter().take(selected.saturating_add(1)) {
+                        let resolution = file
+                            .get("resolution")
+                            .and_then(|value| value.as_i64())
+                            .unwrap_or(0);
+                        if previous != Some(resolution) {
+                            headings += 1;
+                            previous = Some(resolution);
+                        }
+                    }
+                    selected + headings
+                });
+                render_scroll_indicator(
+                    frame,
+                    streams_area,
+                    content_height,
+                    rendered_position,
+                    theme,
                 );
             } else {
                 let has_multiple_dubs = state
@@ -659,9 +846,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .and_then(|d| d.as_array())
                     .is_some_and(|a| a.len() > 1);
                 let msg = if has_multiple_dubs && !state.language_chosen {
-                    "Please select a language dubbing first."
+                    "Choose an audio track to load streams."
                 } else {
-                    "No streaming files available."
+                    "No streams found — press r to retry."
                 };
 
                 let inner = streams_block.inner(streams_area);
@@ -694,13 +881,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 };
                 format!("{} Loading streams...", spinner)
             } else if has_multiple_dubs && !state.language_chosen {
-                "Please select a language dubbing from the Audio panel to view streams.".to_string()
+                "Choose an audio track to load streams.".to_string()
             } else if state.status_message.to_lowercase().contains("no streams")
                 || state.status_message.to_lowercase().contains("error")
             {
                 state.status_message.clone()
             } else {
-                String::new()
+                "No streams found — press r to retry.".to_string()
             };
 
             let style = if is_busy || (has_multiple_dubs && !state.language_chosen) {
@@ -817,11 +1004,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_stateful_widget(list, popup_area, &mut state.player_picker_state);
     }
 
-    let footer_text = "Enter Play      o Open With...      d Download      r Refresh      Esc Back";
-
-    let footer_p = Paragraph::new(footer_text)
-        .alignment(Alignment::Center)
-        .style(theme.muted);
+    let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);
+    let footer_p = if matches!(tier, DetailsLayoutTier::Wide) {
+        primary_footer.extend(secondary_footer);
+        Paragraph::new(Line::from(primary_footer))
+    } else {
+        Paragraph::new(vec![
+            Line::from(primary_footer),
+            Line::from(secondary_footer),
+        ])
+    }
+    .alignment(Alignment::Center);
     frame.render_widget(footer_p, chunks[3]);
 
     if state.show_season_download_confirm {
@@ -963,4 +1156,298 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         frame.render_widget(p, popup_area);
     }
+}
+
+fn truncate_with_ellipsis(value: &str, capacity: usize) -> String {
+    if capacity == 0 {
+        return String::new();
+    }
+    if crate::tui::text::width(value) <= capacity {
+        return value.to_string();
+    }
+    if capacity == 1 {
+        return "…".to_string();
+    }
+    format!(
+        "{}…",
+        crate::tui::text::truncate_width(value, capacity.saturating_sub(1))
+    )
+}
+
+fn clean_language_name(value: &str) -> String {
+    let mut name = if value.to_ascii_lowercase().starts_with("original") {
+        "Original".to_string()
+    } else {
+        value
+            .replace("dub", "")
+            .replace("Dub", "")
+            .trim()
+            .to_string()
+    };
+    if name.eq_ignore_ascii_case("ptbr") {
+        name = "Portuguese (BR)".to_string();
+    }
+    name
+}
+
+fn pane_title(
+    label: &str,
+    count: usize,
+    pane: crate::tui::state::DetailsPane,
+    focused: bool,
+    state: &AppState,
+) -> Line<'static> {
+    let marker = if focused {
+        if state.basic_terminal { "> " } else { "◆ " }
+    } else {
+        ""
+    };
+    let mut title = format!(" {marker}{label} · {count}");
+    if focused {
+        let mut panes = Vec::new();
+        let has_languages = state
+            .selected_details
+            .as_ref()
+            .and_then(|details| details.get("dubs"))
+            .and_then(|dubs| dubs.as_array())
+            .is_some_and(|dubs| dubs.len() > 1);
+        if has_languages {
+            panes.push(crate::tui::state::DetailsPane::Languages);
+        }
+        if !state.available_seasons.is_empty() {
+            panes.push(crate::tui::state::DetailsPane::Seasons);
+            panes.push(crate::tui::state::DetailsPane::Episodes);
+        }
+        panes.push(crate::tui::state::DetailsPane::Streams);
+        if let Some(position) = panes.iter().position(|candidate| *candidate == pane) {
+            title.push_str(&format!("  {}/{}", position + 1, panes.len()));
+        }
+    }
+    title.push(' ');
+    Line::from(title)
+}
+
+fn selection_style(focused: bool, theme: &Theme) -> ratatui::style::Style {
+    if focused {
+        theme
+            .highlight
+            .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+    } else {
+        theme.text.add_modifier(Modifier::BOLD)
+    }
+}
+
+fn selection_symbol(focused: bool, basic_terminal: bool) -> &'static str {
+    if focused {
+        if basic_terminal { "> " } else { "▌ " }
+    } else if basic_terminal {
+        "* "
+    } else {
+        "· "
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_workflow(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    details: &serde_json::Value,
+    has_languages: bool,
+    is_series: bool,
+    streams_count: usize,
+    theme: &Theme,
+) {
+    let compact = area.width < 100;
+    let mut steps = Vec::new();
+
+    if has_languages {
+        let language = details
+            .get("dubs")
+            .and_then(|dubs| dubs.as_array())
+            .and_then(|dubs| dubs.get(state.language_list_state.selected().unwrap_or(0)))
+            .and_then(|dub| dub.get("lanName"))
+            .and_then(|name| name.as_str())
+            .map(clean_language_name)
+            .unwrap_or_else(|| "Choose".to_string());
+        steps.push((
+            crate::tui::state::DetailsPane::Languages,
+            format!("Audio: {language}"),
+        ));
+    }
+    if is_series {
+        steps.push((
+            crate::tui::state::DetailsPane::Seasons,
+            if compact {
+                format!("S{}", state.selected_season)
+            } else {
+                format!("Season {}", state.selected_season)
+            },
+        ));
+        steps.push((
+            crate::tui::state::DetailsPane::Episodes,
+            if compact {
+                format!("E{}", state.selected_episode)
+            } else {
+                format!("Episode {}", state.selected_episode)
+            },
+        ));
+    }
+    steps.push((
+        crate::tui::state::DetailsPane::Streams,
+        format!("Streams: {streams_count}"),
+    ));
+
+    if area.width < 60 {
+        let position = steps
+            .iter()
+            .position(|(pane, _)| *pane == state.details_pane)
+            .unwrap_or(0);
+        let label = steps
+            .get(position)
+            .map(|(_, label)| label.as_str())
+            .unwrap_or("Streams");
+        let text = format!("{label}  ·  {}/{}", position + 1, steps.len());
+        frame.render_widget(
+            Paragraph::new(text)
+                .style(theme.accent)
+                .alignment(Alignment::Center),
+            area,
+        );
+        return;
+    }
+
+    let mut spans = Vec::new();
+    for (index, (pane, label)) in steps.iter().enumerate() {
+        if index > 0 {
+            spans.push(Span::styled(
+                if state.basic_terminal {
+                    " > "
+                } else {
+                    "  ›  "
+                },
+                theme.muted,
+            ));
+        }
+        spans.push(Span::styled(
+            label.clone(),
+            if *pane == state.details_pane {
+                theme.accent
+            } else {
+                theme.text_dim
+            },
+        ));
+    }
+    frame.render_widget(
+        Paragraph::new(Line::from(spans)).alignment(Alignment::Center),
+        area,
+    );
+}
+
+fn footer_group(key: &'static str, action: &'static str, theme: &Theme) -> Vec<Span<'static>> {
+    vec![
+        Span::styled("[", theme.text_dim),
+        Span::styled(key, theme.shortcut),
+        Span::styled("] ", theme.text_dim),
+        Span::styled(action, theme.text),
+        Span::raw("   "),
+    ]
+}
+
+fn details_footer(
+    state: &AppState,
+    theme: &Theme,
+    width: u16,
+) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
+    let compact = width < 80;
+    let very_compact = width < 45;
+    let mut primary = footer_group("Tab", if compact { "Pane" } else { "Next pane" }, theme);
+    primary.extend(footer_group("↑↓", "Move", theme));
+    if !very_compact {
+        primary.extend(footer_group(
+            "Enter",
+            if state.details_pane == crate::tui::state::DetailsPane::Streams {
+                "Play"
+            } else {
+                "Select"
+            },
+            theme,
+        ));
+    }
+
+    let mut secondary = Vec::new();
+    if very_compact {
+        secondary.extend(footer_group(
+            "Enter",
+            if state.details_pane == crate::tui::state::DetailsPane::Streams {
+                "Play"
+            } else {
+                "Select"
+            },
+            theme,
+        ));
+    } else {
+        if state.details_pane == crate::tui::state::DetailsPane::Streams {
+            secondary.extend(footer_group(
+                "o",
+                if compact { "Open" } else { "Open with" },
+                theme,
+            ));
+        }
+        if !matches!(
+            state.details_pane,
+            crate::tui::state::DetailsPane::Languages
+        ) {
+            secondary.extend(footer_group(
+                "d",
+                if compact { "Save" } else { "Download" },
+                theme,
+            ));
+        }
+        if !very_compact {
+            secondary.extend(footer_group(
+                "r",
+                if compact { "Retry" } else { "Refresh" },
+                theme,
+            ));
+        }
+    }
+    secondary.extend(footer_group("Esc", "Back", theme));
+
+    if let Some(last) = secondary.last_mut() {
+        *last = Span::raw("");
+    }
+    (primary, secondary)
+}
+
+fn render_scroll_indicator(
+    frame: &mut Frame,
+    area: Rect,
+    content_length: usize,
+    position: usize,
+    theme: &Theme,
+) {
+    let viewport_length = area.height.saturating_sub(2) as usize;
+    if content_length <= viewport_length || viewport_length == 0 {
+        return;
+    }
+
+    let mut state = ScrollbarState::default()
+        .content_length(content_length)
+        .viewport_content_length(viewport_length)
+        .position(position);
+    let scrollbar = Scrollbar::default()
+        .orientation(ScrollbarOrientation::VerticalRight)
+        .thumb_style(theme.accent)
+        .track_style(theme.muted)
+        .begin_symbol(Some("▲"))
+        .end_symbol(Some("▼"));
+    frame.render_stateful_widget(
+        scrollbar,
+        area.inner(ratatui::layout::Margin {
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut state,
+    );
 }

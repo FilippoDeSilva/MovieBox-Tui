@@ -7,6 +7,7 @@ pub mod state;
 pub mod terminal;
 pub mod text;
 pub mod theme;
+pub mod updater;
 
 pub fn clear_area(frame: &mut ratatui::Frame, area: ratatui::layout::Rect, _theme: &theme::Theme) {
     frame.render_widget(ratatui::widgets::Clear, area);

@@ -45,7 +45,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![
             Span::styled("    [←] / [→]  ", theme.header),
-            Span::styled("Switch Panels", theme.text),
+            Span::styled("Page Through Search Results", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [Tab]      ", theme.header),
+            Span::styled("Next Details Pane", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [Shift+Tab]", theme.header),
+            Span::styled("Previous Details Pane", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Enter]    ", theme.header),

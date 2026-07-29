@@ -15,7 +15,7 @@ pub enum Screen {
     Details,
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum DetailsPane {
     #[default]
     Streams,

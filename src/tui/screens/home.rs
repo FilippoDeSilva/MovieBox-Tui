@@ -110,7 +110,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             if state.is_tv_mode { 57 } else { 55 }
         };
-        let compact_footer = area.width < 100;
+        let compact_footer = area.width < 120;
         let footer_height = if compact_footer { 2 } else { 1 };
 
         let vertical_chunks = Layout::default()
@@ -211,38 +211,34 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 frame.render_widget(search_bar, search_bar_area);
             }
 
-            let primary_legend = vec![
+            let mut primary_legend = vec![
+                ratatui::text::Span::styled(
+                    state.active_provider.label().to_string(),
+                    theme.accent,
+                ),
+                ratatui::text::Span::styled(" • ", theme.muted),
+                ratatui::text::Span::styled(
+                    if state.is_tv_mode { "TV" } else { "Streaming" },
+                    theme.text_dim,
+                ),
+                ratatui::text::Span::raw("    "),
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("Ctrl+P", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled(
-                    format!("{}   ", state.active_provider.label()),
-                    theme.accent,
-                ),
+                ratatui::text::Span::styled("Provider   ", theme.text),
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("Ctrl+T", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled(
-                    if state.is_tv_mode {
-                        "TV Mode   "
-                    } else {
-                        "Streaming Mode   "
-                    },
-                    theme.text,
-                ),
+                ratatui::text::Span::styled("TV Mode", theme.text),
+            ];
+            let search_legend = vec![
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("Type", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled(
-                    if compact_footer {
-                        "Search"
-                    } else {
-                        "Search   "
-                    },
-                    theme.text,
-                ),
+                ratatui::text::Span::styled("Search   ", theme.text),
             ];
-            let secondary_legend = vec![
+            let mut secondary_legend = search_legend;
+            secondary_legend.extend([
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("↑↓", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
@@ -255,7 +251,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ratatui::text::Span::styled("q", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
                 ratatui::text::Span::styled("Quit", theme.text),
-            ];
+            ]);
 
             let legend = if compact_footer {
                 Paragraph::new(vec![
@@ -263,9 +259,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     ratatui::text::Line::from(secondary_legend),
                 ])
             } else {
-                let mut legend = primary_legend;
-                legend.extend(secondary_legend);
-                Paragraph::new(ratatui::text::Line::from(legend))
+                primary_legend.push(ratatui::text::Span::raw("   "));
+                primary_legend.extend(secondary_legend);
+                Paragraph::new(ratatui::text::Line::from(primary_legend))
             }
             .alignment(Alignment::Center);
             frame.render_widget(legend, vertical_chunks[7]);
