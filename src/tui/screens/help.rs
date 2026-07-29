@@ -34,6 +34,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 theme.text,
             ),
         ]),
+        Line::from(vec![
+            Span::styled("    [Ctrl+T]   ", theme.header),
+            Span::styled("Switch Streaming / TV Mode", theme.text),
+        ]),
         Line::from(vec![]),
         Line::from(vec![Span::styled(
             "  Navigation",

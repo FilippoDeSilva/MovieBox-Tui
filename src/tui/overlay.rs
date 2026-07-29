@@ -108,7 +108,7 @@ pub fn picker(
         } else {
             BorderType::Rounded
         })
-        .border_style(theme.border_focus);
+        .border_style(theme.lavender);
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
@@ -118,11 +118,7 @@ pub fn picker(
         .map(|item| ListItem::new(item.clone()).style(theme.text))
         .collect::<Vec<_>>();
     let list = List::new(list_items)
-        .highlight_style(
-            theme
-                .highlight
-                .add_modifier(Modifier::BOLD | Modifier::REVERSED),
-        )
+        .highlight_style(selection_style(theme, basic_terminal))
         .highlight_symbol(if basic_terminal { "> " } else { "▌ " });
     frame.render_stateful_widget(list, sections[0], state);
 
@@ -131,8 +127,8 @@ pub fn picker(
             .viewport_content_length(visible_rows)
             .position(selected);
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .thumb_style(theme.accent)
-            .track_style(theme.muted)
+            .thumb_style(theme.lavender)
+            .track_style(theme.surface1)
             .begin_symbol(Some("▲"))
             .end_symbol(Some("▼"));
         frame.render_stateful_widget(scrollbar, sections[0], &mut scrollbar_state);
@@ -188,7 +184,7 @@ pub fn confirmation(
         } else {
             BorderType::Rounded
         })
-        .border_style(theme.border_focus);
+        .border_style(theme.lavender);
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
     let sections = Layout::vertical([
@@ -202,9 +198,7 @@ pub fn confirmation(
         sections[0],
     );
 
-    let selected_style = theme
-        .highlight
-        .add_modifier(Modifier::BOLD | Modifier::REVERSED);
+    let selected_style = selection_style(theme, basic_terminal);
     let actions = Line::from(vec![
         Span::styled(
             " Download ",
@@ -351,6 +345,15 @@ pub fn clear_modal_area(frame: &mut Frame, bounds: Rect, popup: Rect, theme: &Th
 
 fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> {
     Span::styled(format!("[{key}] {action}"), theme.text_dim)
+}
+
+fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
+    let style = theme.text.add_modifier(Modifier::BOLD);
+    if basic_terminal {
+        style.add_modifier(Modifier::UNDERLINED)
+    } else {
+        style.bg(theme.surface0.fg.unwrap_or(theme.base))
+    }
 }
 
 fn notification_style(

@@ -573,6 +573,7 @@ impl App {
 
         if self.state.auto_update && now.saturating_sub(self.state.last_update_check) > 3600 {
             self.state.last_update_check = now;
+            self.state.manual_update_check = false;
             self.persist_config();
             self.action_sender.send(Action::CheckForUpdates).ok();
         } else {
@@ -636,97 +637,6 @@ impl App {
                     self.state.dirty = true;
                 }
 
-                if self.state.search_query.is_empty()
-                    && matches!(self.state.active_screen, crate::tui::state::Screen::Home)
-                {
-                    let greeting = format!("Welcome back, {}", self.state.username);
-
-                    let prompts = if self.state.is_tv_mode {
-                        vec![
-                            "What live channel are you looking for?",
-                            "Try 'BBC', 'CNN', or 'ESPN'...",
-                            "Discover news, sports, or entertainment...",
-                            "Search your selected broadcast areas...",
-                            "Feeling bored? Find a live stream...",
-                            "Search live broadcast channels...",
-                        ]
-                    } else {
-                        vec![
-                            "What are you in the mood to watch?",
-                            "Try 'Oppenheimer', 'Titanic', or 'Interstellar'...",
-                            "Discover your next binge-worthy masterpiece...",
-                            "Search for blockbuster movies, hit shows, or anime...",
-                            "Feeling nostalgic? Search timeless classics...",
-                            "Explore trending titles for your movie night...",
-                        ]
-                    };
-                    let type_speed = 3;
-                    let del_speed = 1;
-                    let pause1 = 90;
-                    let pause2 = 15;
-
-                    let greeting_graphemes = crate::tui::text::grapheme_count(&greeting);
-                    let greeting_cycle = greeting_graphemes * type_speed
-                        + pause1
-                        + greeting_graphemes * del_speed
-                        + pause2;
-                    let mut total_ticks = 0;
-                    for p in prompts.iter() {
-                        let count = crate::tui::text::grapheme_count(p);
-                        total_ticks += count * type_speed + pause1 + count * del_speed + pause2;
-                    }
-
-                    let tick_u = self.state.tick_count as usize;
-                    let mut animated_text = String::new();
-
-                    if tick_u < greeting_cycle {
-                        let t = tick_u;
-                        let greeting_len = greeting_graphemes;
-                        let t_type = greeting_len * type_speed;
-                        let t_del = greeting_len * del_speed;
-                        let display_len = if t < t_type {
-                            t / type_speed
-                        } else if t < t_type + pause1 {
-                            greeting_len
-                        } else if t < t_type + pause1 + t_del {
-                            greeting_len.saturating_sub((t - (t_type + pause1)) / del_speed)
-                        } else {
-                            0
-                        };
-                        animated_text = crate::tui::text::take_graphemes(
-                            &greeting,
-                            display_len.min(greeting_len),
-                        );
-                    } else {
-                        let mut t = (tick_u - greeting_cycle) % total_ticks;
-                        for p in prompts.iter() {
-                            let p_len = crate::tui::text::grapheme_count(p);
-                            let t_type = p_len * type_speed;
-                            let t_del = p_len * del_speed;
-                            let cycle = t_type + pause1 + t_del + pause2;
-                            if t < cycle {
-                                let display_len = if t < t_type {
-                                    t / type_speed
-                                } else if t < t_type + pause1 {
-                                    p_len
-                                } else if t < t_type + pause1 + t_del {
-                                    p_len.saturating_sub((t - (t_type + pause1)) / del_speed)
-                                } else {
-                                    0
-                                };
-                                animated_text =
-                                    crate::tui::text::take_graphemes(p, display_len.min(p_len));
-                                break;
-                            } else {
-                                t -= cycle;
-                            }
-                        }
-                    }
-                    if self.state.cached_animated_text != animated_text {
-                        self.state.cached_animated_text = animated_text;
-                        self.state.dirty = true;
-                    }
-                }
                 let current_query = self.state.search_query.trim().to_string();
                 if current_query != self.state.last_suggest_query
                     && self.state.last_search_edit.elapsed()
@@ -1076,7 +986,28 @@ impl App {
                                     self.action_sender.send(Action::MoveRight).ok();
                                 }
                                 KeyCode::Enter => {
-                                    self.action_sender.send(Action::Submit).ok();
+                                    if self.state.search_results.is_empty()
+                                        && !self.state.search_query.trim().is_empty()
+                                        && (self
+                                            .state
+                                            .status_message
+                                            .to_ascii_lowercase()
+                                            .starts_with("no matches")
+                                            || self
+                                                .state
+                                                .status_message
+                                                .to_ascii_lowercase()
+                                                .contains("search failed"))
+                                    {
+                                        self.action_sender
+                                            .send(Action::Search {
+                                                query: self.state.search_query.trim().to_string(),
+                                                force_refresh: true,
+                                            })
+                                            .ok();
+                                    } else {
+                                        self.action_sender.send(Action::Submit).ok();
+                                    }
                                 }
                                 KeyCode::Char('?') => {
                                     self.action_sender.send(Action::ToggleHelp).ok();
@@ -1360,7 +1291,9 @@ impl App {
                 match self.state.active_screen {
                     Screen::Startup => {}
                     Screen::Home => {
-                        if !self.state.search_results.is_empty() {
+                        if !self.state.search_results.is_empty()
+                            || !self.state.search_query.is_empty()
+                        {
                             self.state.search_poster_protocols.clear();
                             self.state.search_results.clear();
                             self.state.search_query.clear();
@@ -1611,6 +1544,7 @@ impl App {
                     self.state.updater_progress = None;
                     self.state.updater_status = None;
                     self.state.updater_done = false;
+                    self.state.manual_update_check = true;
                     self.action_sender.send(Action::CheckForUpdates).ok();
                     return None;
                 }
@@ -4130,13 +4064,17 @@ impl App {
                 if version == "none" {
                     if self.state.active_screen == Screen::Startup {
                         self.state.active_screen = Screen::Home;
+                    }
+                    if self.state.manual_update_check {
                         self.state.notify(
                             NotificationKind::Success,
                             "Up to date",
                             "You are using the latest version.",
                         );
                     }
+                    self.state.manual_update_check = false;
                 } else {
+                    self.state.manual_update_check = false;
                     self.state.update_available = Some(version);
                     if self.state.active_screen == Screen::Startup {
                         match crate::tui::updater::replacement_access() {

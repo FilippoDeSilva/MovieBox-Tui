@@ -63,7 +63,6 @@ pub struct AppState {
     pub is_homepage_mode: bool,
     pub current_tab_id: String,
     pub current_page: usize,
-    pub cached_animated_text: String,
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
     pub search_poster_protocols:
         lru::LruCache<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
@@ -127,6 +126,7 @@ pub struct AppState {
     pub updater_done: bool,
     pub auto_update: bool,
     pub last_update_check: u64,
+    pub manual_update_check: bool,
 
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
@@ -163,7 +163,6 @@ impl Default for AppState {
             provider_generation: 0,
             active_screen: Screen::Startup,
             input_mode: InputMode::Normal,
-            cached_animated_text: String::new(),
             search_query: String::new(),
             last_suggest_query: String::new(),
             last_search_edit: std::time::Instant::now(),
@@ -233,6 +232,7 @@ impl Default for AppState {
             updater_done: false,
             auto_update: true,
             last_update_check: 0,
+            manual_update_check: false,
 
             download_progress: None,
             download_status: None,

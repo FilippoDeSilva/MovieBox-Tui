@@ -2,7 +2,7 @@ use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::Modifier,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
         Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
@@ -167,7 +167,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             ratatui::widgets::BorderType::Rounded
         })
-        .border_style(theme.border)
+        .border_style(theme.surface1)
         .padding(ratatui::widgets::Padding::new(
             if matches!(tier, DetailsLayoutTier::Wide) {
                 2
@@ -304,9 +304,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if !duration_str.is_empty() {
         metadata.push(duration.to_string());
     }
-    let meta_line = Line::from(vec![Span::styled(metadata.join(" • "), theme.text)]);
+    let meta_line = Line::from(vec![Span::styled(
+        metadata.join(" • "),
+        metadata_style(theme),
+    )]);
 
-    let genre_line = Line::from(vec![Span::styled(genres.to_string(), theme.text_dim)]);
+    let genre_line = Line::from(vec![Span::styled(
+        genres.to_string(),
+        metadata_style(theme),
+    )]);
 
     let mut top_meta = vec![
         title_line,
@@ -315,10 +321,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         Line::from(vec![Span::styled(
             tagline.unwrap_or_default(),
             theme
-                .text_dim
+                .overlay1
                 .add_modifier(ratatui::style::Modifier::ITALIC),
         )]),
-        Line::from(vec![Span::styled("Synopsis", theme.text)]),
+        Line::from(vec![Span::styled("Synopsis", theme.title)]),
     ];
     if matches!(tier, DetailsLayoutTier::Tiny) {
         top_meta.truncate(3);
@@ -340,10 +346,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let synopsis_capacity =
         (meta_chunks[1].width as usize).saturating_mul(meta_chunks[1].height as usize);
     let synopsis = truncate_with_ellipsis(intro, synopsis_capacity);
-    let syn_lines = vec![Line::from(vec![Span::styled(
-        synopsis,
-        theme.text_dim.add_modifier(ratatui::style::Modifier::DIM),
-    )])];
+    let syn_lines = vec![Line::from(vec![Span::styled(synopsis, theme.overlay1)])];
     let intro_p = Paragraph::new(syn_lines).wrap(Wrap { trim: true });
     frame.render_widget(intro_p, meta_chunks[1]);
 
@@ -470,9 +473,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let language_focused = state.details_pane == crate::tui::state::DetailsPane::Languages;
         let lang_border = if language_focused {
-            theme.border_focus
+            focused_border_style(theme)
         } else {
-            theme.border
+            unfocused_border_style(theme)
         };
         let lang_list = List::new(lang_items)
             .block(
@@ -491,14 +494,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         state,
                     ))
                     .title_style(if language_focused {
-                        theme.accent
+                        focused_title_style(theme)
                     } else {
-                        theme.text_dim
+                        unfocused_title_style(theme)
                     })
                     .border_style(lang_border)
                     .padding(ratatui::widgets::Padding::horizontal(1)),
             )
-            .highlight_style(selection_style(language_focused, theme))
+            .highlight_style(selection_style(
+                language_focused,
+                state.basic_terminal,
+                theme,
+            ))
             .highlight_symbol(selection_symbol(language_focused, state.basic_terminal));
 
         if let Some(area) = lang_area {
@@ -526,9 +533,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let seasons_focused = state.details_pane == crate::tui::state::DetailsPane::Seasons;
         let seasons_border = if seasons_focused {
-            theme.border_focus
+            focused_border_style(theme)
         } else {
-            theme.border
+            unfocused_border_style(theme)
         };
         let seasons_list = List::new(seasons_items)
             .block(
@@ -547,14 +554,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         state,
                     ))
                     .title_style(if seasons_focused {
-                        theme.accent
+                        focused_title_style(theme)
                     } else {
-                        theme.text_dim
+                        unfocused_title_style(theme)
                     })
                     .border_style(seasons_border)
                     .padding(ratatui::widgets::Padding::horizontal(1)),
             )
-            .highlight_style(selection_style(seasons_focused, theme))
+            .highlight_style(selection_style(
+                seasons_focused,
+                state.basic_terminal,
+                theme,
+            ))
             .highlight_symbol(selection_symbol(seasons_focused, state.basic_terminal));
 
         if let Some(area) = seasons_area {
@@ -583,9 +594,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let episodes_focused = state.details_pane == crate::tui::state::DetailsPane::Episodes;
         let eps_border = if episodes_focused {
-            theme.border_focus
+            focused_border_style(theme)
         } else {
-            theme.border
+            unfocused_border_style(theme)
         };
         let eps_list = List::new(ep_items)
             .block(
@@ -604,14 +615,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         state,
                     ))
                     .title_style(if episodes_focused {
-                        theme.accent
+                        focused_title_style(theme)
                     } else {
-                        theme.text_dim
+                        unfocused_title_style(theme)
                     })
                     .border_style(eps_border)
                     .padding(ratatui::widgets::Padding::horizontal(1)),
             )
-            .highlight_style(selection_style(episodes_focused, theme))
+            .highlight_style(selection_style(
+                episodes_focused,
+                state.basic_terminal,
+                theme,
+            ))
             .highlight_symbol(selection_symbol(episodes_focused, state.basic_terminal));
 
         if let Some(area) = eps_area {
@@ -630,10 +645,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
     }
 
-    let streams_border = if state.details_pane == crate::tui::state::DetailsPane::Streams {
-        theme.border_focus
+    let streams_focused = state.details_pane == crate::tui::state::DetailsPane::Streams;
+    let streams_border = if streams_focused {
+        focused_border_style(theme)
     } else {
-        theme.border
+        unfocused_border_style(theme)
     };
 
     let streams_title = if streams_count > 0 {
@@ -643,11 +659,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .unwrap_or(0)
             .min(streams_count.saturating_sub(1));
         format!(
-            " Streams · {} available · {}/{} ",
+            " {}Streams · {} available · {}/{} ",
+            if streams_focused {
+                focus_title_marker(state.basic_terminal)
+            } else {
+                ""
+            },
             streams_count,
             selected + 1,
             streams_count
         )
+    } else if streams_focused {
+        format!(" {}Streams ", focus_title_marker(state.basic_terminal))
     } else {
         " Streams ".to_string()
     };
@@ -660,13 +683,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ratatui::widgets::BorderType::Rounded
         })
         .title(ratatui::text::Line::from(streams_title).alignment(Alignment::Left))
-        .title_style(
-            if state.details_pane == crate::tui::state::DetailsPane::Streams {
-                theme.accent
-            } else {
-                theme.text_dim
-            },
-        )
+        .title_style(if streams_focused {
+            focused_title_style(theme)
+        } else {
+            unfocused_title_style(theme)
+        })
         .border_style(streams_border)
         .padding(ratatui::widgets::Padding::horizontal(1));
 
@@ -732,19 +753,38 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                         let is_selected = Some(i) == selected_idx;
                         let pointer = if is_selected {
-                            if state.basic_terminal { "> " } else { "▌ " }
+                            selection_symbol(streams_focused, state.basic_terminal)
                         } else {
                             "  "
                         };
 
-                        let stream_style = if is_selected {
-                            selection_style(
-                                state.details_pane
-                                    == crate::tui::state::DetailsPane::Streams,
+                        let row_style = if is_selected {
+                            selection_style(streams_focused, state.basic_terminal, theme)
+                        } else {
+                            metadata_style(theme)
+                        };
+                        let marker_style = if is_selected && streams_focused {
+                            with_selection_surface(theme.lavender, state.basic_terminal, theme)
+                                .add_modifier(Modifier::BOLD)
+                        } else if is_selected {
+                            theme.title
+                        } else {
+                            metadata_style(theme)
+                        };
+                        let primary_style = if is_selected {
+                            with_selection_surface(theme.text, state.basic_terminal, theme)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            theme.text
+                        };
+                        let secondary_style = if is_selected {
+                            with_selection_surface(
+                                metadata_style(theme),
+                                state.basic_terminal,
                                 theme,
                             )
                         } else {
-                            theme.text_dim
+                            metadata_style(theme)
                         };
 
                         let is_fourk = file.get("_fourk_release").is_some();
@@ -758,36 +798,46 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .unwrap_or(0);
                         let stream_width = streams_area.width.saturating_sub(6) as usize;
                         let codec = codec.to_uppercase();
-                        let metadata = if is_fourk && stream_width >= 58 {
-                            format!(
-                                "{size_formatted:<9}{codec:<8}{language:<16}{source_count} mirror{}",
-                                if source_count == 1 { "" } else { "s" }
-                            )
+                        let mut stream_spans = vec![
+                            Span::styled(pointer, marker_style),
+                            Span::styled(format!("{size_formatted:<9}"), primary_style),
+                            Span::styled(format!("{codec:<8}"), secondary_style),
+                        ];
+                        if is_fourk && stream_width >= 58 {
+                            stream_spans
+                                .push(Span::styled(format!("{language:<16}"), secondary_style));
+                            stream_spans.push(Span::styled(
+                                format!(
+                                    "{source_count} mirror{}",
+                                    if source_count == 1 { "" } else { "s" }
+                                ),
+                                secondary_style,
+                            ));
                         } else if is_fourk && stream_width >= 38 {
-                            format!("{size_formatted:<9}{codec:<8}{language}")
-                        } else if is_fourk {
-                            format!("{size_formatted:<9}{codec}")
-                        } else if stream_width >= 64 {
+                            stream_spans.push(Span::styled(language.to_string(), secondary_style));
+                        } else if !is_fourk && stream_width >= 64 {
                             let fixed_width = 9 + 8 + 12;
                             let uploader = crate::tui::text::truncate_width(
                                 upload_by,
                                 stream_width.saturating_sub(fixed_width).max(4),
                             );
-                            format!("{size_formatted:<9}{codec:<8}{duration_str:<12}{uploader}")
-                        } else if stream_width >= 38 {
-                            format!("{size_formatted:<9}{codec:<8}{duration_str}")
-                        } else {
-                            format!("{size_formatted:<9}{codec}")
-                        };
-                        let metadata = if is_selected {
-                            format!("{metadata:<width$}", width = stream_width.saturating_sub(2))
-                        } else {
-                            metadata
-                        };
-                        let stream_line = ratatui::text::Line::from(vec![
-                            ratatui::text::Span::styled(pointer, stream_style),
-                            ratatui::text::Span::styled(metadata, stream_style),
-                        ]);
+                            stream_spans
+                                .push(Span::styled(format!("{duration_str:<12}"), secondary_style));
+                            stream_spans.push(Span::styled(uploader, secondary_style));
+                        } else if !is_fourk && stream_width >= 38 {
+                            stream_spans.push(Span::styled(duration_str, secondary_style));
+                        }
+                        if is_selected {
+                            let used_width = stream_spans
+                                .iter()
+                                .map(|span| crate::tui::text::width(span.content.as_ref()))
+                                .sum::<usize>();
+                            stream_spans.push(Span::styled(
+                                " ".repeat(stream_width.saturating_sub(used_width)),
+                                row_style,
+                            ));
+                        }
+                        let stream_line = Line::from(stream_spans);
 
                         let mut lines = vec![];
                         if is_first_of_quality {
@@ -796,17 +846,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             }
                             let option_count =
                                 quality_counts.get(&resolution).copied().unwrap_or(1);
-                            lines.push(ratatui::text::Line::from(
-                                ratatui::text::Span::styled(
+                            lines.push(Line::from(vec![
+                                Span::styled(quality_str, group_heading_style(theme)),
+                                Span::styled(" · ", theme.overlay0),
+                                Span::styled(
                                     format!(
-                                        "{} · {} option{}",
-                                        quality_str,
+                                        "{} option{}",
                                         option_count,
                                         if option_count == 1 { "" } else { "s" }
                                     ),
-                                    theme.accent,
+                                    metadata_style(theme),
                                 ),
-                            ));
+                            ]));
                         }
 
                         lines.push(stream_line);
@@ -1111,7 +1162,7 @@ fn pane_title(
     state: &AppState,
 ) -> Line<'static> {
     let marker = if focused {
-        if state.basic_terminal { "> " } else { "◆ " }
+        focus_title_marker(state.basic_terminal)
     } else {
         ""
     };
@@ -1140,14 +1191,58 @@ fn pane_title(
     Line::from(title)
 }
 
-fn selection_style(focused: bool, theme: &Theme) -> ratatui::style::Style {
+fn theme_color(style: Style, fallback: ratatui::style::Color) -> ratatui::style::Color {
+    style.fg.unwrap_or(fallback)
+}
+
+fn focused_border_style(theme: &Theme) -> Style {
+    theme.lavender
+}
+
+fn unfocused_border_style(theme: &Theme) -> Style {
+    theme.surface1
+}
+
+fn focused_title_style(theme: &Theme) -> Style {
+    theme.title
+}
+
+fn unfocused_title_style(theme: &Theme) -> Style {
+    theme.subtext1
+}
+
+fn metadata_style(theme: &Theme) -> Style {
+    theme.subtext1
+}
+
+fn group_heading_style(theme: &Theme) -> Style {
+    theme.lavender.add_modifier(Modifier::BOLD)
+}
+
+fn with_selection_surface(style: Style, basic_terminal: bool, theme: &Theme) -> Style {
+    if basic_terminal {
+        style
+    } else {
+        style.bg(theme_color(theme.surface0, theme.base))
+    }
+}
+
+fn selection_style(focused: bool, basic_terminal: bool, theme: &Theme) -> Style {
     if focused {
-        theme
-            .highlight
-            .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        let style =
+            with_selection_surface(theme.text, basic_terminal, theme).add_modifier(Modifier::BOLD);
+        if basic_terminal {
+            style.add_modifier(Modifier::UNDERLINED)
+        } else {
+            style
+        }
     } else {
         theme.text.add_modifier(Modifier::BOLD)
     }
+}
+
+fn focus_title_marker(basic_terminal: bool) -> &'static str {
+    if basic_terminal { "> " } else { "● " }
 }
 
 fn selection_symbol(focused: bool, basic_terminal: bool) -> &'static str {
@@ -1223,7 +1318,7 @@ fn render_workflow(
         let text = format!("{label}  ·  {}/{}", position + 1, steps.len());
         frame.render_widget(
             Paragraph::new(text)
-                .style(theme.accent)
+                .style(focused_title_style(theme))
                 .alignment(Alignment::Center),
             area,
         );
@@ -1231,6 +1326,10 @@ fn render_workflow(
     }
 
     let mut spans = Vec::new();
+    let active_index = steps
+        .iter()
+        .position(|(pane, _)| *pane == state.details_pane)
+        .unwrap_or(0);
     for (index, (pane, label)) in steps.iter().enumerate() {
         if index > 0 {
             spans.push(Span::styled(
@@ -1239,17 +1338,25 @@ fn render_workflow(
                 } else {
                     "  ›  "
                 },
-                theme.muted,
+                theme.overlay0,
             ));
         }
-        spans.push(Span::styled(
-            label.clone(),
-            if *pane == state.details_pane {
-                theme.accent
-            } else {
-                theme.text_dim
-            },
-        ));
+        if *pane == state.details_pane {
+            spans.push(Span::styled(
+                focus_title_marker(state.basic_terminal),
+                theme.lavender.add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::styled(label.clone(), focused_title_style(theme)));
+        } else {
+            spans.push(Span::styled(
+                label.clone(),
+                if index < active_index {
+                    theme.text
+                } else {
+                    theme.overlay0
+                },
+            ));
+        }
     }
     frame.render_widget(
         Paragraph::new(Line::from(spans)).alignment(Alignment::Center),
@@ -1257,12 +1364,24 @@ fn render_workflow(
     );
 }
 
-fn footer_group(key: &'static str, action: &'static str, theme: &Theme) -> Vec<Span<'static>> {
+fn footer_group(
+    key: &'static str,
+    action: &'static str,
+    prominent: bool,
+    theme: &Theme,
+) -> Vec<Span<'static>> {
     vec![
-        Span::styled("[", theme.text_dim),
+        Span::styled("[", theme.overlay0),
         Span::styled(key, theme.shortcut),
-        Span::styled("] ", theme.text_dim),
-        Span::styled(action, theme.text),
+        Span::styled("] ", theme.overlay0),
+        Span::styled(
+            action,
+            if prominent {
+                theme.text
+            } else {
+                theme.subtext1
+            },
+        ),
         Span::raw("   "),
     ]
 }
@@ -1274,8 +1393,13 @@ fn details_footer(
 ) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
     let compact = width < 80;
     let very_compact = width < 45;
-    let mut primary = footer_group("Tab", if compact { "Pane" } else { "Next pane" }, theme);
-    primary.extend(footer_group("↑↓", "Move", theme));
+    let mut primary = footer_group(
+        "Tab",
+        if compact { "Pane" } else { "Next pane" },
+        false,
+        theme,
+    );
+    primary.extend(footer_group("↑↓", "Move", false, theme));
     if !very_compact {
         primary.extend(footer_group(
             "Enter",
@@ -1284,6 +1408,7 @@ fn details_footer(
             } else {
                 "Select"
             },
+            true,
             theme,
         ));
     }
@@ -1297,6 +1422,7 @@ fn details_footer(
             } else {
                 "Select"
             },
+            true,
             theme,
         ));
     } else {
@@ -1304,6 +1430,7 @@ fn details_footer(
             secondary.extend(footer_group(
                 "o",
                 if compact { "Open" } else { "Open with" },
+                false,
                 theme,
             ));
         }
@@ -1314,6 +1441,7 @@ fn details_footer(
             secondary.extend(footer_group(
                 "d",
                 if compact { "Save" } else { "Download" },
+                false,
                 theme,
             ));
         }
@@ -1321,11 +1449,12 @@ fn details_footer(
             secondary.extend(footer_group(
                 "r",
                 if compact { "Retry" } else { "Refresh" },
+                false,
                 theme,
             ));
         }
     }
-    secondary.extend(footer_group("Esc", "Back", theme));
+    secondary.extend(footer_group("Esc", "Back", false, theme));
 
     if let Some(last) = secondary.last_mut() {
         *last = Span::raw("");
@@ -1351,8 +1480,8 @@ fn render_scroll_indicator(
         .position(position);
     let scrollbar = Scrollbar::default()
         .orientation(ScrollbarOrientation::VerticalRight)
-        .thumb_style(theme.accent)
-        .track_style(theme.muted)
+        .thumb_style(theme.lavender)
+        .track_style(theme.surface1)
         .begin_symbol(Some("▲"))
         .end_symbol(Some("▼"));
     frame.render_stateful_widget(

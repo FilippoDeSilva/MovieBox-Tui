@@ -5,56 +5,207 @@ use crate::tui::{
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    style::{Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Cell, Paragraph, Row, Table},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SearchViewState {
+    Empty,
+    Editing,
+    Loading,
+    Results,
+    NoResults,
+    Error,
+}
+
+fn search_view_state(state: &AppState) -> SearchViewState {
+    if state.input_mode == InputMode::Editing {
+        SearchViewState::Editing
+    } else if state.is_loading {
+        SearchViewState::Loading
+    } else if state
+        .status_message
+        .to_ascii_lowercase()
+        .contains("search failed")
+    {
+        SearchViewState::Error
+    } else if !state.search_results.is_empty() {
+        SearchViewState::Results
+    } else if !state.search_query.trim().is_empty()
+        && state
+            .status_message
+            .to_ascii_lowercase()
+            .starts_with("no matches")
+    {
+        SearchViewState::NoResults
+    } else {
+        SearchViewState::Empty
+    }
+}
+
+fn search_spinner(state: &AppState) -> char {
+    if state.basic_terminal {
+        let frames = ['-', '\\', '|', '/'];
+        frames[(state.tick_count as usize) % frames.len()]
+    } else {
+        let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        frames[(state.tick_count as usize) % frames.len()]
+    }
+}
+
+fn search_hint(view: SearchViewState, width: u16, theme: &Theme) -> Line<'static> {
+    let text = match view {
+        SearchViewState::Editing if width >= 82 => "[↑↓] Suggestions  [Enter] Search  [Esc] Cancel",
+        SearchViewState::Editing if width >= 54 => "[↑↓] Suggest  [Enter] Search  [Esc] Cancel",
+        SearchViewState::Editing => "[Enter] Search  [Esc] Cancel",
+        SearchViewState::Error if width >= 62 => "[Enter] Retry  [Type] Edit  [Esc] Clear",
+        SearchViewState::Error => "[Enter] Retry  [Esc] Clear",
+        SearchViewState::Results if width >= 62 => "[Type] Edit  [↑↓] Browse  [Enter] Open",
+        SearchViewState::Results => "[↑↓] Browse  [Enter] Open",
+        SearchViewState::NoResults if width >= 62 => "[Type] Edit  [Enter] Retry  [Esc] Clear",
+        SearchViewState::NoResults => "[Type] Edit  [Esc] Clear",
+        SearchViewState::Loading => "",
+        SearchViewState::Empty => "",
+    };
+
+    let mut spans = Vec::new();
+    let mut remaining = text;
+    while let Some(open) = remaining.find('[') {
+        if open > 0 {
+            spans.push(Span::styled(remaining[..open].to_string(), theme.text_dim));
+        }
+        let Some(close) = remaining[open..].find(']') else {
+            spans.push(Span::styled(remaining[open..].to_string(), theme.text_dim));
+            remaining = "";
+            break;
+        };
+        let close = open + close;
+        spans.push(Span::styled("[", theme.text_dim));
+        spans.push(Span::styled(
+            remaining[open + 1..close].to_string(),
+            theme.shortcut,
+        ));
+        spans.push(Span::styled("]", theme.text_dim));
+        remaining = &remaining[close + 1..];
+    }
+    if !remaining.is_empty() {
+        spans.push(Span::styled(remaining.to_string(), theme.text_dim));
+    }
+    Line::from(spans).centered()
+}
+
+fn centered_width(area: Rect, maximum: u16) -> Rect {
+    let width = area.width.min(maximum).max(1);
+    Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        width,
+        ..area
+    }
+}
+
+fn search_content(
+    state: &AppState,
+    view: SearchViewState,
+    show_cursor: bool,
+    width: u16,
+) -> String {
+    let prefix = if state.basic_terminal { "> " } else { "❯ " };
+    let cursor_width = usize::from(view == SearchViewState::Editing);
+    let available = width
+        .saturating_sub(4)
+        .saturating_sub(crate::tui::text::width(prefix) as u16)
+        .saturating_sub(cursor_width as u16) as usize;
+    let content = if state.search_query.is_empty() {
+        "Search movies and series…".to_string()
+    } else {
+        crate::tui::text::truncate_width(&state.search_query, available)
+    };
+    let cursor = if view == SearchViewState::Editing {
+        if show_cursor { "█" } else { " " }
+    } else {
+        ""
+    };
+    format!("{prefix}{content}{cursor}")
+}
+
+fn render_search_bar(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    theme: &Theme,
+    view: SearchViewState,
+    show_cursor: bool,
+    centered: bool,
+) {
+    let rule_style = if view == SearchViewState::Editing {
+        theme.border_focus
+    } else if view == SearchViewState::Error {
+        theme.error
+    } else {
+        theme.border
+    };
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(area);
+    let mut paragraph = Paragraph::new(search_content(state, view, show_cursor, area.width)).style(
+        if view == SearchViewState::Editing {
+            theme.text
+        } else if state.search_query.is_empty() {
+            theme.text_dim
+        } else {
+            theme.text
+        },
+    );
+    if centered {
+        paragraph = paragraph.alignment(Alignment::Center);
+    }
+    frame.render_widget(paragraph, rows[0]);
+
+    let status = match view {
+        SearchViewState::Loading => format!(" {} Searching… ", search_spinner(state)),
+        SearchViewState::Results => format!(" {} results ", state.search_results.len()),
+        SearchViewState::NoResults => " No results ".to_string(),
+        SearchViewState::Error => " Search failed ".to_string(),
+        _ => String::new(),
+    };
+    let status_width = crate::tui::text::width(&status) as u16;
+    let rule_width = area.width.saturating_sub(status_width);
+    let rule = if state.basic_terminal { "-" } else { "─" };
+    let rule_text = rule.repeat(rule_width as usize);
+    let status_style = if view == SearchViewState::Error {
+        theme.error.add_modifier(Modifier::BOLD)
+    } else if view == SearchViewState::Results {
+        theme.accent
+    } else {
+        theme.text_dim
+    };
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(rule_text, rule_style),
+            Span::styled(status, status_style),
+        ])),
+        rows[1],
+    );
+}
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
     let show_cursor = (state.tick_count % 16) < 8;
-    let search_prefix = if state.basic_terminal { "> " } else { "❯ " };
-
-    let search_content =
-        if !state.status_message.is_empty() && state.input_mode == InputMode::Normal {
-            format!("{}{}", search_prefix, state.status_message)
-        } else if state.search_query.is_empty() {
-            let animated_text = &state.cached_animated_text;
-
-            if state.input_mode == InputMode::Editing {
-                if show_cursor {
-                    format!("{}{}{}█", search_prefix, animated_text, "")
-                } else {
-                    format!("{}{}{} ", search_prefix, animated_text, "")
-                }
-            } else {
-                if show_cursor {
-                    format!("{}{}|", search_prefix, animated_text)
-                } else {
-                    format!("{}{}", search_prefix, animated_text)
-                }
-            }
-        } else {
-            if state.input_mode == InputMode::Editing {
-                if show_cursor {
-                    format!("{} {}█", search_prefix, state.search_query)
-                } else {
-                    format!("{} {} ", search_prefix, state.search_query)
-                }
-            } else {
-                format!("{} {}", search_prefix, state.search_query)
-            }
-        };
-
+    let view = search_view_state(state);
     let mut search_bar_area = Rect::default();
+    let mut suggestion_area = Rect::default();
 
-    if state.search_results.is_empty()
-        && !state.is_loading
-        && !state.status_message.to_lowercase().contains("fail")
+    if view == SearchViewState::Empty
+        || (view == SearchViewState::Editing && state.search_results.is_empty())
     {
         if state.tick_count < 1 {
             return;
         }
 
-        let is_narrow = area.width < 60 || state.basic_terminal;
-        let is_wide = area.width >= 100 && !state.basic_terminal;
+        let is_narrow = area.width < 100 || area.height < 28 || state.basic_terminal;
+        let is_wide = area.width >= 120 && area.height >= 32 && !state.basic_terminal;
         let logo_height = if is_narrow {
             2
         } else if is_wide {
@@ -110,20 +261,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             if state.is_tv_mode { 57 } else { 55 }
         };
-        let compact_footer = area.width < 120;
-        let footer_height = if compact_footer { 2 } else { 1 };
-
+        let suggestions_open =
+            state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Percentage(15),
+                Constraint::Percentage(18),
                 Constraint::Length(logo_height),
                 Constraint::Length(1),
                 Constraint::Length(2),
-                Constraint::Length(3),
-                Constraint::Length(3),
+                Constraint::Length(1),
+                Constraint::Length(1),
                 Constraint::Min(0),
-                Constraint::Length(footer_height),
+                Constraint::Length(1),
                 Constraint::Length(1),
             ])
             .split(area);
@@ -198,183 +348,171 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(version, version_chunks[1]);
 
         if state.tick_count >= 3 {
-            search_bar_area = vertical_chunks[5];
-
-            let search_bar = Paragraph::new(search_content.clone())
-                .alignment(Alignment::Center)
-                .style(match state.input_mode {
-                    InputMode::Editing => theme.title,
-                    InputMode::Normal => theme.text_dim,
-                });
+            let search_width = if is_wide {
+                64
+            } else if is_narrow {
+                area.width.saturating_sub(4)
+            } else {
+                56
+            };
+            search_bar_area = centered_width(vertical_chunks[3], search_width);
+            suggestion_area = Rect {
+                x: search_bar_area.x,
+                y: search_bar_area.bottom(),
+                width: search_bar_area.width,
+                height: area.bottom().saturating_sub(search_bar_area.bottom()),
+            };
 
             if !state.tv_config_popup {
-                frame.render_widget(search_bar, search_bar_area);
+                render_search_bar(
+                    frame,
+                    search_bar_area,
+                    state,
+                    theme,
+                    view,
+                    show_cursor,
+                    true,
+                );
             }
 
-            let mut primary_legend = vec![
-                ratatui::text::Span::styled(
-                    state.active_provider.label().to_string(),
-                    theme.accent,
-                ),
-                ratatui::text::Span::styled(" • ", theme.muted),
-                ratatui::text::Span::styled(
+            let context = Line::from(vec![
+                Span::styled(state.active_provider.label().to_string(), theme.accent),
+                Span::styled(" • ", theme.muted),
+                Span::styled(
                     if state.is_tv_mode { "TV" } else { "Streaming" },
                     theme.text_dim,
                 ),
-                ratatui::text::Span::raw("    "),
-                ratatui::text::Span::styled("[", theme.text_dim),
-                ratatui::text::Span::styled("Ctrl+P", theme.shortcut),
-                ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("Provider   ", theme.text),
-                ratatui::text::Span::styled("[", theme.text_dim),
-                ratatui::text::Span::styled("Ctrl+T", theme.shortcut),
-                ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("TV Mode", theme.text),
-            ];
-            let search_legend = vec![
-                ratatui::text::Span::styled("[", theme.text_dim),
-                ratatui::text::Span::styled("Type", theme.shortcut),
-                ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("Search   ", theme.text),
-            ];
-            let mut secondary_legend = search_legend;
-            secondary_legend.extend([
-                ratatui::text::Span::styled("[", theme.text_dim),
-                ratatui::text::Span::styled("↑↓", theme.shortcut),
-                ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("Browse   ", theme.text),
-                ratatui::text::Span::styled("[", theme.text_dim),
-                ratatui::text::Span::styled("?", theme.shortcut),
-                ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("Help   ", theme.text),
-                ratatui::text::Span::styled("[", theme.text_dim),
-                ratatui::text::Span::styled("q", theme.shortcut),
-                ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("Quit", theme.text),
             ]);
-
-            let legend = if compact_footer {
-                Paragraph::new(vec![
-                    ratatui::text::Line::from(primary_legend),
-                    ratatui::text::Line::from(secondary_legend),
-                ])
+            let context_area = if suggestions_open {
+                Rect::default()
+            } else if view == SearchViewState::Empty {
+                vertical_chunks[4]
             } else {
-                primary_legend.push(ratatui::text::Span::raw("   "));
-                primary_legend.extend(secondary_legend);
-                Paragraph::new(ratatui::text::Line::from(primary_legend))
+                frame.render_widget(
+                    Paragraph::new(search_hint(view, search_bar_area.width, theme))
+                        .alignment(Alignment::Center),
+                    vertical_chunks[4],
+                );
+                vertical_chunks[5]
+            };
+            if context_area.width > 0 {
+                frame.render_widget(
+                    Paragraph::new(context).alignment(Alignment::Center),
+                    context_area,
+                );
             }
-            .alignment(Alignment::Center);
-            frame.render_widget(legend, vertical_chunks[7]);
 
-            if let Some(version_str) = &state.update_available {
-                let update_text = Paragraph::new(format!(
-                    "Update v{} available! Auto-update failed, please reinstall manually.",
-                    version_str
-                ))
-                .alignment(Alignment::Center)
-                .style(theme.highlight);
-                frame.render_widget(update_text, vertical_chunks[8]);
-            }
+            let footer = Line::from(vec![
+                Span::styled("[", theme.text_dim),
+                Span::styled("?", theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Help", theme.text_dim),
+                Span::raw("    "),
+                Span::styled("[", theme.text_dim),
+                Span::styled("q", theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Quit", theme.text_dim),
+            ]);
+            frame.render_widget(
+                Paragraph::new(footer).alignment(Alignment::Center),
+                vertical_chunks[7],
+            );
         }
     } else {
+        let suggestion_height =
+            if state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty() {
+                state.search_suggestions.len().min(6) as u16 + 2
+            } else {
+                0
+            };
+        let feedback_height = u16::from(matches!(
+            view,
+            SearchViewState::NoResults | SearchViewState::Error
+        ));
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(suggestion_height),
+                Constraint::Length(feedback_height),
+                Constraint::Min(0),
+            ])
             .split(area);
 
-        search_bar_area = chunks[0];
-        let border_style = if state.input_mode == InputMode::Editing {
-            theme.border_focus
+        let search_width = if area.width >= 120 {
+            88
         } else {
-            theme.border
+            area.width.saturating_sub(4)
         };
-
-        let loading_title = if state.is_loading && !state.search_results.is_empty() {
-            let spinner = if state.basic_terminal {
-                let frames = ['-', '\\', '|', '/'];
-                frames[(state.tick_count as usize) % frames.len()]
-            } else {
-                let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-                frames[(state.tick_count as usize) % frames.len()]
-            };
-            Some(ratatui::text::Line::from(ratatui::text::Span::styled(
-                format!(" {} ", spinner),
-                theme.accent,
-            )))
-        } else {
-            None
-        };
-
-        let mut search_block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(border_style)
-            .border_type(if state.basic_terminal {
-                ratatui::widgets::BorderType::Plain
-            } else {
-                ratatui::widgets::BorderType::Rounded
-            })
-            .padding(ratatui::widgets::Padding::left(1));
-        if let Some(title) = loading_title {
-            search_block = search_block
-                .title_top(title)
-                .title_alignment(Alignment::Right);
+        search_bar_area = centered_width(chunks[0], search_width);
+        suggestion_area = chunks[2];
+        render_search_bar(
+            frame,
+            search_bar_area,
+            state,
+            theme,
+            view,
+            show_cursor,
+            false,
+        );
+        let suggestions_open =
+            state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
+        if !suggestions_open {
+            frame.render_widget(
+                Paragraph::new(search_hint(view, search_bar_area.width, theme))
+                    .alignment(Alignment::Center),
+                chunks[1],
+            );
         }
-        let search_bar = Paragraph::new(search_content.clone())
-            .style(match state.input_mode {
-                InputMode::Editing => theme.title,
-                InputMode::Normal => theme.text,
-            })
-            .block(search_block);
-        frame.render_widget(search_bar, search_bar_area);
 
         let list_block = Block::default();
+        if feedback_height > 0 {
+            let feedback = match view {
+                SearchViewState::NoResults => format!(
+                    "No matches for “{}” · Type to edit or press Esc to clear",
+                    state.search_query
+                ),
+                SearchViewState::Error => {
+                    "Search failed · Press Enter to retry or type to edit".to_string()
+                }
+                _ => String::new(),
+            };
+            frame.render_widget(
+                Paragraph::new(feedback).style(if view == SearchViewState::Error {
+                    theme.error
+                } else if view == SearchViewState::NoResults {
+                    theme.text_dim
+                } else {
+                    theme.accent
+                }),
+                chunks[3],
+            );
+        }
 
         if state.is_loading && state.search_results.is_empty() {
-            let spinner = if state.basic_terminal {
-                let frames = ['-', '\\', '|', '/'];
-                frames[(state.tick_count as usize) % frames.len()]
-            } else {
-                let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-                frames[(state.tick_count as usize) % frames.len()]
-            };
-
-            let inner_area = list_block.inner(chunks[1]);
-            frame.render_widget(list_block, chunks[1]);
-
-            let v_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(45),
-                    Constraint::Length(1),
-                    Constraint::Percentage(50),
-                ])
-                .split(inner_area);
-
-            let spinner_color = if state.basic_terminal {
-                theme.accent
-            } else {
-                let is_sky = (state.tick_count % 16) < 8;
-                if is_sky { theme.accent } else { theme.teal }
-            };
-
-            let loading_text = if state.is_homepage_mode {
-                state.status_message.clone()
-            } else {
-                format!("Searching for \"{}\"...", state.search_query)
-            };
-
-            let p = Paragraph::new(ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(format!("{}  ", spinner), spinner_color),
-                ratatui::text::Span::styled(loading_text, theme.title),
-            ]))
-            .alignment(Alignment::Center);
-            frame.render_widget(p, v_chunks[1]);
+            frame.render_widget(list_block, chunks[4]);
         } else if !state.search_results.is_empty() {
+            let poster_width = if state.image_supported {
+                (state.poster_rows.saturating_mul(2) / 3).max(5)
+            } else {
+                12
+            };
+            let content_width = state
+                .search_results
+                .iter()
+                .map(|result| crate::tui::text::width(&result.title) as u16)
+                .max()
+                .unwrap_or(0)
+                .saturating_add(poster_width)
+                .saturating_add(18)
+                .clamp(48, 104);
+            let results_area = centered_width(chunks[4], content_width);
             let selected_idx = state.search_list_state.selected();
             let offset = state.search_list_state.offset();
 
-            let row_height = state.poster_rows;
-            state.visible_items = (chunks[1].height as usize) / (row_height as usize);
+            let row_height = state.poster_rows.max(3);
+            state.visible_items = (results_area.height as usize) / (row_height as usize);
             let rows = state
                 .search_results
                 .iter()
@@ -382,13 +520,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let table = Table::new(rows, [Constraint::Percentage(100)]).block(list_block);
 
-            frame.render_stateful_widget(table, chunks[1], &mut state.search_list_state);
+            frame.render_stateful_widget(table, results_area, &mut state.search_list_state);
 
-            let mut inner_area = chunks[1];
-            inner_area.x += 1;
-            inner_area.y += 1;
-            inner_area.width = inner_area.width.saturating_sub(2);
-            inner_area.height = inner_area.height.saturating_sub(2);
+            let inner_area = results_area;
 
             let mut current_y = inner_area.y;
 
@@ -411,16 +545,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
 
                 let is_selected = Some(i) == selected_idx;
+                if is_selected {
+                    let selected_bg = theme.surface0.fg.unwrap_or(theme.base);
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(selected_bg)),
+                        item_area,
+                    );
+                }
 
                 let layout = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([
                         Constraint::Length(2),
-                        Constraint::Length(if state.image_supported {
-                            state.poster_rows + 1
-                        } else {
-                            12
-                        }),
+                        Constraint::Length(poster_width),
                         Constraint::Length(1),
                         Constraint::Min(0),
                     ])
@@ -603,29 +740,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .content_length(content_len.saturating_sub(state.visible_items))
                     .position(offset);
 
-                let mut sb_area = chunks[1];
-                sb_area.y += 1;
-                sb_area.height = sb_area.height.saturating_sub(2);
+                let sb_area = results_area;
 
                 frame.render_stateful_widget(scrollbar, sb_area, &mut scrollbar_state);
             }
         } else {
-            let inner_area = list_block.inner(chunks[1]);
-            frame.render_widget(list_block, chunks[1]);
-
-            let v_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(45),
-                    Constraint::Length(1),
-                    Constraint::Percentage(50),
-                ])
-                .split(inner_area);
-
-            let p = Paragraph::new(state.status_message.clone())
-                .alignment(Alignment::Center)
-                .style(theme.error);
-            frame.render_widget(p, v_chunks[1]);
+            frame.render_widget(list_block, chunks[4]);
         }
     }
 
@@ -634,58 +754,61 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         && search_bar_area.width > 0
     {
         let search_area = search_bar_area;
-
-        let dropdown_height = std::cmp::min(state.search_suggestions.len() as u16, 10);
-
-        let is_home_screen = state.search_results.is_empty()
-            && !state.is_loading
-            && !state.status_message.to_lowercase().contains("fail");
-
-        let dropdown_y = if !is_home_screen && search_area.y > area.height / 2 {
-            search_area.y.saturating_sub(dropdown_height)
+        let visible_count = state.search_suggestions.len().min(6);
+        let dropdown_height = visible_count as u16 + 2;
+        let selected_index = state.suggest_index.unwrap_or(0);
+        let suggestion_offset = selected_index
+            .saturating_add(1)
+            .saturating_sub(visible_count)
+            .min(state.search_suggestions.len().saturating_sub(visible_count));
+        let dropdown_width = search_area.width;
+        let dropdown_x = search_area.x;
+        let dropdown_area = if suggestion_area.height >= dropdown_height {
+            Rect {
+                x: dropdown_x,
+                y: suggestion_area.y,
+                width: dropdown_width,
+                height: dropdown_height,
+            }
         } else {
-            search_area.y + 1
+            Rect {
+                x: dropdown_x,
+                y: search_area.y + search_area.height,
+                width: dropdown_width,
+                height: dropdown_height,
+            }
         };
 
-        let max_len = state
-            .search_suggestions
-            .iter()
-            .map(|s| crate::tui::text::width(s))
-            .max()
-            .unwrap_or(0) as u16;
-
-        let dropdown_width = std::cmp::min(std::cmp::max(max_len + 8, 30), search_area.width);
-
-        let text_len = crate::tui::text::width(&search_content) as u16;
-        let text_start_x = search_area.x + search_area.width.saturating_sub(text_len) / 2;
-
-        let dropdown_x = if is_home_screen {
-            text_start_x + 2
-        } else {
-            search_area.x + 3
-        };
-
-        let dropdown_area = Rect {
-            x: dropdown_x,
-            y: dropdown_y,
-            width: dropdown_width,
-            height: dropdown_height,
-        };
-
-        if dropdown_area.y + dropdown_area.height <= area.height || search_area.y > area.height / 2
-        {
-            crate::tui::clear_area(frame, dropdown_area, theme);
+        if dropdown_area.y + dropdown_area.height <= area.y + area.height {
+            let surface = theme.surface0.fg.unwrap_or(theme.base);
+            let selected_surface = theme.surface1.fg.unwrap_or(surface);
+            frame.render_widget(
+                Block::default().style(Style::default().bg(surface)),
+                dropdown_area,
+            );
+            let dropdown_rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(visible_count as u16),
+                    Constraint::Length(1),
+                ])
+                .split(dropdown_area);
             let items: Vec<ratatui::widgets::ListItem> = state
                 .search_suggestions
                 .iter()
                 .enumerate()
+                .skip(suggestion_offset)
+                .take(visible_count)
                 .map(|(i, s)| {
-                    let text = if Some(i) == state.suggest_index {
-                        format!("▌ {}", s)
+                    let selected = Some(i) == state.suggest_index;
+                    let marker = if selected {
+                        if state.basic_terminal { "> " } else { "▌ " }
                     } else {
-                        format!("   {}", s)
+                        "  "
                     };
-                    let style = if Some(i) == state.suggest_index {
+                    let text = format!("{marker}{s}");
+                    let style = if selected {
                         theme.highlight
                     } else {
                         theme.text
@@ -694,11 +817,68 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         ratatui::text::Line::from(ratatui::text::Span::styled(text, style))
                             .alignment(ratatui::layout::Alignment::Left),
                     )
+                    .style(if selected {
+                        theme.lavender.bg(selected_surface)
+                    } else {
+                        theme.text.bg(surface)
+                    })
                 })
                 .collect();
+            let position = state
+                .suggest_index
+                .map(|index| format!("{}/{}", index + 1, state.search_suggestions.len()))
+                .unwrap_or_else(|| state.search_suggestions.len().to_string());
+            let heading = Line::from(vec![
+                Span::styled(" Suggestions", theme.title),
+                Span::styled(" · ", theme.overlay0),
+                Span::styled(position, theme.subtext1),
+            ]);
+            frame.render_widget(
+                Paragraph::new(heading).style(Style::default().bg(surface)),
+                dropdown_rows[0],
+            );
             let list = ratatui::widgets::List::new(items)
-                .block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::NONE));
-            frame.render_widget(list, dropdown_area);
+                .highlight_style(
+                    theme
+                        .lavender
+                        .bg(selected_surface)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .style(Style::default().bg(surface));
+            frame.render_widget(list, dropdown_rows[1]);
+
+            let footer = Line::from(vec![
+                Span::styled(" [", theme.text_dim),
+                Span::styled("↑↓", theme.shortcut),
+                Span::styled("] Move   [", theme.text_dim),
+                Span::styled("Enter", theme.shortcut),
+                Span::styled("] Use   [", theme.text_dim),
+                Span::styled("Esc", theme.shortcut),
+                Span::styled("] Close", theme.text_dim),
+            ])
+            .centered();
+            frame.render_widget(
+                Paragraph::new(footer).style(Style::default().bg(surface)),
+                dropdown_rows[2],
+            );
+            if state.search_suggestions.len() > visible_count {
+                let mut scrollbar_state = ratatui::widgets::ScrollbarState::default()
+                    .content_length(state.search_suggestions.len())
+                    .position(selected_index);
+                let scrollbar = ratatui::widgets::Scrollbar::default()
+                    .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(None)
+                    .end_symbol(None)
+                    .track_symbol(Some("│"))
+                    .thumb_symbol(if state.basic_terminal { "|" } else { "█" });
+                let scrollbar_area = Rect {
+                    x: dropdown_rows[1].x,
+                    y: dropdown_rows[1].y,
+                    width: dropdown_rows[1].width,
+                    height: dropdown_rows[1].height,
+                };
+                frame.render_stateful_widget(scrollbar, scrollbar_area, &mut scrollbar_state);
+            }
         }
     }
     if state.tv_config_popup {
