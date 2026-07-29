@@ -24,9 +24,9 @@ md-5 = "0.11.0"
 rand = "0.10.2"
 ratatui = "0.30.2"
 ratatui-image = { version = "11.0.6", default-features = false, features = ["crossterm", "image-defaults"] }
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "blocking"] }
 scraper = "0.24.0"
-self_update = { version = "0.44.0", default-features = false, features = ["archive-tar", "archive-zip", "rustls", "reqwest"] }
+semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 thiserror = "2.0.18"

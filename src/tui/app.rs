@@ -1567,9 +1567,6 @@ impl App {
                     self.state.input_mode = InputMode::Normal;
                     self.state.active_screen = Screen::Startup;
                     self.state.update_available = None;
-                    self.state.updater_progress = None;
-                    self.state.updater_status = None;
-                    self.state.updater_done = false;
                     self.state.manual_update_check = true;
                     self.action_sender.send(Action::CheckForUpdates).ok();
                     return None;
@@ -4162,16 +4159,19 @@ impl App {
                                 .ok();
                         }
                         Err(error) => {
-                            update_sender.send(Action::UpdateFailure(error)).ok();
+                            update_sender
+                                .send(Action::UpdateAvailable(format!("error:{}", error)))
+                                .ok();
                         }
                     }
                 });
             }
             Action::UpdateAvailable(version) => {
+                if self.state.active_screen == Screen::Startup {
+                    self.state.active_screen = Screen::Home;
+                }
+
                 if version == "none" {
-                    if self.state.active_screen == Screen::Startup {
-                        self.state.active_screen = Screen::Home;
-                    }
                     if self.state.manual_update_check {
                         self.state.notify(
                             NotificationKind::Success,
@@ -4180,69 +4180,25 @@ impl App {
                         );
                     }
                     self.state.manual_update_check = false;
+                } else if version.starts_with("error:") {
+                    let err = version.trim_start_matches("error:");
+                    if self.state.manual_update_check {
+                        self.state.notify(
+                            NotificationKind::Error,
+                            "Update check failed",
+                            err.to_string(),
+                        );
+                    }
+                    self.state.manual_update_check = false;
                 } else {
                     self.state.manual_update_check = false;
-                    self.state.update_available = Some(version);
-                    if self.state.active_screen == Screen::Startup {
-                        match crate::tui::updater::replacement_access() {
-                            Ok(()) => {
-                                self.action_sender.send(Action::StartUpdate).ok();
-                            }
-                            Err(error) => {
-                                self.state.active_screen = Screen::Home;
-                                self.state.notify(
-                                    NotificationKind::Warning,
-                                    "Update needs permission",
-                                    error,
-                                );
-                            }
-                        }
-                    }
+                    self.state.update_available = Some(version.clone());
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Update Available",
+                        format!("Version v{} is available! Download at github.com/mesamirh/MovieBox-Tui", version),
+                    );
                 }
-            }
-            Action::StartUpdate => {
-                let version = self.state.update_available.clone().unwrap_or_default();
-                self.state.updater_progress = Some(0.0);
-                self.state.updater_status = Some("Starting update...".to_string());
-                let update_sender = self.action_sender.clone();
-
-                tokio::task::spawn_blocking(move || {
-                    let result = crate::tui::updater::install(&version, |progress, status| {
-                        update_sender
-                            .send(Action::UpdateProgress(progress, status.into()))
-                            .ok();
-                    });
-                    match result {
-                        Ok(()) => {
-                            update_sender.send(Action::UpdateSuccess).ok();
-                        }
-                        Err(error) => {
-                            update_sender.send(Action::UpdateFailure(error)).ok();
-                        }
-                    }
-                });
-            }
-            Action::UpdateProgress(p, status) => {
-                if !self.state.updater_done {
-                    self.state.updater_progress = Some(p);
-                    self.state.updater_status = Some(status);
-                }
-            }
-            Action::UpdateSuccess => {
-                self.state.updater_done = true;
-                self.state.updater_progress = Some(1.0);
-
-                if let Ok(exe) = std::env::current_exe() {
-                    let _ = std::process::Command::new(exe).spawn();
-                }
-                return Some(());
-            }
-            Action::UpdateFailure(error) => {
-                self.state.updater_progress = None;
-                self.state.updater_status = None;
-                self.state.active_screen = Screen::Home;
-                self.state
-                    .notify(NotificationKind::Error, "Update failed", error);
             }
         }
         None
