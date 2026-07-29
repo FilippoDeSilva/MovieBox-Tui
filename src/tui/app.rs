@@ -226,7 +226,7 @@ impl App {
     }
 
     fn trigger_episode_fetch(&mut self) {
-        if let Some(id) = &self.state.active_subject_id {
+        if let Some(id) = self.state.active_subject_id.clone() {
             let stype = self
                 .state
                 .selected_details
@@ -261,38 +261,44 @@ impl App {
             self.state.selected_season = se;
             self.state.selected_episode = ep;
             self.state.resource_list_state.select(None);
+            self.state.active_resource_request = self.state.active_resource_request.wrapping_add(1);
 
-            let mut found_cached = false;
-            if let Some(cached) =
-                crate::cache::get_provider_stream_cache(self.state.active_provider, id, se, ep)
-            {
-                found_cached = true;
-                if let Some(arr) = cached.as_array() {
-                    let count = arr.len();
-                    let mut result = serde_json::Map::new();
-                    result.insert("list".to_string(), cached.clone());
-                    self.state.selected_resources = Some(serde_json::Value::Object(result));
-                    self.state.is_loading = false;
-                    self.state.is_fetching_streams = false;
-                    self.state
-                        .resource_list_state
-                        .select(if count > 0 { Some(0) } else { None });
-                    self.state.status_message =
-                        format!("Resolved {} direct stream sources (cached).", count);
-                    self.state.status_timer = 150;
+            let memory_cached = self
+                .state
+                .stream_pool
+                .get(&id)
+                .and_then(|pool| pool.episode_index.get(&(se, ep)))
+                .filter(|streams| !streams.is_empty())
+                .cloned();
+            let disk_cached = memory_cached.is_none().then(|| {
+                crate::cache::get_provider_stream_cache(self.state.active_provider, &id, se, ep)
+                    .and_then(|value| value.as_array().cloned())
+            });
+            let cached = memory_cached.or_else(|| disk_cached.flatten());
+
+            if let Some(streams) = cached {
+                let count = streams.len();
+                if let Some(pool) = self.state.stream_pool.get_mut(&id) {
+                    pool.episode_index.insert((se, ep), streams.clone());
                 }
-            }
-
-            if !found_cached {
+                let mut result = serde_json::Map::new();
+                result.insert("list".to_string(), serde_json::Value::Array(streams));
+                self.state.selected_resources = Some(serde_json::Value::Object(result));
+                self.state.is_loading = false;
+                self.state.is_fetching_streams = false;
+                self.state.resource_list_state.select(Some(0));
+                self.state.status_message = format!("{count} streams loaded from cache.");
+                self.state.status_timer = 90;
+                self.state.pending_episode_fetch = None;
+            } else {
+                self.state.selected_resources = None;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
-                self.state.status_message = "Resolving streams...".to_string();
-                self.state.status_timer = 150;
+                self.state.status_message = "Loading streams...".to_string();
+                self.state.status_timer = 90;
 
                 self.state.pending_episode_fetch = Some((id.clone(), se, ep));
                 self.state.last_episode_nav = std::time::Instant::now();
-            } else {
-                self.state.pending_episode_fetch = None;
             }
         }
     }
@@ -1356,8 +1362,11 @@ impl App {
                             self.state.selected_episode
                         };
                         let id_clone = id.clone();
+                        let provider = self.state.active_provider;
                         tokio::task::spawn_blocking(move || {
-                            crate::cache::invalidate_stream_cache(&id_clone, se, ep);
+                            crate::cache::invalidate_provider_stream_cache(
+                                provider, &id_clone, se, ep,
+                            );
                         });
                         self.state.selected_season = se;
                         self.state.selected_episode = ep;
@@ -3420,6 +3429,17 @@ impl App {
                     .and_then(|list| list.as_array())
                     .is_some_and(|list| !list.is_empty());
                 if already_loaded {
+                    if let Some(streams) = self
+                        .state
+                        .selected_resources
+                        .as_ref()
+                        .and_then(|resources| resources.get("list"))
+                        .and_then(|list| list.as_array())
+                        .cloned()
+                        && let Some(pool) = self.state.stream_pool.get_mut(&subject_id)
+                    {
+                        pool.episode_index.insert((se, ep), streams);
+                    }
                     self.state.is_loading = false;
                     self.state.is_fetching_streams = false;
                     return None;

@@ -21,8 +21,41 @@ fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value
                 return Some(val);
             }
         }
+        let _ = fs::remove_file(path);
     }
     None
+}
+
+fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
+    let Ok(content) = serde_json::to_vec(data) else {
+        return;
+    };
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
+    if fs::write(&temporary, content).is_err() {
+        return;
+    }
+    if fs::rename(&temporary, path).is_err() {
+        let _ = fs::remove_file(path);
+        if fs::rename(&temporary, path).is_err() {
+            let _ = fs::remove_file(temporary);
+        }
+    }
+}
+
+fn stream_payload_has_results(data: &serde_json::Value) -> bool {
+    data.as_array().is_some_and(|streams| {
+        !streams.is_empty()
+            && streams.iter().any(|stream| {
+                stream
+                    .get("resourceLink")
+                    .and_then(|link| link.as_str())
+                    .is_some_and(|link| !link.is_empty())
+            })
+    })
 }
 
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
@@ -77,10 +110,14 @@ pub fn get_provider_stream_cache(
     season: usize,
     episode: usize,
 ) -> Option<serde_json::Value> {
-    read_json_cache(
-        &get_provider_stream_path(provider, subject_id, season, episode),
-        CACHE_EXPIRY_SECS,
-    )
+    let path = get_provider_stream_path(provider, subject_id, season, episode);
+    let value = read_json_cache(&path, CACHE_EXPIRY_SECS)?;
+    if stream_payload_has_results(&value) {
+        Some(value)
+    } else {
+        let _ = fs::remove_file(path);
+        None
+    }
 }
 
 pub fn get_details_path(subject_id: &str) -> PathBuf {
@@ -148,9 +185,7 @@ pub fn get_provider_search_cache(provider: ProviderKind, query: &str) -> Option<
 
 pub fn set_search_cache(query: &str, data: &serde_json::Value) {
     let path = get_search_path(query);
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(&path, content);
-    }
+    write_json_cache(&path, data);
 }
 
 pub fn set_provider_search_cache(provider: ProviderKind, query: &str, data: &serde_json::Value) {
@@ -159,9 +194,7 @@ pub fn set_provider_search_cache(provider: ProviderKind, query: &str, data: &ser
         let _ = fs::remove_file(path);
         return;
     }
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(path, content);
-    }
+    write_json_cache(&path, data);
 }
 
 fn search_payload_has_results(data: &serde_json::Value) -> bool {
@@ -175,9 +208,7 @@ fn search_payload_has_results(data: &serde_json::Value) -> bool {
 
 pub fn set_details_cache(subject_id: &str, data: &serde_json::Value) {
     let path = get_details_path(subject_id);
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(&path, content);
-    }
+    write_json_cache(&path, data);
 }
 
 pub fn set_provider_details_cache(
@@ -186,15 +217,13 @@ pub fn set_provider_details_cache(
     data: &serde_json::Value,
 ) {
     let path = get_provider_details_path(provider, subject_id);
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(path, content);
-    }
+    write_json_cache(&path, data);
 }
 
 pub fn set_stream_cache(subject_id: &str, season: usize, episode: usize, data: &serde_json::Value) {
     let path = get_cache_path(subject_id, season, episode);
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(&path, content);
+    if stream_payload_has_results(data) {
+        write_json_cache(&path, data);
     }
 }
 
@@ -206,13 +235,22 @@ pub fn set_provider_stream_cache(
     data: &serde_json::Value,
 ) {
     let path = get_provider_stream_path(provider, subject_id, season, episode);
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(path, content);
+    if stream_payload_has_results(data) {
+        write_json_cache(&path, data);
     }
 }
 
 pub fn invalidate_stream_cache(subject_id: &str, season: usize, episode: usize) {
-    let path = get_cache_path(subject_id, season, episode);
+    invalidate_provider_stream_cache(ProviderKind::MovieBox, subject_id, season, episode);
+}
+
+pub fn invalidate_provider_stream_cache(
+    provider: ProviderKind,
+    subject_id: &str,
+    season: usize,
+    episode: usize,
+) {
+    let path = get_provider_stream_path(provider, subject_id, season, episode);
     if path.exists() {
         let _ = fs::remove_file(&path);
     }
@@ -238,7 +276,5 @@ pub fn get_homepage_cache(tab_id: &str, page: usize) -> Option<serde_json::Value
 
 pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
     let path = get_homepage_path(tab_id, page);
-    if let Ok(content) = serde_json::to_string(data) {
-        let _ = fs::write(&path, content);
-    }
+    write_json_cache(&path, data);
 }
