@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph},
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
@@ -178,7 +178,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ])
         .split(popup_layout[1])[1];
 
-    frame.render_widget(Clear, popup_chunk);
+    crate::tui::clear_area(frame, popup_chunk, theme);
 
     let block = Block::default()
         .title(" Keybindings Help ")

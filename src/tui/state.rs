@@ -176,17 +176,7 @@ impl Default for AppState {
             search_posters: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             search_poster_protocols: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
             search_list_state: TableState::default(),
-            basic_terminal: {
-                let term = std::env::var("TERM").unwrap_or_default();
-                let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-                let is_windows = cfg!(target_os = "windows");
-                let is_dumb = term == "dumb" || term == "linux";
-                let is_apple_terminal = term_program == "Apple_Terminal";
-                let is_tmux = std::env::var("TMUX").is_ok();
-                let is_ssh =
-                    std::env::var("SSH_TTY").is_ok() || std::env::var("SSH_CLIENT").is_ok();
-                is_windows || is_dumb || is_apple_terminal || is_tmux || is_ssh
-            },
+            basic_terminal: crate::tui::terminal::uses_basic_ui(),
             selected_details: None,
             active_subject_id: None,
             selected_resources: None,
@@ -217,15 +207,7 @@ impl Default for AppState {
             poster_image: None,
             poster_protocol: None,
             image_picker: None,
-            image_supported: {
-                let term = std::env::var("TERM").unwrap_or_default();
-                let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-                !(term_program == "Apple_Terminal"
-                    || term == "dumb"
-                    || term == "linux"
-                    || std::env::var("TMUX").is_ok()
-                    || std::env::var("SSH_TTY").is_ok())
-            },
+            image_supported: crate::tui::terminal::should_query_images(),
             poster_rows: 3,
             image_cache: lru::LruCache::new(std::num::NonZeroUsize::new(10).unwrap()),
             show_help: false,

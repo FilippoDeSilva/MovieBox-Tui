@@ -242,5 +242,3 @@ pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
         let _ = fs::write(&path, content);
     }
 }
-
-

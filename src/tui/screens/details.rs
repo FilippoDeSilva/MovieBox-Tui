@@ -4,8 +4,8 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     text::{Line, Span},
     widgets::{
-        Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Wrap,
+        Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        Wrap,
     },
 };
 
@@ -138,14 +138,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let poster_width = if state.image_supported {
         (inner_area.height as f32 * 1.33).ceil() as u16
     } else {
-        0
+        20
     };
 
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(poster_width),
-            Constraint::Length(if state.image_supported { 4 } else { 0 }),
+            Constraint::Length(2),
             Constraint::Min(1),
         ])
         .split(inner_area);
@@ -157,46 +157,67 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     };
     let right_area = h_chunks[2];
 
-    if let Some(img) = &state.poster_image {
-        if state.poster_protocol.as_ref().map(|(r, _)| *r) != Some(poster_area)
-            && let Some(picker) = &mut state.image_picker
-        {
-            let size = ratatui::layout::Size::new(poster_area.width, poster_area.height);
-            if let Ok(proto) =
-                picker.new_protocol(img.clone(), size, ratatui_image::Resize::Fit(None))
+    if state.image_supported {
+        if let Some(img) = &state.poster_image {
+            if state.poster_protocol.as_ref().map(|(r, _)| *r) != Some(poster_area)
+                && let Some(picker) = &mut state.image_picker
             {
-                state.poster_protocol = Some((poster_area, proto));
+                let size = ratatui::layout::Size::new(poster_area.width, poster_area.height);
+                if let Ok(proto) =
+                    picker.new_protocol(img.clone(), size, ratatui_image::Resize::Fit(None))
+                {
+                    state.poster_protocol = Some((poster_area, proto));
+                }
             }
-        }
-        if let Some((_, proto)) = &state.poster_protocol {
-            if !state.show_help {
-                frame.render_widget(ratatui_image::Image::new(proto), poster_area);
+            if let Some((_, proto)) = &state.poster_protocol {
+                if !state.show_help {
+                    frame.render_widget(ratatui_image::Image::new(proto), poster_area);
+                }
             }
-        }
-    } else if state.image_supported {
-        let current_spinner = if state.basic_terminal {
-            let frames = ['-', '\\', '|', '/'];
-            frames[(state.tick_count as usize) % frames.len()]
         } else {
-            let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-            frames[(state.tick_count as usize) % frames.len()]
-        };
+            let current_spinner = if state.basic_terminal {
+                let frames = ['-', '\\', '|', '/'];
+                frames[(state.tick_count as usize) % frames.len()]
+            } else {
+                let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+                frames[(state.tick_count as usize) % frames.len()]
+            };
 
+            let placeholder_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(theme.muted);
+
+            let inner = placeholder_block.inner(poster_area);
+
+            let (pad, msg) = if state.is_loading {
+                let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
+                (p, format!("{}\nLoading Art", current_spinner))
+            } else {
+                let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
+                (p, title.to_string())
+            };
+
+            let placeholder = Paragraph::new(format!("{}{}", pad, msg))
+                .style(theme.text_dim)
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: true })
+                .block(placeholder_block);
+            frame.render_widget(placeholder, poster_area);
+        }
+    } else {
         let placeholder_block = Block::default()
             .borders(Borders::ALL)
             .border_style(theme.muted);
 
         let inner = placeholder_block.inner(poster_area);
-
-        let (pad, msg) = if state.is_loading {
-            let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
-            (p, format!("{}\nLoading Art", current_spinner))
+        let lines = if inner.height >= 5 {
+            let pad_top = "\n".repeat((inner.height.saturating_sub(5) / 2) as usize);
+            format!("{pad_top}Poster preview\nunsupported\n\nUse a graphics-\ncapable terminal")
         } else {
-            let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
-            (p, title.to_string())
+            "Poster\nunsupported".to_string()
         };
 
-        let placeholder = Paragraph::new(format!("{}{}", pad, msg))
+        let placeholder = Paragraph::new(lines)
             .style(theme.text_dim)
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: true })
@@ -679,7 +700,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             height: popup_height,
         };
 
-        frame.render_widget(ratatui::widgets::Clear, popup_area);
+        crate::tui::clear_area(frame, popup_area, theme);
 
         let items: Vec<ratatui::widgets::ListItem> = state
             .subtitle_list
@@ -724,7 +745,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             height: popup_height,
         };
 
-        frame.render_widget(ratatui::widgets::Clear, popup_area);
+        crate::tui::clear_area(frame, popup_area, theme);
 
         let items: Vec<ratatui::widgets::ListItem> = state
             .available_players
@@ -774,7 +795,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             popup_width,
             popup_height,
         );
-        frame.render_widget(Clear, popup_area);
+        crate::tui::clear_area(frame, popup_area, theme);
 
         let season_idx = state.selected_season;
         let eps_count = if season_idx > 0 && season_idx <= state.available_episode_numbers.len() {
@@ -844,7 +865,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             popup_width,
             popup_height,
         );
-        frame.render_widget(Clear, popup_area);
+        crate::tui::clear_area(frame, popup_area, theme);
 
         let season_idx = state.selected_season;
         let ep_idx = state.selected_episode;

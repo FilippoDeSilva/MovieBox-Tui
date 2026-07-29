@@ -705,5 +705,3 @@ async fn retry_delay(attempt: usize) {
         tokio::time::sleep(Duration::from_secs(1 << (attempt - 1))).await;
     }
 }
-
-

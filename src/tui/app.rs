@@ -4547,7 +4547,7 @@ impl App {
         }
         if let Some(prog) = self.state.download_progress {
             if let Some(dl_area) = download_area {
-                use ratatui::widgets::{Block, Borders, Clear, Gauge};
+                use ratatui::widgets::{Block, Borders, Gauge};
 
                 let status = self
                     .state
@@ -4576,7 +4576,7 @@ impl App {
                     .gauge_style(self.theme.accent)
                     .ratio((prog / 100.0).clamp(0.0, 1.0));
 
-                frame.render_widget(Clear, dl_area);
+                crate::tui::clear_area(frame, dl_area, &self.theme);
                 frame.render_widget(gauge, dl_area);
             }
         }

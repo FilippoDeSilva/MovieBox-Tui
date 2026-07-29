@@ -110,6 +110,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             if state.is_tv_mode { 57 } else { 55 }
         };
+        let compact_footer = area.width < 100;
+        let footer_height = if compact_footer { 2 } else { 1 };
 
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -121,7 +123,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 Constraint::Length(3),
                 Constraint::Length(3),
                 Constraint::Min(0),
-                Constraint::Length(1),
+                Constraint::Length(footer_height),
                 Constraint::Length(1),
             ])
             .split(area);
@@ -149,10 +151,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             theme.title
         } else {
             let t = state.tick_count as f32 / 8.0;
-
-            let r = (49.0 + (203.0 - 49.0) * t) as u8;
-            let g = (50.0 + (166.0 - 50.0) * t) as u8;
-            let b = (68.0 + (247.0 - 68.0) * t) as u8;
+            let (start, end) = logo_fade_colors(theme);
+            let r = (start.0 + (end.0 - start.0) * t) as u8;
+            let g = (start.1 + (end.1 - start.1) * t) as u8;
+            let b = (start.2 + (end.2 - start.2) * t) as u8;
             ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(r, g, b))
         };
 
@@ -162,9 +164,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let row_tick_start = 1 + i as u64;
                 if state.tick_count >= row_tick_start {
                     let row_t = ((state.tick_count - row_tick_start) as f32 / 7.0).clamp(0.0, 1.0);
-                    let r = (49.0 + (203.0 - 49.0) * row_t) as u8;
-                    let g = (50.0 + (166.0 - 50.0) * row_t) as u8;
-                    let b = (68.0 + (247.0 - 68.0) * row_t) as u8;
+                    let (start, end) = logo_fade_colors(theme);
+                    let r = (start.0 + (end.0 - start.0) * row_t) as u8;
+                    let g = (start.1 + (end.1 - start.1) * row_t) as u8;
+                    let b = (start.2 + (end.2 - start.2) * row_t) as u8;
                     let row_style =
                         ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(r, g, b));
 
@@ -185,7 +188,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
 
         let version_style = if state.tick_count < 6 {
-            ratatui::style::Style::default().fg(theme.base)
+            theme.surface1
         } else {
             theme.text_dim
         };
@@ -208,7 +211,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 frame.render_widget(search_bar, search_bar_area);
             }
 
-            let legend_line = ratatui::text::Line::from(vec![
+            let primary_legend = vec![
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("Ctrl+P", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
@@ -230,7 +233,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("Type", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
-                ratatui::text::Span::styled("Search   ", theme.text),
+                ratatui::text::Span::styled(
+                    if compact_footer {
+                        "Search"
+                    } else {
+                        "Search   "
+                    },
+                    theme.text,
+                ),
+            ];
+            let secondary_legend = vec![
                 ratatui::text::Span::styled("[", theme.text_dim),
                 ratatui::text::Span::styled("↑↓", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
@@ -243,9 +255,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ratatui::text::Span::styled("q", theme.shortcut),
                 ratatui::text::Span::styled("] ", theme.text_dim),
                 ratatui::text::Span::styled("Quit", theme.text),
-            ]);
+            ];
 
-            let legend = Paragraph::new(legend_line).alignment(Alignment::Center);
+            let legend = if compact_footer {
+                Paragraph::new(vec![
+                    ratatui::text::Line::from(primary_legend),
+                    ratatui::text::Line::from(secondary_legend),
+                ])
+            } else {
+                let mut legend = primary_legend;
+                legend.extend(secondary_legend);
+                Paragraph::new(ratatui::text::Line::from(legend))
+            }
+            .alignment(Alignment::Center);
             frame.render_widget(legend, vertical_chunks[7]);
 
             if let Some(version_str) = &state.update_available {
@@ -401,9 +423,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         Constraint::Length(if state.image_supported {
                             state.poster_rows + 1
                         } else {
-                            0
+                            12
                         }),
-                        Constraint::Length(if state.image_supported { 1 } else { 0 }),
+                        Constraint::Length(1),
                         Constraint::Min(0),
                     ])
                     .split(item_area);
@@ -432,8 +454,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     frame.render_widget(indicator, v_layout[1]);
                 }
 
-                if let Some(img) = state.search_posters.peek(&res.id) {
-                    if state.image_supported {
+                if state.image_supported {
+                    if let Some(img) = state.search_posters.peek(&res.id) {
                         let target_dims = (poster_area.width, state.poster_rows);
                         let needs_protocol =
                             state.search_poster_protocols.peek(&res.id).map(|(d, _)| *d)
@@ -459,7 +481,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             };
                             frame.render_widget(ratatui_image::Image::new(proto), p_area);
                         }
+                    } else {
+                        let placeholder = Paragraph::new("Poster\nunavailable")
+                            .style(theme.text_dim)
+                            .alignment(Alignment::Center);
+                        frame.render_widget(placeholder, poster_area);
                     }
+                } else {
+                    let placeholder_height = item_area.height.min(2);
+                    let v_center = item_area.height.saturating_sub(placeholder_height) / 2;
+                    let p_area = Rect {
+                        x: poster_area.x,
+                        y: poster_area.y + v_center,
+                        width: 12,
+                        height: placeholder_height,
+                    };
+                    let placeholder = Paragraph::new("Poster\nunsupported")
+                        .style(theme.text_dim)
+                        .alignment(Alignment::Center);
+                    frame.render_widget(placeholder, p_area);
                 }
 
                 let text_layout = Layout::default()
@@ -645,7 +685,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         if dropdown_area.y + dropdown_area.height <= area.height || search_area.y > area.height / 2
         {
-            frame.render_widget(ratatui::widgets::Clear, dropdown_area);
+            crate::tui::clear_area(frame, dropdown_area, theme);
             let items: Vec<ratatui::widgets::ListItem> = state
                 .search_suggestions
                 .iter()
@@ -785,7 +825,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             height: popup_height,
         };
 
-        frame.render_widget(ratatui::widgets::Clear, popup_area);
+        crate::tui::clear_area(frame, popup_area, theme);
 
         let items: Vec<ratatui::widgets::ListItem> = state
             .available_players
@@ -817,5 +857,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
 
         frame.render_stateful_widget(list, popup_area, &mut state.player_picker_state);
+    }
+}
+
+fn logo_fade_colors(theme: &Theme) -> ((f32, f32, f32), (f32, f32, f32)) {
+    if theme.is_light {
+        ((172.0, 176.0, 190.0), (136.0, 57.0, 239.0))
+    } else {
+        ((73.0, 76.0, 94.0), (203.0, 166.0, 247.0))
     }
 }
