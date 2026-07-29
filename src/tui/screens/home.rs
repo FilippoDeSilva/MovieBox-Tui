@@ -600,7 +600,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             render_search_state(frame, results_chunk, state, theme, SearchViewState::Loading);
         } else if !state.search_results.is_empty() {
             let poster_width = if state.image_supported {
-                (state.poster_rows.saturating_mul(2) / 3).max(5)
+                state.poster_rows.saturating_mul(4).div_ceil(3).max(6)
             } else {
                 12
             };
@@ -732,10 +732,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     frame.render_widget(placeholder, p_area);
                 }
 
+                let text_top_padding = text_area.height.saturating_sub(2) / 2;
                 let text_layout = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
-                        Constraint::Length(1),
+                        Constraint::Length(text_top_padding),
                         Constraint::Length(1),
                         Constraint::Length(1),
                         Constraint::Min(0),
@@ -760,8 +761,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     ratatui::text::Span::raw(" "),
                     ratatui::text::Span::styled(display_title, title_style),
                 ]);
-                if text_layout[0].height > 0 {
-                    frame.render_widget(Paragraph::new(title_line), text_layout[0]);
+                if text_layout[1].height > 0 {
+                    frame.render_widget(Paragraph::new(title_line), text_layout[1]);
                 }
 
                 let mut info_spans = vec![];
