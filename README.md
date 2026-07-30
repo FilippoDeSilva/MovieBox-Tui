@@ -1,8 +1,9 @@
 <div align="center">
 
-# MovieBox-Tui
+# MovieBox-TUI
 
-Stream and download movies, TV shows, anime, and watch live TV from the terminal.
+**Stream movies, TV shows, anime, and live TV straight from your terminal.** <br>
+Fast and clean. No configuration, no torrents, and no debrid required.
 
 [![Crates.io](https://img.shields.io/crates/v/moviebox-tui.svg?logo=rust)](https://crates.io/crates/moviebox-tui)
 [![Downloads](https://img.shields.io/crates/d/moviebox-tui.svg)](https://crates.io/crates/moviebox-tui)
@@ -11,81 +12,58 @@ Stream and download movies, TV shows, anime, and watch live TV from the terminal
 
 <br>
 
-**[See what's new in v0.1.6 on YouTube](https://youtu.be/TlDxCFttoAU)**
+<img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/01-home-blocky.jpg" alt="MovieBox-TUI Home" width="85%">
+
+<br><br>
+
+**[See what's new in v0.1.7 on YouTube](https://youtu.be/5M2_mjH5r5Y)**
+
+<br>
+
+**Found a bug?** [Open an issue](https://github.com/mesamirh/MovieBox-Tui/issues) so I can fix it for everyone!
 
 </div>
 
 
-## What is this?
-
-**MovieBox-Tui** is a terminal-based streaming client. It interfaces with the MovieBox to search catalogs, resolve stream URLs, and open them in your local video player (`mpv`, `IINA`, or `VLC`). 
-
-No browser or configuration is required. Search for a title, select a video quality, and press enter to play or download the stream.
-
-> **Disclaimer:** This project is a third-party client. It does not host, store, or redistribute any media. It strictly resolves links provided by the upstream API. It is intended for educational and personal use only. You are responsible for complying with copyright law in your jurisdiction.
-
-
 ## Screenshots
 
-<details open>
-<summary><b>Home and search</b></summary>
+<details>
+<summary><b>Click to view gallery</b></summary>
 <br>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/01-home.jpg" alt="Home screen" width="49%">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/02-search-results.jpg" alt="Search results" width="49%">
+  <b>Details View & Search</b><br>
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/08-series-details.jpg" alt="Series details" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/06-search-results.jpg" alt="Search results" width="49%">
 </p>
 
-</details>
-
-<details>
-<summary><b>Details view</b></summary>
-<br>
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/03-movie-details.jpg" alt="Movie details" width="49%">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/04-series-details.jpg" alt="Series details" width="49%">
+  <b>Playback & Subtitles</b><br>
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/11-player-picker.jpg" alt="Player picker" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/10-playback-subtitles.jpg" alt="Subtitle selection" width="49%">
 </p>
 
-</details>
-
-<details>
-<summary><b>Playback and Subtitles</b></summary>
-<br>
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/06-player.jpg" alt="Player Selection" width="49%">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/05-subtitle.jpg" alt="Subtitle Selection" width="49%">
+  <b>Downloads & Live TV</b><br>
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/12-download-progress.jpg" alt="Download progress" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/09-live-tv-list.jpg" alt="Live TV Channels" width="49%">
 </p>
 
-</details>
-
-<details>
-<summary><b>Live TV Channels</b></summary>
-<br>
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/07-channel-list.jpg" alt="TV Channels" width="88%">
+  <b>Themes & Help</b><br>
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/03-home-3d.jpg" alt="Home 3D Theme" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/04-global-help.jpg" alt="Global Help Menu" width="49%">
 </p>
 
-</details>
-
-<details>
-<summary><b>Live TV Mode</b></summary>
-<br>
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/08-tv-home.jpg" alt="Live TV Home" width="88%">
+  <b>More Views</b><br>
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/07-movie-details.jpg" alt="Movie details" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/02-home-ascii.jpg" alt="Home ASCII Theme" width="49%">
 </p>
 
-</details>
-
-<details>
-<summary><b>Help and Configuration</b></summary>
-<br>
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/09-help.jpg" alt="Help screen" width="88%">
+  <b>Configuration</b><br>
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/05-tv-help.jpg" alt="TV Configuration Menu" width="49%">
 </p>
 
 </details>
@@ -93,56 +71,29 @@ No browser or configuration is required. Search for a title, select a video qual
 
 ## Features
 
-- **Search & discover easily:** Just start typing to find what you want, or use commands like `/movies` and `/anime` to see what's trending.
-- **All the details you need:** Select a title to see its poster, IMDb rating, release year, genre, and a quick summary.
-- **Play instantly:** The app grabs different stream qualities (like 1080p and 720p) behind the scenes. Pick your resolution and subtitles, and it starts playing immediately.
-- **Built-in fast downloader:** 
-  - Download videos straight to your disk using multiple connections to max out your internet speed. You get live speed and ETA updates while you wait.
-  - **Subtitles included:** It automatically grabs the `.srt` subtitle files to match your video.
-  - **Download entire seasons:** Queue up a whole season at once. Just tell it what language you want for the subtitles, and it handles the rest automatically.
-- **Live TV Mode:** Press `Ctrl+T` to switch to TV mode and watch thousands of live IPTV channels from around the world straight from your terminal.
-- **Works on your terminal:** Whether you're on macOS, Linux, or Windows, it just works. If your terminal supports it, you'll get actual image posters; otherwise, it falls back nicely to text.
+### Streaming & Playback
+- **Instant Search & Catalogs:** Type to search instantly, or browse trending movies, shows, and anime using slash commands (e.g., `/movies`, `/anime`).
+- **Seamless Local Playback:** Resolves 4K/1080p streams and opens them instantly in your preferred local video player (`mpv`, `IINA`, or `VLC`).
+- **Integrated Subtitles:** Automatically fetches available subtitles and lets you select your preferred language before playback.
+- **Live IPTV:** Press `Ctrl+T` to toggle Live TV mode and stream thousands of live television channels globally.
 
+### Advanced Downloading
+- **Batch Season Downloader:** Queue up entire television seasons for concurrent downloading with a single keystroke.
+- **Resilient Downloads:** Built-in support for download resumes. If a download is interrupted or fails, it picks up right where it left off.
+- **Auto-Subtitle Fetching:** Automatically downloads the best-matching `.srt` subtitle files alongside your video files.
 
-## What you'll need
-
-1. **A Terminal:** Any terminal works! Just make sure your window is at least 85×24 characters. If you use a modern terminal, you'll even get high quality native image posters automatically.
-2. **A Video Player:** You'll need `mpv`, `IINA` (for macOS), or `VLC` installed. The app will automatically find whichever one you have and use it.
-
-<details>
-<summary><b>Want to download a pre-built binary instead?</b></summary>
-<br>
-
-You can grab the compiled executable directly from the [Releases page](https://github.com/mesamirh/MovieBox-Tui/releases/latest).
-
-</details>
-
-<details>
-<summary><b>Need help installing a video player?</b></summary>
-<br>
-
-```bash
-# macOS
-brew install mpv
-# or
-brew install --cask iina
-
-# Debian / Ubuntu
-sudo apt install mpv
-
-# Arch Linux
-sudo pacman -S mpv
-
-# Windows
-choco install mpv
-```
-
-</details>
+### Terminal Experience
+- **Native Image Rendering:** Enjoy high-resolution movie posters rendered directly in supported terminals.
+- **Dynamic Theming:** Switch between beautiful 3D block layouts and clean ASCII themes to fit your aesthetic.
+- **Power-User Slash Commands:** Use terminal-style commands to update the app (`/update`), switch categories, or customize your Live TV playlists (`/config`).
+- **Smart Auto-Cleanup:** A silent background worker intelligently manages and deletes old cache files to protect your disk space.
 
 
 ## Installation
 
-The easiest way to get started is by using the quick install scripts below. If you're a Rust developer, you can also just grab it from Cargo.
+**Prerequisites:** You will need a terminal (at least 85×24 characters) and a local video player installed (e.g. `mpv`, `IINA`, or `VLC`).
+
+The easiest way to get started is by using our quick install scripts. These scripts will automatically download the correct version for your computer.
 
 ### macOS & Linux
 ```bash
@@ -154,7 +105,7 @@ curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.
 powershell -c "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex"
 ```
 
-### Cargo (Rust)
+### Cargo (For Rust Developers)
 ```bash
 cargo install moviebox-tui
 ```
@@ -162,34 +113,33 @@ cargo install moviebox-tui
 
 ## Getting Started
 
-Just open your terminal and type `moviebox-tui` to jump in.
+Once installed, just open your terminal and type `moviebox-tui` to jump in!
 
-Here's how to get around:
-- **Search:** Just start typing! It searches instantly.
-- **Navigate:** Use the <kbd>Up</kbd> / <kbd>Down</kbd> / <kbd>Left</kbd> / <kbd>Right</kbd> arrow keys.
-- **Select:** Press <kbd>Enter</kbd> to view details, pick episodes, or start playing a video.
-- **Switch Player:** Press <kbd>o</kbd> on a stream if you want to open it in a different video player.
-- **Download:** Press <kbd>d</kbd> on any episode or season to save it to your disk (you'll get to pick your subtitles first).
-- **Live TV:** Press <kbd>Ctrl+T</kbd> to toggle Live TV mode and browse IPTV channels.
-- **Refresh:** Press <kbd>r</kbd> if a stream link expires and needs to be re-fetched.
-- **Help:** Need a quick reminder? Press <kbd>?</kbd> anywhere to see the cheat sheet.
-- **Quit:** Press <kbd>q</kbd> to exit (use <kbd>Esc</kbd> to go back or clear search).
+### Keyboard Controls
 
-### Handy Slash Commands
+| Key | Action |
+| --- | --- |
+| Alphanumeric | Start searching instantly |
+| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | Navigate menus and grids |
+| <kbd>Enter</kbd> | View details, pick episodes, or play video |
+| <kbd>o</kbd> | Switch to a different video player on playback |
+| <kbd>d</kbd> | Download an episode or an entire season |
+| <kbd>Ctrl</kbd>+<kbd>p</kbd> | Switch between different content providers / sources |
+| <kbd>Ctrl</kbd>+<kbd>t</kbd> | Toggle Live TV mode to browse IPTV channels |
+| <kbd>?</kbd> | Open the global help menu |
+| <kbd>q</kbd> | Quit (or use <kbd>Esc</kbd> to go back/clear search) |
+
+### Slash Commands
 You can type these special commands straight into the search bar:
 
-**General commands:**
-- `/clear-cache` - Free up disk space by wiping downloaded images and cache.
-- `/update` - Check to see if there's a new version of the app.
-- `/toggle-update` - Turn automatic background update checking on or off.
-
-**Streaming Mode commands:**
-- `/discover` or `/home` - See what's trending right now.
-- `/movies`, `/shows`, `/anime` - Jump straight to a specific category.
-
-**Live TV Mode commands:**
-- `/list` - Show the list of available live channels.
-- `/config` - Open the TV configuration menu to add your own m3u playlists.
+| Command | Category | Description |
+| --- | --- | --- |
+| `/discover` or `/home` | Streaming | See what's trending right now |
+| `/movies`, `/shows`, `/anime`| Streaming | Jump straight to a specific category |
+| `/list` | Live TV | Show the list of available live channels |
+| `/config` | Live TV | Open the TV configuration menu to add your own m3u playlists |
+| `/update` | General | Check to see if there's a new version of the app |
+| `/toggle-update` | General | Turn automatic background update checking on or off |
 
 
 ## Contributing
@@ -197,7 +147,7 @@ You can type these special commands straight into the search bar:
 I'd love your help making this even better! If you've got a big feature in mind, it's usually best to open an issue first so we can chat about it.
 
 ```bash
-git clone https://github.com/<your-username>/MovieBox-Tui.git
+git clone https://github.com/mesamirh/MovieBox-Tui.git
 cd MovieBox-Tui
 cargo build
 ```
@@ -205,16 +155,20 @@ cargo build
 Just try to follow [Conventional Commits](https://www.conventionalcommits.org/) and make sure `cargo fmt` and `cargo clippy` are happy before you open a PR. You can check out [CONTRIBUTING.md](CONTRIBUTING.md) for the full rundown.
 
 
-## Credits
+## Credits & Legal
 
 Live TV channel playlists are graciously provided by [iptv-org/iptv](https://github.com/iptv-org/iptv).
 
+> **Disclaimer:** This is a third-party client. It does not host or store any media and only resolves links from upstream APIs. Intended for personal use only.
 
-## Support
 
-If this TUI makes your movie nights better and you want to support its development, crypto tips are always super appreciated:
+## Community & Support
 
-- **EVM (ETH, BNB, Polygon, etc):** `0x7ea20d5fa29d87f33195f5a3b211ff94038d794c`
+The best way to support MovieBox-TUI is simply to use it, share it, and leave a star on GitHub!
+
+If you'd like to buy me a coffee for the late nights spent coding, you can use the addresses below.
+
+- **EVM:** `0x7ea20d5fa29d87f33195f5a3b211ff94038d794c`
 - **BTC:** `3MEAtqtRWrQBhnaMi3Zuf5nt2efNUS2LUQ`
 - **LTC:** `ltc1qhjkq2n6tsayxj56n3c53uqv23v8vqhvc9g3vxl`
 
@@ -225,6 +179,6 @@ If this TUI makes your movie nights better and you want to support its developme
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE) at your option.<br>
 Built by [**@mesamirh**](https://github.com/mesamirh)
 
-<sub>Not affiliated with MovieBox or its operators.</sub>
+<sub>Not affiliated with any third-party content providers or operators.</sub>
 
 </div>

@@ -3073,6 +3073,10 @@ impl App {
                                 }
                             }
                         });
+                    } else {
+                        self.action_sender
+                            .send(Action::StartDownload(subtitle_url, None))
+                            .ok();
                     }
                 } else {
                     self.action_sender
@@ -3096,14 +3100,7 @@ impl App {
             Action::ConfirmDownloadEpisode => {
                 self.state.show_episode_download_confirm = false;
 
-                let subject_id = self
-                    .state
-                    .selected_details
-                    .as_ref()
-                    .and_then(|d| d.get("id"))
-                    .and_then(|i| i.as_str())
-                    .unwrap_or("")
-                    .to_string();
+                let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
                 let resource_id = self.get_selected_resource_id();
 
                 if let Some(rid) = resource_id {
@@ -3177,19 +3174,7 @@ impl App {
                         format!("S{season:02}E{episode:02} · {num}/{total}"),
                     );
 
-                    let subject_id = self
-                        .state
-                        .selected_details
-                        .as_ref()
-                        .and_then(|d| d.get("id").or_else(|| d.get("idStr")))
-                        .and_then(|v| {
-                            if let Some(s) = v.as_str() {
-                                Some(s.to_string())
-                            } else {
-                                v.as_i64().map(|n| n.to_string())
-                            }
-                        })
-                        .unwrap_or_default();
+                    let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
 
                     self.action_sender
                         .send(Action::FetchEpisodeStreams {
@@ -3916,14 +3901,7 @@ impl App {
 
                     let is_season_queue = self.state.download_queue_total > 0;
                     if is_season_queue {
-                        let subject_id = self
-                            .state
-                            .selected_details
-                            .as_ref()
-                            .and_then(|d| d.get("id"))
-                            .and_then(|i| i.as_str())
-                            .unwrap_or("")
-                            .to_string();
+                        let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
                         if let Some(rid) = self.get_selected_resource_id() {
                             let client = self.client.clone();
                             let sender = self.action_sender.clone();

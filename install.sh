@@ -1,22 +1,40 @@
 #!/bin/bash
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# Logging Helpers
+log_info() { echo -e "\033[0;34m$1\033[0m"; }
+log_success() { echo -e "\033[0;32m$1\033[0m"; }
+log_warn() { echo -e "\033[1;33mWARNING: $1\033[0m"; }
+log_err() { echo -e "\033[0;31mERROR: $1\033[0m"; exit 1; }
 
 INSTALL_DIR="/usr/local/bin"
 BIN_NAME="moviebox-tui"
 APP_PATH="$INSTALL_DIR/$BIN_NAME"
 
-if command -v "$BIN_NAME" &> /dev/null; then
-    echo -e "${YELLOW}>> Updating MovieBox-Tui to the latest version...${NC}"
+# Dependency Checks
+command -v curl >/dev/null 2>&1 || log_err "curl is required but not installed. Please install it."
+command -v tar >/dev/null 2>&1 || log_err "tar is required but not installed. Please install it."
+
+# Version Detection
+log_info "Fetching latest version information..."
+LATEST_RELEASE=$(curl -s "https://api.github.com/repos/mesamirh/MovieBox-Tui/releases/latest")
+VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+[ -z "$VERSION" ] && log_err "Failed to fetch latest version from GitHub API."
+
+if command -v "$BIN_NAME" > /dev/null 2>&1; then
+    CURRENT_VERSION=$($BIN_NAME --version 2>/dev/null | awk '{print $2}' || echo "unknown")
+    if [ "v$CURRENT_VERSION" = "$VERSION" ]; then
+        log_success "You already have the latest version ($VERSION) installed."
+        exit 0
+    fi
+    log_info "Updating MovieBox-TUI from v$CURRENT_VERSION to $VERSION..."
+    IS_UPDATE=1
 else
-    echo -e "${BLUE}>> Installing MovieBox-Tui...${NC}"
+    log_info "Installing MovieBox-TUI $VERSION..."
+    IS_UPDATE=0
 fi
 
+# OS/Architecture Detection
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
@@ -28,44 +46,45 @@ elif [ "$OS" = "Linux" ]; then
     elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
         FILE="MovieBox_Linux_arm64.tar.gz"
     else
-        echo -e "${RED}Error: Unsupported Linux architecture ($ARCH). Only x86_64 and arm64 are supported.${NC}"
-        exit 1
+        log_err "Unsupported Linux architecture ($ARCH). Only x86_64 and arm64 are supported."
     fi
 else
-    echo -e "${RED}Error: Unsupported OS ($OS).${NC}"
-    exit 1
+    log_err "Unsupported OS ($OS)."
 fi
 
-URL="https://github.com/mesamirh/MovieBox-Tui/releases/latest/download/$FILE"
+URL="https://github.com/mesamirh/MovieBox-Tui/releases/download/$VERSION/$FILE"
 TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo -e "${BLUE}>> Downloading latest release...${NC}"
+log_info "Downloading $FILE..."
 if ! curl -fsSL --progress-bar "$URL" -o "$TMP_DIR/$FILE"; then
-    echo -e "${RED}Error: Failed to download release.${NC}"
-    rm -rf "$TMP_DIR"
-    exit 1
+    log_err "Download failed. Please check your internet connection."
 fi
 
-echo -e "${BLUE}>> Extracting...${NC}"
+log_info "Extracting files..."
 tar -xzf "$TMP_DIR/$FILE" -C "$TMP_DIR"
 
-echo -e "${BLUE}>> Moving binary to $INSTALL_DIR...${NC}"
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP_DIR/moviebox" "$APP_PATH"
-else
-    sudo mv "$TMP_DIR/moviebox" "$APP_PATH"
+if [ ! -f "$TMP_DIR/$BIN_NAME" ]; then
+    log_err "Binary not found in archive. This is an unexpected packaging error."
 fi
 
-if [ -w "$APP_PATH" ]; then
+log_info "Moving binary to $INSTALL_DIR..."
+if [ -w "$INSTALL_DIR" ]; then
+    mv "$TMP_DIR/$BIN_NAME" "$APP_PATH"
     chmod +x "$APP_PATH"
 else
+    log_info "Requires sudo privileges to write to $INSTALL_DIR..."
+    sudo mv "$TMP_DIR/$BIN_NAME" "$APP_PATH"
     sudo chmod +x "$APP_PATH"
 fi
 
-rm -rf "$TMP_DIR"
+# PATH check
+if ! echo "$PATH" | tr ':' '\n' | grep -q "^$INSTALL_DIR$"; then
+    log_warn "$INSTALL_DIR is not in your PATH. You may need to add it to run $BIN_NAME easily."
+fi
 
-if command -v "$BIN_NAME" &> /dev/null; then
-    echo -e "${GREEN}Success! MovieBox-Tui has been updated. Run 'moviebox-tui' to start.${NC}"
+if [ "$IS_UPDATE" -eq 1 ]; then
+    log_success "Update complete! Run '$BIN_NAME' to start."
 else
-    echo -e "${GREEN}Success! MovieBox-Tui is installed. Run 'moviebox-tui' to start.${NC}"
+    log_success "Installation complete! Run '$BIN_NAME' to start."
 fi
