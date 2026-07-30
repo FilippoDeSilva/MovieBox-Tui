@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Logging Helpers
 log_info() { echo -e "\033[0;34m$1\033[0m"; }
 log_success() { echo -e "\033[0;32m$1\033[0m"; }
 log_warn() { echo -e "\033[1;33mWARNING: $1\033[0m"; }
@@ -11,25 +10,36 @@ INSTALL_DIR="/usr/local/bin"
 BIN_NAME="moviebox-tui"
 APP_PATH="$INSTALL_DIR/$BIN_NAME"
 
-# Dependency Checks
 command -v curl >/dev/null 2>&1 || log_err "curl is required but not installed. Please install it."
 command -v tar >/dev/null 2>&1 || log_err "tar is required but not installed. Please install it."
 
-# Version Detection
 log_info "Fetching latest version information..."
-LATEST_RELEASE=$(curl -s "https://api.github.com/repos/mesamirh/MovieBox-Tui/releases/latest")
-VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_RELEASE=$(curl -sI "https://github.com/mesamirh/MovieBox-Tui/releases/latest")
+VERSION=$(echo "$LATEST_RELEASE" | grep -i '^location:' | awk -F '/' '{print $NF}' | tr -d '\r')
 [ -z "$VERSION" ] && log_err "Failed to fetch latest version from GitHub API."
 
 if command -v "$BIN_NAME" > /dev/null 2>&1; then
-    log_info "MovieBox-TUI is already installed. Forcing update to $VERSION..."
+    if strings "$APP_PATH" 2>/dev/null | grep -q "\-\-version"; then
+        CURRENT_VERSION=$($BIN_NAME --version 2>/dev/null | awk '{print $2}')
+    else
+        CURRENT_VERSION="unknown"
+    fi
+
+    if [ -z "$CURRENT_VERSION" ]; then
+        CURRENT_VERSION="unknown"
+    fi
+
+    if [ "v$CURRENT_VERSION" = "$VERSION" ]; then
+        log_success "You already have the latest version ($VERSION) installed."
+        exit 0
+    fi
+    log_info "Updating MovieBox-TUI from v$CURRENT_VERSION to $VERSION..."
     IS_UPDATE=1
 else
     log_info "Installing MovieBox-TUI $VERSION..."
     IS_UPDATE=0
 fi
 
-# OS/Architecture Detection
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
@@ -73,7 +83,6 @@ else
     sudo chmod +x "$APP_PATH"
 fi
 
-# PATH check
 if ! echo "$PATH" | tr ':' '\n' | grep -q "^$INSTALL_DIR$"; then
     log_warn "$INSTALL_DIR is not in your PATH. You may need to add it to run $BIN_NAME easily."
 fi

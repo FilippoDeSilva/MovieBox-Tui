@@ -12,24 +12,44 @@ $ZipFile = "$env:TEMP\MovieBox_Windows_x64.zip"
 
 Write-Info "Fetching latest version information..."
 try {
-    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/mesamirh/MovieBox-Tui/releases/latest" -UseBasicParsing
-    $Version = $Release.tag_name
-    if (-not $Version) { throw "Version not found in API response." }
+    $Request = [System.Net.WebRequest]::Create("https://github.com/mesamirh/MovieBox-Tui/releases/latest")
+    $Request.AllowAutoRedirect = $false
+    $Response = $Request.GetResponse()
+    $Location = $Response.Headers["Location"]
+    $Version = $Location.Split('/')[-1]
+    $Response.Close()
+    if (-not $Version) { throw "Version not found from redirect." }
 } catch {
     Write-Err "Failed to fetch latest version from GitHub API. Please check your internet connection."
 }
 
 $IsUpdate = $false
 if (Test-Path $ExePath) {
-    Write-Info "MovieBox-TUI is already installed. Forcing update to $Version..."
-    $IsUpdate = $true
-    
-    # Ensure it's not running
-    $RunningProcesses = Get-Process -Name "moviebox-tui" -ErrorAction SilentlyContinue
-    if ($RunningProcesses) {
-        Write-Info "Stopping running instances of MovieBox-Tui..."
-        $RunningProcesses | Stop-Process -Force
-        Start-Sleep -Seconds 1
+    try {
+        $Strings = (Select-String -Path $ExePath -Pattern "--version" -Quiet -ErrorAction SilentlyContinue)
+        if ($Strings) {
+            $CurrentVersionOutput = (& $ExePath --version 2>&1 | Out-String)
+            if ($CurrentVersionOutput -match "moviebox-tui\s+([\d\.]+)") {
+                $CurrentVersion = $matches[1]
+                if ("v$CurrentVersion" -eq $Version) {
+                    Write-Success "You already have the latest version ($Version) installed."
+                    exit 0
+                }
+            }
+        }
+        if (-not $CurrentVersion) { $CurrentVersion = "unknown" }
+        Write-Info "Updating MovieBox-TUI from v$CurrentVersion to $Version..."
+        $IsUpdate = $true
+        
+        $RunningProcesses = Get-Process -Name "moviebox-tui" -ErrorAction SilentlyContinue
+        if ($RunningProcesses) {
+            Write-Info "Stopping running instances of MovieBox-Tui..."
+            $RunningProcesses | Stop-Process -Force
+            Start-Sleep -Seconds 1
+        }
+    } catch {
+        Write-Info "Updating MovieBox-TUI to $Version..."
+        $IsUpdate = $true
     }
 } else {
     Write-Info "Installing MovieBox-TUI $Version..."
