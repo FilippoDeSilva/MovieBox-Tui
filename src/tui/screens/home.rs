@@ -1029,30 +1029,47 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .max()
             .unwrap_or(32)
             .max(crate::tui::text::width(
-                "[Space] Toggle  [Enter] Confirm  [Esc] Back",
+                "[↑↓] Move  [Space] Toggle  [Enter] Confirm  [Esc] Back",
             ));
         let popup_area = crate::tui::overlay::centered(
             area,
             content_width.saturating_add(6) as u16,
-            content_height.min(8) + 3,
+            content_height.min(8) + 4,
             36,
             64,
         );
         crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
+        let title_text = if state.tv_wizard_step == 0 {
+            "TV Setup: Select Grouping"
+        } else {
+            "TV Setup: Select Items"
+        };
+        let title = format!(
+            " {} · {}/{} ",
+            title_text,
+            state.tv_wizard_selected_idx.saturating_add(1),
+            state.tv_wizard_options.len().max(1)
+        );
+
         let popup_block = ratatui::widgets::Block::default()
-            .title(if state.tv_wizard_step == 0 {
-                " TV Setup: Select Grouping "
-            } else {
-                " TV Setup: Select Items "
-            })
-            .title_alignment(ratatui::layout::Alignment::Center)
+            .title(title)
+            .title_style(theme.title)
             .borders(ratatui::widgets::Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(theme.border_focus)
-            .style(ratatui::style::Style::default());
+            .border_type(if state.basic_terminal {
+                ratatui::widgets::BorderType::Plain
+            } else {
+                ratatui::widgets::BorderType::Rounded
+            })
+            .border_style(theme.lavender);
 
         let inner_area = popup_block.inner(popup_area);
         frame.render_widget(popup_block, popup_area);
+
+        let sections = ratatui::layout::Layout::vertical([
+            ratatui::layout::Constraint::Min(1),
+            ratatui::layout::Constraint::Length(2),
+        ])
+        .split(inner_area);
 
         let items: Vec<ratatui::widgets::ListItem> = state
             .tv_wizard_options
@@ -1075,57 +1092,65 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .collect();
 
         let list = ratatui::widgets::List::new(items)
-            .highlight_style(theme.highlight.add_modifier(ratatui::style::Modifier::BOLD))
+            .highlight_style(crate::tui::overlay::selection_style(theme, state.basic_terminal))
             .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-
-        let mut list_area = inner_area;
-        list_area.height = list_area.height.saturating_sub(1);
 
         let mut list_state = ratatui::widgets::ListState::default();
         list_state.select(Some(state.tv_wizard_selected_idx));
 
-        frame.render_stateful_widget(list, list_area, &mut list_state);
+        frame.render_stateful_widget(list, sections[0], &mut list_state);
 
-        let scrollbar =
-            ratatui::widgets::Scrollbar::new(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("▲"))
-                .end_symbol(Some("▼"))
-                .track_symbol(Some("│"))
-                .thumb_symbol("█");
+        if state.tv_wizard_options.len() > sections[0].height as usize {
+            let scrollbar = ratatui::widgets::Scrollbar::new(
+                ratatui::widgets::ScrollbarOrientation::VerticalRight,
+            )
+            .thumb_style(theme.lavender)
+            .track_style(theme.surface1)
+            .begin_symbol(Some("▲"))
+            .end_symbol(Some("▼"));
 
-        let mut scrollbar_state = ratatui::widgets::ScrollbarState::new(
-            state
-                .tv_wizard_options
-                .len()
-                .saturating_sub(list_area.height as usize),
-        )
-        .position(list_state.offset());
+            let mut scrollbar_state = ratatui::widgets::ScrollbarState::new(
+                state.tv_wizard_options.len()
+            )
+            .viewport_content_length(sections[0].height as usize)
+            .position(list_state.offset());
 
-        frame.render_stateful_widget(
-            scrollbar,
-            list_area.inner(ratatui::layout::Margin {
-                vertical: 0,
-                horizontal: 0,
-            }),
-            &mut scrollbar_state,
-        );
+            frame.render_stateful_widget(
+                scrollbar,
+                sections[0],
+                &mut scrollbar_state,
+            );
+        }
 
-        let hint_area = ratatui::layout::Rect {
-            x: inner_area.x,
-            y: inner_area.y + inner_area.height.saturating_sub(1),
-            width: inner_area.width,
-            height: 1,
-        };
-        let hint = if state.tv_wizard_step == 0 {
-            " [Enter] Select   [Esc] Cancel "
+        let footer = if state.tv_wizard_step == 0 {
+            ratatui::text::Line::from(vec![
+                crate::tui::overlay::key_hint("↑↓", "Move", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Enter", "Select", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Esc", "Cancel", theme),
+            ])
         } else {
-            " [Space] Toggle   [Enter] Confirm   [Esc] Back "
+            ratatui::text::Line::from(vec![
+                crate::tui::overlay::key_hint("↑↓", "Move", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Space", "Toggle", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Enter", "Confirm", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Esc", "Back", theme),
+            ])
         };
+
         frame.render_widget(
-            ratatui::widgets::Paragraph::new(hint)
+            ratatui::widgets::Paragraph::new(footer)
                 .alignment(ratatui::layout::Alignment::Center)
-                .style(theme.text_dim),
-            hint_area,
+                .block(
+                    ratatui::widgets::Block::default()
+                        .borders(ratatui::widgets::Borders::TOP)
+                        .border_style(theme.muted),
+                ),
+            sections[1],
         );
     }
 

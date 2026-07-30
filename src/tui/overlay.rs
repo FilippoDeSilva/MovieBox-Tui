@@ -343,11 +343,11 @@ pub fn clear_modal_area(frame: &mut Frame, bounds: Rect, popup: Rect, theme: &Th
     );
 }
 
-fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> {
+pub(crate) fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> {
     Span::styled(format!("[{key}] {action}"), theme.text_dim)
 }
 
-fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
+pub(crate) fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
     let style = theme.text.add_modifier(Modifier::BOLD);
     if basic_terminal {
         style.add_modifier(Modifier::UNDERLINED)
