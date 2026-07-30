@@ -24,44 +24,50 @@ Fast and clean. No configuration, no torrents, and no debrid required.
 ## Screenshots
 
 <details>
-<summary><b>Click to view gallery</b></summary>
-<br>
-
+<summary><b>Movie & Series Details</b></summary><br>
 <p align="center">
-  <b>Movie & Series Details</b><br>
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/07-movie-details.jpg" alt="Movie Details" width="49%">
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/08-series-details.jpg" alt="Series Details" width="49%">
 </p>
+</details>
 
+<details>
+<summary><b>Search & Downloads</b></summary><br>
 <p align="center">
-  <b>Search & Downloads</b><br>
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/06-search-results.jpg" alt="Search Results" width="49%">
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/12-download-progress.jpg" alt="Download Progress" width="49%">
 </p>
+</details>
 
+<details>
+<summary><b>Playback & Subtitles</b></summary><br>
 <p align="center">
-  <b>Playback & Subtitles</b><br>
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/11-player-picker.jpg" alt="Media Player Selection" width="49%">
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/10-playback-subtitles.jpg" alt="Subtitle Language Selection" width="49%">
 </p>
+</details>
 
+<details>
+<summary><b>Live TV Experience</b></summary><br>
 <p align="center">
-  <b>Live TV Experience</b><br>
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/09-live-tv-list.jpg" alt="Live TV Channels" width="49%">
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/05-tv-help.jpg" alt="Live TV Configuration" width="49%">
 </p>
+</details>
 
+<details>
+<summary><b>Home Themes</b></summary><br>
 <p align="center">
-  <b>Home Themes</b><br>
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/03-home-3d.jpg" alt="3D Block Theme" width="49%">
   <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/02-home-ascii.jpg" alt="Minimal ASCII Theme" width="49%">
 </p>
+</details>
 
+<details>
+<summary><b>Help & Configuration</b></summary><br>
 <p align="center">
-  <b>Help & Configuration</b><br>
-  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/04-global-help.jpg" alt="Global Help Menu" width="49%">
+  <img src="https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/assets/screenshots/04-global-help.jpg" alt="Global Help Menu" width="85%">
 </p>
-
 </details>
 
 
@@ -91,7 +97,13 @@ Fast and clean. No configuration, no torrents, and no debrid required.
 
 The easiest way to get started is by using our quick install scripts. These scripts will automatically download the correct version for your computer.
 
-### macOS & Linux
+### Homebrew (macOS & Linux)
+```bash
+brew tap mesamirh/moviebox-tui https://github.com/mesamirh/MovieBox-Tui
+brew install moviebox-tui
+```
+
+### Install Script (macOS & Linux)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
 ```
@@ -113,29 +125,89 @@ Once installed, just open your terminal and type `moviebox-tui` to jump in!
 
 ### Keyboard Controls
 
-| Key | Action |
-| --- | --- |
-| Alphanumeric | Start searching instantly |
-| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | Navigate menus and grids |
-| <kbd>Enter</kbd> | View details, pick episodes, or play video |
-| <kbd>o</kbd> | Switch to a different video player on playback |
-| <kbd>d</kbd> | Download an episode or an entire season |
-| <kbd>Ctrl</kbd>+<kbd>p</kbd> | Switch between different content providers / sources |
-| <kbd>Ctrl</kbd>+<kbd>t</kbd> | Toggle Live TV mode to browse IPTV channels |
-| <kbd>?</kbd> | Open the global help menu |
-| <kbd>q</kbd> | Quit (or use <kbd>Esc</kbd> to go back/clear search) |
+<table>
+  <tr>
+    <th align="left">Key</th>
+    <th align="left">Action</th>
+  </tr>
+  <tr>
+    <td>Alphanumeric</td>
+    <td>Start searching instantly</td>
+  </tr>
+  <tr>
+    <td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></td>
+    <td>Navigate menus and grids</td>
+  </tr>
+  <tr>
+    <td><kbd>Enter</kbd></td>
+    <td>View details, pick episodes, or play video</td>
+  </tr>
+  <tr>
+    <td><kbd>o</kbd></td>
+    <td>Switch to a different video player on playback</td>
+  </tr>
+  <tr>
+    <td><kbd>d</kbd></td>
+    <td>Download an episode or an entire season</td>
+  </tr>
+  <tr>
+    <td><kbd>Ctrl</kbd>+<kbd>p</kbd></td>
+    <td>Switch between different content providers / sources</td>
+  </tr>
+  <tr>
+    <td><kbd>Ctrl</kbd>+<kbd>t</kbd></td>
+    <td>Toggle Live TV mode to browse IPTV channels</td>
+  </tr>
+  <tr>
+    <td><kbd>?</kbd></td>
+    <td>Open the global help menu</td>
+  </tr>
+  <tr>
+    <td><kbd>q</kbd></td>
+    <td>Quit (or use <kbd>Esc</kbd> to go back/clear search)</td>
+  </tr>
+</table>
 
 ### Slash Commands
 You can type these special commands straight into the search bar:
 
-| Command | Category | Description |
-| --- | --- | --- |
-| `/discover` or `/home` | Streaming | See what's trending right now |
-| `/movies`, `/shows`, `/anime`| Streaming | Jump straight to a specific category |
-| `/list` | Live TV | Show the list of available live channels |
-| `/config` | Live TV | Open the TV configuration menu to add your own m3u playlists |
-| `/update` | General | Check to see if there's a new version of the app |
-| `/toggle-update` | General | Turn automatic background update checking on or off |
+<table>
+  <tr>
+    <th align="left">Command</th>
+    <th align="left">Category</th>
+    <th align="left">Description</th>
+  </tr>
+  <tr>
+    <td><code>/discover</code> or <code>/home</code></td>
+    <td>Streaming</td>
+    <td>See what's trending right now</td>
+  </tr>
+  <tr>
+    <td><code>/movies</code>, <code>/shows</code>, <code>/anime</code></td>
+    <td>Streaming</td>
+    <td>Jump straight to a specific category</td>
+  </tr>
+  <tr>
+    <td><code>/list</code></td>
+    <td>Live TV</td>
+    <td>Show the list of available live channels</td>
+  </tr>
+  <tr>
+    <td><code>/config</code></td>
+    <td>Live TV</td>
+    <td>Open the TV configuration menu to add your own m3u playlists</td>
+  </tr>
+  <tr>
+    <td><code>/update</code></td>
+    <td>General</td>
+    <td>Check to see if there's a new version of the app</td>
+  </tr>
+  <tr>
+    <td><code>/toggle-update</code></td>
+    <td>General</td>
+    <td>Turn automatic background update checking on or off</td>
+  </tr>
+</table>
 
 
 ## Contributing
