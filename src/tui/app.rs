@@ -4137,10 +4137,34 @@ impl App {
                     return None;
                 }
                 tokio::spawn(async move {
+                    let mut local_sub = source.subtitle.clone();
+                    let mut sub_temp_path = None;
+                    if kind == crate::tui::state::PlayerKind::Vlc
+                        || kind == crate::tui::state::PlayerKind::Iina
+                    {
+                        if let Some(s_url) = source.subtitle.as_ref() {
+                            if let Ok(resp) = reqwest::get(s_url).await {
+                                if let Ok(bytes) = resp.bytes().await {
+                                    let temp_path = std::env::temp_dir().join(format!(
+                                        "moviebox_sub_{}.srt",
+                                        std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_millis()
+                                    ));
+                                    if tokio::fs::write(&temp_path, bytes).await.is_ok() {
+                                        local_sub = Some(temp_path.to_string_lossy().to_string());
+                                        sub_temp_path = Some(temp_path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     let mut cmd = crate::tui::player::command(
                         kind,
                         &source.url,
-                        source.subtitle.as_deref(),
+                        local_sub.as_deref(),
                         &source.headers,
                     );
                     cmd.stdout(std::process::Stdio::null());
@@ -4151,6 +4175,11 @@ impl App {
                         cmd.process_group(0);
                     }
                     let _ = cmd.spawn();
+
+                    if let Some(path) = sub_temp_path {
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        let _ = tokio::fs::remove_file(path).await;
+                    }
                 });
             }
             Action::CheckForUpdates => {
