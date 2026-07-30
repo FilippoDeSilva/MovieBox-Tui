@@ -118,6 +118,16 @@ powershell -c "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/
 cargo install moviebox-tui
 ```
 
+<details>
+<summary><i>Need to uninstall?</i></summary>
+
+- **Homebrew:** `brew uninstall moviebox-tui && brew untap mesamirh/moviebox-tui`
+- **Mac/Linux:** `sudo rm -f /usr/local/bin/moviebox-tui`
+- **Windows:** `Remove-Item -Recurse -Force $env:USERPROFILE\AppData\Local\MovieBox-Tui`
+- **Cargo:** `cargo uninstall moviebox-tui`
+</details>
+
+
 
 ## Getting Started
 
