@@ -37,15 +37,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         2 => "..",
         _ => "...",
     };
-    
+
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(format!("Checking GitHub for a newer release{dots}"), theme.text),
-        ]))
+        Paragraph::new(Line::from(vec![Span::styled(
+            format!("Checking GitHub for a newer release{dots}"),
+            theme.text,
+        )]))
         .alignment(Alignment::Center),
         rows[1],
     );
-
 
     let footer = Rect {
         x: panel.x,

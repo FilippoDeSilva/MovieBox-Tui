@@ -206,10 +206,7 @@ fn render_search_state(
         _ => return,
     };
 
-    frame.render_widget(
-        Paragraph::new(line).alignment(Alignment::Center),
-        rows[1],
-    );
+    frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), rows[1]);
 }
 
 fn search_content(
@@ -885,11 +882,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let dropdown_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(1), // Header
+                    Constraint::Length(1),                    // Header
                     Constraint::Length(visible_count as u16), // List
-                    Constraint::Length(1), // Separator
-                    Constraint::Length(1), // Footer text
-                    Constraint::Length(1), // Pad below footer
+                    Constraint::Length(1),                    // Separator
+                    Constraint::Length(1),                    // Footer text
+                    Constraint::Length(1),                    // Pad below footer
                 ])
                 .split(dropdown_area);
             let items: Vec<ratatui::widgets::ListItem> = state
@@ -1071,7 +1068,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .collect();
 
         let list = ratatui::widgets::List::new(items)
-            .highlight_style(crate::tui::overlay::selection_style(theme, state.basic_terminal))
+            .highlight_style(crate::tui::overlay::selection_style(
+                theme,
+                state.basic_terminal,
+            ))
             .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
 
         let mut list_state = ratatui::widgets::ListState::default();
@@ -1088,17 +1088,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .begin_symbol(Some("▲"))
             .end_symbol(Some("▼"));
 
-            let mut scrollbar_state = ratatui::widgets::ScrollbarState::new(
-                state.tv_wizard_options.len()
-            )
-            .viewport_content_length(sections[0].height as usize)
-            .position(list_state.offset());
+            let mut scrollbar_state =
+                ratatui::widgets::ScrollbarState::new(state.tv_wizard_options.len())
+                    .viewport_content_length(sections[0].height as usize)
+                    .position(list_state.offset());
 
-            frame.render_stateful_widget(
-                scrollbar,
-                sections[0],
-                &mut scrollbar_state,
-            );
+            frame.render_stateful_widget(scrollbar, sections[0], &mut scrollbar_state);
         }
 
         let footer = if state.tv_wizard_step == 0 {

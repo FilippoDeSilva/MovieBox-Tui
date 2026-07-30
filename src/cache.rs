@@ -264,6 +264,39 @@ pub fn clear_all_cache() {
     }
 }
 
+pub fn clean_old_cache_background() {
+    tokio::task::spawn_blocking(|| {
+        let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
+        path.push("moviebox-tui");
+        if !path.exists() {
+            return;
+        }
+
+        let max_age = 7 * 24 * 60 * 60;
+
+        let mut dirs_to_check = vec![path];
+        while let Some(dir) = dirs_to_check.pop() {
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_dir() {
+                            dirs_to_check.push(entry.path());
+                        } else if metadata.is_file() {
+                            if let Ok(modified) = metadata.modified() {
+                                if let Ok(elapsed) = modified.elapsed() {
+                                    if elapsed.as_secs() > max_age {
+                                        let _ = fs::remove_file(entry.path());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 fn get_homepage_path(tab_id: &str, page: usize) -> PathBuf {
     let mut path = get_provider_cache_dir(ProviderKind::MovieBox, "homepage");
     path.push(format!("{}_{}.json", tab_id, page));

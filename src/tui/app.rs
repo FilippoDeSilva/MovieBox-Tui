@@ -3062,16 +3062,25 @@ impl App {
                         tokio::spawn(async move {
                             match client.resolve_release(&release).await {
                                 Ok(source) => {
-                                    sender.send(Action::StartDownload(subtitle_url, Some(source.url))).ok();
+                                    sender
+                                        .send(Action::StartDownload(subtitle_url, Some(source.url)))
+                                        .ok();
                                 }
                                 Err(error) => {
-                                    sender.send(Action::SetStatus(format!("Resolve failed: {error}"))).ok();
+                                    sender
+                                        .send(Action::SetStatus(format!("Resolve failed: {error}")))
+                                        .ok();
                                 }
                             }
                         });
                     }
                 } else {
-                    self.action_sender.send(Action::StartDownload(subtitle_url, self.get_selected_link())).ok();
+                    self.action_sender
+                        .send(Action::StartDownload(
+                            subtitle_url,
+                            self.get_selected_link(),
+                        ))
+                        .ok();
                 }
                 return None;
             }
@@ -3505,13 +3514,13 @@ impl App {
                 self.state.is_fetching_streams = true;
                 self.state.selected_resources = None;
                 self.state.stream_error = None;
-                
+
                 if force_refresh {
                     if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
                         pool.episode_index.remove(&(season, episode));
                     }
                 }
-                
+
                 let context = self.request_context();
 
                 if context.provider == ProviderKind::FourKHdHub {

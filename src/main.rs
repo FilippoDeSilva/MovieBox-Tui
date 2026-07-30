@@ -26,6 +26,8 @@ async fn main() -> std::io::Result<()> {
         crossterm::event::EnableFocusChange
     )?;
 
+    moviebox_tui::cache::clean_old_cache_background();
+
     let _guard = TerminalGuard;
 
     let mut app = App::new();

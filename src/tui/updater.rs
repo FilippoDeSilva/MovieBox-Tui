@@ -3,7 +3,9 @@ const REPOSITORY: &str = "MovieBox-Tui";
 
 pub fn check(current: &str) -> Result<Option<String>, String> {
     let releases = fetch_releases()?;
-    let release = releases.first().ok_or_else(|| "No published releases".to_string())?;
+    let release = releases
+        .first()
+        .ok_or_else(|| "No published releases".to_string())?;
 
     if !is_newer(current, &release.version) {
         return Ok(None);
@@ -29,7 +31,9 @@ fn fetch_releases() -> Result<Vec<Release>, String> {
         request = request.header("Authorization", format!("Bearer {token}"));
     }
 
-    let resp = request.send().map_err(|e| format!("GitHub request failed: {e}"))?;
+    let resp = request
+        .send()
+        .map_err(|e| format!("GitHub request failed: {e}"))?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().unwrap_or_default();
@@ -41,7 +45,10 @@ fn fetch_releases() -> Result<Vec<Release>, String> {
     items
         .into_iter()
         .map(|r| {
-            let tag = r["tag_name"].as_str().ok_or("missing tag_name")?.to_string();
+            let tag = r["tag_name"]
+                .as_str()
+                .ok_or("missing tag_name")?
+                .to_string();
             Ok(Release {
                 version: tag.trim_start_matches('v').to_string(),
             })
