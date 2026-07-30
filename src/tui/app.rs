@@ -3505,6 +3505,13 @@ impl App {
                 self.state.is_fetching_streams = true;
                 self.state.selected_resources = None;
                 self.state.stream_error = None;
+                
+                if force_refresh {
+                    if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
+                        pool.episode_index.remove(&(season, episode));
+                    }
+                }
+                
                 let context = self.request_context();
 
                 if context.provider == ProviderKind::FourKHdHub {
