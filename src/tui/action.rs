@@ -56,6 +56,7 @@ pub enum Action {
     LaunchMpv(String, Option<String>),
     PlayersDetected(Vec<crate::tui::state::PlayerKind>),
     DownloadStream(Option<String>),
+    StartDownload(Option<String>, Option<String>),
     UpdateDownload(Option<f64>, Option<String>),
     DownloadCompleted(String),
     DownloadFailed(String),

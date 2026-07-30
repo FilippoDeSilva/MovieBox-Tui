@@ -361,11 +361,11 @@ impl App {
             .and_then(|value| serde_json::from_value(value.clone()).ok())
     }
 
-    fn start_resilient_download(&mut self, subtitle_url: Option<String>) {
+    fn start_resilient_download(&mut self, subtitle_url: Option<String>, link: Option<String>) {
         if self.state.download_progress.is_some() || self.state.active_screen != Screen::Details {
             return;
         }
-        let Some(link) = self.get_selected_link() else {
+        let Some(link) = link else {
             if self.state.is_fetching_streams {
                 self.state.is_waiting_for_download_stream = true;
                 self.state.notify(
@@ -3049,16 +3049,36 @@ impl App {
                 }
             }
             Action::DownloadStream(subtitle_url) => {
-                self.start_resilient_download(subtitle_url);
+                if self.state.active_provider == ProviderKind::FourKHdHub {
+                    if let Some(release) = self.get_selected_release() {
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Preparing download",
+                            "Resolving the selected mirror.",
+                        );
+                        let client = self.fourk_client.clone();
+                        let sender = self.action_sender.clone();
+                        tokio::spawn(async move {
+                            match client.resolve_release(&release).await {
+                                Ok(source) => {
+                                    sender.send(Action::StartDownload(subtitle_url, Some(source.url))).ok();
+                                }
+                                Err(error) => {
+                                    sender.send(Action::SetStatus(format!("Resolve failed: {error}"))).ok();
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    self.action_sender.send(Action::StartDownload(subtitle_url, self.get_selected_link())).ok();
+                }
+                return None;
+            }
+            Action::StartDownload(subtitle_url, link) => {
+                self.start_resilient_download(subtitle_url, link);
                 return None;
             }
             Action::PromptDownloadEpisode => {
-                if self.state.active_provider != ProviderKind::MovieBox {
-                    self.state.status_message =
-                        "Downloads require a verified direct-file mirror; none is active.".into();
-                    self.state.status_timer = 180;
-                    return None;
-                }
                 self.state.show_episode_download_confirm = true;
                 self.state.episode_download_confirm_yes_selected = false;
             }
@@ -3097,12 +3117,6 @@ impl App {
             }
 
             Action::PromptDownloadSeason => {
-                if self.state.active_provider != ProviderKind::MovieBox {
-                    self.state.status_message =
-                        "Season downloads are unavailable for this provider.".into();
-                    self.state.status_timer = 180;
-                    return None;
-                }
                 self.state.show_season_download_confirm = true;
                 self.state.season_download_confirm_yes_selected = false;
             }
