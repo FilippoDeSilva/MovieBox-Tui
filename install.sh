@@ -22,12 +22,7 @@ VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/
 [ -z "$VERSION" ] && log_err "Failed to fetch latest version from GitHub API."
 
 if command -v "$BIN_NAME" > /dev/null 2>&1; then
-    CURRENT_VERSION=$($BIN_NAME --version 2>/dev/null | awk '{print $2}' || echo "unknown")
-    if [ "v$CURRENT_VERSION" = "$VERSION" ]; then
-        log_success "You already have the latest version ($VERSION) installed."
-        exit 0
-    fi
-    log_info "Updating MovieBox-TUI from v$CURRENT_VERSION to $VERSION..."
+    log_info "MovieBox-TUI is already installed. Forcing update to $VERSION..."
     IS_UPDATE=1
 else
     log_info "Installing MovieBox-TUI $VERSION..."

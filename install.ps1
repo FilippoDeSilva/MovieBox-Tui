@@ -21,27 +21,15 @@ try {
 
 $IsUpdate = $false
 if (Test-Path $ExePath) {
-    try {
-        $CurrentVersionOutput = & $ExePath --version 2>&1
-        $CurrentVersion = ($CurrentVersionOutput -split ' ')[1]
-        
-        if ("v$CurrentVersion" -eq $Version) {
-            Write-Success "You already have the latest version ($Version) installed."
-            exit 0
-        }
-        Write-Info "Updating MovieBox-TUI from v$CurrentVersion to $Version..."
-        $IsUpdate = $true
-        
-        # Ensure it's not running
-        $RunningProcesses = Get-Process -Name "moviebox-tui" -ErrorAction SilentlyContinue
-        if ($RunningProcesses) {
-            Write-Info "Stopping running instances of MovieBox-Tui..."
-            $RunningProcesses | Stop-Process -Force
-            Start-Sleep -Seconds 1
-        }
-    } catch {
-        Write-Info "Updating MovieBox-TUI to $Version..."
-        $IsUpdate = $true
+    Write-Info "MovieBox-TUI is already installed. Forcing update to $Version..."
+    $IsUpdate = $true
+    
+    # Ensure it's not running
+    $RunningProcesses = Get-Process -Name "moviebox-tui" -ErrorAction SilentlyContinue
+    if ($RunningProcesses) {
+        Write-Info "Stopping running instances of MovieBox-Tui..."
+        $RunningProcesses | Stop-Process -Force
+        Start-Sleep -Seconds 1
     }
 } else {
     Write-Info "Installing MovieBox-TUI $Version..."

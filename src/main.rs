@@ -15,6 +15,12 @@ impl Drop for TerminalGuard {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--version" || arg == "-v" || arg == "-V") {
+        println!("moviebox-tui {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     let stdout = std::io::stdout();
     let backend =
         ratatui::backend::CrosstermBackend::new(std::io::BufWriter::with_capacity(65536, stdout));
