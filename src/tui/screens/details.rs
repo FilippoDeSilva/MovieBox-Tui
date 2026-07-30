@@ -1189,6 +1189,8 @@ fn clean_language_name(value: &str) -> String {
     };
     if name.eq_ignore_ascii_case("ptbr") {
         name = "Portuguese (BR)".to_string();
+    } else if name.eq_ignore_ascii_case("esla") {
+        name = "Spanish (LA)".to_string();
     }
     name
 }

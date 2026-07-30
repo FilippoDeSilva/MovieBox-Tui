@@ -399,7 +399,8 @@ impl App {
             .unwrap_or(1);
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
-        let safe_title = crate::download::safe_file_stem(title);
+        let clean_title = crate::tui::app::clean_moviebox_title(title);
+        let safe_title = crate::download::safe_file_stem(&clean_title);
 
         let extension = self
             .state
