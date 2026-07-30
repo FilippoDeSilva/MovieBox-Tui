@@ -45,16 +45,6 @@ fn search_view_state(state: &AppState) -> SearchViewState {
     }
 }
 
-fn search_spinner(state: &AppState) -> char {
-    if state.basic_terminal {
-        let frames = ['-', '\\', '|', '/'];
-        frames[(state.tick_count as usize) % frames.len()]
-    } else {
-        let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        frames[(state.tick_count as usize) % frames.len()]
-    }
-}
-
 fn search_hint(view: SearchViewState, width: u16, theme: &Theme) -> Line<'static> {
     let text = match view {
         SearchViewState::Editing if width >= 82 => "[↑↓] Suggestions  [Enter] Search  [Esc] Cancel",
@@ -175,61 +165,50 @@ fn render_search_state(
         card_width.saturating_sub(10) as usize,
     );
 
-    let (symbol, title, title_style, detail) = match view {
-        SearchViewState::Loading => (
-            search_spinner(state).to_string(),
-            "Searching",
-            theme.lavender,
-            format!("Looking for “{query}”"),
-        ),
-        SearchViewState::NoResults => (
-            if state.basic_terminal { "-" } else { pulse }.to_string(),
-            "No matches",
-            if (state.tick_count / 4) % 2 == 0 {
+    let line = match view {
+        SearchViewState::Loading => {
+            let dots = match (state.tick_count / 4) % 4 {
+                0 => "",
+                1 => ".",
+                2 => "..",
+                _ => "...",
+            };
+            Line::from(vec![Span::styled(
+                format!("Searching for “{query}”{dots}"),
+                theme.lavender,
+            )])
+        }
+        SearchViewState::NoResults => {
+            let symbol = if state.basic_terminal { "-" } else { pulse };
+            let style = if (state.tick_count / 4) % 2 == 0 {
                 theme.lavender
             } else {
                 theme.subtext1
-            },
-            format!("Nothing found for “{query}”"),
-        ),
-        SearchViewState::Error => (
-            if state.basic_terminal { "!" } else { "×" }.to_string(),
-            "Search failed",
-            theme.error,
-            crate::tui::text::truncate_width(
-                &state.status_message,
-                card_width.saturating_sub(4) as usize,
-            ),
-        ),
+            };
+            Line::from(vec![
+                Span::styled(format!("{symbol} "), style),
+                Span::styled(format!("Nothing found for “{query}”"), theme.text),
+            ])
+        }
+        SearchViewState::Error => {
+            let symbol = if state.basic_terminal { "!" } else { "×" };
+            Line::from(vec![
+                Span::styled(format!("{symbol} "), theme.error),
+                Span::styled(
+                    crate::tui::text::truncate_width(
+                        &state.status_message,
+                        card_width.saturating_sub(4) as usize,
+                    ),
+                    theme.error,
+                ),
+            ])
+        }
         _ => return,
     };
 
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(format!("{symbol} "), title_style),
-            Span::styled(title, title_style.add_modifier(Modifier::BOLD)),
-        ]))
-        .alignment(Alignment::Center),
-        rows[0],
-    );
-    frame.render_widget(
-        Paragraph::new(detail)
-            .style(theme.text_dim)
-            .alignment(Alignment::Center),
+        Paragraph::new(line).alignment(Alignment::Center),
         rows[1],
-    );
-
-    let guidance = match view {
-        SearchViewState::Loading => "Please wait",
-        SearchViewState::NoResults => "Type to edit  ·  Enter to retry",
-        SearchViewState::Error => "Enter to retry  ·  Type to edit",
-        _ => "",
-    };
-    frame.render_widget(
-        Paragraph::new(guidance)
-            .style(theme.overlay0)
-            .alignment(Alignment::Center),
-        rows[2],
     );
 }
 
