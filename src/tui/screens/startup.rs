@@ -25,33 +25,27 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
+            Constraint::Min(0),
             Constraint::Length(1),
             Constraint::Min(0),
         ])
         .split(inner);
 
-    let status_text = "Checking GitHub for a newer release…";
-
-    let spinner_frames = ['◐', '◓', '◑', '◒'];
-    let spinner = spinner_frames[(state.tick_count as usize / 3) % spinner_frames.len()];
+    let dots = match (state.tick_count / 4) % 4 {
+        0 => "",
+        1 => ".",
+        2 => "..",
+        _ => "...",
+    };
     
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled(format!("{spinner}  "), theme.accent),
-            Span::styled(status_text, theme.text),
+            Span::styled(format!("Checking GitHub for a newer release{dots}"), theme.text),
         ]))
         .alignment(Alignment::Center),
         rows[1],
     );
 
-    let pulse = ["●  ·  ·", "·  ●  ·", "·  ·  ●", "·  ●  ·"][(state.tick_count as usize / 4) % 4];
-    frame.render_widget(
-        Paragraph::new(Span::styled(pulse, theme.accent)).alignment(Alignment::Center),
-        rows[3],
-    );
 
     let footer = Rect {
         x: panel.x,

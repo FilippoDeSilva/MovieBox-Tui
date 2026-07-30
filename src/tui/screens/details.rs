@@ -96,12 +96,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let details_json = match &state.selected_details {
         Some(d) => d,
         None => {
-            let spinner = if state.basic_terminal {
-                let frames = ['-', '\\', '|', '/'];
-                frames[(state.tick_count as usize) % frames.len()]
-            } else {
-                let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-                frames[(state.tick_count as usize) % frames.len()]
+            let dots = match (state.tick_count / 4) % 4 {
+                0 => "",
+                1 => ".",
+                2 => "..",
+                _ => "...",
             };
 
             let vertical_chunks = Layout::default()
@@ -113,7 +112,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ])
                 .split(area);
 
-            let loading_p = Paragraph::new(format!("{} Loading details...", spinner))
+            let loading_p = Paragraph::new(format!("Loading details{dots}"))
                 .alignment(ratatui::layout::Alignment::Center)
                 .style(theme.text_dim);
 
@@ -268,12 +267,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
             }
         } else {
-            let current_spinner = if state.basic_terminal {
-                let frames = ['-', '\\', '|', '/'];
-                frames[(state.tick_count as usize) % frames.len()]
-            } else {
-                let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-                frames[(state.tick_count as usize) % frames.len()]
+            let dots = match (state.tick_count / 4) % 4 {
+                0 => "",
+                1 => ".",
+                2 => "..",
+                _ => "...",
             };
 
             let placeholder_block = Block::default()
@@ -284,7 +282,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let (pad, msg) = if state.is_loading {
                 let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
-                (p, format!("{}\nLoading Art", current_spinner))
+                (p, format!("Loading Art{dots}"))
             } else {
                 let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
                 (p, title.to_string())
@@ -972,14 +970,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else if let Some(error) = &state.stream_error {
                 format!("{error} — press r to retry.")
             } else {
-                let spinner = if state.basic_terminal {
-                    let frames = ['-', '\\', '|', '/'];
-                    frames[(state.tick_count as usize) % frames.len()]
-                } else {
-                    let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-                    frames[(state.tick_count as usize) % frames.len()]
+                let dots = match (state.tick_count / 4) % 4 {
+                    0 => "",
+                    1 => ".",
+                    2 => "..",
+                    _ => "...",
                 };
-                format!("{} Loading streams...", spinner)
+                format!("Loading streams{dots}")
             };
 
             let style = if has_error {
