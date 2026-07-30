@@ -2,7 +2,7 @@
 
 # MovieBox-TUI
 
-**Stream movies, TV shows, anime, and live TV straight from your terminal.** <br>
+**Stream movies, shows, anime, and live TV from your terminal.** <br>
 Fast and clean. No configuration, no torrents, and no debrid required.
 
 [![Crates.io](https://img.shields.io/crates/v/moviebox-tui.svg?logo=rust)](https://crates.io/crates/moviebox-tui)
@@ -20,7 +20,7 @@ Fast and clean. No configuration, no torrents, and no debrid required.
 
 <br>
 
-**Found a bug?** [Open an issue](https://github.com/mesamirh/MovieBox-Tui/issues) so I can fix it for everyone!
+<sub>Found a bug? [Open an issue](https://github.com/mesamirh/MovieBox-Tui/issues) so I can fix it for everyone!</sub>
 
 </div>
 
