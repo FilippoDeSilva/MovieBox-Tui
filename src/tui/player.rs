@@ -26,10 +26,7 @@ pub fn detect() -> Vec<PlayerKind> {
 }
 
 pub fn supports_headers(kind: PlayerKind, headers: &[(String, String)]) -> bool {
-    kind != PlayerKind::Vlc
-        || headers.iter().all(|(name, _)| {
-            name.eq_ignore_ascii_case("referer") || name.eq_ignore_ascii_case("user-agent")
-        })
+    kind != PlayerKind::Vlc || headers.is_empty()
 }
 
 pub fn command(
@@ -87,8 +84,13 @@ fn mpv_command(
 
 #[cfg(target_os = "macos")]
 fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
-    let mut command = Command::new("open");
-    command.arg("-a").arg("IINA").arg("--args");
+    let mut command = if Path::new("/Applications/IINA.app").exists() {
+        let mut c = Command::new("open");
+        c.arg("-a").arg("IINA").arg("--args");
+        c
+    } else {
+        Command::new("iina")
+    };
     let mpv = mpv_command(url, subtitle, headers, true);
     command.args(mpv.get_args());
     command

@@ -260,7 +260,7 @@ where
                             downloaded,
                             total: metadata.total,
                             bytes_per_second: if elapsed > 0.0 {
-                                downloaded as f64 / elapsed
+                                downloaded.saturating_sub(offset) as f64 / elapsed
                             } else {
                                 0.0
                             },
@@ -345,7 +345,7 @@ where
 
     let downloaded = Arc::new(AtomicU64::new(initial));
     let (progress_sender, mut progress_receiver) =
-        tokio::sync::mpsc::unbounded_channel::<(u64, usize)>();
+        tokio::sync::mpsc::channel::<(u64, usize)>(64);
     let mut tasks = tokio::task::JoinSet::new();
     let validator = metadata.etag.clone().or(metadata.last_modified.clone());
 
@@ -473,7 +473,7 @@ async fn download_segment(
     total: u64,
     validator: Option<String>,
     cancel: Arc<AtomicBool>,
-    progress: tokio::sync::mpsc::UnboundedSender<(u64, usize)>,
+    progress: tokio::sync::mpsc::Sender<(u64, usize)>,
 ) -> Result<(), DownloadError> {
     let expected = end - start + 1;
     let mut last_error = None;
@@ -539,7 +539,7 @@ async fn download_segment(
                     let bytes = chunk.len().min(remaining as usize);
                     file.write_all(&chunk[..bytes]).await?;
                     written += bytes as u64;
-                    progress.send((bytes as u64, attempt)).ok();
+                    let _ = progress.send((bytes as u64, attempt)).await;
                     if written == expected {
                         file.flush().await?;
                         file.sync_data().await?;
@@ -600,15 +600,19 @@ fn segment_path(destination: &Path, index: usize) -> PathBuf {
 }
 
 fn metadata_matches(previous: &ResumeMetadata, current: &ResumeMetadata) -> bool {
-    previous.total == current.total
-        && previous.segments == current.segments
-        && match (&previous.etag, &current.etag) {
-            (Some(previous), Some(current)) => previous == current,
-            _ => match (&previous.last_modified, &current.last_modified) {
-                (Some(previous), Some(current)) => previous == current,
-                _ => true,
-            },
-        }
+    if previous.total != current.total || previous.segments != current.segments {
+        return false;
+    }
+
+    match (&previous.etag, &current.etag) {
+        (Some(a), Some(b)) => return a == b,
+        _ => {}
+    }
+
+    match (&previous.last_modified, &current.last_modified) {
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
 }
 
 async fn remove_segment_files(destination: &Path) {

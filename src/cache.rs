@@ -62,6 +62,19 @@ pub fn get_cache_dir(subdir: &str) -> PathBuf {
     get_provider_cache_dir(ProviderKind::MovieBox, subdir)
 }
 
+fn hash_key(value: &str) -> String {
+    use md5::{Digest, Md5};
+    let mut hasher = Md5::new();
+    hasher.update(value.as_bytes());
+    let result = hasher.finalize();
+    let mut safe_query = String::with_capacity(32);
+    for b in result {
+        use std::fmt::Write;
+        let _ = write!(&mut safe_query, "{:02x}", b);
+    }
+    safe_query
+}
+
 pub fn get_provider_cache_dir(provider: ProviderKind, subdir: &str) -> PathBuf {
     let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
     path.push("moviebox-tui");
@@ -89,7 +102,8 @@ pub fn get_provider_stream_path(
     } else {
         ""
     };
-    path.push(format!("{schema}{subject_id}_{season}_{episode}.json"));
+    let hashed_id = hash_key(subject_id);
+    path.push(format!("{schema}{hashed_id}_{season}_{episode}.json"));
     path
 }
 
@@ -131,7 +145,8 @@ pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> Pa
     } else {
         ""
     };
-    path.push(format!("details_{schema}{subject_id}.json"));
+    let hashed_id = hash_key(subject_id);
+    path.push(format!("details_{schema}{hashed_id}.json"));
     path
 }
 
@@ -155,16 +170,8 @@ pub fn get_search_path(query: &str) -> PathBuf {
 
 pub fn get_provider_search_path(provider: ProviderKind, query: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(provider, "search");
-    use md5::{Digest, Md5};
-    let mut hasher = Md5::new();
-    hasher.update(query.as_bytes());
-    let result = hasher.finalize();
-    let mut safe_query = String::with_capacity(32);
-    for b in result {
-        use std::fmt::Write;
-        let _ = write!(&mut safe_query, "{:02x}", b);
-    }
-    path.push(format!("search_{}.json", safe_query));
+    let hashed = hash_key(query);
+    path.push(format!("{hashed}.json"));
     path
 }
 

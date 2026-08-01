@@ -1,5 +1,8 @@
 use moviebox_tui::tui::app::App;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 struct TerminalGuard;
 
 impl Drop for TerminalGuard {
