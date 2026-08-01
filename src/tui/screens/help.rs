@@ -100,6 +100,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("    /clear-cache   ", theme.header),
                 Span::styled("Clear App Cache", theme.text),
             ]),
+            Line::from(vec![
+                Span::styled("    /theme         ", theme.header),
+                Span::styled("Change UI Theme", theme.text),
+            ]),
         ]);
     } else {
         help_text.extend(vec![
@@ -168,6 +172,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Line::from(vec![
                 Span::styled("    /clear-cache   ", theme.header),
                 Span::styled("Clear App Cache", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /theme         ", theme.header),
+                Span::styled("Change UI Theme", theme.text),
             ]),
         ]);
     }

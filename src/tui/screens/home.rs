@@ -1158,9 +1158,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 }
 
 fn logo_fade_colors(theme: &Theme) -> ((f32, f32, f32), (f32, f32, f32)) {
-    if theme.is_light {
-        ((172.0, 176.0, 190.0), (136.0, 57.0, 239.0))
-    } else {
-        ((73.0, 76.0, 94.0), (203.0, 166.0, 247.0))
-    }
+    let get_rgb = |style: ratatui::style::Style, default: (f32, f32, f32)| {
+        if let Some(ratatui::style::Color::Rgb(r, g, b)) = style.fg {
+            (r as f32, g as f32, b as f32)
+        } else {
+            default
+        }
+    };
+
+    let start = get_rgb(theme.surface1, (73.0, 76.0, 94.0));
+    let end = get_rgb(theme.title, (203.0, 166.0, 247.0));
+    (start, end)
 }
