@@ -20,7 +20,7 @@ pub enum ThemeKind {
 }
 
 impl ThemeKind {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_ascii_lowercase().as_str() {
             "latte" | "light" => ThemeKind::Latte,
             "macchiato" => ThemeKind::Macchiato,
@@ -197,7 +197,7 @@ impl Theme {
         let is_light = crate::tui::terminal::background_is_light();
 
         if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
-            return Self::from_kind(ThemeKind::from_str(&theme_env));
+            return Self::from_kind(ThemeKind::parse(&theme_env));
         }
 
         if has_no_color {

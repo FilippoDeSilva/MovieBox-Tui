@@ -94,7 +94,7 @@ impl App {
 
         let mut theme = crate::tui::theme::Theme::new();
         if !state.active_theme_kind.is_empty() {
-            let theme_kind = crate::tui::theme::ThemeKind::from_str(&state.active_theme_kind);
+            let theme_kind = crate::tui::theme::ThemeKind::parse(&state.active_theme_kind);
             state.active_theme_kind = theme_kind.as_str().to_string();
             theme = crate::tui::theme::Theme::from_kind(theme_kind);
         } else {
@@ -3209,7 +3209,7 @@ impl App {
                 }
             }
             Action::SelectTheme(theme_name) => {
-                let kind = crate::tui::theme::ThemeKind::from_str(&theme_name);
+                let kind = crate::tui::theme::ThemeKind::parse(&theme_name);
                 self.state.active_theme_kind = kind.as_str().to_string();
                 self.theme = crate::tui::theme::Theme::from_kind(kind);
                 self.state.dirty = true;

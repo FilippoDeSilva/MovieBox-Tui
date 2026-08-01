@@ -604,9 +604,8 @@ fn metadata_matches(previous: &ResumeMetadata, current: &ResumeMetadata) -> bool
         return false;
     }
 
-    match (&previous.etag, &current.etag) {
-        (Some(a), Some(b)) => return a == b,
-        _ => {}
+    if let (Some(a), Some(b)) = (&previous.etag, &current.etag) {
+        return a == b;
     }
 
     match (&previous.last_modified, &current.last_modified) {
