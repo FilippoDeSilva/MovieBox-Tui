@@ -608,13 +608,9 @@ impl App {
 
         loop {
             if self.state.clear_terminal_before_draw {
-                let _ = crossterm::execute!(
-                    std::io::stdout(),
-                    crossterm::terminal::Clear(crossterm::terminal::ClearType::All)
-                );
-                let _ = terminal.draw(|f| {
-                    f.render_widget(ratatui::widgets::Clear, f.area());
-                });
+                terminal.current_buffer_mut().reset();
+                let _ = terminal.backend_mut().clear();
+                terminal.swap_buffers();
                 self.state.clear_terminal_before_draw = false;
                 self.state.dirty = true;
             }
