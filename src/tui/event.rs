@@ -33,6 +33,17 @@ impl EventHandler {
                                     break;
                                 }
                             }
+                            Ok(CrosstermEvent::Mouse(mouse)) => {
+                                match mouse.kind {
+                                    crossterm::event::MouseEventKind::ScrollUp => {
+                                        let _ = event_sender.send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Up, crossterm::event::KeyModifiers::empty())));
+                                    }
+                                    crossterm::event::MouseEventKind::ScrollDown => {
+                                        let _ = event_sender.send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Down, crossterm::event::KeyModifiers::empty())));
+                                    }
+                                    _ => {}
+                                }
+                            }
                             Ok(CrosstermEvent::FocusGained) => {
                                 let _ = event_sender.send(Action::FocusChange);
                             }

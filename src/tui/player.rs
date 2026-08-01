@@ -51,7 +51,11 @@ fn mpv_command(
     headers: &[(String, String)],
     iina: bool,
 ) -> Command {
-    let fallback = if cfg!(target_os = "windows") { "mpv.exe" } else { "mpv" };
+    let fallback = if cfg!(target_os = "windows") {
+        "mpv.exe"
+    } else {
+        "mpv"
+    };
     let executable = mpv_executable().unwrap_or_else(|| fallback.into());
     let mut command = Command::new(executable);
     let prefix = if iina { "--mpv-" } else { "--" };
@@ -96,7 +100,11 @@ fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)])
 }
 
 fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
-    let fallback = if cfg!(target_os = "windows") { "vlc.exe" } else { "vlc" };
+    let fallback = if cfg!(target_os = "windows") {
+        "vlc.exe"
+    } else {
+        "vlc"
+    };
     let executable = vlc_executable().unwrap_or_else(|| fallback.into());
     let mut command = Command::new(executable);
     command.arg("--width=960").arg("--height=540").arg(url);
@@ -116,12 +124,20 @@ fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) 
 }
 
 fn mpv_executable() -> Option<String> {
-    let fallback = if cfg!(target_os = "windows") { "mpv.exe" } else { "mpv" };
+    let fallback = if cfg!(target_os = "windows") {
+        "mpv.exe"
+    } else {
+        "mpv"
+    };
     first_executable(&[MPV_WINDOWS, MPV_MACOS], fallback)
 }
 
 fn vlc_executable() -> Option<String> {
-    let fallback = if cfg!(target_os = "windows") { "vlc.exe" } else { "vlc" };
+    let fallback = if cfg!(target_os = "windows") {
+        "vlc.exe"
+    } else {
+        "vlc"
+    };
     first_executable(&[VLC_WINDOWS, VLC_WINDOWS_X86, VLC_MACOS], fallback)
 }
 

@@ -8,6 +8,7 @@ impl Drop for TerminalGuard {
         let _ = crossterm::execute!(
             std::io::stdout(),
             crossterm::terminal::LeaveAlternateScreen,
+            crossterm::event::DisableMouseCapture,
             crossterm::event::DisableFocusChange
         );
     }
@@ -16,7 +17,10 @@ impl Drop for TerminalGuard {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|arg| arg == "--version" || arg == "-v" || arg == "-V") {
+    if args
+        .iter()
+        .any(|arg| arg == "--version" || arg == "-v" || arg == "-V")
+    {
         println!("moviebox-tui {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
@@ -29,6 +33,7 @@ async fn main() -> std::io::Result<()> {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::EnterAlternateScreen,
+        crossterm::event::EnableMouseCapture,
         crossterm::event::EnableFocusChange
     )?;
 

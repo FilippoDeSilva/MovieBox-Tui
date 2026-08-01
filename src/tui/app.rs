@@ -275,13 +275,8 @@ impl App {
                 .and_then(|pool| pool.episode_index.get(&(se, ep)))
                 .filter(|streams| !streams.is_empty())
                 .cloned();
-            let disk_cached = memory_cached.is_none().then(|| {
-                crate::cache::get_provider_stream_cache(self.state.active_provider, &id, se, ep)
-                    .and_then(|value| value.as_array().cloned())
-            });
-            let cached = memory_cached.or_else(|| disk_cached.flatten());
 
-            if let Some(streams) = cached {
+            if let Some(streams) = memory_cached {
                 if let Some(pool) = self.state.stream_pool.get_mut(&id) {
                     pool.episode_index.insert((se, ep), streams.clone());
                 }
@@ -1742,8 +1737,12 @@ impl App {
                 let context = self.request_context();
                 tokio::spawn(async move {
                     if !force_refresh {
-                        if let Some(cached) =
-                            crate::cache::get_provider_search_cache(context.provider, &query_clone)
+                        let q = query_clone.clone();
+                        let p = context.provider;
+                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                            crate::cache::get_provider_search_cache(p, &q)
+                        })
+                        .await
                         {
                             sender
                                 .send(Action::SearchSuccess {
@@ -1768,11 +1767,12 @@ impl App {
                     };
                     match result {
                         Ok(res) => {
-                            crate::cache::set_provider_search_cache(
-                                context.provider,
-                                &query_clone,
-                                &res,
-                            );
+                            let q = query_clone.clone();
+                            let p = context.provider;
+                            let r = res.clone();
+                            tokio::task::spawn_blocking(move || {
+                                crate::cache::set_provider_search_cache(p, &q, &r);
+                            });
                             sender
                                 .send(Action::SearchSuccess {
                                     context,
@@ -1818,19 +1818,26 @@ impl App {
                 let sender = self.action_sender.clone();
                 let force_refresh = false;
 
-                if !force_refresh {
-                    if let Some(cached) = crate::cache::get_homepage_cache(&tab_id, page) {
-                        sender
-                            .send(Action::HomepageSuccess {
-                                tab_id: tab_id.clone(),
-                                page,
-                                payload: cached,
-                            })
-                            .ok();
-                    }
-                }
-
                 tokio::spawn(async move {
+                    if !force_refresh {
+                        let t_clone = tab_id.clone();
+                        let p_clone = page;
+                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                            crate::cache::get_homepage_cache(&t_clone, p_clone)
+                        })
+                        .await
+                        {
+                            sender
+                                .send(Action::HomepageSuccess {
+                                    tab_id: tab_id.clone(),
+                                    page,
+                                    payload: cached,
+                                })
+                                .ok();
+                            return;
+                        }
+                    }
+
                     match client.get_homepage(&tab_id, page).await {
                         Ok(res) => {
                             let r_clone = res.clone();
@@ -3514,6 +3521,33 @@ impl App {
 
                 let context = self.request_context();
 
+                if !force_refresh {
+                    let id_clone = subject_id.clone();
+                    let prov = context.provider;
+                    let sender = self.action_sender.clone();
+                    let req_id = request_id;
+                    if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                        crate::cache::get_provider_stream_cache(prov, &id_clone, season, episode)
+                            .and_then(|v| v.as_array().cloned())
+                    })
+                    .await
+                    {
+                        tokio::spawn(async move {
+                            sender
+                                .send(Action::EpisodeStreamsReady(
+                                    context,
+                                    req_id,
+                                    subject_id.clone(),
+                                    season,
+                                    episode,
+                                    serde_json::Value::Array(cached),
+                                ))
+                                .ok();
+                        });
+                        return None;
+                    }
+                }
+
                 if context.provider == ProviderKind::FourKHdHub {
                     let sender = self.action_sender.clone();
                     let client = self.fourk_client.clone();
@@ -4082,6 +4116,7 @@ impl App {
             }
             Action::LaunchPlayer(kind, link, sub) => {
                 self.state.player_picker_popup = false;
+                let client = self.client.http_client().clone();
                 tokio::spawn(async move {
                     let mut local_sub = sub.clone();
                     let mut sub_temp_path = None;
@@ -4089,7 +4124,7 @@ impl App {
                         || kind == crate::tui::state::PlayerKind::Iina
                     {
                         if let Some(s_url) = sub {
-                            if let Ok(resp) = reqwest::get(&s_url).await {
+                            if let Ok(resp) = client.get(&s_url).send().await {
                                 if let Ok(bytes) = resp.bytes().await {
                                     let temp_path = std::env::temp_dir().join(format!(
                                         "moviebox_sub_{}.srt",
@@ -4136,6 +4171,7 @@ impl App {
                     self.state.status_timer = 180;
                     return None;
                 }
+                let client = self.client.http_client().clone();
                 tokio::spawn(async move {
                     let mut local_sub = source.subtitle.clone();
                     let mut sub_temp_path = None;
@@ -4143,7 +4179,7 @@ impl App {
                         || kind == crate::tui::state::PlayerKind::Iina
                     {
                         if let Some(s_url) = source.subtitle.as_ref() {
-                            if let Ok(resp) = reqwest::get(s_url).await {
+                            if let Ok(resp) = client.get(s_url).send().await {
                                 if let Ok(bytes) = resp.bytes().await {
                                     let temp_path = std::env::temp_dir().join(format!(
                                         "moviebox_sub_{}.srt",
