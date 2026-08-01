@@ -3963,10 +3963,10 @@ impl App {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                                     } else if let Some(pref_lang) = pref {
                                         let mut sub_url = None;
-                                        if let Some(list) = res.as_array() {
+                                        if let Some(list) = res.get("extCaptions").and_then(|c| c.as_array()) {
                                             for sub in list {
                                                 if let (Some(lang), Some(url)) = (
-                                                    sub.get("language").and_then(|l| l.as_str()),
+                                                    sub.get("lanName").and_then(|l| l.as_str()),
                                                     sub.get("url").and_then(|u| u.as_str()),
                                                 ) {
                                                     if lang == pref_lang {
