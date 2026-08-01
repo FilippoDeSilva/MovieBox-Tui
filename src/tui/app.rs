@@ -83,7 +83,9 @@ impl App {
                     {
                         state.active_provider = ProviderKind::FourKHdHub;
                     }
-                    if let Some(theme_val) = config_json.get("active_theme").and_then(|v| v.as_str()) {
+                    if let Some(theme_val) =
+                        config_json.get("active_theme").and_then(|v| v.as_str())
+                    {
                         state.active_theme_kind = theme_val.to_string();
                     }
                 }
@@ -96,7 +98,6 @@ impl App {
             state.active_theme_kind = theme_kind.as_str().to_string();
             theme = crate::tui::theme::Theme::from_kind(theme_kind);
         } else {
-            
             state.active_theme_kind = "Mocha".to_string();
         }
 
@@ -793,22 +794,38 @@ impl App {
                         KeyCode::Up => {
                             let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
                             let i = match self.state.theme_list_state.selected() {
-                                Some(i) => if i == 0 { max } else { i - 1 },
+                                Some(i) => {
+                                    if i == 0 {
+                                        max
+                                    } else {
+                                        i - 1
+                                    }
+                                }
                                 None => 0,
                             };
                             self.state.theme_list_state.select(Some(i));
                             let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
-                            self.action_sender.send(Action::SelectTheme(selected_theme)).ok();
+                            self.action_sender
+                                .send(Action::SelectTheme(selected_theme))
+                                .ok();
                         }
                         KeyCode::Down => {
                             let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
                             let i = match self.state.theme_list_state.selected() {
-                                Some(i) => if i >= max { 0 } else { i + 1 },
+                                Some(i) => {
+                                    if i >= max {
+                                        0
+                                    } else {
+                                        i + 1
+                                    }
+                                }
                                 None => 0,
                             };
                             self.state.theme_list_state.select(Some(i));
                             let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
-                            self.action_sender.send(Action::SelectTheme(selected_theme)).ok();
+                            self.action_sender
+                                .send(Action::SelectTheme(selected_theme))
+                                .ok();
                         }
                         KeyCode::Enter => {
                             self.state.show_theme_popup = false;
@@ -2752,19 +2769,50 @@ impl App {
                                     if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                         let id_clone = id2.clone();
                                         move || crate::cache::get_image_cache(&id_clone)
-                                    }).await {
-                                        if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                            tx.send(Action::SearchPosterLoaded(id2, Some(std::sync::Arc::new(img)))).ok();
+                                    })
+                                    .await
+                                    {
+                                        if let Ok(Ok(img)) =
+                                            tokio::task::spawn_blocking(move || {
+                                                image::load_from_memory(&bytes)
+                                            })
+                                            .await
+                                        {
+                                            tx.send(Action::SearchPosterLoaded(
+                                                id2,
+                                                Some(std::sync::Arc::new(img)),
+                                            ))
+                                            .ok();
                                             return;
                                         }
                                     }
-                                    if let Ok(resp) = client.get(&cover_url).header("User-Agent", "MovieBox-Tui/1.0").send().await {
+                                    if let Ok(resp) = client
+                                        .get(&cover_url)
+                                        .header("User-Agent", "MovieBox-Tui/1.0")
+                                        .send()
+                                        .await
+                                    {
                                         if let Ok(bytes) = resp.bytes().await {
                                             let bytes_clone = bytes.clone();
                                             let id_clone = id2.clone();
-                                            let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone, &bytes_clone)).await;
-                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                                tx.send(Action::SearchPosterLoaded(id2, Some(std::sync::Arc::new(img)))).ok();
+                                            let _ = tokio::task::spawn_blocking(move || {
+                                                crate::cache::set_image_cache(
+                                                    &id_clone,
+                                                    &bytes_clone,
+                                                )
+                                            })
+                                            .await;
+                                            if let Ok(Ok(img)) =
+                                                tokio::task::spawn_blocking(move || {
+                                                    image::load_from_memory(&bytes)
+                                                })
+                                                .await
+                                            {
+                                                tx.send(Action::SearchPosterLoaded(
+                                                    id2,
+                                                    Some(std::sync::Arc::new(img)),
+                                                ))
+                                                .ok();
                                             }
                                         }
                                     }
@@ -2799,19 +2847,42 @@ impl App {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id2.clone();
                                 move || crate::cache::get_image_cache(&id_clone)
-                            }).await {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                    tx.send(Action::PosterSuccess(id2, std::sync::Arc::new(img))).ok();
+                            })
+                            .await
+                            {
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                    image::load_from_memory(&bytes)
+                                })
+                                .await
+                                {
+                                    tx.send(Action::PosterSuccess(id2, std::sync::Arc::new(img)))
+                                        .ok();
                                     return;
                                 }
                             }
-                            if let Ok(resp) = client.get(&url).header("User-Agent", "MovieBox-Tui/1.0").send().await {
+                            if let Ok(resp) = client
+                                .get(&url)
+                                .header("User-Agent", "MovieBox-Tui/1.0")
+                                .send()
+                                .await
+                            {
                                 if let Ok(bytes) = resp.bytes().await {
                                     let bytes_clone = bytes.clone();
                                     let id_clone = id2.clone();
-                                    let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone, &bytes_clone)).await;
-                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                        tx.send(Action::PosterSuccess(id2, std::sync::Arc::new(img))).ok();
+                                    let _ = tokio::task::spawn_blocking(move || {
+                                        crate::cache::set_image_cache(&id_clone, &bytes_clone)
+                                    })
+                                    .await;
+                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                        image::load_from_memory(&bytes)
+                                    })
+                                    .await
+                                    {
+                                        tx.send(Action::PosterSuccess(
+                                            id2,
+                                            std::sync::Arc::new(img),
+                                        ))
+                                        .ok();
                                     }
                                 }
                             }
@@ -2819,7 +2890,7 @@ impl App {
                     }
                     return None;
                 }
-                
+
                 self.state.preview_loading = true;
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
@@ -2829,18 +2900,23 @@ impl App {
                     if let Ok(Some(cached_disk)) = tokio::task::spawn_blocking({
                         let id_clone = id_clone.clone();
                         move || crate::cache::get_provider_details_cache(prov, &id_clone)
-                    }).await {
-                        sender.send(Action::PreviewSuccess(id_clone, cached_disk)).ok();
+                    })
+                    .await
+                    {
+                        sender
+                            .send(Action::PreviewSuccess(id_clone, cached_disk))
+                            .ok();
                         return;
                     }
-                    
+
                     match client.get_details(&id_clone).await {
                         Ok(details) => {
                             let id_save = id_clone.clone();
                             let det_save = details.clone();
                             let _ = tokio::task::spawn_blocking(move || {
                                 crate::cache::set_provider_details_cache(prov, &id_save, &det_save)
-                            }).await;
+                            })
+                            .await;
                             sender.send(Action::PreviewSuccess(id_clone, details)).ok();
                         }
                         Err(e) => {
@@ -2890,20 +2966,46 @@ impl App {
                         if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                             let id_clone = id_clone.clone();
                             move || crate::cache::get_image_cache(&id_clone)
-                        }).await {
-                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                        })
+                        .await
+                        {
+                            if let Ok(Ok(img)) =
+                                tokio::task::spawn_blocking(move || image::load_from_memory(&bytes))
+                                    .await
+                            {
+                                let _ = action_tx.send(Action::PosterSuccess(
+                                    id_clone,
+                                    std::sync::Arc::new(img),
+                                ));
                                 return;
                             }
                         }
-                        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).build().unwrap_or_default();
-                        if let Ok(resp) = client.get(&url_clone).header("User-Agent", "MovieBox-Tui/1.0").send().await {
+                        let client = reqwest::Client::builder()
+                            .timeout(std::time::Duration::from_secs(5))
+                            .build()
+                            .unwrap_or_default();
+                        if let Ok(resp) = client
+                            .get(&url_clone)
+                            .header("User-Agent", "MovieBox-Tui/1.0")
+                            .send()
+                            .await
+                        {
                             if let Ok(bytes) = resp.bytes().await {
                                 let bytes_clone = bytes.clone();
                                 let id_clone2 = id_clone.clone();
-                                let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone2, &bytes_clone)).await;
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    crate::cache::set_image_cache(&id_clone2, &bytes_clone)
+                                })
+                                .await;
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                    image::load_from_memory(&bytes)
+                                })
+                                .await
+                                {
+                                    let _ = action_tx.send(Action::PosterSuccess(
+                                        id_clone,
+                                        std::sync::Arc::new(img),
+                                    ));
                                 }
                             }
                         }
@@ -3339,20 +3441,44 @@ impl App {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id_clone.clone();
                                 move || crate::cache::get_image_cache(&id_clone)
-                            }).await {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                            })
+                            .await
+                            {
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                    image::load_from_memory(&bytes)
+                                })
+                                .await
+                                {
+                                    let _ = action_tx.send(Action::PosterSuccess(
+                                        id_clone,
+                                        std::sync::Arc::new(img),
+                                    ));
                                     return;
                                 }
                             }
                             let client = reqwest::Client::new();
-                            if let Ok(resp) = client.get(&url_clone).header("User-Agent", "MovieBox-Tui/1.0").send().await {
+                            if let Ok(resp) = client
+                                .get(&url_clone)
+                                .header("User-Agent", "MovieBox-Tui/1.0")
+                                .send()
+                                .await
+                            {
                                 if let Ok(bytes) = resp.bytes().await {
                                     let bytes_clone = bytes.clone();
                                     let id_clone2 = id_clone.clone();
-                                    let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone2, &bytes_clone)).await;
-                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
-                                        let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                                    let _ = tokio::task::spawn_blocking(move || {
+                                        crate::cache::set_image_cache(&id_clone2, &bytes_clone)
+                                    })
+                                    .await;
+                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
+                                        image::load_from_memory(&bytes)
+                                    })
+                                    .await
+                                    {
+                                        let _ = action_tx.send(Action::PosterSuccess(
+                                            id_clone,
+                                            std::sync::Arc::new(img),
+                                        ));
                                     }
                                 }
                             }
@@ -4032,7 +4158,9 @@ impl App {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                                     } else if let Some(pref_lang) = pref {
                                         let mut sub_url = None;
-                                        if let Some(list) = res.get("extCaptions").and_then(|c| c.as_array()) {
+                                        if let Some(list) =
+                                            res.get("extCaptions").and_then(|c| c.as_array())
+                                        {
                                             for sub in list {
                                                 if let (Some(lang), Some(url)) = (
                                                     sub.get("lanName").and_then(|l| l.as_str()),

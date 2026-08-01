@@ -6,7 +6,7 @@ pub const AVAILABLE_THEMES: [&str; 6] = [
     "Macchiato",
     "Frappe",
     "Nord",
-    "TokyoNight"
+    "TokyoNight",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,7 +30,7 @@ impl ThemeKind {
             _ => ThemeKind::Mocha,
         }
     }
-    
+
     pub fn as_str(&self) -> &'static str {
         match self {
             ThemeKind::Mocha => "Mocha",
@@ -339,15 +339,23 @@ impl Theme {
             border_focus: Style::default().fg(cp(138, 173, 244)),
             text: Style::default().fg(cp(202, 211, 245)),
             text_dim: Style::default().fg(cp(165, 173, 203)),
-            title: Style::default().fg(cp(198, 160, 246)).add_modifier(Modifier::BOLD),
-            highlight: Style::default().fg(cp(138, 173, 244)).add_modifier(Modifier::BOLD),
-            header: Style::default().fg(cp(245, 189, 230)).add_modifier(Modifier::BOLD),
+            title: Style::default()
+                .fg(cp(198, 160, 246))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(138, 173, 244))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(245, 189, 230))
+                .add_modifier(Modifier::BOLD),
             error: Style::default().fg(cp(237, 135, 150)),
             success: Style::default().fg(cp(166, 218, 149)),
             shortcut: Style::default().fg(cp(245, 169, 127)),
             overlay: Style::default().fg(cp(110, 115, 141)),
             rating: Style::default().fg(cp(238, 212, 159)),
-            accent: Style::default().fg(cp(125, 196, 228)).add_modifier(Modifier::BOLD),
+            accent: Style::default()
+                .fg(cp(125, 196, 228))
+                .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(cp(91, 96, 120)),
             teal: Style::default().fg(cp(139, 213, 202)),
             lavender: Style::default().fg(cp(183, 189, 248)),
@@ -376,15 +384,23 @@ impl Theme {
             border_focus: Style::default().fg(cp(140, 170, 238)),
             text: Style::default().fg(cp(198, 208, 245)),
             text_dim: Style::default().fg(cp(165, 173, 206)),
-            title: Style::default().fg(cp(202, 158, 230)).add_modifier(Modifier::BOLD),
-            highlight: Style::default().fg(cp(140, 170, 238)).add_modifier(Modifier::BOLD),
-            header: Style::default().fg(cp(244, 184, 228)).add_modifier(Modifier::BOLD),
+            title: Style::default()
+                .fg(cp(202, 158, 230))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(140, 170, 238))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(244, 184, 228))
+                .add_modifier(Modifier::BOLD),
             error: Style::default().fg(cp(231, 130, 132)),
             success: Style::default().fg(cp(166, 209, 137)),
             shortcut: Style::default().fg(cp(239, 159, 118)),
             overlay: Style::default().fg(cp(115, 121, 148)),
             rating: Style::default().fg(cp(229, 200, 144)),
-            accent: Style::default().fg(cp(129, 200, 190)).add_modifier(Modifier::BOLD),
+            accent: Style::default()
+                .fg(cp(129, 200, 190))
+                .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(cp(98, 104, 128)),
             teal: Style::default().fg(cp(129, 200, 190)),
             lavender: Style::default().fg(cp(186, 187, 241)),
@@ -413,15 +429,23 @@ impl Theme {
             border_focus: Style::default().fg(cp(136, 192, 208)),
             text: Style::default().fg(cp(216, 222, 233)),
             text_dim: Style::default().fg(cp(146, 153, 163)),
-            title: Style::default().fg(cp(180, 142, 173)).add_modifier(Modifier::BOLD),
-            highlight: Style::default().fg(cp(136, 192, 208)).add_modifier(Modifier::BOLD),
-            header: Style::default().fg(cp(163, 190, 140)).add_modifier(Modifier::BOLD),
+            title: Style::default()
+                .fg(cp(180, 142, 173))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(136, 192, 208))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(163, 190, 140))
+                .add_modifier(Modifier::BOLD),
             error: Style::default().fg(cp(191, 97, 106)),
             success: Style::default().fg(cp(163, 190, 140)),
             shortcut: Style::default().fg(cp(208, 135, 112)),
             overlay: Style::default().fg(cp(76, 86, 106)),
             rating: Style::default().fg(cp(235, 203, 139)),
-            accent: Style::default().fg(cp(143, 188, 187)).add_modifier(Modifier::BOLD),
+            accent: Style::default()
+                .fg(cp(143, 188, 187))
+                .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(cp(67, 76, 94)),
             teal: Style::default().fg(cp(143, 188, 187)),
             lavender: Style::default().fg(cp(129, 161, 193)),
@@ -450,15 +474,23 @@ impl Theme {
             border_focus: Style::default().fg(cp(122, 162, 247)),
             text: Style::default().fg(cp(192, 202, 245)),
             text_dim: Style::default().fg(cp(169, 177, 214)),
-            title: Style::default().fg(cp(187, 154, 247)).add_modifier(Modifier::BOLD),
-            highlight: Style::default().fg(cp(122, 162, 247)).add_modifier(Modifier::BOLD),
-            header: Style::default().fg(cp(255, 158, 100)).add_modifier(Modifier::BOLD),
+            title: Style::default()
+                .fg(cp(187, 154, 247))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(122, 162, 247))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(255, 158, 100))
+                .add_modifier(Modifier::BOLD),
             error: Style::default().fg(cp(247, 118, 142)),
             success: Style::default().fg(cp(158, 206, 106)),
             shortcut: Style::default().fg(cp(255, 158, 100)),
             overlay: Style::default().fg(cp(86, 95, 137)),
             rating: Style::default().fg(cp(224, 175, 104)),
-            accent: Style::default().fg(cp(42, 203, 213)).add_modifier(Modifier::BOLD),
+            accent: Style::default()
+                .fg(cp(42, 203, 213))
+                .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(cp(41, 46, 66)),
             teal: Style::default().fg(cp(115, 218, 202)),
             lavender: Style::default().fg(cp(187, 154, 247)),
