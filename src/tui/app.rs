@@ -83,13 +83,26 @@ impl App {
                     {
                         state.active_provider = ProviderKind::FourKHdHub;
                     }
+                    if let Some(theme_val) = config_json.get("active_theme").and_then(|v| v.as_str()) {
+                        state.active_theme_kind = theme_val.to_string();
+                    }
                 }
             }
         }
 
+        let mut theme = crate::tui::theme::Theme::new();
+        if !state.active_theme_kind.is_empty() {
+            let theme_kind = crate::tui::theme::ThemeKind::from_str(&state.active_theme_kind);
+            state.active_theme_kind = theme_kind.as_str().to_string();
+            theme = crate::tui::theme::Theme::from_kind(theme_kind);
+        } else {
+            
+            state.active_theme_kind = "Mocha".to_string();
+        }
+
         Self {
+            theme,
             state,
-            theme: Theme::new(),
             client: MovieBoxClient::new(),
             fourk_client: FourKHdHubClient::new(),
             action_sender,
@@ -116,7 +129,8 @@ impl App {
             let config = serde_json::json!({
                 "auto_update": self.state.auto_update,
                 "last_update_check": self.state.last_update_check,
-                "active_provider": self.state.active_provider.cache_key()
+                "active_provider": self.state.active_provider.cache_key(),
+                "active_theme": self.state.active_theme_kind
             });
             let _ = std::fs::write(app_dir.join("config.json"), config.to_string());
         }
@@ -768,6 +782,40 @@ impl App {
 
                 if key.code == KeyCode::F(1) {
                     self.action_sender.send(Action::ToggleHelp).ok();
+                    return None;
+                }
+
+                if self.state.show_theme_popup {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.state.show_theme_popup = false;
+                        }
+                        KeyCode::Up => {
+                            let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
+                            let i = match self.state.theme_list_state.selected() {
+                                Some(i) => if i == 0 { max } else { i - 1 },
+                                None => 0,
+                            };
+                            self.state.theme_list_state.select(Some(i));
+                            let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
+                            self.action_sender.send(Action::SelectTheme(selected_theme)).ok();
+                        }
+                        KeyCode::Down => {
+                            let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
+                            let i = match self.state.theme_list_state.selected() {
+                                Some(i) => if i >= max { 0 } else { i + 1 },
+                                None => 0,
+                            };
+                            self.state.theme_list_state.select(Some(i));
+                            let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
+                            self.action_sender.send(Action::SelectTheme(selected_theme)).ok();
+                        }
+                        KeyCode::Enter => {
+                            self.state.show_theme_popup = false;
+                            self.persist_config();
+                        }
+                        _ => {}
+                    }
                     return None;
                 }
 
@@ -1567,6 +1615,12 @@ impl App {
                     self.state.update_available = None;
                     self.state.manual_update_check = true;
                     self.action_sender.send(Action::CheckForUpdates).ok();
+                    return None;
+                }
+                if lower_query == "/theme" || lower_query == "/themes" {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.action_sender.send(Action::ToggleThemePopup).ok();
                     return None;
                 }
                 if lower_query == "/toggle-update" {
@@ -3039,6 +3093,25 @@ impl App {
                     self.action_sender.send(Action::DownloadStream(None)).ok();
                 }
             }
+            Action::ToggleThemePopup => {
+                self.state.show_theme_popup = !self.state.show_theme_popup;
+                if self.state.show_theme_popup {
+                    if let Some(idx) = crate::tui::theme::AVAILABLE_THEMES
+                        .iter()
+                        .position(|&t| t.eq_ignore_ascii_case(&self.state.active_theme_kind))
+                    {
+                        self.state.theme_list_state.select(Some(idx));
+                    } else {
+                        self.state.theme_list_state.select(Some(0));
+                    }
+                }
+            }
+            Action::SelectTheme(theme_name) => {
+                let kind = crate::tui::theme::ThemeKind::from_str(&theme_name);
+                self.state.active_theme_kind = kind.as_str().to_string();
+                self.theme = crate::tui::theme::Theme::from_kind(kind);
+                self.state.dirty = true;
+            }
             Action::LaunchMpv(link, subtitle_url) => {
                 let player = self.state.available_players.first().cloned();
                 match player {
@@ -4388,6 +4461,26 @@ impl App {
                 crate::tui::clear_area(frame, dl_area, &self.theme);
                 frame.render_widget(gauge, dl_area);
             }
+        }
+
+        if self.state.show_theme_popup {
+            let items: Vec<String> = crate::tui::theme::AVAILABLE_THEMES
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            crate::tui::overlay::picker(
+                frame,
+                area,
+                &items,
+                &mut self.state.theme_list_state,
+                crate::tui::overlay::PickerSpec {
+                    title: "Select Theme",
+                    confirm_label: "Apply",
+                    minimum_width: 32,
+                },
+                &self.theme,
+                self.state.basic_terminal,
+            );
         }
 
         crate::tui::overlay::notifications(

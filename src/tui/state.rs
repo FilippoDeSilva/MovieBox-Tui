@@ -98,6 +98,11 @@ pub struct AppState {
 
     pub tick_count: u64,
     pub poster_image: Option<image::DynamicImage>,
+
+    pub show_theme_popup: bool,
+    pub active_theme_kind: String,
+    pub theme_list_state: ListState,
+
     pub poster_protocol: Option<(ratatui::layout::Rect, ratatui_image::protocol::Protocol)>,
     pub image_picker: Option<ratatui_image::picker::Picker>,
     pub image_supported: bool,
@@ -203,6 +208,9 @@ impl Default for AppState {
             preview_loading: false,
             tick_count: 0,
             poster_image: None,
+            active_theme_kind: String::new(),
+            show_theme_popup: false,
+            theme_list_state: ListState::default(),
             poster_protocol: None,
             image_picker: None,
             image_supported: crate::tui::terminal::should_query_images(),

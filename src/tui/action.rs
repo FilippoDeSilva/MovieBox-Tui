@@ -53,6 +53,8 @@ pub enum Action {
     PlayStream(bool),
     ShowSubtitlePopup(String, serde_json::Value, bool),
     ShowDownloadSubtitlePopup(serde_json::Value),
+    ToggleThemePopup,
+    SelectTheme(String),
     LaunchMpv(String, Option<String>),
     PlayersDetected(Vec<crate::tui::state::PlayerKind>),
     DownloadStream(Option<String>),
