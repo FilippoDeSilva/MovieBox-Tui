@@ -2772,13 +2772,28 @@ impl App {
                     }
                     return None;
                 }
+                
                 self.state.preview_loading = true;
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
+                let prov = self.state.active_provider;
                 tokio::spawn(async move {
+                    if let Ok(Some(cached_disk)) = tokio::task::spawn_blocking({
+                        let id_clone = id_clone.clone();
+                        move || crate::cache::get_provider_details_cache(prov, &id_clone)
+                    }).await {
+                        sender.send(Action::PreviewSuccess(id_clone, cached_disk)).ok();
+                        return;
+                    }
+                    
                     match client.get_details(&id_clone).await {
                         Ok(details) => {
+                            let id_save = id_clone.clone();
+                            let det_save = details.clone();
+                            let _ = tokio::task::spawn_blocking(move || {
+                                crate::cache::set_provider_details_cache(prov, &id_save, &det_save)
+                            }).await;
                             sender.send(Action::PreviewSuccess(id_clone, details)).ok();
                         }
                         Err(e) => {
