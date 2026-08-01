@@ -311,3 +311,54 @@ pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
     let path = get_homepage_path(tab_id, page);
     write_json_cache(&path, data);
 }
+
+pub fn get_image_path(id: &str) -> PathBuf {
+    let mut path = get_cache_dir("images");
+    use md5::{Digest, Md5};
+    let mut hasher = Md5::new();
+    hasher.update(id.as_bytes());
+    let result = hasher.finalize();
+    let mut safe_name = String::with_capacity(32);
+    for b in result {
+        use std::fmt::Write;
+        let _ = write!(&mut safe_name, "{:02x}", b);
+    }
+    path.push(format!("{safe_name}.img"));
+    path
+}
+
+pub fn get_image_cache(id: &str) -> Option<Vec<u8>> {
+    let path = get_image_path(id);
+    if path.exists() {
+        if let Ok(metadata) = std::fs::metadata(&path) {
+            if let Ok(modified) = metadata.modified() {
+                if let Ok(elapsed) = modified.elapsed() {
+                    if elapsed.as_secs() > CACHE_EXPIRY_SECS {
+                        let _ = std::fs::remove_file(&path);
+                        return None;
+                    }
+                }
+            }
+        }
+        return std::fs::read(&path).ok();
+    }
+    None
+}
+
+pub fn set_image_cache(id: &str, bytes: &[u8]) {
+    let path = get_image_path(id);
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
+    if std::fs::write(&temporary, bytes).is_err() {
+        return;
+    }
+    if std::fs::rename(&temporary, &path).is_err() {
+        let _ = std::fs::remove_file(&path);
+        if std::fs::rename(&temporary, &path).is_err() {
+            let _ = std::fs::remove_file(temporary);
+        }
+    }
+}

@@ -2699,24 +2699,22 @@ impl App {
                                 let client = self.client.http_client().clone();
                                 let id2 = id.clone();
                                 tokio::spawn(async move {
-                                    if let Ok(resp) = client
-                                        .get(&cover_url)
-                                        .header("User-Agent", "MovieBox-Tui/1.0")
-                                        .send()
-                                        .await
-                                    {
+                                    if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
+                                        let id_clone = id2.clone();
+                                        move || crate::cache::get_image_cache(&id_clone)
+                                    }).await {
+                                        if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                            tx.send(Action::SearchPosterLoaded(id2, Some(std::sync::Arc::new(img)))).ok();
+                                            return;
+                                        }
+                                    }
+                                    if let Ok(resp) = client.get(&cover_url).header("User-Agent", "MovieBox-Tui/1.0").send().await {
                                         if let Ok(bytes) = resp.bytes().await {
-                                            if let Ok(Ok(img)) =
-                                                tokio::task::spawn_blocking(move || {
-                                                    image::load_from_memory(&bytes)
-                                                })
-                                                .await
-                                            {
-                                                tx.send(Action::SearchPosterLoaded(
-                                                    id2,
-                                                    Some(std::sync::Arc::new(img)),
-                                                ))
-                                                .ok();
+                                            let bytes_clone = bytes.clone();
+                                            let id_clone = id2.clone();
+                                            let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone, &bytes_clone)).await;
+                                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                                tx.send(Action::SearchPosterLoaded(id2, Some(std::sync::Arc::new(img)))).ok();
                                             }
                                         }
                                     }
@@ -2748,23 +2746,22 @@ impl App {
                         let id2 = id.clone();
                         let client = self.client.http_client().clone();
                         tokio::spawn(async move {
-                            if let Ok(resp) = client
-                                .get(&url)
-                                .header("User-Agent", "MovieBox-Tui/1.0")
-                                .send()
-                                .await
-                            {
+                            if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
+                                let id_clone = id2.clone();
+                                move || crate::cache::get_image_cache(&id_clone)
+                            }).await {
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                    tx.send(Action::PosterSuccess(id2, std::sync::Arc::new(img))).ok();
+                                    return;
+                                }
+                            }
+                            if let Ok(resp) = client.get(&url).header("User-Agent", "MovieBox-Tui/1.0").send().await {
                                 if let Ok(bytes) = resp.bytes().await {
-                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                        image::load_from_memory(&bytes)
-                                    })
-                                    .await
-                                    {
-                                        tx.send(Action::PosterSuccess(
-                                            id2,
-                                            std::sync::Arc::new(img),
-                                        ))
-                                        .ok();
+                                    let bytes_clone = bytes.clone();
+                                    let id_clone = id2.clone();
+                                    let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone, &bytes_clone)).await;
+                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                        tx.send(Action::PosterSuccess(id2, std::sync::Arc::new(img))).ok();
                                     }
                                 }
                             }
@@ -2840,26 +2837,23 @@ impl App {
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
                     tokio::spawn(async move {
-                        let client = reqwest::Client::builder()
-                            .timeout(std::time::Duration::from_secs(5))
-                            .build()
-                            .unwrap_or_default();
-                        if let Ok(resp) = client
-                            .get(&url_clone)
-                            .header("User-Agent", "MovieBox-Tui/1.0")
-                            .send()
-                            .await
-                        {
+                        if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
+                            let id_clone = id_clone.clone();
+                            move || crate::cache::get_image_cache(&id_clone)
+                        }).await {
+                            if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                                return;
+                            }
+                        }
+                        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).build().unwrap_or_default();
+                        if let Ok(resp) = client.get(&url_clone).header("User-Agent", "MovieBox-Tui/1.0").send().await {
                             if let Ok(bytes) = resp.bytes().await {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                    image::load_from_memory(&bytes)
-                                })
-                                .await
-                                {
-                                    let _ = action_tx.send(Action::PosterSuccess(
-                                        id_clone,
-                                        std::sync::Arc::new(img),
-                                    ));
+                                let bytes_clone = bytes.clone();
+                                let id_clone2 = id_clone.clone();
+                                let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone2, &bytes_clone)).await;
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
                                 }
                             }
                         }
@@ -3273,23 +3267,23 @@ impl App {
                         let action_tx = self.action_sender.clone();
                         let id_clone = id.clone();
                         tokio::spawn(async move {
+                            if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
+                                let id_clone = id_clone.clone();
+                                move || crate::cache::get_image_cache(&id_clone)
+                            }).await {
+                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
+                                    return;
+                                }
+                            }
                             let client = reqwest::Client::new();
-                            if let Ok(resp) = client
-                                .get(&url_clone)
-                                .header("User-Agent", "MovieBox-Tui/1.0")
-                                .send()
-                                .await
-                            {
+                            if let Ok(resp) = client.get(&url_clone).header("User-Agent", "MovieBox-Tui/1.0").send().await {
                                 if let Ok(bytes) = resp.bytes().await {
-                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                        image::load_from_memory(&bytes)
-                                    })
-                                    .await
-                                    {
-                                        let _ = action_tx.send(Action::PosterSuccess(
-                                            id_clone,
-                                            std::sync::Arc::new(img),
-                                        ));
+                                    let bytes_clone = bytes.clone();
+                                    let id_clone2 = id_clone.clone();
+                                    let _ = tokio::task::spawn_blocking(move || crate::cache::set_image_cache(&id_clone2, &bytes_clone)).await;
+                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || image::load_from_memory(&bytes)).await {
+                                        let _ = action_tx.send(Action::PosterSuccess(id_clone, std::sync::Arc::new(img)));
                                     }
                                 }
                             }
