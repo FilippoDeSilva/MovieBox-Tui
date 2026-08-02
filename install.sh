@@ -58,7 +58,7 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 log_info "Downloading $FILE..."
-if ! curl -fSL --progress-bar "$URL" -o "$TMP_DIR/$FILE"; then
+if ! curl -fSL "$URL" -o "$TMP_DIR/$FILE"; then
     log_err "Download failed. Please check your internet connection."
 fi
 
