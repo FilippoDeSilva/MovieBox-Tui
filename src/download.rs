@@ -250,8 +250,8 @@ where
                 return Ok(DownloadOutcome::Paused { bytes: downloaded });
             }
 
-            match response.chunk().await {
-                Ok(Some(chunk)) => {
+            match tokio::time::timeout(Duration::from_secs(30), response.chunk()).await {
+                Ok(Ok(Some(chunk))) => {
                     file.write_all(&chunk).await?;
                     downloaded += chunk.len() as u64;
                     if last_report.elapsed() >= Duration::from_millis(200) {
@@ -270,7 +270,7 @@ where
                         last_report = Instant::now();
                     }
                 }
-                Ok(None) => {
+                Ok(Ok(None)) => {
                     file.flush().await?;
                     file.sync_data().await?;
                     if let Some(expected) = metadata.total
@@ -297,9 +297,14 @@ where
                     finalize(&partial, &metadata_path, destination).await?;
                     return Ok(DownloadOutcome::Completed { bytes: downloaded });
                 }
-                Err(error) => {
+                Ok(Err(error)) => {
                     file.flush().await?;
                     last_error = Some(DownloadError::Network(error));
+                    break;
+                }
+                Err(_) => {
+                    file.flush().await?;
+                    last_error = Some(DownloadError::InvalidRange("read timeout".into()));
                     break;
                 }
             }
@@ -344,8 +349,7 @@ where
     }
 
     let downloaded = Arc::new(AtomicU64::new(initial));
-    let (progress_sender, mut progress_receiver) =
-        tokio::sync::mpsc::channel::<(u64, usize)>(64);
+    let (progress_sender, mut progress_receiver) = tokio::sync::mpsc::channel::<(u64, usize)>(64);
     let mut tasks = tokio::task::JoinSet::new();
     let validator = metadata.etag.clone().or(metadata.last_modified.clone());
 
@@ -533,8 +537,8 @@ async fn download_segment(
                 file.flush().await?;
                 return Err(DownloadError::Paused);
             }
-            match response.chunk().await {
-                Ok(Some(chunk)) => {
+            match tokio::time::timeout(Duration::from_secs(30), response.chunk()).await {
+                Ok(Ok(Some(chunk))) => {
                     let remaining = expected - written;
                     let bytes = chunk.len().min(remaining as usize);
                     file.write_all(&chunk[..bytes]).await?;
@@ -546,7 +550,7 @@ async fn download_segment(
                         return Ok(());
                     }
                 }
-                Ok(None) => {
+                Ok(Ok(None)) => {
                     file.flush().await?;
                     last_error = Some(DownloadError::Incomplete {
                         downloaded: written,
@@ -554,9 +558,14 @@ async fn download_segment(
                     });
                     break;
                 }
-                Err(error) => {
+                Ok(Err(error)) => {
                     file.flush().await?;
                     last_error = Some(DownloadError::Network(error));
+                    break;
+                }
+                Err(_) => {
+                    file.flush().await?;
+                    last_error = Some(DownloadError::InvalidRange("read timeout".into()));
                     break;
                 }
             }

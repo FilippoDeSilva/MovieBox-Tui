@@ -6,7 +6,7 @@ function Write-Success { param([string]$Message) Write-Host "$Message" -Foregrou
 function Write-Warn { param([string]$Message) Write-Host "WARNING: $Message" -ForegroundColor Yellow }
 function Write-Err { param([string]$Message) Write-Host "ERROR: $Message" -ForegroundColor Red; exit 1 }
 
-$InstallDir = "$env:USERPROFILE\AppData\Local\MovieBox-Tui"
+$InstallDir = "$env:LOCALAPPDATA\MovieBox-Tui"
 $ExePath = "$InstallDir\moviebox-tui.exe"
 $ZipFile = "$env:TEMP\MovieBox_Windows_x64.zip"
 

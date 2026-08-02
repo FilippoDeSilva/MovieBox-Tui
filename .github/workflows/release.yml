@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    name: Check Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      is_new: ${{ steps.check.outputs.is_new }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version from Cargo.toml
+        id: check
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          if gh release view "v$VERSION" &>/dev/null; then
+            echo "is_new=false" >> $GITHUB_OUTPUT
+            echo "Release v$VERSION already exists. Skipping build."
+          else
+            echo "is_new=true" >> $GITHUB_OUTPUT
+            echo "New version v$VERSION detected."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: check-version
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross-compilation tools
+        if: matrix.os == 'ubuntu-latest' && matrix.target == 'aarch64-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Binary
+        run: |
+          if [ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          cargo build --release --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Archive Unix
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir dist
+          cp target/${{ matrix.target }}/release/moviebox-tui dist/
+          cp README.md dist/
+          cp LICENSE-* dist/ || true
+          
+          if [ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]; then
+            tar -czvf MovieBox_Linux_x64.tar.gz -C dist .
+          elif [ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]; then
+            tar -czvf MovieBox_Linux_arm64.tar.gz -C dist .
+          else
+            tar -czvf moviebox-tui-${{ matrix.target }}.tar.gz -C dist .
+          fi
+
+      - name: Archive Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir dist
+          cp target\${{ matrix.target }}\release\moviebox-tui.exe dist\
+          cp README.md dist\
+          cp LICENSE-* dist\ || echo "No license files found"
+          Compress-Archive -Path dist\* -DestinationPath MovieBox_Windows_x64.zip
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: |
+            *.tar.gz
+            *.zip
+
+  build-macos-universal:
+    name: Build macOS Universal
+    needs: [check-version, build]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-x86_64-apple-darwin
+          path: x86_64
+
+      - name: Download aarch64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-aarch64-apple-darwin
+          path: aarch64
+
+      - name: Create Universal Binary
+        run: |
+          mkdir -p universal/dist
+          tar -xzf x86_64/moviebox-tui-x86_64-apple-darwin.tar.gz -C x86_64/
+          tar -xzf aarch64/moviebox-tui-aarch64-apple-darwin.tar.gz -C aarch64/
+          lipo -create -output universal/dist/moviebox-tui x86_64/moviebox-tui aarch64/moviebox-tui
+          cp README.md universal/dist/
+          cp LICENSE-* universal/dist/ || true
+          cd universal/dist
+          tar -czvf ../../MovieBox_macOS_Universal.tar.gz .
+
+      - name: Upload Universal Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-universal-apple-darwin
+          path: MovieBox_macOS_Universal.tar.gz
+
+  release:
+    name: Create Release
+    needs: [check-version, build, build-macos-universal]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Generate Release Notes and Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.check-version.outputs.version }}"
+          name: "MovieBox TUI v${{ needs.check-version.outputs.version }}"
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip

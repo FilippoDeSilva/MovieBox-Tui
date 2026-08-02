@@ -29,26 +29,24 @@ impl EventHandler {
                         match event {
                             Ok(CrosstermEvent::Key(key)) => {
                                 let is_press = key.kind == KeyEventKind::Press;
-                                if is_press && event_sender.send(Action::Key(key)).await.is_err() {
-                                    break;
-                                }
+                                if is_press && event_sender.try_send(Action::Key(key)).is_err() {}
                             }
                             Ok(CrosstermEvent::Mouse(mouse)) => {
                                 match mouse.kind {
                                     crossterm::event::MouseEventKind::ScrollUp => {
-                                        let _ = event_sender.send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Up, crossterm::event::KeyModifiers::empty()))).await;
+                                        let _ = event_sender.try_send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Up, crossterm::event::KeyModifiers::empty())));
                                     }
                                     crossterm::event::MouseEventKind::ScrollDown => {
-                                        let _ = event_sender.send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Down, crossterm::event::KeyModifiers::empty()))).await;
+                                        let _ = event_sender.try_send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Down, crossterm::event::KeyModifiers::empty())));
                                     }
                                     _ => {}
                                 }
                             }
-                            Ok(CrosstermEvent::FocusGained) => {
-                                let _ = event_sender.send(Action::FocusChange).await;
+                            Ok(CrosstermEvent::FocusGained) | Ok(CrosstermEvent::FocusLost) => {
+                                let _ = event_sender.try_send(Action::FocusChange);
                             }
-                            Ok(CrosstermEvent::Resize(w, h)) if event_sender.send(Action::Resize(w, h)).await.is_err() => {
-                                break;
+                            Ok(CrosstermEvent::Resize(w, h)) => {
+                                let _ = event_sender.try_send(Action::Resize(w, h));
                             }
                             _ => {}
                         }

@@ -78,7 +78,11 @@ impl MovieBoxClient {
         let path = "/wefeed-mobile-bff/tab-operating?page=1&tabId=0&version=";
         let _ = self.get(path).await?;
 
-        let has_token = self.runtime_token.read().unwrap().is_some();
+        let has_token = self
+            .runtime_token
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_some();
         if !has_token {
             return Err(ScraperError::MissingToken);
         }
@@ -99,7 +103,10 @@ impl MovieBoxClient {
             return;
         };
         if !token.is_empty() {
-            let mut write_token = self.runtime_token.write().unwrap();
+            let mut write_token = self
+                .runtime_token
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             *write_token = Some(token.to_string());
         }
     }
@@ -129,7 +136,11 @@ impl MovieBoxClient {
             let base = HOST_POOL[idx];
             let url = format!("{}{}", base, path_and_query);
 
-            let token = self.runtime_token.read().unwrap().clone();
+            let token = self
+                .runtime_token
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
             let headers = build_signed_headers(
                 method,
                 &url,
@@ -185,12 +196,12 @@ impl MovieBoxClient {
         };
 
         let body_val: Value =
-            match tokio::task::spawn_blocking(move || serde_json::from_str(&raw_text))
-                .await
-                .unwrap()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(ScraperError::Json(e)),
+            match tokio::task::spawn_blocking(move || serde_json::from_str(&raw_text)).await {
+                Ok(Ok(v)) => v,
+                Ok(Err(e)) => return Err(ScraperError::Json(e)),
+                Err(_) => {
+                    return Err(ScraperError::HostsExhausted);
+                }
             };
 
         if let Some(data) = body_val.get("data") {

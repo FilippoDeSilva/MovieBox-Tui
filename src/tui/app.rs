@@ -437,6 +437,7 @@ impl App {
             .to_ascii_lowercase();
 
         let base_dir = dirs::download_dir()
+            .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
             .unwrap_or_else(|| std::path::PathBuf::from("."))
             .join("MovieBox-TUI");
         let (target_dir, base_name) = if media_type == 2 {
@@ -3369,6 +3370,9 @@ impl App {
 
                     let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
 
+                    self.state.selected_resources = None;
+                    self.state.is_fetching_streams = true;
+
                     self.action_sender
                         .send(Action::FetchEpisodeStreams {
                             subject_id,
@@ -4358,14 +4362,19 @@ impl App {
                         use std::os::unix::process::CommandExt;
                         cmd.process_group(0);
                     }
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000);
+                    }
 
-                    let _ = cmd.spawn();
-
-                    if let Some(path) = sub_temp_path {
-                        tokio::spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                            let _ = tokio::fs::remove_file(path).await;
-                        });
+                    if let Ok(mut child) = cmd.spawn() {
+                        if let Some(path) = sub_temp_path {
+                            tokio::task::spawn_blocking(move || {
+                                let _ = child.wait();
+                                let _ = std::fs::remove_file(path);
+                            });
+                        }
                     }
                 });
             }
@@ -4416,11 +4425,18 @@ impl App {
                         use std::os::unix::process::CommandExt;
                         cmd.process_group(0);
                     }
-                    let _ = cmd.spawn();
-
-                    if let Some(path) = sub_temp_path {
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        let _ = tokio::fs::remove_file(path).await;
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000);
+                    }
+                    if let Ok(mut child) = cmd.spawn() {
+                        if let Some(path) = sub_temp_path {
+                            tokio::task::spawn_blocking(move || {
+                                let _ = child.wait();
+                                let _ = std::fs::remove_file(path);
+                            });
+                        }
                     }
                 });
             }

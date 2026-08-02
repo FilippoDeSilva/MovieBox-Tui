@@ -54,7 +54,14 @@ fn mpv_command(
         "mpv"
     };
     let executable = mpv_executable().unwrap_or_else(|| fallback.into());
-    let mut command = Command::new(executable);
+    let mut command = if executable.starts_with("flatpak run ") {
+        let mut parts = executable.split(' ');
+        let mut cmd = Command::new(parts.next().unwrap());
+        cmd.args(parts);
+        cmd
+    } else {
+        Command::new(executable)
+    };
     let prefix = if iina { "--mpv-" } else { "--" };
 
     command
@@ -108,7 +115,14 @@ fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) 
         "vlc"
     };
     let executable = vlc_executable().unwrap_or_else(|| fallback.into());
-    let mut command = Command::new(executable);
+    let mut command = if executable.starts_with("flatpak run ") {
+        let mut parts = executable.split(' ');
+        let mut cmd = Command::new(parts.next().unwrap());
+        cmd.args(parts);
+        cmd
+    } else {
+        Command::new(executable)
+    };
     command.arg("--width=960").arg("--height=540").arg(url);
 
     for (name, value) in headers {
@@ -132,6 +146,7 @@ fn mpv_executable() -> Option<String> {
         "mpv"
     };
     first_executable(&[MPV_WINDOWS, MPV_MACOS], fallback)
+        .or_else(|| flatpak_executable("io.mpv.Mpv"))
 }
 
 fn vlc_executable() -> Option<String> {
@@ -140,7 +155,40 @@ fn vlc_executable() -> Option<String> {
     } else {
         "vlc"
     };
-    first_executable(&[VLC_WINDOWS, VLC_WINDOWS_X86, VLC_MACOS], fallback)
+
+    let paths = vec![VLC_WINDOWS, VLC_WINDOWS_X86, VLC_MACOS];
+
+    #[cfg(windows)]
+    let windows_app_path = std::env::var("LOCALAPPDATA")
+        .map(|l| format!(r"{}\Microsoft\WindowsApps\vlc.exe", l))
+        .unwrap_or_default();
+
+    #[allow(unused_mut)]
+    let mut static_paths: Vec<&str> = paths.clone();
+
+    #[cfg(windows)]
+    if !windows_app_path.is_empty() {
+        static_paths.push(&windows_app_path);
+    }
+
+    first_executable(&static_paths, fallback).or_else(|| flatpak_executable("org.videolan.VLC"))
+}
+
+fn flatpak_executable(app_id: &str) -> Option<String> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    if command_exists("flatpak") {
+        let mut cmd = Command::new("flatpak");
+        cmd.arg("info")
+            .arg(app_id)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        if cmd.output().map(|o| o.status.success()).unwrap_or(false) {
+            return Some(format!("flatpak run {}", app_id));
+        }
+    }
+    None
 }
 
 fn first_executable(paths: &[&str], fallback: &str) -> Option<String> {
@@ -152,13 +200,14 @@ fn first_executable(paths: &[&str], fallback: &str) -> Option<String> {
 }
 
 fn command_exists(command: &str) -> bool {
-    let finder = if cfg!(target_os = "windows") {
-        "where"
-    } else {
-        "which"
-    };
-    Command::new(finder)
-        .arg(command)
-        .output()
-        .is_ok_and(|output| output.status.success())
+    let mut cmd = Command::new(command);
+    cmd.arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.output().is_ok()
 }
