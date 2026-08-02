@@ -882,11 +882,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let dropdown_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(1),                    // Header
-                    Constraint::Length(visible_count as u16), // List
-                    Constraint::Length(1),                    // Separator
-                    Constraint::Length(1),                    // Footer text
-                    Constraint::Length(1),                    // Pad below footer
+                    Constraint::Length(1),
+                    Constraint::Length(visible_count as u16),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
                 ])
                 .split(dropdown_area);
             let items: Vec<ratatui::widgets::ListItem> = state

@@ -126,15 +126,99 @@ impl App {
     fn persist_config(&self) {
         if let Some(config_dir) = dirs::config_dir() {
             let app_dir = config_dir.join("moviebox-tui");
-            let _ = std::fs::create_dir_all(&app_dir);
+            if std::fs::create_dir_all(&app_dir).is_err() {
+                return;
+            }
             let config = serde_json::json!({
                 "auto_update": self.state.auto_update,
                 "last_update_check": self.state.last_update_check,
                 "active_provider": self.state.active_provider.cache_key(),
                 "active_theme": self.state.active_theme_kind
             });
-            let _ = std::fs::write(app_dir.join("config.json"), config.to_string());
+            let path = app_dir.join("config.json");
+            let temporary = app_dir.join(format!("config.{}.tmp", std::process::id()));
+            if std::fs::write(&temporary, config.to_string()).is_ok()
+                && std::fs::rename(&temporary, &path).is_err()
+            {
+                let _ = std::fs::remove_file(&path);
+                let _ = std::fs::rename(&temporary, &path);
+            }
         }
+    }
+
+    fn launch_player(
+        &self,
+        kind: crate::tui::state::PlayerKind,
+        link: String,
+        subtitle: Option<String>,
+        headers: Vec<(String, String)>,
+    ) {
+        let client = self.client.http_client().clone();
+        let sender = self.action_sender.clone();
+        tokio::spawn(async move {
+            let mut local_subtitle = subtitle.clone();
+            let mut temporary_subtitle = None;
+            if matches!(
+                kind,
+                crate::tui::state::PlayerKind::Vlc | crate::tui::state::PlayerKind::Iina
+            ) && let Some(url) = subtitle
+                && let Ok(Ok(response)) =
+                    tokio::time::timeout(std::time::Duration::from_secs(30), client.get(url).send())
+                        .await
+                && let Ok(response) = response.error_for_status()
+                && let Ok(bytes) = response.bytes().await
+            {
+                let path = std::env::temp_dir().join(format!(
+                    "moviebox_sub_{}_{}.srt",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos()
+                ));
+                if tokio::fs::write(&path, bytes).await.is_ok() {
+                    local_subtitle = Some(path.to_string_lossy().into_owned());
+                    temporary_subtitle = Some(path);
+                }
+            }
+
+            let mut command =
+                crate::tui::player::command(kind, &link, local_subtitle.as_deref(), &headers);
+            command.stdout(std::process::Stdio::null());
+            command.stderr(std::process::Stdio::null());
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::CommandExt;
+                command.process_group(0);
+            }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000);
+            }
+
+            match command.spawn() {
+                Ok(mut child) => {
+                    if let Some(path) = temporary_subtitle {
+                        tokio::task::spawn_blocking(move || {
+                            let _ = child.wait();
+                            let _ = std::fs::remove_file(path);
+                        });
+                    }
+                }
+                Err(error) => {
+                    if let Some(path) = temporary_subtitle {
+                        let _ = tokio::fs::remove_file(path).await;
+                    }
+                    sender
+                        .send(Action::SetStatus(format!(
+                            "Error: failed to launch media player: {error}"
+                        )))
+                        .ok();
+                }
+            }
+        });
     }
 
     fn switch_provider(&mut self, provider: ProviderKind) {
@@ -490,15 +574,54 @@ impl App {
 
             if let Some(subtitle_url) = subtitle_url {
                 let subtitle_path = destination.with_extension("srt");
-                let subtitle_client = client.clone();
-                tokio::spawn(async move {
-                    if let Ok(response) = subtitle_client.get(subtitle_url).send().await
-                        && response.status().is_success()
-                        && let Ok(bytes) = response.bytes().await
-                    {
-                        let _ = tokio::fs::write(subtitle_path, bytes).await;
+                let result = tokio::time::timeout(
+                    std::time::Duration::from_secs(30),
+                    client.get(subtitle_url).send(),
+                )
+                .await;
+                match result {
+                    Ok(Ok(response)) => match response.error_for_status() {
+                        Ok(response) => match response.bytes().await {
+                            Ok(bytes) => {
+                                if let Err(error) = tokio::fs::write(subtitle_path, bytes).await {
+                                    sender
+                                        .send(Action::SetStatus(format!(
+                                            "Error: subtitle write failed: {error}"
+                                        )))
+                                        .ok();
+                                }
+                            }
+                            Err(error) => {
+                                sender
+                                    .send(Action::SetStatus(format!(
+                                        "Error: subtitle download failed: {error}"
+                                    )))
+                                    .ok();
+                            }
+                        },
+                        Err(error) => {
+                            sender
+                                .send(Action::SetStatus(format!(
+                                    "Error: subtitle download failed: {error}"
+                                )))
+                                .ok();
+                        }
+                    },
+                    Ok(Err(error)) => {
+                        sender
+                            .send(Action::SetStatus(format!(
+                                "Error: subtitle download failed: {error}"
+                            )))
+                            .ok();
                     }
-                });
+                    Err(_) => {
+                        sender
+                            .send(Action::SetStatus(
+                                "Error: subtitle download timed out".to_string(),
+                            ))
+                            .ok();
+                    }
+                }
             }
 
             let progress_sender = sender.clone();
@@ -625,7 +748,7 @@ impl App {
         loop {
             if self.state.clear_terminal_before_draw {
                 terminal.current_buffer_mut().reset();
-                let _ = terminal.backend_mut().clear();
+                terminal.backend_mut().clear()?;
                 terminal.swap_buffers();
                 self.state.clear_terminal_before_draw = false;
                 self.state.dirty = true;
@@ -1036,12 +1159,8 @@ impl App {
                                                     );
                                                 let mut all_channels = Vec::new();
                                                 for url in urls_to_fetch {
-                                                    let filename = url
-                                                        .split('/')
-                                                        .next_back()
-                                                        .unwrap_or("playlist.m3u");
                                                     if let Ok(channels) =
-                                                        parser.fetch_playlist(&url, filename).await
+                                                        parser.fetch_playlist(&url).await
                                                     {
                                                         all_channels.extend(channels);
                                                     }
@@ -1295,7 +1414,7 @@ impl App {
             }
             Action::ToggleTvMode => {
                 self.state.is_tv_mode = !self.state.is_tv_mode;
-                self.state.tick_count = 0; // Reset animation
+                self.state.tick_count = 0;
                 if self.state.is_tv_mode {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
@@ -1323,8 +1442,7 @@ impl App {
                             let parser = crate::providers::iptv_org::m3u::M3UParser::new();
                             let mut all_channels = Vec::new();
                             for url in loaded_urls {
-                                let filename = url.split('/').next_back().unwrap_or("playlist.m3u");
-                                if let Ok(channels) = parser.fetch_playlist(&url, filename).await {
+                                if let Ok(channels) = parser.fetch_playlist(&url).await {
                                     all_channels.extend(channels);
                                 }
                             }
@@ -2769,7 +2887,11 @@ impl App {
                                 tokio::spawn(async move {
                                     if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                         let id_clone = id2.clone();
-                                        move || crate::cache::get_image_cache(&id_clone)
+                                        move || {
+                                            crate::cache::get_namespaced_image_cache(
+                                                "iptv", &id_clone,
+                                            )
+                                        }
                                     })
                                     .await
                                     {
@@ -2797,7 +2919,8 @@ impl App {
                                             let bytes_clone = bytes.clone();
                                             let id_clone = id2.clone();
                                             let _ = tokio::task::spawn_blocking(move || {
-                                                crate::cache::set_image_cache(
+                                                crate::cache::set_namespaced_image_cache(
+                                                    "iptv",
                                                     &id_clone,
                                                     &bytes_clone,
                                                 )
@@ -2963,10 +3086,16 @@ impl App {
                     let url_clone = url.to_string();
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
+                    let provider = self.state.active_provider;
                     tokio::spawn(async move {
                         if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                             let id_clone = id_clone.clone();
-                            move || crate::cache::get_image_cache(&id_clone)
+                            move || {
+                                crate::cache::get_namespaced_image_cache(
+                                    provider.cache_key(),
+                                    &id_clone,
+                                )
+                            }
                         })
                         .await
                         {
@@ -2995,7 +3124,11 @@ impl App {
                                 let bytes_clone = bytes.clone();
                                 let id_clone2 = id_clone.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
-                                    crate::cache::set_image_cache(&id_clone2, &bytes_clone)
+                                    crate::cache::set_namespaced_image_cache(
+                                        provider.cache_key(),
+                                        &id_clone2,
+                                        &bytes_clone,
+                                    )
                                 })
                                 .await;
                                 if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
@@ -3441,10 +3574,16 @@ impl App {
                         let url_clone = url.to_string();
                         let action_tx = self.action_sender.clone();
                         let id_clone = id.clone();
+                        let provider = context.provider;
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id_clone.clone();
-                                move || crate::cache::get_image_cache(&id_clone)
+                                move || {
+                                    crate::cache::get_namespaced_image_cache(
+                                        provider.cache_key(),
+                                        &id_clone,
+                                    )
+                                }
                             })
                             .await
                             {
@@ -3471,7 +3610,11 @@ impl App {
                                     let bytes_clone = bytes.clone();
                                     let id_clone2 = id_clone.clone();
                                     let _ = tokio::task::spawn_blocking(move || {
-                                        crate::cache::set_image_cache(&id_clone2, &bytes_clone)
+                                        crate::cache::set_namespaced_image_cache(
+                                            provider.cache_key(),
+                                            &id_clone2,
+                                            &bytes_clone,
+                                        )
                                     })
                                     .await;
                                     if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
@@ -4326,57 +4469,7 @@ impl App {
             }
             Action::LaunchPlayer(kind, link, sub) => {
                 self.state.player_picker_popup = false;
-                let client = self.client.http_client().clone();
-                tokio::spawn(async move {
-                    let mut local_sub = sub.clone();
-                    let mut sub_temp_path = None;
-                    if kind == crate::tui::state::PlayerKind::Vlc
-                        || kind == crate::tui::state::PlayerKind::Iina
-                    {
-                        if let Some(s_url) = sub {
-                            if let Ok(resp) = client.get(&s_url).send().await {
-                                if let Ok(bytes) = resp.bytes().await {
-                                    let temp_path = std::env::temp_dir().join(format!(
-                                        "moviebox_sub_{}.srt",
-                                        std::time::SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_millis()
-                                    ));
-                                    if tokio::fs::write(&temp_path, bytes).await.is_ok() {
-                                        local_sub = Some(temp_path.to_string_lossy().to_string());
-                                        sub_temp_path = Some(temp_path);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    let mut cmd =
-                        crate::tui::player::command(kind, &link, local_sub.as_deref(), &[]);
-                    cmd.stdout(std::process::Stdio::null());
-                    cmd.stderr(std::process::Stdio::null());
-
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::process::CommandExt;
-                        cmd.process_group(0);
-                    }
-                    #[cfg(windows)]
-                    {
-                        use std::os::windows::process::CommandExt;
-                        cmd.creation_flags(0x08000000);
-                    }
-
-                    if let Ok(mut child) = cmd.spawn() {
-                        if let Some(path) = sub_temp_path {
-                            tokio::task::spawn_blocking(move || {
-                                let _ = child.wait();
-                                let _ = std::fs::remove_file(path);
-                            });
-                        }
-                    }
-                });
+                self.launch_player(kind, link, sub, Vec::new());
             }
             Action::LaunchPlayback(kind, source) => {
                 self.state.player_picker_popup = false;
@@ -4386,69 +4479,17 @@ impl App {
                     self.state.status_timer = 180;
                     return None;
                 }
-                let client = self.client.http_client().clone();
-                tokio::spawn(async move {
-                    let mut local_sub = source.subtitle.clone();
-                    let mut sub_temp_path = None;
-                    if kind == crate::tui::state::PlayerKind::Vlc
-                        || kind == crate::tui::state::PlayerKind::Iina
-                    {
-                        if let Some(s_url) = source.subtitle.as_ref() {
-                            if let Ok(resp) = client.get(s_url).send().await {
-                                if let Ok(bytes) = resp.bytes().await {
-                                    let temp_path = std::env::temp_dir().join(format!(
-                                        "moviebox_sub_{}.srt",
-                                        std::time::SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_millis()
-                                    ));
-                                    if tokio::fs::write(&temp_path, bytes).await.is_ok() {
-                                        local_sub = Some(temp_path.to_string_lossy().to_string());
-                                        sub_temp_path = Some(temp_path);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    let mut cmd = crate::tui::player::command(
-                        kind,
-                        &source.url,
-                        local_sub.as_deref(),
-                        &source.headers,
-                    );
-                    cmd.stdout(std::process::Stdio::null());
-                    cmd.stderr(std::process::Stdio::null());
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::process::CommandExt;
-                        cmd.process_group(0);
-                    }
-                    #[cfg(windows)]
-                    {
-                        use std::os::windows::process::CommandExt;
-                        cmd.creation_flags(0x08000000);
-                    }
-                    if let Ok(mut child) = cmd.spawn() {
-                        if let Some(path) = sub_temp_path {
-                            tokio::task::spawn_blocking(move || {
-                                let _ = child.wait();
-                                let _ = std::fs::remove_file(path);
-                            });
-                        }
-                    }
-                });
+                self.launch_player(kind, source.url, source.subtitle, source.headers);
             }
             Action::CheckForUpdates => {
                 let update_sender = self.action_sender.clone();
-                tokio::task::spawn_blocking(move || {
-                    let start = std::time::Instant::now();
-                    let result = crate::tui::updater::check(env!("CARGO_PKG_VERSION"));
+                tokio::spawn(async move {
+                    let start = tokio::time::Instant::now();
+                    let result = crate::tui::updater::check(env!("CARGO_PKG_VERSION")).await;
 
                     let elapsed = start.elapsed();
                     if elapsed.as_millis() < 1500 {
-                        std::thread::sleep(std::time::Duration::from_millis(1500) - elapsed);
+                        tokio::time::sleep(std::time::Duration::from_millis(1500) - elapsed).await;
                     }
 
                     match result {

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -14,6 +14,7 @@ pub struct Channel {
 
 pub struct M3UParser {
     cache_dir: PathBuf,
+    client: reqwest::Client,
 }
 
 impl Default for M3UParser {
@@ -28,19 +29,23 @@ impl M3UParser {
         cache_dir.push("moviebox-tui");
         cache_dir.push("tv_playlists");
         std::fs::create_dir_all(&cache_dir).ok();
-        Self { cache_dir }
+        let client = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default();
+        Self { cache_dir, client }
     }
 
     pub async fn fetch_playlist(
         &self,
         url: &str,
-        filename: &str,
     ) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
-        let file_path = self.cache_dir.join(filename);
+        let file_path = self.cache_dir.join(cache_filename(url));
         let mut needs_download = true;
 
         if file_path.exists() {
-            if let Ok(metadata) = fs::metadata(&file_path) {
+            if let Ok(metadata) = tokio::fs::metadata(&file_path).await {
                 if let Ok(modified) = metadata.modified() {
                     if let Ok(duration) = SystemTime::now().duration_since(modified) {
                         if duration.as_secs() < 24 * 3600 {
@@ -52,12 +57,18 @@ impl M3UParser {
         }
 
         let content = if needs_download {
-            let client = reqwest::Client::new();
-            let res = client.get(url).send().await?.text().await?;
-            fs::write(&file_path, &res).ok();
+            let res = self
+                .client
+                .get(url)
+                .send()
+                .await?
+                .error_for_status()?
+                .text()
+                .await?;
+            let _ = tokio::fs::write(&file_path, &res).await;
             res
         } else {
-            fs::read_to_string(&file_path)?
+            tokio::fs::read_to_string(&file_path).await?
         };
 
         Ok(self.parse_m3u(&content))
@@ -115,4 +126,10 @@ impl M3UParser {
 
         channels
     }
+}
+
+fn cache_filename(raw: &str) -> String {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    raw.hash(&mut hasher);
+    format!("{:016x}.m3u", hasher.finish())
 }

@@ -18,15 +18,7 @@ impl MovieBoxClient {
     }
 
     pub async fn suggest(&self, query: &str) -> Result<Value, ScraperError> {
-        let payload = json!({
-            "keyword": query,
-            "page": 1,
-            "perPage": 20,
-            "subjectType": "All",
-            "tabId": "All"
-        });
-        self.post("/wefeed-mobile-bff/subject-api/search/v2", &payload)
-            .await
+        self.search(query, 1).await
     }
 
     pub async fn get_details(&self, subject_id: &str) -> Result<Value, ScraperError> {

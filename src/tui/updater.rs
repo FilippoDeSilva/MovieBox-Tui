@@ -1,11 +1,8 @@
 const OWNER: &str = "mesamirh";
 const REPOSITORY: &str = "MovieBox-Tui";
 
-pub fn check(current: &str) -> Result<Option<String>, String> {
-    let releases = fetch_releases()?;
-    let release = releases
-        .first()
-        .ok_or_else(|| "No published releases".to_string())?;
+pub async fn check(current: &str) -> Result<Option<String>, String> {
+    let release = fetch_release().await?;
 
     if !is_newer(current, &release.version) {
         return Ok(None);
@@ -22,8 +19,8 @@ fn is_newer(current: &str, other: &str) -> bool {
     }
 }
 
-fn fetch_releases() -> Result<Vec<Release>, String> {
-    let url = format!("https://api.github.com/repos/{OWNER}/{REPOSITORY}/releases?per_page=20");
+async fn fetch_release() -> Result<Release, String> {
+    let url = format!("https://api.github.com/repos/{OWNER}/{REPOSITORY}/releases/latest");
     let client = http_client()?;
 
     let mut request = client.get(&url);
@@ -33,31 +30,23 @@ fn fetch_releases() -> Result<Vec<Release>, String> {
 
     let resp = request
         .send()
+        .await
         .map_err(|e| format!("GitHub request failed: {e}"))?;
     let status = resp.status();
     if !status.is_success() {
-        let body = resp.text().unwrap_or_default();
+        let body = resp.text().await.unwrap_or_default();
         return Err(format!("GitHub API {status}: {body}"));
     }
 
-    let items: Vec<serde_json::Value> = resp.json().map_err(|e| format!("bad JSON: {e}"))?;
-
-    items
-        .into_iter()
-        .map(|r| {
-            let tag = r["tag_name"]
-                .as_str()
-                .ok_or("missing tag_name")?
-                .to_string();
-            Ok(Release {
-                version: tag.trim_start_matches('v').to_string(),
-            })
-        })
-        .collect()
+    let item: serde_json::Value = resp.json().await.map_err(|e| format!("bad JSON: {e}"))?;
+    let tag = item["tag_name"].as_str().ok_or("missing tag_name")?;
+    Ok(Release {
+        version: tag.trim_start_matches('v').to_string(),
+    })
 }
 
-fn http_client() -> Result<reqwest::blocking::Client, String> {
-    reqwest::blocking::Client::builder()
+fn http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
         .user_agent("MovieBox-Tui")
         .timeout(std::time::Duration::from_secs(30))
         .connect_timeout(std::time::Duration::from_secs(10))

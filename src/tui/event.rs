@@ -5,8 +5,6 @@ use tokio::sync::mpsc;
 
 pub struct EventHandler {
     receiver: mpsc::Receiver<Action>,
-    #[allow(dead_code)]
-    sender: mpsc::Sender<Action>,
 }
 
 impl EventHandler {
@@ -28,8 +26,9 @@ impl EventHandler {
                     Some(event) = reader.next() => {
                         match event {
                             Ok(CrosstermEvent::Key(key)) => {
-                                let is_press = key.kind == KeyEventKind::Press;
-                                if is_press && event_sender.try_send(Action::Key(key)).is_err() {}
+                                if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+                                    let _ = event_sender.send(Action::Key(key)).await;
+                                }
                             }
                             Ok(CrosstermEvent::Mouse(mouse)) => {
                                 match mouse.kind {
@@ -48,6 +47,12 @@ impl EventHandler {
                             Ok(CrosstermEvent::Resize(w, h)) => {
                                 let _ = event_sender.try_send(Action::Resize(w, h));
                             }
+                            Err(error) => {
+                                let _ = event_sender.send(Action::SetStatus(format!(
+                                    "Error: terminal input failed: {error}"
+                                ))).await;
+                                break;
+                            }
                             _ => {}
                         }
                     }
@@ -55,7 +60,7 @@ impl EventHandler {
             }
         });
 
-        Self { receiver, sender }
+        Self { receiver }
     }
 
     pub async fn next(&mut self) -> Option<Action> {

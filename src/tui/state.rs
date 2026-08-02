@@ -78,7 +78,6 @@ pub struct AppState {
     pub show_episode_download_confirm: bool,
     pub episode_download_confirm_yes_selected: bool,
     pub is_waiting_for_download_stream: bool,
-    pub is_downloading: bool,
     pub is_fetching_streams: bool,
     pub stream_error: Option<String>,
     pub preview_cache: lru::LruCache<String, serde_json::Value>,
@@ -148,7 +147,6 @@ pub struct AppState {
     pub pending_play_link: Option<String>,
     pub pending_open_with: bool,
     pub basic_terminal: bool,
-    pub username: String,
 
     pub is_tv_mode: bool,
     pub tv_config_popup: bool,
@@ -189,7 +187,6 @@ impl Default for AppState {
             show_episode_download_confirm: false,
             episode_download_confirm_yes_selected: false,
             is_waiting_for_download_stream: false,
-            is_downloading: false,
             is_fetching_streams: false,
             stream_error: None,
             preview_cache: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
@@ -252,14 +249,6 @@ impl Default for AppState {
             subtitle_list_state: ListState::default(),
             pending_play_link: None,
             pending_open_with: false,
-            username: std::env::var("USER")
-                .or_else(|_| std::env::var("USERNAME"))
-                .unwrap_or_else(|_| "Friend".to_string())
-                .split('\\')
-                .next_back()
-                .unwrap_or("Friend")
-                .to_string(),
-
             is_tv_mode: false,
             tv_config_popup: false,
             tv_channels: Vec::new(),

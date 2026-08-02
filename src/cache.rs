@@ -320,7 +320,15 @@ pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
 }
 
 pub fn get_image_path(id: &str) -> PathBuf {
-    let mut path = get_cache_dir("images");
+    get_namespaced_image_path(ProviderKind::MovieBox.cache_key(), id)
+}
+
+fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
+    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
+    path.push("moviebox-tui");
+    path.push(namespace);
+    path.push("images");
+    let _ = fs::create_dir_all(&path);
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
     hasher.update(id.as_bytes());
@@ -335,7 +343,11 @@ pub fn get_image_path(id: &str) -> PathBuf {
 }
 
 pub fn get_image_cache(id: &str) -> Option<Vec<u8>> {
-    let path = get_image_path(id);
+    get_namespaced_image_cache(ProviderKind::MovieBox.cache_key(), id)
+}
+
+pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> {
+    let path = get_namespaced_image_path(namespace, id);
     if path.exists() {
         if let Ok(metadata) = std::fs::metadata(&path) {
             if let Ok(modified) = metadata.modified() {
@@ -353,7 +365,11 @@ pub fn get_image_cache(id: &str) -> Option<Vec<u8>> {
 }
 
 pub fn set_image_cache(id: &str, bytes: &[u8]) {
-    let path = get_image_path(id);
+    set_namespaced_image_cache(ProviderKind::MovieBox.cache_key(), id, bytes);
+}
+
+pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {
+    let path = get_namespaced_image_path(namespace, id);
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
