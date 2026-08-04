@@ -15,20 +15,20 @@ pub async fn resolve(
         .error_for_status()?
         .text()
         .await?;
-    let sportverse_url = {
+    let resolver_url = {
         let document = Html::parse_document(&drive_html);
         let download = Selector::parse("a#download")
             .map_err(|_| FourKHdHubError::Parse("invalid resolver selector".into()))?;
         document
             .select(&download)
             .filter_map(|node| node.value().attr("href"))
-            .find(|href| href.starts_with("https://sportverse."))
+            .find(|href| href.starts_with("https://"))
             .map(str::to_string)
             .ok_or_else(|| FourKHdHubError::Parse("HubCloud resolver link missing".into()))?
     };
 
     let resolver_html = client
-        .get(&sportverse_url)
+        .get(&resolver_url)
         .send()
         .await?
         .error_for_status()?
@@ -98,33 +98,39 @@ fn extract_hubcloud_drive_url(html: &str) -> Option<String> {
 }
 
 fn extract_script_pixeldrain_urls(html: &str) -> Vec<String> {
-    const PREFIX: &str = "https://pixeldrain.dev/u/";
     let mut urls = Vec::new();
-    let mut remainder = html;
-    while let Some(variable_offset) = remainder.find("var pxl") {
-        let variable = &remainder[variable_offset..];
-        let Some(url_offset) = variable.find(PREFIX) else {
-            break;
-        };
-        let candidate = &variable[url_offset..];
-        let end = candidate
-            .find(|character: char| {
-                character == '"' || character == '\'' || character.is_whitespace()
-            })
-            .unwrap_or(candidate.len());
-        if let Some(url) = pixeldrain_api_url(&candidate[..end])
-            && !urls.contains(&url)
-        {
-            urls.push(url);
+    
+    let mut search_prefix = |prefix: &str| {
+        let mut remainder = html;
+        while let Some(variable_offset) = remainder.find("var pxl") {
+            let variable = &remainder[variable_offset..];
+            let Some(url_offset) = variable.find(prefix) else {
+                break;
+            };
+            let candidate = &variable[url_offset..];
+            let end = candidate
+                .find(|character: char| {
+                    character == '"' || character == '\'' || character.is_whitespace()
+                })
+                .unwrap_or(candidate.len());
+            if let Some(url) = pixeldrain_api_url(&candidate[..end])
+                && !urls.contains(&url)
+            {
+                urls.push(url);
+            }
+            remainder = &candidate[end..];
         }
-        remainder = &candidate[end..];
-    }
+    };
+
+    search_prefix("https://pixeldrain.dev/u/");
+    search_prefix("https://pixeldrain.com/u/");
     urls
 }
 
 fn pixeldrain_api_url(raw: &str) -> Option<String> {
     let url = Url::parse(raw).ok()?;
-    if url.host_str() != Some("pixeldrain.dev") {
+    let host = url.host_str()?;
+    if host != "pixeldrain.dev" && host != "pixeldrain.com" {
         return None;
     }
     let id = url.path().strip_prefix("/u/")?.trim_matches('/');
@@ -135,7 +141,7 @@ fn pixeldrain_api_url(raw: &str) -> Option<String> {
     {
         return None;
     }
-    Some(format!("https://pixeldrain.dev/api/file/{id}?download"))
+    Some(format!("https://{}/api/file/{}?download", host, id))
 }
 
 fn validate_resolver_url(raw: &str) -> Result<(), FourKHdHubError> {
