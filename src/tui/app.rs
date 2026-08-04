@@ -3196,6 +3196,10 @@ impl App {
             }
 
             Action::PlayStream(open_with) => {
+                if self.state.is_resolving_playback {
+                    return None;
+                }
+                self.state.is_resolving_playback = true;
                 if self.state.active_provider == ProviderKind::FourKHdHub {
                     if let Some(release) = self.get_selected_release() {
                         self.state.notify(
@@ -3274,9 +3278,12 @@ impl App {
                             self.action_sender.send(Action::LaunchMpv(link, None)).ok();
                         }
                     }
+                } else {
+                    self.state.is_resolving_playback = false;
                 }
             }
             Action::ShowSubtitlePopup(link, ext_captions, open_with) => {
+                self.state.is_resolving_playback = false;
                 let mut options = vec![("None".to_string(), "".to_string())];
 
                 if let Some(captions_list) =
@@ -3319,6 +3326,7 @@ impl App {
                 }
             }
             Action::ShowDownloadSubtitlePopup(ext_captions) => {
+                self.state.is_resolving_playback = false;
                 let mut options = vec![("None".to_string(), "".to_string())];
 
                 if let Some(captions_list) =
@@ -3372,6 +3380,7 @@ impl App {
                 self.state.dirty = true;
             }
             Action::LaunchMpv(link, subtitle_url) => {
+                self.state.is_resolving_playback = false;
                 let player = self.state.available_players.first().cloned();
                 match player {
                     None => {
@@ -3400,6 +3409,10 @@ impl App {
                 }
             }
             Action::DownloadStream(subtitle_url) => {
+                if self.state.is_resolving_playback {
+                    return None;
+                }
+                self.state.is_resolving_playback = true;
                 if self.state.active_provider == ProviderKind::FourKHdHub {
                     if let Some(release) = self.get_selected_release() {
                         self.state.notify(
@@ -3439,6 +3452,7 @@ impl App {
                 return None;
             }
             Action::StartDownload(subtitle_url, link) => {
+                self.state.is_resolving_playback = false;
                 self.start_resilient_download(subtitle_url, link);
                 return None;
             }
@@ -3760,6 +3774,7 @@ impl App {
                 self.state.status_timer = 150;
             }
             Action::SetStatus(msg) => {
+                self.state.is_resolving_playback = false;
                 if msg.starts_with("Error:") {
                     self.state.notify(
                         NotificationKind::Error,
