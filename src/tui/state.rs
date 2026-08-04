@@ -125,7 +125,7 @@ pub struct AppState {
     pub status_message: String,
     pub status_timer: usize,
     pub notifications: std::collections::VecDeque<crate::tui::overlay::Notification>,
-    pub update_available: Option<String>,
+    pub update_available: Option<(String, String)>,
     pub auto_update: bool,
     pub last_update_check: u64,
     pub manual_update_check: bool,

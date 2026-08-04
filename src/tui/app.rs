@@ -913,6 +913,21 @@ impl App {
                     return None;
                 }
 
+                if let Some((version, _)) = &self.state.update_available {
+                    match key.code {
+                        KeyCode::Enter | KeyCode::Esc => {
+                            self.state.update_available = None;
+                        }
+                        KeyCode::Char('o') | KeyCode::Char('O') => {
+                            let url = format!("https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{}", version);
+                            let _ = open::that(&url);
+                            self.state.update_available = None;
+                        }
+                        _ => {}
+                    }
+                    return None;
+                }
+
                 if key.code == KeyCode::F(1) {
                     self.action_sender.send(Action::ToggleHelp).ok();
                     return None;
@@ -4501,23 +4516,23 @@ impl App {
                     }
 
                     match result {
-                        Ok(Some(version)) => {
-                            update_sender.send(Action::UpdateAvailable(version)).ok();
+                        Ok(Some((version, notes))) => {
+                            update_sender.send(Action::UpdateAvailable(version, notes)).ok();
                         }
                         Ok(None) => {
                             update_sender
-                                .send(Action::UpdateAvailable("none".into()))
+                                .send(Action::UpdateAvailable("none".into(), "".into()))
                                 .ok();
                         }
                         Err(error) => {
                             update_sender
-                                .send(Action::UpdateAvailable(format!("error:{}", error)))
+                                .send(Action::UpdateAvailable(format!("error:{}", error), "".into()))
                                 .ok();
                         }
                     }
                 });
             }
-            Action::UpdateAvailable(version) => {
+            Action::UpdateAvailable(version, notes) => {
                 if self.state.active_screen == Screen::Startup {
                     self.state.active_screen = Screen::Home;
                 }
@@ -4543,12 +4558,7 @@ impl App {
                     self.state.manual_update_check = false;
                 } else {
                     self.state.manual_update_check = false;
-                    self.state.update_available = Some(version.clone());
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Update Available",
-                        format!("Version v{} is available! Download at github.com/mesamirh/MovieBox-Tui", version),
-                    );
+                    self.state.update_available = Some((version, notes));
                 }
             }
         }
@@ -4674,6 +4684,72 @@ impl App {
                 &self.theme,
                 self.state.basic_terminal,
             );
+        }
+
+        if let Some((version, notes)) = &self.state.update_available {
+            use ratatui::layout::{Constraint, Direction, Layout, Alignment};
+            use ratatui::widgets::{Block, Borders, Paragraph, Clear};
+            use ratatui::text::{Line, Span};
+
+            let popup_width = 65;
+            let popup_height = 20;
+
+            let h_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Min(0),
+                    Constraint::Length(popup_width),
+                    Constraint::Min(0),
+                ])
+                .split(area);
+
+            let v_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(0),
+                    Constraint::Length(popup_height),
+                    Constraint::Min(0),
+                ])
+                .split(h_chunks[1]);
+
+            let popup_area = v_chunks[1];
+            frame.render_widget(Clear, popup_area);
+
+            let mut text = vec![
+                Line::from(Span::styled("Update Available!", self.theme.accent)).alignment(Alignment::Center),
+                Line::from(""),
+                Line::from("A new version of MovieBox-Tui is available."),
+                Line::from(""),
+                Line::from(format!("Current: v{}", env!("CARGO_PKG_VERSION"))),
+                Line::from(format!("Latest:  v{}", version)),
+                Line::from(""),
+                Line::from(Span::styled("Release Notes:", self.theme.highlight)),
+            ];
+
+            let note_lines = notes.lines().filter(|l| !l.trim().is_empty()).take(3).collect::<Vec<_>>();
+            for line in note_lines {
+                let mut truncated = line.to_string();
+                if truncated.len() > 55 {
+                    truncated.truncate(55);
+                    truncated.push_str("...");
+                }
+                text.push(Line::from(truncated));
+            }
+            if notes.lines().count() > 3 {
+                text.push(Line::from(Span::styled("... (read more on GitHub)", self.theme.text_dim)));
+            }
+
+            text.push(Line::from(""));
+            text.push(Line::from(Span::styled("[Enter] Close popup   [o] Open in Browser", self.theme.accent)).alignment(Alignment::Center));
+
+            let popup = Paragraph::new(text)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(self.theme.border)
+                );
+
+            frame.render_widget(popup, popup_area);
         }
 
         crate::tui::overlay::notifications(

@@ -1,14 +1,14 @@
 const OWNER: &str = "mesamirh";
 const REPOSITORY: &str = "MovieBox-Tui";
 
-pub async fn check(current: &str) -> Result<Option<String>, String> {
+pub async fn check(current: &str) -> Result<Option<(String, String)>, String> {
     let release = fetch_release().await?;
 
     if !is_newer(current, &release.version) {
         return Ok(None);
     }
 
-    Ok(Some(release.version.clone()))
+    Ok(Some((release.version.clone(), release.notes.clone())))
 }
 
 fn is_newer(current: &str, other: &str) -> bool {
@@ -40,8 +40,10 @@ async fn fetch_release() -> Result<Release, String> {
 
     let item: serde_json::Value = resp.json().await.map_err(|e| format!("bad JSON: {e}"))?;
     let tag = item["tag_name"].as_str().ok_or("missing tag_name")?;
+    let body = item["body"].as_str().unwrap_or("").to_string();
     Ok(Release {
         version: tag.trim_start_matches('v').to_string(),
+        notes: body,
     })
 }
 
@@ -56,4 +58,5 @@ fn http_client() -> Result<reqwest::Client, String> {
 
 struct Release {
     version: String,
+    notes: String,
 }
