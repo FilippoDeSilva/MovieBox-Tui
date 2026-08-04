@@ -58,44 +58,6 @@ fn stream_payload_has_results(data: &serde_json::Value) -> bool {
     })
 }
 
-pub fn get_image_cache_path(url: &str) -> PathBuf {
-    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-    path.push("moviebox-tui");
-    path.push("images");
-    if !path.exists() {
-        let _ = fs::create_dir_all(&path);
-    }
-    path.push(format!("{}.img", hash_key(url)));
-    path
-}
-
-pub fn read_image_cache(url: &str) -> Option<Vec<u8>> {
-    let path = get_image_cache_path(url);
-    if path.exists() {
-        if let Ok(bytes) = fs::read(&path) {
-            return Some(bytes);
-        }
-    }
-    None
-}
-
-pub fn write_image_cache(url: &str, data: &[u8]) {
-    let path = get_image_cache_path(url);
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    if fs::write(&temporary, data).is_err() {
-        return;
-    }
-    if fs::rename(&temporary, &path).is_err() {
-        let _ = fs::remove_file(&path);
-        if fs::rename(&temporary, &path).is_err() {
-            let _ = fs::remove_file(temporary);
-        }
-    }
-}
 
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
     get_provider_cache_dir(ProviderKind::MovieBox, subdir)
