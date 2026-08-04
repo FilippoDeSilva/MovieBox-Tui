@@ -316,9 +316,40 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(placeholder, poster_area);
     }
 
+    let is_currently_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
+        let provider = state.active_provider.cache_key();
+        let (se, ep) = if type_val == 2 {
+            let se_idx = state.season_list_state.selected().unwrap_or(0);
+            let ep_idx = state.episode_list_state.selected().unwrap_or(0);
+            let se_num = state
+                .available_seasons
+                .get(se_idx)
+                .and_then(|s| s.get("se"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(1) as usize;
+            let ep_num = if let Some(eps) = state.available_episode_numbers.get(se_idx) {
+                eps.get(ep_idx).copied().unwrap_or(ep_idx + 1)
+            } else {
+                ep_idx + 1
+            };
+            (se_num, ep_num)
+        } else {
+            (0, 0)
+        };
+        state.history.is_watched(provider, subject_id, se, ep)
+    } else {
+        false
+    };
+
+    let display_title = if is_currently_watched {
+        format!("✓ {title}")
+    } else {
+        title.to_string()
+    };
+
     let title_line = Line::from(vec![
         Span::styled(
-            title.to_string(),
+            display_title,
             theme.text.add_modifier(ratatui::style::Modifier::BOLD),
         ),
         Span::styled("   ", theme.text),
@@ -623,9 +654,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .available_episode_numbers
             .get(state.season_list_state.selected().unwrap_or(0))
         {
+            let season_idx = state.season_list_state.selected().unwrap_or(0);
+            let se_num = state
+                .available_seasons
+                .get(season_idx)
+                .and_then(|s| s.get("se"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(1) as usize;
+            let subject_id = state.active_subject_id.as_deref().unwrap_or("");
+            let provider = state.active_provider.cache_key();
+            
             ep_numbers
                 .iter()
-                .map(|&ep| ListItem::new(format!("Episode {}", ep)).style(theme.text))
+                .map(|&ep| {
+                    if state.history.is_watched(provider, subject_id, se_num, ep) {
+                        ListItem::new(format!("✓ Episode {}", ep)).style(theme.text_dim)
+                    } else {
+                        ListItem::new(format!("Episode {}", ep)).style(theme.text)
+                    }
+                })
                 .collect()
         } else {
             vec![]
@@ -1330,13 +1377,28 @@ fn render_workflow(
                 format!("Season {}", state.selected_season)
             },
         ));
+        let is_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
+            let provider = state.active_provider.cache_key();
+            state.history.is_watched(provider, subject_id, state.selected_season, state.selected_episode)
+        } else {
+            false
+        };
+
+        let ep_label = if compact {
+            format!("E{}", state.selected_episode)
+        } else {
+            format!("Episode {}", state.selected_episode)
+        };
+
+        let ep_label = if is_watched {
+            format!("✓ {ep_label}")
+        } else {
+            ep_label
+        };
+
         steps.push((
             crate::tui::state::DetailsPane::Episodes,
-            if compact {
-                format!("E{}", state.selected_episode)
-            } else {
-                format!("Episode {}", state.selected_episode)
-            },
+            ep_label,
         ));
     }
     steps.push((

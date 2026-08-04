@@ -155,6 +155,7 @@ pub struct AppState {
     pub tv_wizard_options: Vec<String>,
     pub tv_wizard_selected_idx: usize,
     pub tv_wizard_selections: std::collections::HashSet<String>,
+    pub history: crate::history::HistoryManager,
 }
 
 impl Default for AppState {
@@ -260,6 +261,7 @@ impl Default for AppState {
             ],
             tv_wizard_selected_idx: 0,
             tv_wizard_selections: std::collections::HashSet::new(),
+            history: crate::history::HistoryManager::new(),
         }
     }
 }

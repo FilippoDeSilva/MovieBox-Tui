@@ -147,12 +147,20 @@ impl App {
     }
 
     fn launch_player(
-        &self,
+        &mut self,
         kind: crate::tui::state::PlayerKind,
         link: String,
         subtitle: Option<String>,
         headers: Vec<(String, String)>,
     ) {
+        if let Some(subject_id) = &self.state.active_subject_id {
+            let season = self.state.selected_season;
+            let episode = self.state.selected_episode;
+            let provider = self.state.active_provider.cache_key();
+            self.state.history.mark_watched(provider, subject_id, season, episode);
+            self.state.dirty = true;
+        }
+
         let client = self.client.http_client().clone();
         let sender = self.action_sender.clone();
         tokio::spawn(async move {
