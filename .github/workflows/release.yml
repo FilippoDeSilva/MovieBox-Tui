@@ -46,9 +46,15 @@ jobs:
         with:
           toolchain: 1.90.0
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@82a92a6e8fbc08259452af873d75fb0b04a8b846 # v2
+        with:
+          prefix-key: "release-quality"
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
-      - run: cargo install cargo-audit --locked && cargo audit
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
       - run: cargo package --locked
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
@@ -86,9 +92,19 @@ jobs:
           toolchain: 1.90.0
           targets: ${{ matrix.target }}
 
+      - uses: Swatinem/rust-cache@82a92a6e8fbc08259452af873d75fb0b04a8b846 # v2
+        with:
+          prefix-key: "release-build-${{ matrix.target }}"
+
+      - name: Install cross
+        if: matrix.os == 'ubuntu-latest'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
       - name: Build Linux binary
         if: matrix.os == 'ubuntu-latest'
-        run: cargo install cross --locked && cross build --release --locked --target ${{ matrix.target }}
+        run: cross build --release --locked --target ${{ matrix.target }}
 
       - name: Build macOS or Windows binary
         if: matrix.os != 'ubuntu-latest'

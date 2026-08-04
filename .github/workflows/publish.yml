@@ -17,7 +17,7 @@ jobs:
       - name: Determine Ref
         id: ref
         run: |
-          REF="${{ github.event.inputs.tag || github.event.release.tag_name || 'v0.1.8' }}"
+          REF="${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}"
           echo "target_ref=$REF" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

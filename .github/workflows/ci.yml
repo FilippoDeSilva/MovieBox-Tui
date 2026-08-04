@@ -19,21 +19,18 @@ jobs:
         with:
           toolchain: 1.90.0
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@82a92a6e8fbc08259452af873d75fb0b04a8b846 # v2
+        with:
+          prefix-key: "ci-quality"
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - name: Audit dependencies
         if: matrix.os == 'ubuntu-latest'
-        run: cargo install cargo-audit --locked && cargo audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - if: matrix.os == 'ubuntu-latest'
+        run: cargo audit
       - name: Verify package
         if: matrix.os == 'ubuntu-latest'
         run: cargo package --locked
-
-  msrv:
-    name: Rust 1.90 compatibility
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
-        with:
-          toolchain: 1.90.0
-      - run: cargo check --all-targets --locked
