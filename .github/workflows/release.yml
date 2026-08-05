@@ -18,7 +18,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
       is_new: ${{ steps.check.outputs.is_new }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4
       - name: Get version from Cargo.toml
         id: check
         run: |
@@ -41,8 +41,8 @@ jobs:
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
           components: rustfmt, clippy
@@ -56,7 +56,7 @@ jobs:
           tool: cargo-audit
       - run: cargo audit
       - run: cargo package --locked
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
       - run: cargo check --all-targets --locked
@@ -84,10 +84,10 @@ jobs:
             os: windows-latest
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
           targets: ${{ matrix.target }}
@@ -140,7 +140,7 @@ jobs:
           }
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.target }}
           path: |
@@ -153,16 +153,16 @@ jobs:
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4
 
       - name: Download x86_64 artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
           name: binary-x86_64-apple-darwin
           path: x86_64
 
       - name: Download aarch64 artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
           name: binary-aarch64-apple-darwin
           path: aarch64
@@ -179,7 +179,7 @@ jobs:
           tar -czvf ../../MovieBox_macOS_Universal.tar.gz .
 
       - name: Upload Universal Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: binary-universal-apple-darwin
           path: MovieBox_macOS_Universal.tar.gz
@@ -194,7 +194,7 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Generate checksums
@@ -206,14 +206,14 @@ jobs:
               echo "$hash  $(basename "$file")"
             done > SHA256SUMS
       - name: Attest release artifacts
-        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
             artifacts/**/MovieBox_*.tar.gz
             artifacts/**/MovieBox_*.zip
             SHA256SUMS
       - name: Generate Release Notes and Publish
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ needs.check-version.outputs.version }}"
           name: "v${{ needs.check-version.outputs.version }}"
