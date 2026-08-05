@@ -663,7 +663,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .unwrap_or(1) as usize;
             let subject_id = state.active_subject_id.as_deref().unwrap_or("");
             let provider = state.active_provider.cache_key();
-            
+
             ep_numbers
                 .iter()
                 .map(|&ep| {
@@ -1379,7 +1379,12 @@ fn render_workflow(
         ));
         let is_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
             let provider = state.active_provider.cache_key();
-            state.history.is_watched(provider, subject_id, state.selected_season, state.selected_episode)
+            state.history.is_watched(
+                provider,
+                subject_id,
+                state.selected_season,
+                state.selected_episode,
+            )
         } else {
             false
         };
@@ -1396,10 +1401,7 @@ fn render_workflow(
             ep_label
         };
 
-        steps.push((
-            crate::tui::state::DetailsPane::Episodes,
-            ep_label,
-        ));
+        steps.push((crate::tui::state::DetailsPane::Episodes, ep_label));
     }
     steps.push((
         crate::tui::state::DetailsPane::Streams,

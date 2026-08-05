@@ -44,13 +44,25 @@ impl HistoryManager {
         format!("{provider}::{subject_id}::{season}::{episode}")
     }
 
-    pub fn mark_watched(&mut self, provider: &str, subject_id: &str, season: usize, episode: usize) {
+    pub fn mark_watched(
+        &mut self,
+        provider: &str,
+        subject_id: &str,
+        season: usize,
+        episode: usize,
+    ) {
         let key = Self::key(provider, subject_id, season, episode);
         self.watched.insert(key);
         self.save();
     }
 
-    pub fn is_watched(&self, provider: &str, subject_id: &str, season: usize, episode: usize) -> bool {
+    pub fn is_watched(
+        &self,
+        provider: &str,
+        subject_id: &str,
+        season: usize,
+        episode: usize,
+    ) -> bool {
         let key = Self::key(provider, subject_id, season, episode);
         self.watched.contains(&key)
     }

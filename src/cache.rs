@@ -58,7 +58,6 @@ fn stream_payload_has_results(data: &serde_json::Value) -> bool {
     })
 }
 
-
 pub fn get_cache_dir(subdir: &str) -> PathBuf {
     get_provider_cache_dir(ProviderKind::MovieBox, subdir)
 }
@@ -395,7 +394,10 @@ pub fn get_captions_path(subject_id: &str, resource_id: &str) -> PathBuf {
 }
 
 pub fn get_captions_cache(subject_id: &str, resource_id: &str) -> Option<serde_json::Value> {
-    read_json_cache(&get_captions_path(subject_id, resource_id), CACHE_EXPIRY_SECS)
+    read_json_cache(
+        &get_captions_path(subject_id, resource_id),
+        CACHE_EXPIRY_SECS,
+    )
 }
 
 pub fn set_captions_cache(subject_id: &str, resource_id: &str, data: &serde_json::Value) {

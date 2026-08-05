@@ -252,7 +252,7 @@ pub fn notifications(
     theme: &Theme,
     basic_terminal: bool,
 ) {
-    let mut y = area.y.saturating_add(1);
+    let mut y = area.bottom().saturating_sub(6);
     for notification in notifications.iter().rev().take(3) {
         let message = middle_truncate(&notification.message, 48);
         let title_width = crate::tui::text::width(&notification.title).saturating_add(6);
@@ -261,7 +261,7 @@ pub fn notifications(
             .max(message_width.saturating_add(4))
             .clamp(24, 52)
             .min(area.width.saturating_sub(4) as usize) as u16;
-        if width < 4 || y.saturating_add(3) > area.bottom() {
+        if width < 4 || y < area.y {
             break;
         }
         let toast_area = Rect::new(
@@ -296,7 +296,7 @@ pub fn notifications(
                 .block(block),
             toast_area,
         );
-        y = y.saturating_add(3);
+        y = y.saturating_sub(4);
     }
 }
 

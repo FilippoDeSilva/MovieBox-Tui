@@ -157,7 +157,9 @@ impl App {
             let season = self.state.selected_season;
             let episode = self.state.selected_episode;
             let provider = self.state.active_provider.cache_key();
-            self.state.history.mark_watched(provider, subject_id, season, episode);
+            self.state
+                .history
+                .mark_watched(provider, subject_id, season, episode);
             self.state.dirty = true;
         }
 
@@ -919,7 +921,10 @@ impl App {
                             self.state.update_available = None;
                         }
                         KeyCode::Char('o') | KeyCode::Char('O') => {
-                            let url = format!("https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{}", version);
+                            let url = format!(
+                                "https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{}",
+                                version
+                            );
                             let _ = open::that(&url);
                             self.state.update_available = None;
                         }
@@ -3259,7 +3264,11 @@ impl App {
                         tokio::spawn(async move {
                             if let Some(res) = crate::cache::get_captions_cache(&subject_id, &rid) {
                                 sender
-                                    .send(Action::ShowSubtitlePopup(link_clone.clone(), res, open_with))
+                                    .send(Action::ShowSubtitlePopup(
+                                        link_clone.clone(),
+                                        res,
+                                        open_with,
+                                    ))
                                     .ok();
                                 return;
                             }
@@ -4539,7 +4548,9 @@ impl App {
 
                     match result {
                         Ok(Some((version, notes))) => {
-                            update_sender.send(Action::UpdateAvailable(version, notes)).ok();
+                            update_sender
+                                .send(Action::UpdateAvailable(version, notes))
+                                .ok();
                         }
                         Ok(None) => {
                             update_sender
@@ -4548,7 +4559,10 @@ impl App {
                         }
                         Err(error) => {
                             update_sender
-                                .send(Action::UpdateAvailable(format!("error:{}", error), "".into()))
+                                .send(Action::UpdateAvailable(
+                                    format!("error:{}", error),
+                                    "".into(),
+                                ))
                                 .ok();
                         }
                     }
@@ -4709,9 +4723,9 @@ impl App {
         }
 
         if let Some((version, notes)) = &self.state.update_available {
-            use ratatui::layout::{Constraint, Direction, Layout, Alignment};
-            use ratatui::widgets::{Block, Borders, Paragraph, Clear};
+            use ratatui::layout::{Alignment, Constraint, Direction, Layout};
             use ratatui::text::{Line, Span};
+            use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
             let popup_width = 65;
             let popup_height = 20;
@@ -4738,7 +4752,8 @@ impl App {
             frame.render_widget(Clear, popup_area);
 
             let mut text = vec![
-                Line::from(Span::styled("Update Available!", self.theme.accent)).alignment(Alignment::Center),
+                Line::from(Span::styled("Update Available!", self.theme.accent))
+                    .alignment(Alignment::Center),
                 Line::from(""),
                 Line::from("A new version of MovieBox-Tui is available."),
                 Line::from(""),
@@ -4748,7 +4763,11 @@ impl App {
                 Line::from(Span::styled("Release Notes:", self.theme.highlight)),
             ];
 
-            let note_lines = notes.lines().filter(|l| !l.trim().is_empty()).take(3).collect::<Vec<_>>();
+            let note_lines = notes
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .take(3)
+                .collect::<Vec<_>>();
             for line in note_lines {
                 let mut truncated = line.to_string();
                 if truncated.len() > 55 {
@@ -4758,18 +4777,26 @@ impl App {
                 text.push(Line::from(truncated));
             }
             if notes.lines().count() > 3 {
-                text.push(Line::from(Span::styled("... (read more on GitHub)", self.theme.text_dim)));
+                text.push(Line::from(Span::styled(
+                    "... (read more on GitHub)",
+                    self.theme.text_dim,
+                )));
             }
 
             text.push(Line::from(""));
-            text.push(Line::from(Span::styled("[Enter] Close popup   [o] Open in Browser", self.theme.accent)).alignment(Alignment::Center));
+            text.push(
+                Line::from(Span::styled(
+                    "[Enter] Close popup   [o] Open in Browser",
+                    self.theme.accent,
+                ))
+                .alignment(Alignment::Center),
+            );
 
-            let popup = Paragraph::new(text)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(self.theme.border)
-                );
+            let popup = Paragraph::new(text).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(self.theme.border),
+            );
 
             frame.render_widget(popup, popup_area);
         }

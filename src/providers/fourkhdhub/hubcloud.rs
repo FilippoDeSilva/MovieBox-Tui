@@ -92,21 +92,24 @@ fn extract_hubcloud_drive_url(html: &str) -> Option<String> {
         let raw = node.value().attr("href")?;
         let url = Url::parse(raw).ok()?;
         let host = url.host_str()?;
-        (host.contains("hubcloud.") && url.path().starts_with("/drive/"))
-            .then(|| url.to_string())
+        (host.contains("hubcloud.") && url.path().starts_with("/drive/")).then(|| url.to_string())
     })
 }
 
 fn extract_script_pixeldrain_urls(html: &str) -> Vec<String> {
     let mut urls = Vec::new();
-    
+
     let mut search_prefix = |prefix: &str| {
         let mut remainder = html;
         while let Some(url_offset) = remainder.find(prefix) {
             let candidate = &remainder[url_offset..];
             let end = candidate
                 .find(|character: char| {
-                    character == '"' || character == '\'' || character.is_whitespace() || character == '<' || character == '\\'
+                    character == '"'
+                        || character == '\''
+                        || character.is_whitespace()
+                        || character == '<'
+                        || character == '\\'
                 })
                 .unwrap_or(candidate.len());
             if let Some(url) = pixeldrain_api_url(&candidate[..end])
@@ -133,10 +136,9 @@ fn pixeldrain_api_url(raw: &str) -> Option<String> {
     }
     let id = if let Some(stripped) = url.path().strip_prefix("/u/") {
         stripped.trim_matches('/')
-    } else if let Some(stripped) = url.path().strip_prefix("/api/file/") {
-        stripped.trim_matches('/')
     } else {
-        return None;
+        let stripped = url.path().strip_prefix("/api/file/")?;
+        stripped.trim_matches('/')
     };
     if id.is_empty()
         || !id
@@ -151,9 +153,7 @@ fn pixeldrain_api_url(raw: &str) -> Option<String> {
 fn validate_resolver_url(raw: &str) -> Result<(), FourKHdHubError> {
     let url = Url::parse(raw).map_err(|_| FourKHdHubError::InvalidUrl(raw.into()))?;
     let host = url.host_str().unwrap_or_default();
-    if url.scheme() != "https"
-        || !host.contains("hubcloud.")
-        || !url.path().starts_with("/drive/")
+    if url.scheme() != "https" || !host.contains("hubcloud.") || !url.path().starts_with("/drive/")
     {
         return Err(FourKHdHubError::InvalidUrl(raw.into()));
     }
@@ -163,10 +163,7 @@ fn validate_resolver_url(raw: &str) -> Result<(), FourKHdHubError> {
 fn validate_hubdrive_url(raw: &str) -> Result<(), FourKHdHubError> {
     let url = Url::parse(raw).map_err(|_| FourKHdHubError::InvalidUrl(raw.into()))?;
     let host = url.host_str().unwrap_or_default();
-    if url.scheme() != "https"
-        || !host.contains("hubdrive.")
-        || !url.path().starts_with("/file/")
-    {
+    if url.scheme() != "https" || !host.contains("hubdrive.") || !url.path().starts_with("/file/") {
         return Err(FourKHdHubError::InvalidUrl(raw.into()));
     }
     Ok(())
