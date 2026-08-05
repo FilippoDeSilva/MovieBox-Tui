@@ -3257,7 +3257,14 @@ impl App {
                         let sender = self.action_sender.clone();
                         let link_clone = link.clone();
                         tokio::spawn(async move {
+                            if let Some(res) = crate::cache::get_captions_cache(&subject_id, &rid) {
+                                sender
+                                    .send(Action::ShowSubtitlePopup(link_clone.clone(), res, open_with))
+                                    .ok();
+                                return;
+                            }
                             if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
+                                crate::cache::set_captions_cache(&subject_id, &rid, &res);
                                 sender
                                     .send(Action::ShowSubtitlePopup(link_clone, res, open_with))
                                     .ok();

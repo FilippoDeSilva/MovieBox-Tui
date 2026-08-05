@@ -386,3 +386,18 @@ pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {
         }
     }
 }
+
+pub fn get_captions_path(subject_id: &str, resource_id: &str) -> PathBuf {
+    let mut path = get_provider_cache_dir(ProviderKind::MovieBox, "captions");
+    let hashed_id = hash_key(&format!("{}_{}", subject_id, resource_id));
+    path.push(format!("captions_{}.json", hashed_id));
+    path
+}
+
+pub fn get_captions_cache(subject_id: &str, resource_id: &str) -> Option<serde_json::Value> {
+    read_json_cache(&get_captions_path(subject_id, resource_id), CACHE_EXPIRY_SECS)
+}
+
+pub fn set_captions_cache(subject_id: &str, resource_id: &str, data: &serde_json::Value) {
+    write_json_cache(&get_captions_path(subject_id, resource_id), data);
+}
