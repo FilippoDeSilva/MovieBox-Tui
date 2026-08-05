@@ -154,7 +154,7 @@ moviebox-tui
 | ---------- | ----------------------------------------------------- |
 | Arrow keys | Navigate lists, grids, seasons, episodes, and dialogs |
 | Enter      | Open or confirm selection                             |
-| Esc / `b`  | Close dialog or go back                               |
+| Esc        | Close dialog or go back                               |
 | `o`        | Choose another player                                 |
 | `d`        | Download selected episode or season                   |
 | `r`        | Refresh current content                               |
