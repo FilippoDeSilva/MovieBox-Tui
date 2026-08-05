@@ -26,7 +26,7 @@ jobs:
         with:
           toolchain: 1.90.0
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@82a92a6e8fbc08259452af873d75fb0b04a8b846 # v2
+      - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "ci-quality"
       - run: cargo fmt --check
