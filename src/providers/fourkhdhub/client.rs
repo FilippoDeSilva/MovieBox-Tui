@@ -12,7 +12,7 @@ pub enum FourKHdHubError {
     InvalidUrl(String),
     #[error("parse error: {0}")]
     Parse(String),
-    #[error("no playable mirror resolved")]
+    #[error("Stream links are dead/deleted on the host (No playable mirrors)")]
     NoPlayableMirror,
 }
 
@@ -204,7 +204,7 @@ fn build_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .connect_timeout(std::time::Duration::from_secs(5))
-        .user_agent("Mozilla/5.0 MovieBox-TUI/0.1")
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .unwrap_or_default()
