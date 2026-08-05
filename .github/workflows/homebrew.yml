@@ -12,7 +12,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
           sed -i "s/LINUX_ARM64_SHA256 = \".*\"/LINUX_ARM64_SHA256 = \"${{ steps.release.outputs.linux_arm64_sha }}\"/" "$FORMULA_FILE"
 
       - name: Commit and Push Changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore(homebrew): update formula to v${{ steps.release.outputs.version }}"
           file_pattern: "Formula/moviebox-tui.rb"
