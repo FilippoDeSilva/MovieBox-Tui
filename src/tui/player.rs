@@ -13,19 +13,21 @@ pub fn detect() -> Vec<PlayerKind> {
     #[cfg(target_os = "android")]
     {
         players.push(PlayerKind::AndroidIntent);
-        return players;
     }
 
-    #[cfg(target_os = "macos")]
-    if iina_available() {
-        players.push(PlayerKind::Iina);
-    }
+    #[cfg(not(target_os = "android"))]
+    {
+        #[cfg(target_os = "macos")]
+        if iina_available() {
+            players.push(PlayerKind::Iina);
+        }
 
-    if mpv_executable().is_some() {
-        players.push(PlayerKind::Mpv);
-    }
-    if vlc_executable().is_some() {
-        players.push(PlayerKind::Vlc);
+        if mpv_executable().is_some() {
+            players.push(PlayerKind::Mpv);
+        }
+        if vlc_executable().is_some() {
+            players.push(PlayerKind::Vlc);
+        }
     }
 
     players
