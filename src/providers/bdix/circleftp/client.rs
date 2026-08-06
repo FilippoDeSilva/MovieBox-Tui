@@ -126,43 +126,23 @@ impl CircleFtpClient {
 
         let title_full = json.get("title").and_then(|v| v.as_str()).unwrap_or("");
 
-        let mut prints = None;
-        let mut audios = None;
-
         let t_lower = title_full.to_lowercase();
-        if t_lower.contains("hindi") {
-            audios = Some("Hindi".to_string());
-        } else if t_lower.contains("bengali") || t_lower.contains("bangla") {
-            audios = Some("Bengali".to_string());
-        } else if t_lower.contains("english") {
-            audios = Some("English".to_string());
-        } else if t_lower.contains("tamil") {
-            audios = Some("Tamil".to_string());
-        } else if t_lower.contains("telugu") {
-            audios = Some("Telugu".to_string());
-        } else if t_lower.contains("malayalam") {
-            audios = Some("Malayalam".to_string());
-        } else if t_lower.contains("korean") {
-            audios = Some("Korean".to_string());
-        } else if t_lower.contains("dual audio") {
-            audios = Some("Dual Audio".to_string());
-        } else if t_lower.contains("multi audio") {
-            audios = Some("Multi Audio".to_string());
-        }
+        
+        let audios = [
+            ("hindi", "Hindi"), ("bengali", "Bengali"), ("bangla", "Bengali"),
+            ("english", "English"), ("tamil", "Tamil"), ("telugu", "Telugu"),
+            ("malayalam", "Malayalam"), ("korean", "Korean"),
+            ("dual audio", "Dual Audio"), ("multi audio", "Multi Audio"),
+        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
 
-        if t_lower.contains("cam") || t_lower.contains("hdcam") {
-            prints = Some("CAM".to_string());
-        } else if t_lower.contains("hdtc") || t_lower.contains("tc") {
-            prints = Some("HDTC".to_string());
-        } else if t_lower.contains("hdrip") || t_lower.contains("hd rip") {
-            prints = Some("HDRip".to_string());
-        } else if t_lower.contains("webrip") || t_lower.contains("web-rip") {
-            prints = Some("WEBRip".to_string());
-        } else if t_lower.contains("webdl") || t_lower.contains("web-dl") {
-            prints = Some("WEB-DL".to_string());
-        } else if t_lower.contains("bluray") || t_lower.contains("brrip") {
-            prints = Some("BluRay".to_string());
-        }
+        let prints = [
+            ("cam", "CAM"), ("hdcam", "CAM"),
+            ("hdtc", "HDTC"), ("tc", "HDTC"),
+            ("hdrip", "HDRip"), ("hd rip", "HDRip"),
+            ("webrip", "WEBRip"), ("web-rip", "WEBRip"),
+            ("webdl", "WEB-DL"), ("web-dl", "WEB-DL"),
+            ("bluray", "BluRay"), ("brrip", "BluRay"),
+        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
 
         Ok(MediaDetails {
             id: ProviderMediaId {
@@ -228,31 +208,19 @@ impl CircleFtpClient {
 
         let title_str = json.get("title").and_then(|v| v.as_str()).unwrap_or("");
 
-        let mut codec = None;
-        let mut language = None;
         let t_lower = title_str.to_lowercase();
 
-        if t_lower.contains("x264") || t_lower.contains("h264") {
-            codec = Some("x264".to_string());
-        } else if t_lower.contains("x265") || t_lower.contains("hevc") {
-            codec = Some("HEVC".to_string());
-        } else if t_lower.contains("av1") {
-            codec = Some("AV1".to_string());
-        }
+        let codec = [
+            ("x264", "x264"), ("h264", "x264"),
+            ("x265", "HEVC"), ("hevc", "HEVC"),
+            ("av1", "AV1"),
+        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
 
-        if t_lower.contains("hindi") {
-            language = Some("Hindi".to_string());
-        } else if t_lower.contains("bengali") || t_lower.contains("bangla") {
-            language = Some("Bengali".to_string());
-        } else if t_lower.contains("english") {
-            language = Some("English".to_string());
-        } else if t_lower.contains("tamil") {
-            language = Some("Tamil".to_string());
-        } else if t_lower.contains("telugu") {
-            language = Some("Telugu".to_string());
-        } else if t_lower.contains("malayalam") {
-            language = Some("Malayalam".to_string());
-        }
+        let language = [
+            ("hindi", "Hindi"), ("bengali", "Bengali"), ("bangla", "Bengali"),
+            ("english", "English"), ("tamil", "Tamil"), ("telugu", "Telugu"),
+            ("malayalam", "Malayalam"),
+        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
 
         if r#type == "series" {
             if let (Some(target_s), Some(target_e)) = (season, episode) {
