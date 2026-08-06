@@ -43,9 +43,9 @@ MovieBox-TUI resolves links from upstream services. Availability can change when
 
 ## Requirements
 
-- 64-bit Windows, macOS, or Linux
+- 64-bit Windows, macOS, Linux, or Android (Termux)
 - Terminal size of at least 85×24
-- One supported player: mpv, VLC, or IINA
+- One supported player: mpv, VLC, IINA, or any native Android video player
 - Internet connection
 
 ## Installation
@@ -81,6 +81,17 @@ powershell -Command "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui
 ```
 
 The installer selects x86_64 or ARM64, installs under `%LOCALAPPDATA%\MovieBox-Tui`, and adds that directory to the user PATH. Open a new terminal after first installation.
+
+### Android (Termux)
+
+MovieBox-Tui runs natively in Termux and opens videos directly in your installed Android video apps (VLC, MX Player, etc).
+
+```bash
+pkg install rust openssl pkg-config
+cargo install moviebox-tui --locked
+termux-setup-storage
+```
+*(Running `termux-setup-storage` ensures downloads are saved to your real Android `Download` folder)*
 
 <details>
 <summary><b>Cargo</b></summary>
