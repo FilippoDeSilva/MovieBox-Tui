@@ -20,6 +20,8 @@ Search, browse, play, and download movies, series, anime, and IPTV streams from 
 - Search and browse movies, TV series, and anime from multiple content catalogs
 - Filter search results by resolution and subtitle availability
 
+> **Note on BDIX:** BDIX sources are only accessible from supported Bangladeshi ISP networks. Because of this, they are hidden by default. You can enable them manually if your network supports it.
+
 ### Playback
 
 - Play streams directly in your local media player (mpv, VLC, or IINA)
