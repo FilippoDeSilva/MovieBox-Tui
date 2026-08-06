@@ -70,8 +70,7 @@ fn mpv_command(
     command
         .arg(format!("{prefix}autofit=960x540"))
         .arg(format!("{prefix}autofit-larger=640x360"))
-        .arg(format!("{prefix}geometry=50%:50%"))
-        .arg(url);
+        .arg(format!("{prefix}geometry=50%:50%"));
 
     if !headers.is_empty() {
         let fields = headers
@@ -89,17 +88,30 @@ fn mpv_command(
         }
     }
 
+    command.arg(url);
+
     command
 }
 
 #[cfg(target_os = "macos")]
 fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
     let configured = configured_executable("MOVIEBOX_IINA_PATH");
+    let cli_global = std::path::Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
+    let cli_local = dirs::home_dir().map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli")).unwrap_or_default();
+
     let mut command = if let Some(executable) = configured {
         Command::new(executable)
+    } else if cli_global.exists() {
+        let mut c = Command::new(cli_global);
+        c.arg("--keep-running");
+        c
+    } else if cli_local.exists() {
+        let mut c = Command::new(cli_local);
+        c.arg("--keep-running");
+        c
     } else if iina_app_exists() {
         let mut c = Command::new("open");
-        c.arg("-a").arg("IINA").arg("--args");
+        c.arg("-W").arg("-a").arg("IINA").arg("--args");
         c
     } else {
         Command::new("iina")
