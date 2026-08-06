@@ -1842,7 +1842,24 @@ impl App {
                 }
 
                 if lower_query == "/enable-bdix" || lower_query == "/disable-bdix" {
-                    self.state.bdix_enabled = lower_query == "/enable-bdix";
+                    let enable_req = lower_query == "/enable-bdix";
+
+                    if self.state.bdix_enabled == enable_req {
+                        self.state.search_query.clear();
+                        self.state.input_mode = InputMode::Normal;
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "BDIX Providers",
+                            if enable_req {
+                                "Already Enabled"
+                            } else {
+                                "Already Disabled"
+                            },
+                        );
+                        return None;
+                    }
+
+                    self.state.bdix_enabled = enable_req;
                     self.persist_config();
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
