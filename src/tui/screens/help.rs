@@ -196,13 +196,30 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]);
     }
 
-    let content_width = help_text.iter().map(Line::width).max().unwrap_or(42);
+    let content_width = help_text.iter().map(Line::width).max().unwrap_or(42) as u16;
+    let total_lines = help_text.len() as u16;
+    let available_height = area.height.saturating_sub(4);
+    
+    let two_columns = total_lines > available_height;
+
+    let desired_width = if two_columns {
+        content_width.saturating_mul(2).saturating_add(8)
+    } else {
+        content_width.saturating_add(4)
+    };
+    
+    let desired_height = if two_columns {
+        (total_lines + 1) / 2 + 2
+    } else {
+        total_lines + 2
+    };
+
     let popup_chunk = crate::tui::overlay::centered(
         area,
-        content_width.saturating_add(4) as u16,
-        help_text.len() as u16 + 2,
+        desired_width,
+        desired_height,
         46,
-        64,
+        120,
     );
 
     crate::tui::overlay::clear_modal_area(frame, area, popup_chunk, theme);
@@ -219,9 +236,26 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         })
         .border_style(theme.border_focus);
 
-    let p = Paragraph::new(help_text)
-        .block(block)
-        .alignment(Alignment::Left);
+    if two_columns {
+        let inner = block.inner(popup_chunk);
+        frame.render_widget(block, popup_chunk);
+        
+        let chunks = ratatui::layout::Layout::horizontal([
+            ratatui::layout::Constraint::Percentage(50),
+            ratatui::layout::Constraint::Percentage(50),
+        ]).split(inner);
+        
+        let mid = (help_text.len() + 1) / 2;
+        let left = help_text[..mid].to_vec();
+        let right = help_text[mid..].to_vec();
+        
+        frame.render_widget(Paragraph::new(left).alignment(Alignment::Left), chunks[0]);
+        frame.render_widget(Paragraph::new(right).alignment(Alignment::Left), chunks[1]);
+    } else {
+        let p = Paragraph::new(help_text)
+            .block(block)
+            .alignment(Alignment::Left);
 
-    frame.render_widget(p, popup_chunk);
+        frame.render_widget(p, popup_chunk);
+    }
 }
