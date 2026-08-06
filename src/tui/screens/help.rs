@@ -101,6 +101,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Clear App Cache", theme.text),
             ]),
             Line::from(vec![
+                Span::styled("    /enable-bdix   ", theme.header),
+                Span::styled("Enable BDIX FTP", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /disable-bdix  ", theme.header),
+                Span::styled("Disable BDIX FTP", theme.text),
+            ]),
+            Line::from(vec![
                 Span::styled("    /theme         ", theme.header),
                 Span::styled("Change UI Theme", theme.text),
             ]),
@@ -172,6 +180,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Line::from(vec![
                 Span::styled("    /clear-cache   ", theme.header),
                 Span::styled("Clear App Cache", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /enable-bdix   ", theme.header),
+                Span::styled("Enable BDIX FTP", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /disable-bdix  ", theme.header),
+                Span::styled("Disable BDIX FTP", theme.text),
             ]),
             Line::from(vec![
                 Span::styled("    /theme         ", theme.header),

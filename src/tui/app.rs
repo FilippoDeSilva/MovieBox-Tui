@@ -48,6 +48,7 @@ pub struct App {
     theme: Theme,
     client: MovieBoxClient,
     fourk_client: FourKHdHubClient,
+    circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient,
     action_sender: mpsc::UnboundedSender<Action>,
     action_receiver: mpsc::UnboundedReceiver<Action>,
 }
@@ -88,6 +89,11 @@ impl App {
                     {
                         state.active_theme_kind = theme_val.to_string();
                     }
+                    if let Some(bdix) =
+                        config_json.get("bdix_enabled").and_then(|v| v.as_bool())
+                    {
+                        state.bdix_enabled = bdix;
+                    }
                 }
             }
         }
@@ -106,6 +112,7 @@ impl App {
             state,
             client: MovieBoxClient::new(),
             fourk_client: FourKHdHubClient::new(),
+            circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient::new(),
             action_sender,
             action_receiver,
         }
@@ -133,7 +140,8 @@ impl App {
                 "auto_update": self.state.auto_update,
                 "last_update_check": self.state.last_update_check,
                 "active_provider": self.state.active_provider.cache_key(),
-                "active_theme": self.state.active_theme_kind
+                "active_theme": self.state.active_theme_kind,
+                "bdix_enabled": self.state.bdix_enabled
             });
             let path = app_dir.join("config.json");
             let temporary = app_dir.join(format!("config.{}.tmp", std::process::id()));
@@ -280,11 +288,18 @@ impl App {
     }
 
     fn cycle_provider(&mut self) {
-        let current = ProviderKind::ENABLED
+        let available_providers: Vec<ProviderKind> = ProviderKind::ENABLED
+            .into_iter()
+            .filter(|p| !p.is_bdix() || self.state.bdix_enabled)
+            .collect();
+            
+        if available_providers.is_empty() { return; }
+
+        let current = available_providers
             .iter()
             .position(|provider| *provider == self.state.active_provider)
             .unwrap_or(0);
-        let next = ProviderKind::ENABLED[(current + 1) % ProviderKind::ENABLED.len()];
+        let next = available_providers[(current + 1) % available_providers.len()];
         self.switch_provider(next);
     }
 
@@ -1589,14 +1604,23 @@ impl App {
                             self.state.selected_episode
                         };
                         let id_clone = id.clone();
+                        let id_clone_2 = id.clone();
                         let provider = self.state.active_provider;
                         tokio::task::spawn_blocking(move || {
                             crate::cache::invalidate_provider_stream_cache(
                                 provider, &id_clone, se, ep,
                             );
+                            crate::cache::invalidate_provider_details_cache(
+                                provider, &id_clone_2,
+                            );
                         });
                         self.state.selected_season = se;
                         self.state.selected_episode = ep;
+                        
+                        self.action_sender
+                            .send(Action::FetchDetails(id.clone(), true))
+                            .ok();
+                            
                         self.action_sender
                             .send(Action::FetchEpisodeStreams {
                                 subject_id: id,
@@ -1803,6 +1827,35 @@ impl App {
                     );
                     return None;
                 }
+                
+                if lower_query == "/enable-bdix" || lower_query == "/disable-bdix" {
+                    self.state.bdix_enabled = lower_query == "/enable-bdix";
+                    self.persist_config();
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "BDIX Providers",
+                        if self.state.bdix_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        },
+                    );
+                    
+                    if !self.state.bdix_enabled && self.state.active_provider.is_bdix() {
+                        let mut new_provider = crate::providers::models::ProviderKind::MovieBox;
+                        for provider in crate::providers::models::ProviderKind::ENABLED.iter() {
+                            if !provider.is_bdix() {
+                                new_provider = *provider;
+                                break;
+                            }
+                        }
+                        self.action_sender.send(Action::SwitchProvider(new_provider)).ok();
+                    }
+                    
+                    return None;
+                }
 
                 if self.state.is_tv_mode {
                     if lower_query == "/config" {
@@ -1948,6 +2001,7 @@ impl App {
                 let sender = self.action_sender.clone();
                 let client = self.client.clone();
                 let fourk_client = self.fourk_client.clone();
+                let circleftp_client = self.circleftp_client.clone();
                 let context = self.request_context();
                 tokio::spawn(async move {
                     if !force_refresh {
@@ -1977,6 +2031,11 @@ impl App {
                             .search(&query_clone)
                             .await
                             .map(|items| search_to_moviebox_json(&items))
+                            .map_err(|error| error.to_string()),
+                        ProviderKind::BdixCircleFtp => circleftp_client
+                            .search(&query_clone)
+                            .await
+                            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
                             .map_err(|error| error.to_string()),
                     };
                     match result {
@@ -2618,6 +2677,7 @@ impl App {
                                 let query = self.state.search_query.clone();
                                 let client = self.client.clone();
                                 let fourk_client = self.fourk_client.clone();
+                                let circleftp_client = self.circleftp_client.clone();
                                 let sender = self.action_sender.clone();
                                 let context = self.request_context();
                                 self.state.is_loading = true;
@@ -2633,6 +2693,11 @@ impl App {
                                             .search(&query)
                                             .await
                                             .map(|items| search_to_moviebox_json(&items))
+                                            .map_err(|error| error.to_string()),
+                                        ProviderKind::BdixCircleFtp => circleftp_client
+                                            .search(&query)
+                                            .await
+                                            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
                                             .map_err(|error| error.to_string()),
                                     };
                                     match result {
@@ -2847,6 +2912,7 @@ impl App {
                 self.state.stream_pool.clear();
                 let client = self.client.clone();
                 let fourk_client = self.fourk_client.clone();
+                let circleftp_client = self.circleftp_client.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
                 let context = self.request_context();
@@ -2876,6 +2942,11 @@ impl App {
                             .details(&id_clone)
                             .await
                             .map(|details| details_to_moviebox_json(&details))
+                            .map_err(|error| error.to_string()),
+                        ProviderKind::BdixCircleFtp => circleftp_client
+                            .details(&id_clone)
+                            .await
+                            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
                             .map_err(|error| error.to_string()),
                     };
                     match result {
@@ -2974,7 +3045,7 @@ impl App {
                     }
                     return None;
                 }
-                if self.state.active_provider == ProviderKind::FourKHdHub {
+                if self.state.active_provider == ProviderKind::FourKHdHub || self.state.active_provider == ProviderKind::BdixCircleFtp {
                     self.state.preview_loading = false;
                     self.state.search_preview = None;
                     return None;
@@ -3212,7 +3283,25 @@ impl App {
                             "Preparing playback",
                             "Resolving the selected mirror.",
                         );
-                        let client = self.fourk_client.clone();
+                        let client = if release.provider == ProviderKind::BdixCircleFtp {
+                            let sender_clone = self.action_sender.clone();
+                            let source = crate::providers::models::PlaybackSource::bare(
+                                ProviderKind::BdixCircleFtp,
+                                release.mirrors[0].resolver_url.clone(),
+                                None
+                            );
+                            if open_with {
+                                sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
+                            } else {
+                                sender_clone.send(Action::LaunchPlayback(
+                                    crate::tui::state::PlayerKind::Mpv,
+                                    source
+                                )).ok();
+                            }
+                            return None;
+                        } else {
+                            self.fourk_client.clone()
+                        };
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
                             match client.resolve_release(&release).await {
@@ -3436,7 +3525,18 @@ impl App {
                             "Preparing download",
                             "Resolving the selected mirror.",
                         );
-                        let client = self.fourk_client.clone();
+                        let client = if release.provider == ProviderKind::BdixCircleFtp {
+                            let sender_clone = self.action_sender.clone();
+                            let source = crate::providers::models::PlaybackSource::bare(
+                                ProviderKind::BdixCircleFtp,
+                                release.mirrors[0].resolver_url.clone(),
+                                None
+                            );
+                            sender_clone.send(Action::StartDownload(subtitle_url, Some(source.url))).ok();
+                            return None;
+                        } else {
+                            self.fourk_client.clone()
+                        };
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
                             match client.resolve_release(&release).await {
@@ -3953,12 +4053,18 @@ impl App {
                     }
                 }
 
-                if context.provider == ProviderKind::FourKHdHub {
+                if context.provider == ProviderKind::FourKHdHub || context.provider == ProviderKind::BdixCircleFtp {
                     let sender = self.action_sender.clone();
-                    let client = self.fourk_client.clone();
+                    let fourk_client = self.fourk_client.clone();
+                    let circleftp_client = self.circleftp_client.clone();
                     let id = subject_id.clone();
                     tokio::spawn(async move {
-                        match client.releases(&id, season, episode).await {
+                        let result = if context.provider == ProviderKind::FourKHdHub {
+                            fourk_client.releases(&id, season, episode).await.map_err(|e| e.to_string())
+                        } else {
+                            circleftp_client.releases(&id, Some(season), Some(episode)).await.map_err(|e| e.to_string())
+                        };
+                        match result {
                             Ok(releases) if !releases.is_empty() => {
                                 sender
                                     .send(Action::EpisodeStreamsReady(

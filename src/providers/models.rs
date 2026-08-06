@@ -7,15 +7,17 @@ pub enum ProviderKind {
     #[default]
     MovieBox,
     FourKHdHub,
+    BdixCircleFtp,
 }
 
 impl ProviderKind {
-    pub const ENABLED: [Self; 2] = [Self::MovieBox, Self::FourKHdHub];
+    pub const ENABLED: [Self; 3] = [Self::MovieBox, Self::FourKHdHub, Self::BdixCircleFtp];
 
     pub const fn cache_key(self) -> &'static str {
         match self {
             Self::MovieBox => "moviebox",
             Self::FourKHdHub => "fourkhdhub",
+            Self::BdixCircleFtp => "bdix_circleftp",
         }
     }
 
@@ -23,7 +25,12 @@ impl ProviderKind {
         match self {
             Self::MovieBox => "MovieBox",
             Self::FourKHdHub => "4KHDHub",
+            Self::BdixCircleFtp => "CircleFTP (BDIX)",
         }
+    }
+
+    pub const fn is_bdix(self) -> bool {
+        matches!(self, Self::BdixCircleFtp)
     }
 }
 
@@ -89,6 +96,7 @@ pub struct MediaDetails {
     pub prints: Option<String>,
     pub audios: Option<String>,
     pub poster_url: Option<String>,
+    pub duration: Option<String>,
     pub genres: Vec<String>,
     pub seasons: Vec<Season>,
 }

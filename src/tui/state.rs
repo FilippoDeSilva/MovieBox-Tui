@@ -148,6 +148,7 @@ pub struct AppState {
     pub pending_play_link: Option<String>,
     pub pending_open_with: bool,
     pub basic_terminal: bool,
+    pub bdix_enabled: bool,
 
     pub is_tv_mode: bool,
     pub tv_config_popup: bool,
@@ -252,6 +253,7 @@ impl Default for AppState {
             subtitle_list_state: ListState::default(),
             pending_play_link: None,
             pending_open_with: false,
+            bdix_enabled: false,
             is_tv_mode: false,
             tv_config_popup: false,
             tv_channels: Vec::new(),

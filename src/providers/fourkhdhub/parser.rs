@@ -109,6 +109,7 @@ pub fn parse_details(id: &str, html: &str) -> Result<MediaDetails, FourKHdHubErr
         prints: find_metadata(&document, "Prints:").or_else(|| find_metadata(&document, "Print:")),
         audios: find_metadata(&document, "Audios:"),
         poster_url,
+        duration: None,
         genres,
         seasons,
     })
@@ -265,6 +266,7 @@ pub fn details_to_moviebox_json(details: &MediaDetails) -> serde_json::Value {
         "stars": details.stars,
         "prints": details.prints,
         "audios": details.audios,
+        "duration": details.duration,
         "cover": { "url": details.poster_url },
         "genre": details.genres,
         "seasons": { "seasons": seasons }

@@ -164,6 +164,11 @@ pub fn get_provider_details_cache(
     )
 }
 
+pub fn invalidate_provider_details_cache(provider: ProviderKind, subject_id: &str) {
+    let path = get_provider_details_path(provider, subject_id);
+    let _ = fs::remove_file(path);
+}
+
 pub fn get_search_path(query: &str) -> PathBuf {
     get_provider_search_path(ProviderKind::MovieBox, query)
 }

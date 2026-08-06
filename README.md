@@ -176,6 +176,8 @@ moviebox-tui
 | `/update`            | Check for a newer release                 |
 | `/toggle-update`     | Enable or disable automatic update checks |
 | `/clear-cache`       | Remove cached application data            |
+| `/enable-bdix`       | Enable BDIX FTP sources                   |
+| `/disable-bdix`      | Disable BDIX FTP sources                  |
 
 `/update` checks availability and shows the release location; it does not replace the running binary. Re-run the installer or Homebrew upgrade command to update.
 
