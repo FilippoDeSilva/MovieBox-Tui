@@ -186,6 +186,20 @@ impl CircleFtpClient {
         })
     }
 
+    async fn fetch_size(&self, link: &str) -> Option<u64> {
+        self.client
+            .head(link)
+            .send()
+            .await
+            .ok()?
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)?
+            .to_str()
+            .ok()?
+            .parse::<u64>()
+            .ok()
+    }
+
     pub async fn releases(
         &self,
         id: &str,
@@ -256,6 +270,7 @@ impl CircleFtpClient {
                                         .replace("%29", ")")
                                         .replace("%5B", "[")
                                         .replace("%5D", "]");
+                                    let size_bytes = self.fetch_size(link).await;
 
                                     releases.push(Release {
                                         provider: ProviderKind::BdixCircleFtp,
@@ -263,7 +278,7 @@ impl CircleFtpClient {
                                         quality: quality.clone(),
                                         codec: codec.clone(),
                                         language: language.clone(),
-                                        size_bytes: None,
+                                        size_bytes,
                                         season: Some(target_s),
                                         episode: Some(target_e),
                                         mirrors: vec![SourceMirror {
@@ -290,6 +305,7 @@ impl CircleFtpClient {
                     .replace("%29", ")")
                     .replace("%5B", "[")
                     .replace("%5D", "]");
+                let size_bytes = self.fetch_size(content).await;
 
                 releases.push(Release {
                     provider: ProviderKind::BdixCircleFtp,
@@ -297,7 +313,7 @@ impl CircleFtpClient {
                     quality: quality.clone(),
                     codec: codec.clone(),
                     language: language.clone(),
-                    size_bytes: None,
+                    size_bytes,
                     season: None,
                     episode: None,
                     mirrors: vec![SourceMirror {
