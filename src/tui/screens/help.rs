@@ -209,7 +209,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     };
 
     let desired_height = if two_columns {
-        (total_lines + 1) / 2 + 2
+        total_lines.div_ceil(2) + 2
     } else {
         total_lines + 2
     };
@@ -240,7 +240,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ])
         .split(inner);
 
-        let mid = (help_text.len() + 1) / 2;
+        let mid = help_text.len().div_ceil(2);
         let left = help_text[..mid].to_vec();
         let right = help_text[mid..].to_vec();
 
