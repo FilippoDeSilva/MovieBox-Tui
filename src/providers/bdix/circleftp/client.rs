@@ -2,10 +2,11 @@ use std::time::Duration;
 use thiserror::Error;
 
 use crate::providers::models::{
-    CatalogItem, Episode, MediaDetails, MediaType, ProviderKind, ProviderMediaId, Release, Season, SourceMirror,
+    CatalogItem, Episode, MediaDetails, MediaType, ProviderKind, ProviderMediaId, Release, Season,
+    SourceMirror,
 };
 
-use super::parser::{search_to_moviebox_json, CircleFtpSearchResponse};
+use super::parser::{CircleFtpSearchResponse, search_to_moviebox_json};
 
 #[derive(Debug, Error)]
 pub enum CircleFtpError {
@@ -41,11 +42,9 @@ impl CircleFtpClient {
         url.query_pairs_mut()
             .append_pair("searchTerm", query)
             .append_pair("order", "desc");
-            
-        let resp = self.client.get(url)
-            .send()
-            .await?;
-            
+
+        let resp = self.client.get(url).send().await?;
+
         let search_resp: CircleFtpSearchResponse = resp.json().await?;
         Ok(search_to_moviebox_json(&search_resp))
     }
@@ -54,10 +53,19 @@ impl CircleFtpClient {
         let url = format!("{}/posts/{}", self.base_url, id);
         let resp = self.client.get(&url).send().await?;
         let json: serde_json::Value = resp.json().await?;
-        
-        let title = json.get("title").or(json.get("name")).and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+
+        let title = json
+            .get("title")
+            .or(json.get("name"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown")
+            .to_string();
         let r#type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        let media_type = if r#type == "series" { MediaType::Series } else { MediaType::Movie };
+        let media_type = if r#type == "series" {
+            MediaType::Series
+        } else {
+            MediaType::Movie
+        };
         let year = json.get("year").and_then(|v| {
             if v.is_number() {
                 Some(v.to_string())
@@ -65,11 +73,13 @@ impl CircleFtpClient {
                 v.as_str().map(|s| s.to_string())
             }
         });
-        
-        let poster_url = json.get("image").or(json.get("imageSm"))
+
+        let poster_url = json
+            .get("image")
+            .or(json.get("imageSm"))
             .and_then(|v| v.as_str())
             .map(|s| format!("http://new.circleftp.net:5000/uploads/{}", s));
-        
+
         let mut seasons = Vec::new();
         if media_type == MediaType::Series {
             if let Some(content) = json.get("content").and_then(|v| v.as_array()) {
@@ -77,7 +87,10 @@ impl CircleFtpClient {
                     let mut episodes = Vec::new();
                     if let Some(ep_arr) = s_val.get("episodes").and_then(|v| v.as_array()) {
                         for (e_idx, e_val) in ep_arr.iter().enumerate() {
-                            let ep_title = e_val.get("title").and_then(|v| v.as_str()).map(|s| s.to_string());
+                            let ep_title = e_val
+                                .get("title")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
                             episodes.push(Episode {
                                 season: s_idx + 1,
                                 number: e_idx + 1,
@@ -92,10 +105,16 @@ impl CircleFtpClient {
                 }
             }
         }
-        
-        let description = json.get("metaData").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let duration = json.get("watchTime").and_then(|v| v.as_str()).map(|s| s.to_string());
-        
+
+        let description = json
+            .get("metaData")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let duration = json
+            .get("watchTime")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         let mut genres = Vec::new();
         if let Some(cats) = json.get("categories").and_then(|v| v.as_array()) {
             for cat in cats {
@@ -104,29 +123,46 @@ impl CircleFtpClient {
                 }
             }
         }
-        
+
         let title_full = json.get("title").and_then(|v| v.as_str()).unwrap_or("");
-        
+
         let mut prints = None;
         let mut audios = None;
-        
+
         let t_lower = title_full.to_lowercase();
-        if t_lower.contains("hindi") { audios = Some("Hindi".to_string()); }
-        else if t_lower.contains("bengali") || t_lower.contains("bangla") { audios = Some("Bengali".to_string()); }
-        else if t_lower.contains("english") { audios = Some("English".to_string()); }
-        else if t_lower.contains("tamil") { audios = Some("Tamil".to_string()); }
-        else if t_lower.contains("telugu") { audios = Some("Telugu".to_string()); }
-        else if t_lower.contains("malayalam") { audios = Some("Malayalam".to_string()); }
-        else if t_lower.contains("korean") { audios = Some("Korean".to_string()); }
-        else if t_lower.contains("dual audio") { audios = Some("Dual Audio".to_string()); }
-        else if t_lower.contains("multi audio") { audios = Some("Multi Audio".to_string()); }
-        
-        if t_lower.contains("cam") || t_lower.contains("hdcam") { prints = Some("CAM".to_string()); }
-        else if t_lower.contains("hdtc") || t_lower.contains("tc") { prints = Some("HDTC".to_string()); }
-        else if t_lower.contains("hdrip") || t_lower.contains("hd rip") { prints = Some("HDRip".to_string()); }
-        else if t_lower.contains("webrip") || t_lower.contains("web-rip") { prints = Some("WEBRip".to_string()); }
-        else if t_lower.contains("webdl") || t_lower.contains("web-dl") { prints = Some("WEB-DL".to_string()); }
-        else if t_lower.contains("bluray") || t_lower.contains("brrip") { prints = Some("BluRay".to_string()); }
+        if t_lower.contains("hindi") {
+            audios = Some("Hindi".to_string());
+        } else if t_lower.contains("bengali") || t_lower.contains("bangla") {
+            audios = Some("Bengali".to_string());
+        } else if t_lower.contains("english") {
+            audios = Some("English".to_string());
+        } else if t_lower.contains("tamil") {
+            audios = Some("Tamil".to_string());
+        } else if t_lower.contains("telugu") {
+            audios = Some("Telugu".to_string());
+        } else if t_lower.contains("malayalam") {
+            audios = Some("Malayalam".to_string());
+        } else if t_lower.contains("korean") {
+            audios = Some("Korean".to_string());
+        } else if t_lower.contains("dual audio") {
+            audios = Some("Dual Audio".to_string());
+        } else if t_lower.contains("multi audio") {
+            audios = Some("Multi Audio".to_string());
+        }
+
+        if t_lower.contains("cam") || t_lower.contains("hdcam") {
+            prints = Some("CAM".to_string());
+        } else if t_lower.contains("hdtc") || t_lower.contains("tc") {
+            prints = Some("HDTC".to_string());
+        } else if t_lower.contains("hdrip") || t_lower.contains("hd rip") {
+            prints = Some("HDRip".to_string());
+        } else if t_lower.contains("webrip") || t_lower.contains("web-rip") {
+            prints = Some("WEBRip".to_string());
+        } else if t_lower.contains("webdl") || t_lower.contains("web-dl") {
+            prints = Some("WEB-DL".to_string());
+        } else if t_lower.contains("bluray") || t_lower.contains("brrip") {
+            prints = Some("BluRay".to_string());
+        }
 
         Ok(MediaDetails {
             id: ProviderMediaId {
@@ -159,38 +195,51 @@ impl CircleFtpClient {
         let url = format!("{}/posts/{}", self.base_url, id);
         let resp = self.client.get(&url).send().await?;
         let json: serde_json::Value = resp.json().await?;
-        
+
         let mut releases = Vec::new();
         let r#type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        
+
         let quality_str = json.get("quality").and_then(|v| v.as_str()).unwrap_or("HD");
         let quality = if quality_str.to_lowercase().contains("1080p") {
             Some("1080p".to_string())
         } else if quality_str.to_lowercase().contains("720p") {
             Some("720p".to_string())
-        } else if quality_str.to_lowercase().contains("4k") || quality_str.to_lowercase().contains("2160p") {
+        } else if quality_str.to_lowercase().contains("4k")
+            || quality_str.to_lowercase().contains("2160p")
+        {
             Some("4k".to_string())
         } else {
             Some(quality_str.to_string())
         };
-        
+
         let title_str = json.get("title").and_then(|v| v.as_str()).unwrap_or("");
-        
+
         let mut codec = None;
         let mut language = None;
         let t_lower = title_str.to_lowercase();
-        
-        if t_lower.contains("x264") || t_lower.contains("h264") { codec = Some("x264".to_string()); }
-        else if t_lower.contains("x265") || t_lower.contains("hevc") { codec = Some("HEVC".to_string()); }
-        else if t_lower.contains("av1") { codec = Some("AV1".to_string()); }
-        
-        if t_lower.contains("hindi") { language = Some("Hindi".to_string()); }
-        else if t_lower.contains("bengali") || t_lower.contains("bangla") { language = Some("Bengali".to_string()); }
-        else if t_lower.contains("english") { language = Some("English".to_string()); }
-        else if t_lower.contains("tamil") { language = Some("Tamil".to_string()); }
-        else if t_lower.contains("telugu") { language = Some("Telugu".to_string()); }
-        else if t_lower.contains("malayalam") { language = Some("Malayalam".to_string()); }
-        
+
+        if t_lower.contains("x264") || t_lower.contains("h264") {
+            codec = Some("x264".to_string());
+        } else if t_lower.contains("x265") || t_lower.contains("hevc") {
+            codec = Some("HEVC".to_string());
+        } else if t_lower.contains("av1") {
+            codec = Some("AV1".to_string());
+        }
+
+        if t_lower.contains("hindi") {
+            language = Some("Hindi".to_string());
+        } else if t_lower.contains("bengali") || t_lower.contains("bangla") {
+            language = Some("Bengali".to_string());
+        } else if t_lower.contains("english") {
+            language = Some("English".to_string());
+        } else if t_lower.contains("tamil") {
+            language = Some("Tamil".to_string());
+        } else if t_lower.contains("telugu") {
+            language = Some("Telugu".to_string());
+        } else if t_lower.contains("malayalam") {
+            language = Some("Malayalam".to_string());
+        }
+
         if r#type == "series" {
             if let (Some(target_s), Some(target_e)) = (season, episode) {
                 if let Some(content) = json.get("content").and_then(|v| v.as_array()) {
@@ -198,44 +247,50 @@ impl CircleFtpClient {
                         if let Some(ep_arr) = s_val.get("episodes").and_then(|v| v.as_array()) {
                             if let Some(e_val) = ep_arr.get(target_e.saturating_sub(1)) {
                                 if let Some(link) = e_val.get("link").and_then(|v| v.as_str()) {
-                                    let filename = link.split('/').next_back().unwrap_or("Video File")
+                                    let filename = link
+                                        .split('/')
+                                        .next_back()
+                                        .unwrap_or("Video File")
                                         .replace("%20", " ")
                                         .replace("%28", "(")
                                         .replace("%29", ")")
                                         .replace("%5B", "[")
                                         .replace("%5D", "]");
-                                    
-                                releases.push(Release {
-                                    provider: ProviderKind::BdixCircleFtp,
-                                    filename,
-                                    quality: quality.clone(),
-                                    codec: codec.clone(),
-                                    language: language.clone(),
-                                    size_bytes: None,
-                                    season: Some(target_s),
-                                    episode: Some(target_e),
-                                    mirrors: vec![SourceMirror {
-                                        label: "CircleFTP".to_string(),
-                                        resolver_url: link.to_string(),
-                                        headers: Vec::new(),
-                                        direct_file: true,
-                                    }],
-                                });
+
+                                    releases.push(Release {
+                                        provider: ProviderKind::BdixCircleFtp,
+                                        filename,
+                                        quality: quality.clone(),
+                                        codec: codec.clone(),
+                                        language: language.clone(),
+                                        size_bytes: None,
+                                        season: Some(target_s),
+                                        episode: Some(target_e),
+                                        mirrors: vec![SourceMirror {
+                                            label: "CircleFTP".to_string(),
+                                            resolver_url: link.to_string(),
+                                            headers: Vec::new(),
+                                            direct_file: true,
+                                        }],
+                                    });
+                                }
                             }
                         }
                     }
                 }
             }
-            }
         } else {
             if let Some(content) = json.get("content").and_then(|v| v.as_str()) {
-                let filename = content.split('/').next_back().unwrap_or("Video File")
+                let filename = content
+                    .split('/')
+                    .next_back()
+                    .unwrap_or("Video File")
                     .replace("%20", " ")
                     .replace("%28", "(")
                     .replace("%29", ")")
                     .replace("%5B", "[")
                     .replace("%5D", "]");
-                    
+
                 releases.push(Release {
                     provider: ProviderKind::BdixCircleFtp,
                     filename,
@@ -258,10 +313,7 @@ impl CircleFtpClient {
         Ok(releases)
     }
 
-    pub async fn resolve_release(
-        &self,
-        resolver_url: &str,
-    ) -> Result<String, CircleFtpError> {
+    pub async fn resolve_release(&self, resolver_url: &str) -> Result<String, CircleFtpError> {
         Ok(resolver_url.to_string())
     }
 }

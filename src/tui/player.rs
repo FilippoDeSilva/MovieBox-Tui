@@ -97,7 +97,9 @@ fn mpv_command(
 fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
     let configured = configured_executable("MOVIEBOX_IINA_PATH");
     let cli_global = std::path::Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
-    let cli_local = dirs::home_dir().map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli")).unwrap_or_default();
+    let cli_local = dirs::home_dir()
+        .map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli"))
+        .unwrap_or_default();
 
     let mut command = if let Some(executable) = configured {
         Command::new(executable)

@@ -8,16 +8,23 @@ pub enum ProviderKind {
     MovieBox,
     FourKHdHub,
     BdixCircleFtp,
+    BdixDhakaFlix,
 }
 
 impl ProviderKind {
-    pub const ENABLED: [Self; 3] = [Self::MovieBox, Self::FourKHdHub, Self::BdixCircleFtp];
+    pub const ENABLED: [Self; 4] = [
+        Self::MovieBox,
+        Self::FourKHdHub,
+        Self::BdixCircleFtp,
+        Self::BdixDhakaFlix,
+    ];
 
     pub const fn cache_key(self) -> &'static str {
         match self {
             Self::MovieBox => "moviebox",
             Self::FourKHdHub => "fourkhdhub",
             Self::BdixCircleFtp => "bdix_circleftp",
+            Self::BdixDhakaFlix => "bdix_dhakaflix",
         }
     }
 
@@ -26,11 +33,12 @@ impl ProviderKind {
             Self::MovieBox => "MovieBox",
             Self::FourKHdHub => "4KHDHub",
             Self::BdixCircleFtp => "CircleFTP (BDIX)",
+            Self::BdixDhakaFlix => "DhakaFlix (BDIX)",
         }
     }
 
     pub const fn is_bdix(self) -> bool {
-        matches!(self, Self::BdixCircleFtp)
+        matches!(self, Self::BdixCircleFtp | Self::BdixDhakaFlix)
     }
 }
 

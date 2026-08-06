@@ -1,6 +1,4 @@
-use crate::providers::models::{
-    CatalogItem, MediaType, ProviderKind, ProviderMediaId,
-};
+use crate::providers::models::{CatalogItem, MediaType, ProviderKind, ProviderMediaId};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -39,13 +37,18 @@ pub fn search_to_moviebox_json(response: &CircleFtpSearchResponse) -> Vec<Catalo
     let mut items = Vec::new();
     if let Some(posts) = &response.posts {
         for post in posts {
-            let title = post.title.as_ref().or(post.name.as_ref()).cloned().unwrap_or_else(|| "Unknown".to_string());
+            let title = post
+                .title
+                .as_ref()
+                .or(post.name.as_ref())
+                .cloned()
+                .unwrap_or_else(|| "Unknown".to_string());
             let media_type = if post.r#type.as_deref() == Some("series") {
                 MediaType::Series
             } else {
                 MediaType::Movie
             };
-            
+
             let year = post.year.as_ref().and_then(|y| {
                 if y.is_number() {
                     Some(y.to_string())
@@ -53,11 +56,14 @@ pub fn search_to_moviebox_json(response: &CircleFtpSearchResponse) -> Vec<Catalo
                     y.as_str().map(|s| s.to_string())
                 }
             });
-            
+
             // Try to construct poster URL if an image is provided
-            let poster_url = post.image.as_ref().or(post.image_sm.as_ref())
+            let poster_url = post
+                .image
+                .as_ref()
+                .or(post.image_sm.as_ref())
                 .map(|img| format!("http://new.circleftp.net:5000/uploads/{}", img));
-            
+
             items.push(CatalogItem {
                 id: ProviderMediaId {
                     provider: ProviderKind::BdixCircleFtp,

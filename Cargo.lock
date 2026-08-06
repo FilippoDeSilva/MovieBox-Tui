@@ -1553,6 +1553,7 @@ dependencies = [
  "md-5",
  "mimalloc",
  "open",
+ "percent-encoding",
  "rand 0.10.2",
  "ratatui",
  "ratatui-image",

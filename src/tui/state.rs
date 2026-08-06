@@ -38,6 +38,7 @@ pub struct SearchResult {
     pub release_year: String,
     pub cover_url: Option<String>,
     pub season: usize,
+    pub provider: crate::providers::models::ProviderKind,
 }
 
 #[derive(Debug, Default)]

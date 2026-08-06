@@ -49,6 +49,7 @@ pub struct App {
     client: MovieBoxClient,
     fourk_client: FourKHdHubClient,
     circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient,
+    dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
     action_sender: mpsc::UnboundedSender<Action>,
     action_receiver: mpsc::UnboundedReceiver<Action>,
 }
@@ -89,9 +90,7 @@ impl App {
                     {
                         state.active_theme_kind = theme_val.to_string();
                     }
-                    if let Some(bdix) =
-                        config_json.get("bdix_enabled").and_then(|v| v.as_bool())
-                    {
+                    if let Some(bdix) = config_json.get("bdix_enabled").and_then(|v| v.as_bool()) {
                         state.bdix_enabled = bdix;
                     }
                 }
@@ -113,6 +112,7 @@ impl App {
             client: MovieBoxClient::new(),
             fourk_client: FourKHdHubClient::new(),
             circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient::new(),
+            dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient::new(),
             action_sender,
             action_receiver,
         }
@@ -262,12 +262,18 @@ impl App {
         self.state.search_results.clear();
         self.state.search_suggestions.clear();
         self.state.search_preview = None;
+        self.state.preview_loading = false;
         self.state.selected_details = None;
         self.state.selected_resources = None;
         self.state.active_subject_id = None;
         self.state.available_seasons.clear();
         self.state.available_episode_numbers.clear();
         self.state.stream_pool.clear();
+        self.state.is_resolving_playback = false;
+        self.state.search_posters.clear();
+        self.state.search_poster_protocols.clear();
+        self.state.image_cache.clear();
+        self.state.preview_cache.clear();
         self.state.poster_image = None;
         self.state.poster_protocol = None;
         self.state.search_poster_protocols.clear();
@@ -292,8 +298,10 @@ impl App {
             .into_iter()
             .filter(|p| !p.is_bdix() || self.state.bdix_enabled)
             .collect();
-            
-        if available_providers.is_empty() { return; }
+
+        if available_providers.is_empty() {
+            return;
+        }
 
         let current = available_providers
             .iter()
@@ -1610,17 +1618,15 @@ impl App {
                             crate::cache::invalidate_provider_stream_cache(
                                 provider, &id_clone, se, ep,
                             );
-                            crate::cache::invalidate_provider_details_cache(
-                                provider, &id_clone_2,
-                            );
+                            crate::cache::invalidate_provider_details_cache(provider, &id_clone_2);
                         });
                         self.state.selected_season = se;
                         self.state.selected_episode = ep;
-                        
+
                         self.action_sender
                             .send(Action::FetchDetails(id.clone(), true))
                             .ok();
-                            
+
                         self.action_sender
                             .send(Action::FetchEpisodeStreams {
                                 subject_id: id,
@@ -1827,7 +1833,7 @@ impl App {
                     );
                     return None;
                 }
-                
+
                 if lower_query == "/enable-bdix" || lower_query == "/disable-bdix" {
                     self.state.bdix_enabled = lower_query == "/enable-bdix";
                     self.persist_config();
@@ -1842,7 +1848,7 @@ impl App {
                             "Disabled"
                         },
                     );
-                    
+
                     if !self.state.bdix_enabled && self.state.active_provider.is_bdix() {
                         let mut new_provider = crate::providers::models::ProviderKind::MovieBox;
                         for provider in crate::providers::models::ProviderKind::ENABLED.iter() {
@@ -1851,9 +1857,11 @@ impl App {
                                 break;
                             }
                         }
-                        self.action_sender.send(Action::SwitchProvider(new_provider)).ok();
+                        self.action_sender
+                            .send(Action::SwitchProvider(new_provider))
+                            .ok();
                     }
-                    
+
                     return None;
                 }
 
@@ -1891,6 +1899,7 @@ impl App {
                             release_year: c.group.clone(),
                             cover_url: Some(c.logo.clone()),
                             season: 1,
+                            provider: ProviderKind::MovieBox,
                         })
                         .collect();
                     self.state.is_loading = false;
@@ -1994,6 +2003,7 @@ impl App {
                 self.state.search_suggestions.clear();
                 self.state.suggest_index = None;
                 self.state.search_preview = None;
+                self.state.preview_loading = false;
                 self.state.status_message = format!("Searching for '{}'...", query);
                 self.state.status_timer = 150;
 
@@ -2002,6 +2012,7 @@ impl App {
                 let client = self.client.clone();
                 let fourk_client = self.fourk_client.clone();
                 let circleftp_client = self.circleftp_client.clone();
+                let dhakaflix_client = self.dhakaflix_client.clone();
                 let context = self.request_context();
                 tokio::spawn(async move {
                     if !force_refresh {
@@ -2035,7 +2046,16 @@ impl App {
                         ProviderKind::BdixCircleFtp => circleftp_client
                             .search(&query_clone)
                             .await
-                            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
+                            .map(|items| {
+                                crate::providers::fourkhdhub::search_to_moviebox_json(&items)
+                            })
+                            .map_err(|error| error.to_string()),
+                        ProviderKind::BdixDhakaFlix => dhakaflix_client
+                            .search(&query_clone)
+                            .await
+                            .map(|items| {
+                                crate::providers::fourkhdhub::search_to_moviebox_json(&items)
+                            })
                             .map_err(|error| error.to_string()),
                     };
                     match result {
@@ -2248,6 +2268,7 @@ impl App {
                                 release_year,
                                 cover_url,
                                 season,
+                                provider: context.provider,
                             });
                         }
                     }
@@ -2474,6 +2495,7 @@ impl App {
                             release_year,
                             cover_url,
                             season,
+                            provider: ProviderKind::MovieBox,
                         });
                         count += 1;
                     }
@@ -2678,6 +2700,7 @@ impl App {
                                 let client = self.client.clone();
                                 let fourk_client = self.fourk_client.clone();
                                 let circleftp_client = self.circleftp_client.clone();
+                                let dhakaflix_client = self.dhakaflix_client.clone();
                                 let sender = self.action_sender.clone();
                                 let context = self.request_context();
                                 self.state.is_loading = true;
@@ -2695,6 +2718,11 @@ impl App {
                                             .map(|items| search_to_moviebox_json(&items))
                                             .map_err(|error| error.to_string()),
                                         ProviderKind::BdixCircleFtp => circleftp_client
+                                            .search(&query)
+                                            .await
+                                            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
+                                            .map_err(|error| error.to_string()),
+                                        ProviderKind::BdixDhakaFlix => dhakaflix_client
                                             .search(&query)
                                             .await
                                             .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
@@ -2913,9 +2941,16 @@ impl App {
                 let client = self.client.clone();
                 let fourk_client = self.fourk_client.clone();
                 let circleftp_client = self.circleftp_client.clone();
+                let dhakaflix_client = self.dhakaflix_client.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
-                let context = self.request_context();
+                let mut target_prov = self.state.active_provider;
+                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
+                    target_prov = res.provider;
+                }
+                let mut context = self.request_context();
+                context.provider = target_prov;
+
                 tokio::spawn(async move {
                     if !force_refresh {
                         let id_for_cache = id_clone.clone();
@@ -2946,7 +2981,16 @@ impl App {
                         ProviderKind::BdixCircleFtp => circleftp_client
                             .details(&id_clone)
                             .await
-                            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
+                            .map(|details| {
+                                crate::providers::fourkhdhub::details_to_moviebox_json(&details)
+                            })
+                            .map_err(|error| error.to_string()),
+                        ProviderKind::BdixDhakaFlix => dhakaflix_client
+                            .details(&id_clone)
+                            .await
+                            .map(|details| {
+                                crate::providers::fourkhdhub::details_to_moviebox_json(&details)
+                            })
                             .map_err(|error| error.to_string()),
                     };
                     match result {
@@ -3045,7 +3089,15 @@ impl App {
                     }
                     return None;
                 }
-                if self.state.active_provider == ProviderKind::FourKHdHub || self.state.active_provider == ProviderKind::BdixCircleFtp {
+                let mut prov = self.state.active_provider;
+                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
+                    prov = res.provider;
+                }
+
+                if prov == ProviderKind::FourKHdHub
+                    || prov == ProviderKind::BdixCircleFtp
+                    || prov == ProviderKind::BdixDhakaFlix
+                {
                     self.state.preview_loading = false;
                     self.state.search_preview = None;
                     return None;
@@ -3118,7 +3170,7 @@ impl App {
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
-                let prov = self.state.active_provider;
+
                 tokio::spawn(async move {
                     if let Ok(Some(cached_disk)) = tokio::task::spawn_blocking({
                         let id_clone = id_clone.clone();
@@ -3167,11 +3219,11 @@ impl App {
                         .map(|res| res.id.clone())
                 };
 
+                self.state.preview_loading = false;
+
                 if current_id.as_deref() != Some(id.as_str()) {
                     return None;
                 }
-
-                self.state.preview_loading = false;
 
                 self.state.preview_cache.put(id.clone(), json.clone());
                 self.state.search_preview = Some(json.clone());
@@ -3288,15 +3340,17 @@ impl App {
                             let source = crate::providers::models::PlaybackSource::bare(
                                 ProviderKind::BdixCircleFtp,
                                 release.mirrors[0].resolver_url.clone(),
-                                None
+                                None,
                             );
                             if open_with {
                                 sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
                             } else {
-                                sender_clone.send(Action::LaunchPlayback(
-                                    crate::tui::state::PlayerKind::Mpv,
-                                    source
-                                )).ok();
+                                sender_clone
+                                    .send(Action::LaunchPlayback(
+                                        crate::tui::state::PlayerKind::Mpv,
+                                        source,
+                                    ))
+                                    .ok();
                             }
                             return None;
                         } else {
@@ -3530,9 +3584,11 @@ impl App {
                             let source = crate::providers::models::PlaybackSource::bare(
                                 ProviderKind::BdixCircleFtp,
                                 release.mirrors[0].resolver_url.clone(),
-                                None
+                                None,
                             );
-                            sender_clone.send(Action::StartDownload(subtitle_url, Some(source.url))).ok();
+                            sender_clone
+                                .send(Action::StartDownload(subtitle_url, Some(source.url)))
+                                .ok();
                             return None;
                         } else {
                             self.fourk_client.clone()
@@ -3719,7 +3775,12 @@ impl App {
                 let payload = final_payload;
 
                 if self.state.poster_image.is_none() {
-                    if let Some(cached_img) = self.state.image_cache.get(&id) {
+                    if let Some(cached_img) = self
+                        .state
+                        .image_cache
+                        .get(&id)
+                        .or_else(|| self.state.search_posters.get(&id))
+                    {
                         self.state.poster_image = Some((**cached_img).clone());
                     } else if let Some(cover_val) = payload.get("cover")
                         && let Some(url) = cover_val.get("url").and_then(|u| u.as_str())
@@ -4053,16 +4114,28 @@ impl App {
                     }
                 }
 
-                if context.provider == ProviderKind::FourKHdHub || context.provider == ProviderKind::BdixCircleFtp {
+                if context.provider == ProviderKind::FourKHdHub || context.provider.is_bdix() {
                     let sender = self.action_sender.clone();
                     let fourk_client = self.fourk_client.clone();
                     let circleftp_client = self.circleftp_client.clone();
+                    let dhakaflix_client = self.dhakaflix_client.clone();
                     let id = subject_id.clone();
                     tokio::spawn(async move {
                         let result = if context.provider == ProviderKind::FourKHdHub {
-                            fourk_client.releases(&id, season, episode).await.map_err(|e| e.to_string())
+                            fourk_client
+                                .releases(&id, season, episode)
+                                .await
+                                .map_err(|e| e.to_string())
+                        } else if context.provider == ProviderKind::BdixCircleFtp {
+                            circleftp_client
+                                .releases(&id, Some(season), Some(episode))
+                                .await
+                                .map_err(|e| e.to_string())
                         } else {
-                            circleftp_client.releases(&id, Some(season), Some(episode)).await.map_err(|e| e.to_string())
+                            dhakaflix_client
+                                .streams(&id)
+                                .await
+                                .map_err(|e| e.to_string())
                         };
                         match result {
                             Ok(releases) if !releases.is_empty() => {
