@@ -1663,7 +1663,14 @@ impl App {
             }
             Action::Suggest(query) => {
                 if query.starts_with('/') {
-                    let mut commands = vec!["/clear-cache", "/update", "/toggle-update", "/github"];
+                    let mut commands = vec![
+                        "/clear-cache",
+                        "/update",
+                        "/toggle-update",
+                        "/github",
+                        "/enable-bdix",
+                        "/disable-bdix",
+                    ];
                     if self.state.is_tv_mode {
                         commands.push("/list");
                         commands.push("/config");
