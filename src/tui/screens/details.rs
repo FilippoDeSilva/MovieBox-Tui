@@ -1089,6 +1089,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     crate::tui::state::PlayerKind::Mpv => "mpv",
                     crate::tui::state::PlayerKind::Iina => "IINA",
                     crate::tui::state::PlayerKind::Vlc => "VLC",
+                    crate::tui::state::PlayerKind::AndroidIntent => "Android Player",
                 }
                 .to_string()
             })

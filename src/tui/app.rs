@@ -555,8 +555,21 @@ impl App {
 
         let base_dir = dirs::download_dir()
             .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("MovieBox-TUI");
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+        #[cfg(target_os = "android")]
+        let base_dir = if let Some(home) = dirs::home_dir() {
+            let android_storage = home.join("storage/downloads");
+            if android_storage.exists() {
+                android_storage
+            } else {
+                base_dir
+            }
+        } else {
+            base_dir
+        };
+
+        let base_dir = base_dir.join("MovieBox-TUI");
         let (target_dir, base_name) = if media_type == 2 {
             (
                 base_dir
@@ -1792,18 +1805,7 @@ impl App {
                 }
 
                 if lower_query == "/github" {
-                    #[cfg(target_os = "windows")]
-                    let _ = std::process::Command::new("cmd")
-                        .args(["/C", "start", "https://github.com/mesamirh/MovieBox-Tui"])
-                        .spawn();
-                    #[cfg(target_os = "macos")]
-                    let _ = std::process::Command::new("open")
-                        .arg("https://github.com/mesamirh/MovieBox-Tui")
-                        .spawn();
-                    #[cfg(all(target_os = "linux", not(target_os = "android")))]
-                    let _ = std::process::Command::new("xdg-open")
-                        .arg("https://github.com/mesamirh/MovieBox-Tui")
-                        .spawn();
+                    let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
                     return None;
@@ -3578,6 +3580,7 @@ impl App {
                             crate::tui::state::PlayerKind::Mpv => "MPV",
                             crate::tui::state::PlayerKind::Iina => "IINA",
                             crate::tui::state::PlayerKind::Vlc => "VLC",
+                            crate::tui::state::PlayerKind::AndroidIntent => "Android Player",
                         };
                         self.state.notify(
                             NotificationKind::Info,

@@ -6,6 +6,7 @@ pub enum PlayerKind {
     Mpv,
     Iina,
     Vlc,
+    AndroidIntent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

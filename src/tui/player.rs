@@ -10,6 +10,12 @@ const VLC_MACOS: &str = "/Applications/VLC.app/Contents/MacOS/VLC";
 pub fn detect() -> Vec<PlayerKind> {
     let mut players = Vec::new();
 
+    #[cfg(target_os = "android")]
+    {
+        players.push(PlayerKind::AndroidIntent);
+        return players;
+    }
+
     #[cfg(target_os = "macos")]
     if iina_available() {
         players.push(PlayerKind::Iina);
@@ -26,6 +32,9 @@ pub fn detect() -> Vec<PlayerKind> {
 }
 
 pub fn supports_headers(kind: PlayerKind, headers: &[(String, String)]) -> bool {
+    if kind == PlayerKind::AndroidIntent {
+        return false;
+    }
     kind != PlayerKind::Vlc
         || headers.iter().all(|(name, _)| {
             name.eq_ignore_ascii_case("referer") || name.eq_ignore_ascii_case("user-agent")
@@ -42,7 +51,21 @@ pub fn command(
         PlayerKind::Mpv => mpv_command(url, subtitle, headers, false),
         PlayerKind::Iina => iina_command(url, subtitle, headers),
         PlayerKind::Vlc => vlc_command(url, subtitle, headers),
+        PlayerKind::AndroidIntent => android_intent_command(url),
     }
+}
+
+fn android_intent_command(url: &str) -> Command {
+    let mut command = Command::new("am");
+    command
+        .arg("start")
+        .arg("-a")
+        .arg("android.intent.action.VIEW")
+        .arg("-d")
+        .arg(url)
+        .arg("-t")
+        .arg("video/*");
+    command
 }
 
 fn mpv_command(

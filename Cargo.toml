@@ -24,7 +24,6 @@ md-5 = "0.11.0"
 rand = "0.10.2"
 ratatui = "0.30.2"
 ratatui-image = { version = "11.0.6", default-features = false, features = ["crossterm"] }
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 rustls = { version = "0.23.42", default-features = false, features = ["ring", "std"] }
 scraper = "0.27.0"
 semver = "1.0.28"
@@ -55,3 +54,9 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "native-tls"] }

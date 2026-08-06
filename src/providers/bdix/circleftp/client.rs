@@ -127,22 +127,40 @@ impl CircleFtpClient {
         let title_full = json.get("title").and_then(|v| v.as_str()).unwrap_or("");
 
         let t_lower = title_full.to_lowercase();
-        
+
         let audios = [
-            ("hindi", "Hindi"), ("bengali", "Bengali"), ("bangla", "Bengali"),
-            ("english", "English"), ("tamil", "Tamil"), ("telugu", "Telugu"),
-            ("malayalam", "Malayalam"), ("korean", "Korean"),
-            ("dual audio", "Dual Audio"), ("multi audio", "Multi Audio"),
-        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
+            ("hindi", "Hindi"),
+            ("bengali", "Bengali"),
+            ("bangla", "Bengali"),
+            ("english", "English"),
+            ("tamil", "Tamil"),
+            ("telugu", "Telugu"),
+            ("malayalam", "Malayalam"),
+            ("korean", "Korean"),
+            ("dual audio", "Dual Audio"),
+            ("multi audio", "Multi Audio"),
+        ]
+        .iter()
+        .find(|(k, _)| t_lower.contains(k))
+        .map(|(_, v)| v.to_string());
 
         let prints = [
-            ("cam", "CAM"), ("hdcam", "CAM"),
-            ("hdtc", "HDTC"), ("tc", "HDTC"),
-            ("hdrip", "HDRip"), ("hd rip", "HDRip"),
-            ("webrip", "WEBRip"), ("web-rip", "WEBRip"),
-            ("webdl", "WEB-DL"), ("web-dl", "WEB-DL"),
-            ("bluray", "BluRay"), ("brrip", "BluRay"),
-        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
+            ("cam", "CAM"),
+            ("hdcam", "CAM"),
+            ("hdtc", "HDTC"),
+            ("tc", "HDTC"),
+            ("hdrip", "HDRip"),
+            ("hd rip", "HDRip"),
+            ("webrip", "WEBRip"),
+            ("web-rip", "WEBRip"),
+            ("webdl", "WEB-DL"),
+            ("web-dl", "WEB-DL"),
+            ("bluray", "BluRay"),
+            ("brrip", "BluRay"),
+        ]
+        .iter()
+        .find(|(k, _)| t_lower.contains(k))
+        .map(|(_, v)| v.to_string());
 
         Ok(MediaDetails {
             id: ProviderMediaId {
@@ -211,16 +229,28 @@ impl CircleFtpClient {
         let t_lower = title_str.to_lowercase();
 
         let codec = [
-            ("x264", "x264"), ("h264", "x264"),
-            ("x265", "HEVC"), ("hevc", "HEVC"),
+            ("x264", "x264"),
+            ("h264", "x264"),
+            ("x265", "HEVC"),
+            ("hevc", "HEVC"),
             ("av1", "AV1"),
-        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
+        ]
+        .iter()
+        .find(|(k, _)| t_lower.contains(k))
+        .map(|(_, v)| v.to_string());
 
         let language = [
-            ("hindi", "Hindi"), ("bengali", "Bengali"), ("bangla", "Bengali"),
-            ("english", "English"), ("tamil", "Tamil"), ("telugu", "Telugu"),
+            ("hindi", "Hindi"),
+            ("bengali", "Bengali"),
+            ("bangla", "Bengali"),
+            ("english", "English"),
+            ("tamil", "Tamil"),
+            ("telugu", "Telugu"),
             ("malayalam", "Malayalam"),
-        ].iter().find(|(k, _)| t_lower.contains(k)).map(|(_, v)| v.to_string());
+        ]
+        .iter()
+        .find(|(k, _)| t_lower.contains(k))
+        .map(|(_, v)| v.to_string());
 
         if r#type == "series" {
             if let (Some(target_s), Some(target_e)) = (season, episode) {
