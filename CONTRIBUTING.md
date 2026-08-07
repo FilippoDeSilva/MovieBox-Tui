@@ -6,7 +6,7 @@ If you're planning a large or breaking change, please open an issue first so we 
 
 ## Getting set up
 
-You'll need Rust **1.85 or newer** (edition 2024). Install it via [rustup.rs](https://rustup.rs/).
+You'll need Rust **1.90 or newer** (edition 2024). Install it via [rustup.rs](https://rustup.rs/).
 
 ```bash
 # Fork on GitHub, then clone your fork
@@ -16,6 +16,9 @@ cd MovieBox-Tui
 # Add the upstream remote to keep in sync
 git remote add upstream https://github.com/mesamirh/MovieBox-Tui.git
 
+# IMPORTANT: Enable our pre-commit hooks to ensure your code formatting and lints pass
+git config core.hooksPath .githooks
+
 # Build and run
 cargo run --release
 ```
@@ -24,42 +27,39 @@ To test playback and download features locally, install `mpv` (see the [README](
 
 ## Project layout
 
-The app has two layers. See the [Project layout section](README.md#project-layout) in the README for the full tree.
+The app is divided into three core layers: UI, Providers, and Core Utilities.
 
 Short version:
-
-- `src/providers/moviebox/` is the HTTP client for the MovieBox API.
-- `src/tui/` is the interface, built on Ratatui.
-- `src/tui/app.rs` is the central event loop. Every user action and background task funnels through its `match` statement. That's the best place to start reading.
+- `src/tui/`: The terminal interface, built on Ratatui.
+  - `src/tui/app.rs`: The central event loop. Every user action and background task funnels through its `match` statement. This is the best place to start reading.
+- `src/providers/`: HTTP clients for various streaming sources (`moviebox`, `bdix`, `fourkhdhub`, `iptv_org`).
+- `src/download.rs`: Handles background media downloading.
+- `src/cache.rs`: Local disk caching system to minimize API calls.
 
 The app is message-driven. User input and background tasks produce `Action` values, handled in `app.rs`. When adding behavior, prefer adding a new `Action` variant over blocking the UI thread.
 
 ## Workflow
 
 1. Create a branch off `main`:
-
    ```bash
    git checkout main
    git pull upstream main
    git checkout -b feat/short-description
    ```
-
 2. Make your change in small, logical commits.
-3. Run the checks below.
-4. Push and open a pull request against `main`.
+3. Push and open a pull request against `main`.
 
-## Before opening a PR
+## Local Checks & Pre-Commit Hook
 
-Run these locally. All must pass.
+Before opening a PR, your code must pass formatting and linting rules. 
 
+Because we enabled the pre-commit hook during setup (`git config core.hooksPath .githooks`), running `git commit` will automatically verify your code by running:
 ```bash
-cargo fmt --all
+cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
-cargo build
 ```
 
-Guidelines:
-
+**Guidelines:**
 - Follow idiomatic Rust and standard `rustfmt` defaults. Don't hand-format.
 - Keep the async, message-passing architecture intact.
 - Avoid panics on paths that handle network or user input.
@@ -70,23 +70,18 @@ Guidelines:
 Follow [Conventional Commits](https://www.conventionalcommits.org/). Keep the subject concise and in the imperative mood.
 
 Examples:
-
-```
-feat: add support for custom mpv arguments
-fix: prevent panic when clipboard is unavailable
-docs: document /anime discover command
-refactor: extract stream resolution into helper
-```
+- `feat: add support for custom mpv arguments`
+- `fix: prevent panic when clipboard is unavailable`
+- `docs: document /anime discover command`
+- `refactor: extract stream resolution into helper`
 
 Common types: `feat`, `fix`, `refactor`, `docs`, `style`, `perf`, `chore`.
 
 ## Pull requests
 
-Keep PRs focused on a single concern. Large PRs mixing unrelated changes may be asked to be split.
-
-In your PR description, explain what changed and why. Link related issues (`Closes #12`) and include screenshots or recordings for anything visible in the UI.
-
-Never commit `target/`, editor settings, or debug dump files.
+- Keep PRs focused on a single concern. Large PRs mixing unrelated changes may be asked to be split.
+- In your PR description, explain what changed and why. Link related issues (`Closes #12`) and include screenshots or recordings for anything visible in the UI.
+- Never commit `target/`, editor settings, or debug dump files.
 
 ## License
 
