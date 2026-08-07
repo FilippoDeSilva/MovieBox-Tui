@@ -1,21 +1,18 @@
 #!/bin/sh
 
-# Allow bypassing the hook via SKIP_HOOKS=1
 if [ "$SKIP_HOOKS" = "1" ]; then
     echo "⏭️  SKIP_HOOKS is set. Bypassing pre-commit checks..."
     exit 0
 fi
 
-# Text color variables
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo "${BLUE}⏳ Running MovieBox-Tui pre-commit checks...${NC}\n"
 
-# 1. Run cargo fmt
 echo "${YELLOW}🦀 1/2 Checking Code Formatting (cargo fmt)...${NC}"
 if ! cargo fmt -- --check; then
     echo "\n${RED}❌ Error: Code formatting failed!${NC}"
@@ -24,7 +21,6 @@ if ! cargo fmt -- --check; then
 fi
 echo "${GREEN}✅ Code formatting is perfect.${NC}\n"
 
-# 2. Run cargo clippy
 echo "${YELLOW}🦀 2/2 Checking Linter Warnings (cargo clippy)...${NC}"
 if ! cargo clippy --all-targets --all-features -- -D warnings; then
     echo "\n${RED}❌ Error: Clippy found warnings or errors in your code!${NC}"
