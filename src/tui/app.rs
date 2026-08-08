@@ -2897,6 +2897,7 @@ impl App {
                                 self.state.is_loading = true;
                                 self.state.status_message =
                                     format!("Loading page {}...", next_page);
+                                self.state.status_timer = 150;
                                 tokio::spawn(async move {
                                     let result = match context.provider {
                                         ProviderKind::MovieBox => client
