@@ -181,11 +181,7 @@ impl App {
                     .or_else(|| details.get("pic"))
                     .and_then(|c| c.as_str().or_else(|| c.get("url").and_then(|u| u.as_str())))
                     .map(|s| s.to_string());
-                stype = details
-                    .get("stype")
-                    .or_else(|| details.get("subjectType"))
-                    .and_then(|s| s.as_i64())
-                    .unwrap_or(1);
+                stype = crate::tui::state::stype(details);
                 if let Some(y) = details
                     .get("year")
                     .or_else(|| details.get("releaseYear"))
@@ -347,11 +343,13 @@ impl App {
         self.state.search_poster_protocols.clear();
         self.state.search_list_state.select(None);
         self.state.resource_list_state.select(None);
-        self.state.status_message = format!(
-            "{} selected. Search uses only this provider.",
-            provider.label()
+        self.state.set_status(
+            format!(
+                "{} selected. Search uses only this provider.",
+                provider.label()
+            ),
+            180,
         );
-        self.state.status_timer = 180;
         self.persist_config();
         if provider == ProviderKind::MovieBox {
             let client = self.client.clone();
@@ -435,8 +433,7 @@ impl App {
                 .state
                 .selected_details
                 .as_ref()
-                .and_then(|d| d.get("subjectType").or_else(|| d.get("stype")))
-                .and_then(|s| s.as_i64())
+                .map(crate::tui::state::stype)
                 .unwrap_or(1);
 
             let (se, ep) = if stype == 2 {
@@ -483,8 +480,7 @@ impl App {
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
-                self.state.status_message = "Loading streams...".to_string();
-                self.state.status_timer = 90;
+                self.state.set_status("Loading streams...".to_string(), 90);
                 self.state.pending_episode_fetch = None;
                 let sender = self.action_sender.clone();
                 let context = self.request_context();
@@ -506,8 +502,7 @@ impl App {
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
-                self.state.status_message = "Loading streams...".to_string();
-                self.state.status_timer = 90;
+                self.state.set_status("Loading streams...".to_string(), 90);
 
                 self.state.pending_episode_fetch = Some((id.clone(), se, ep));
                 self.state.last_episode_nav = std::time::Instant::now();
@@ -589,8 +584,7 @@ impl App {
             .state
             .selected_details
             .as_ref()
-            .and_then(|details| details.get("stype").or_else(|| details.get("subjectType")))
-            .and_then(|value| value.as_i64())
+            .map(crate::tui::state::stype)
             .unwrap_or(1);
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
@@ -946,9 +940,10 @@ impl App {
                                 } else {
                                     None
                                 });
-                                self.state.status_message =
-                                    format!("Resolved {} direct stream sources (cached).", count);
-                                self.state.status_timer = 150;
+                                self.state.set_status(
+                                    format!("Resolved {} direct stream sources (cached).", count),
+                                    150,
+                                );
                             }
                         }
 
@@ -972,13 +967,11 @@ impl App {
                 self.prepare_image_refresh();
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
-                if self.state.image_picker.is_some() {}
             }
             Action::Resize(_w, _h) => {
                 self.prepare_image_refresh();
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
-                if self.state.image_picker.is_some() {}
             }
             Action::SwitchProvider(provider) => self.switch_provider(provider),
             Action::Key(key) => {
@@ -1083,8 +1076,7 @@ impl App {
                     InputMode::Editing => match key.code {
                         KeyCode::Esc => {
                             self.state.input_mode = InputMode::Normal;
-                            self.state.status_message = String::new();
-                            self.state.status_timer = 150;
+                            self.state.set_status(String::new(), 150);
                         }
                         KeyCode::Enter => {
                             let query = self.state.search_query.trim().to_string();
@@ -1233,9 +1225,10 @@ impl App {
                                             self.state.tv_config_popup = false;
 
                                             self.state.is_loading = true;
-                                            self.state.status_message =
-                                                "Fetching TV channels...".to_string();
-                                            self.state.status_timer = 150;
+                                            self.state.set_status(
+                                                "Fetching TV channels...".to_string(),
+                                                150,
+                                            );
 
                                             let mut urls_to_fetch = Vec::new();
                                             for sel in &self.state.tv_wizard_selections {
@@ -1368,8 +1361,7 @@ impl App {
 
                                     self.state.search_suggestions.clear();
                                     self.state.suggest_index = None;
-                                    self.state.status_message = String::new();
-                                    self.state.status_timer = 150;
+                                    self.state.set_status(String::new(), 150);
                                     self.state.last_search_edit = std::time::Instant::now();
                                 }
                                 _ => {}
@@ -1538,8 +1530,8 @@ impl App {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
-                    self.state.status_message = "Initializing Moviebox TV Mode...".to_string();
-                    self.state.status_timer = 200;
+                    self.state
+                        .set_status("Initializing Moviebox TV Mode...".to_string(), 200);
 
                     let sender = self.action_sender.clone();
                     tokio::spawn(async move {
@@ -1590,9 +1582,10 @@ impl App {
             Action::TvChannelsLoaded(channels) => {
                 self.state.tv_channels = channels;
                 self.state.is_loading = false;
-                self.state.status_message =
-                    format!("Loaded {} TV channels.", self.state.tv_channels.len());
-                self.state.status_timer = 150;
+                self.state.set_status(
+                    format!("Loaded {} TV channels.", self.state.tv_channels.len()),
+                    150,
+                );
             }
             Action::GoBack => {
                 self.prepare_image_refresh();
@@ -1622,8 +1615,7 @@ impl App {
                             self.state.search_results.clear();
                             self.state.search_query.clear();
                             self.state.search_preview = None;
-                            self.state.status_message = "Search cleared.".to_string();
-                            self.state.status_timer = 150;
+                            self.state.set_status("Search cleared.".to_string(), 150);
                         }
                     }
                     Screen::Details => {
@@ -1636,9 +1628,8 @@ impl App {
                         self.state.active_screen = Screen::Home;
                         self.state.is_loading = false;
                         self.state.language_chosen = false;
-                        self.state.status_message =
-                            "Select a movie/series and press Enter".to_string();
-                        self.state.status_timer = 150;
+                        self.state
+                            .set_status("Select a movie/series and press Enter".to_string(), 150);
                     }
                 }
             }
@@ -1647,9 +1638,10 @@ impl App {
                     let query = self.state.search_query.trim().to_string();
                     if self.state.is_tv_mode {
                         if query.is_empty() {
-                            self.state.status_message =
-                                "TV Mode channels are loaded from local config.".to_string();
-                            self.state.status_timer = 150;
+                            self.state.set_status(
+                                "TV Mode channels are loaded from local config.".to_string(),
+                                150,
+                            );
                         } else {
                             self.action_sender
                                 .send(Action::Search {
@@ -1709,8 +1701,8 @@ impl App {
             },
             Action::ClearCache => {
                 crate::cache::clear_all_cache();
-                self.state.status_message = "Cache cleared completely.".to_string();
-                self.state.status_timer = 150;
+                self.state
+                    .set_status("Cache cleared completely.".to_string(), 150);
             }
             Action::SelectLanguage(idx) => {
                 if let Some(details) = &self.state.selected_details
@@ -1722,8 +1714,8 @@ impl App {
                     self.state.selected_resources = None;
                     self.state.resource_list_state.select(None);
                     self.state.language_chosen = true;
-                    self.state.status_message = "Switching language...".to_string();
-                    self.state.status_timer = 150;
+                    self.state
+                        .set_status("Switching language...".to_string(), 150);
                     self.action_sender
                         .send(Action::FetchDetails(next_id, false))
                         .ok();
@@ -2051,9 +2043,10 @@ impl App {
                         lower_query.as_str(),
                         "/home" | "/discover" | "/movies" | "/shows" | "/tvshows" | "/anime"
                     ) {
-                        self.state.status_message =
-                            "Switch to streaming mode to use this command".to_string();
-                        self.state.status_timer = 150;
+                        self.state.set_status(
+                            "Switch to streaming mode to use this command".to_string(),
+                            150,
+                        );
                         self.state.search_query.clear();
                         return None;
                     }
@@ -2137,12 +2130,14 @@ impl App {
                             }
                         });
                     }
-                    self.state.status_message = if self.state.search_results.is_empty() {
-                        format!("No matches for '{}'.", query)
-                    } else {
-                        format!("Found {} channels.", self.state.search_results.len())
-                    };
-                    self.state.status_timer = 150;
+                    self.state.set_status(
+                        if self.state.search_results.is_empty() {
+                            format!("No matches for '{}'.", query)
+                        } else {
+                            format!("Found {} channels.", self.state.search_results.len())
+                        },
+                        150,
+                    );
                     return None;
                 }
 
@@ -2156,9 +2151,10 @@ impl App {
 
                 if let Some(tid) = tab_id {
                     if self.state.active_provider != ProviderKind::MovieBox {
-                        self.state.status_message =
-                            "4KHDHub has no discover feed; enter a title to search.".into();
-                        self.state.status_timer = 180;
+                        self.state.set_status(
+                            "4KHDHub has no discover feed; enter a title to search.",
+                            180,
+                        );
                         return None;
                     }
                     self.action_sender
@@ -2181,8 +2177,8 @@ impl App {
                 self.state.suggest_index = None;
                 self.state.search_preview = None;
                 self.state.preview_loading = false;
-                self.state.status_message = format!("Searching for '{}'...", query);
-                self.state.status_timer = 150;
+                self.state
+                    .set_status(format!("Searching for '{}'...", query), 150);
 
                 let query_clone = query.clone();
                 let sender = self.action_sender.clone();
@@ -2263,9 +2259,10 @@ impl App {
                 }
                 if self.state.active_provider != ProviderKind::MovieBox {
                     self.state.is_loading = false;
-                    self.state.status_message =
-                        "This provider exposes search, not a shared MovieBox homepage.".into();
-                    self.state.status_timer = 180;
+                    self.state.set_status(
+                        "This provider exposes search, not a shared MovieBox homepage.",
+                        180,
+                    );
                     return None;
                 }
                 self.state.is_homepage_mode = true;
@@ -2281,8 +2278,8 @@ impl App {
                 }
                 self.state.search_suggestions.clear();
                 self.state.suggest_index = None;
-                self.state.status_message = "Loading discover tab...".to_string();
-                self.state.status_timer = 150;
+                self.state
+                    .set_status("Loading discover tab...".to_string(), 150);
 
                 let client = self.client.clone();
                 let sender = self.action_sender.clone();
@@ -2519,20 +2516,22 @@ impl App {
 
                 self.prepare_image_refresh();
 
-                self.state.status_message = if self.state.search_results.is_empty() {
-                    format!(
-                        "No matches for '{}' on {}. Press Ctrl+P to try another provider.",
-                        query,
-                        context.provider.label()
-                    )
-                } else {
-                    format!(
-                        "Found {} results on {}.",
-                        self.state.search_results.len(),
-                        context.provider.label()
-                    )
-                };
-                self.state.status_timer = 150;
+                self.state.set_status(
+                    if self.state.search_results.is_empty() {
+                        format!(
+                            "No matches for '{}' on {}. Press Ctrl+P to try another provider.",
+                            query,
+                            context.provider.label()
+                        )
+                    } else {
+                        format!(
+                            "Found {} results on {}.",
+                            self.state.search_results.len(),
+                            context.provider.label()
+                        )
+                    },
+                    150,
+                );
                 if self.state.current_page <= 1 {
                     if let Some(res) = self.state.search_results.first() {
                         self.state.search_list_state.select(Some(0));
@@ -2550,8 +2549,8 @@ impl App {
                     return None;
                 }
                 self.state.is_loading = false;
-                self.state.status_message = format!("Search failed: {}", err);
-                self.state.status_timer = 150;
+                self.state
+                    .set_status(format!("Search failed: {}", err), 150);
             }
             Action::HomepageSuccess {
                 tab_id,
@@ -2744,14 +2743,15 @@ impl App {
 
                 self.prepare_image_refresh();
 
-                self.state.status_message =
-                    format!("Found {} discover items", self.state.search_results.len());
-                self.state.status_timer = 150;
+                self.state.set_status(
+                    format!("Found {} discover items", self.state.search_results.len()),
+                    150,
+                );
             }
             Action::HomepageFailure(err) => {
                 self.state.is_loading = false;
-                self.state.status_message = format!("Discover failed: {}", err);
-                self.state.status_timer = 150;
+                self.state
+                    .set_status(format!("Discover failed: {}", err), 150);
             }
             Action::MoveUp => {
                 if self.state.active_screen == Screen::Home {
@@ -2887,9 +2887,8 @@ impl App {
                                 let sender = self.action_sender.clone();
                                 let context = self.request_context();
                                 self.state.is_loading = true;
-                                self.state.status_message =
-                                    format!("Loading page {}...", next_page);
-                                self.state.status_timer = 150;
+                                self.state
+                                    .set_status(format!("Loading page {}...", next_page), 150);
                                 tokio::spawn(async move {
                                     let result = match context.provider {
                                         ProviderKind::MovieBox => client
@@ -3105,9 +3104,8 @@ impl App {
                         self.state.language_chosen = false;
                         self.state.poster_image = None;
                         self.state.available_seasons.clear();
-                        self.state.status_message =
-                            format!("Loading details for {}...", item.title);
-                        self.state.status_timer = 150;
+                        self.state
+                            .set_status(format!("Loading details for {}...", item.title), 150);
 
                         let sender = self.action_sender.clone();
                         sender
@@ -3122,7 +3120,8 @@ impl App {
                 self.state
                     .fetch_cancel
                     .store(false, std::sync::atomic::Ordering::Relaxed);
-                self.state.status_message = "Fetching details...".to_string();
+                self.state
+                    .set_status("Fetching details...".to_string(), 150);
                 self.state.stream_pool.clear();
                 let client = self.client.clone();
                 let fourk_client = self.fourk_client.clone();
@@ -3392,11 +3391,7 @@ impl App {
                         .selected_details
                         .as_ref()
                         .and_then(|d| d.get("id"))
-                        .and_then(|i| {
-                            i.as_i64()
-                                .map(|n| n.to_string())
-                                .or_else(|| i.as_str().map(|s| s.to_string()))
-                        })
+                        .and_then(crate::tui::state::subject_id)
                 } else {
                     self.state
                         .search_list_state
@@ -3505,8 +3500,8 @@ impl App {
             }
             Action::PreviewFailure(err) => {
                 self.state.preview_loading = false;
-                self.state.status_message = format!("Preview failed: {}", err);
-                self.state.status_timer = 150;
+                self.state
+                    .set_status(format!("Preview failed: {}", err), 150);
             }
 
             Action::PlayStream(open_with) => {
@@ -3570,11 +3565,7 @@ impl App {
                         .selected_details
                         .as_ref()
                         .and_then(|d| d.get("id"))
-                        .and_then(|i| {
-                            i.as_str()
-                                .map(|s| s.to_string())
-                                .or_else(|| i.as_i64().map(|n| n.to_string()))
-                        })
+                        .and_then(crate::tui::state::subject_id)
                         .unwrap_or_default();
                     let resource_id = self.get_selected_resource_id();
 
@@ -4045,11 +4036,7 @@ impl App {
                     }
                 }
 
-                let stype = payload
-                    .get("subjectType")
-                    .and_then(|s| s.as_i64())
-                    .or_else(|| payload.get("stype").and_then(|s| s.as_i64()))
-                    .unwrap_or(1);
+                let stype = crate::tui::state::stype(&payload);
 
                 if let Some(seasons_arr) = payload
                     .get("seasons")
@@ -4128,11 +4115,7 @@ impl App {
                 if let Some(dubs) = payload.get("dubs").and_then(|d| d.as_array()) {
                     let mut current_idx = 0;
                     for (i, dub) in dubs.iter().enumerate() {
-                        let dub_id = dub.get("subjectId").and_then(|i| {
-                            i.as_i64()
-                                .map(|n| n.to_string())
-                                .or_else(|| i.as_str().map(|s| s.to_string()))
-                        });
+                        let dub_id = dub.get("subjectId").and_then(crate::tui::state::subject_id);
                         if dub_id == Some(id.clone()) {
                             current_idx = i;
                         }
@@ -4155,8 +4138,8 @@ impl App {
                 if has_multiple_dubs && !self.state.language_chosen {
                     self.state.details_pane = crate::tui::state::DetailsPane::Languages;
                     self.state.is_loading = false;
-                    self.state.status_message = "Please select a language dubbing.".to_string();
-                    self.state.status_timer = 150;
+                    self.state
+                        .set_status("Please select a language dubbing.".to_string(), 150);
                 } else {
                     if stype == 2 && !self.state.available_seasons.is_empty() {
                         self.state.details_pane = crate::tui::state::DetailsPane::Seasons;
@@ -4176,8 +4159,8 @@ impl App {
                     return None;
                 }
                 self.state.is_loading = false;
-                self.state.status_message = format!("Details fetch failed: {}", err);
-                self.state.status_timer = 150;
+                self.state
+                    .set_status(format!("Details fetch failed: {}", err), 150);
             }
             Action::SetStatus(msg) => {
                 self.state.is_resolving_playback = false;
@@ -4188,8 +4171,7 @@ impl App {
                         msg.trim_start_matches("Error:").trim(),
                     );
                 } else {
-                    self.state.status_message = msg;
-                    self.state.status_timer = 150;
+                    self.state.set_status(msg, 150);
                 }
             }
             Action::InitStreamPool(subject_id) => {
@@ -4223,11 +4205,7 @@ impl App {
                 self.state.stream_pool.insert(subject_id.clone(), pool);
 
                 let (se, ep) = if let Some(details) = &self.state.selected_details {
-                    let stype = details
-                        .get("subjectType")
-                        .and_then(|s| s.as_i64())
-                        .or_else(|| details.get("stype").and_then(|s| s.as_i64()))
-                        .unwrap_or(1);
+                    let stype = crate::tui::state::stype(details);
                     if stype == 2 {
                         let se = if self.state.selected_season > 0 {
                             self.state.selected_season
@@ -4777,8 +4755,8 @@ impl App {
                 self.state
                     .resource_list_state
                     .select(if count > 0 { Some(0) } else { None });
-                self.state.status_message = format!("{} streams available.", count);
-                self.state.status_timer = 150;
+                self.state
+                    .set_status(format!("{} streams available.", count), 150);
 
                 if self.state.is_waiting_for_download_stream {
                     self.state.is_waiting_for_download_stream = false;
@@ -4851,8 +4829,7 @@ impl App {
                 self.state.is_fetching_streams = false;
                 self.state.selected_resources = None;
                 self.state.stream_error = Some(err.clone());
-                self.state.status_message = format!("Error: {}", err);
-                self.state.status_timer = 150;
+                self.state.set_status(format!("Error: {}", err), 150);
             }
             Action::UpdateDownload(prog, stat) => {
                 if self.state.download_progress != prog || self.state.download_status != stat {
@@ -4925,9 +4902,8 @@ impl App {
 
             Action::ShowPlaybackPicker(source) => {
                 if self.state.available_players.is_empty() {
-                    self.state.status_message =
-                        "No media player found. Install mpv, IINA, or VLC.".into();
-                    self.state.status_timer = 150;
+                    self.state
+                        .set_status("No media player found. Install mpv, IINA, or VLC.", 150);
                     return None;
                 }
                 self.state.show_help = false;
@@ -4966,9 +4942,10 @@ impl App {
             Action::LaunchPlayback(kind, source) => {
                 self.state.player_picker_popup = false;
                 if !crate::tui::player::supports_headers(kind, &source.headers) {
-                    self.state.status_message =
-                        "This source needs headers VLC cannot provide; use mpv or IINA.".into();
-                    self.state.status_timer = 180;
+                    self.state.set_status(
+                        "This source needs headers VLC cannot provide; use mpv or IINA.",
+                        180,
+                    );
                     return None;
                 }
                 self.launch_player(kind, source.url, source.subtitle, source.headers);
@@ -4984,9 +4961,10 @@ impl App {
                     error_msg.lines().last().unwrap_or(&error_msg).to_string()
                 };
 
-                self.state.status_message =
-                    format!("Player crashed (code {code_str}): {display_err}");
-                self.state.status_timer = 300;
+                self.state.set_status(
+                    format!("Player crashed (code {code_str}): {display_err}"),
+                    300,
+                );
 
                 self.state.notify(
                     NotificationKind::Error,

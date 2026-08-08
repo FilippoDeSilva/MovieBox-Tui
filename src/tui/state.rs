@@ -309,4 +309,33 @@ impl AppState {
         self.notifications
             .retain(|notification| !notification.expired());
     }
+
+    pub fn set_status(&mut self, message: impl Into<String>, timer: usize) {
+        self.status_message = message.into();
+        self.status_timer = timer;
+    }
+
+    pub fn loading_dots(&self) -> &'static str {
+        match (self.tick_count / 4) % 4 {
+            0 => "",
+            1 => ".",
+            2 => "..",
+            _ => "...",
+        }
+    }
+}
+
+pub fn subject_id(value: &serde_json::Value) -> Option<String> {
+    value
+        .as_i64()
+        .map(|n| n.to_string())
+        .or_else(|| value.as_str().map(|s| s.to_string()))
+}
+
+pub fn stype(value: &serde_json::Value) -> i64 {
+    value
+        .get("subjectType")
+        .and_then(|s| s.as_i64())
+        .or_else(|| value.get("stype").and_then(|s| s.as_i64()))
+        .unwrap_or(1)
 }

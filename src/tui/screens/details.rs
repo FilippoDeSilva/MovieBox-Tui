@@ -96,12 +96,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let details_json = match &state.selected_details {
         Some(d) => d,
         None => {
-            let dots = match (state.tick_count / 4) % 4 {
-                0 => "",
-                1 => ".",
-                2 => "..",
-                _ => "...",
-            };
+            let dots = state.loading_dots();
 
             let vertical_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -136,11 +131,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         .and_then(|y| y.as_str())
         .or_else(|| details_json.get("year").and_then(|y| y.as_str()))
         .unwrap_or("N/A");
-    let type_val = details_json
-        .get("subjectType")
-        .and_then(|s| s.as_i64())
-        .or_else(|| details_json.get("stype").and_then(|s| s.as_i64()))
-        .unwrap_or(1);
+    let type_val = crate::tui::state::stype(details_json);
     let type_str = if type_val == 2 { "Series" } else { "Movie" };
 
     let genres = details_json

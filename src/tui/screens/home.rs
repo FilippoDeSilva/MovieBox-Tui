@@ -167,12 +167,7 @@ fn render_search_state(
 
     let line = match view {
         SearchViewState::Loading => {
-            let dots = match (state.tick_count / 4) % 4 {
-                0 => "",
-                1 => ".",
-                2 => "..",
-                _ => "...",
-            };
+            let dots = state.loading_dots();
             Line::from(vec![Span::styled(
                 format!("Searching for “{query}”{dots}"),
                 theme.lavender,

@@ -31,12 +31,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         ])
         .split(inner);
 
-    let dots = match (state.tick_count / 4) % 4 {
-        0 => "",
-        1 => ".",
-        2 => "..",
-        _ => "...",
-    };
+    let dots = state.loading_dots();
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![Span::styled(
