@@ -321,62 +321,39 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             return;
         }
 
-        let is_narrow = area.width < 100 || area.height < 28 || state.basic_terminal;
-        let is_wide = area.width >= 120 && area.height >= 32 && !state.basic_terminal;
-        let logo_height = if is_narrow {
-            2
-        } else if is_wide {
-            6
-        } else {
-            4
-        };
+        let basic_terminal = state.basic_terminal;
+        let logo_height = if basic_terminal { 2 } else { 6 };
 
-        let logo_text = if is_narrow {
+        let logo_text = if basic_terminal {
             if state.is_tv_mode {
                 "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █TV".to_string()
             } else {
                 "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █".to_string()
             }
-        } else if is_wide {
-            if state.is_tv_mode {
-                r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
+        } else if state.is_tv_mode {
+            r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
 ██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ TV
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝"
-                    .to_string()
-            } else {
-                r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
+                .to_string()
+        } else {
+            r"███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
 ██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝"
-                    .to_string()
-            }
-        } else {
-            if state.is_tv_mode {
-                r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
- |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
- | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  TV
- |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ "
-                    .to_string()
-            } else {
-                r"  __  __  ___  __   __ ___  ___  ___   ___  __  __ 
- |  \/  |/ _ \ \ \ / /|_ _|| __|| _ ) / _ \ \ \/ / 
- | |\/| | (_) | \ V /  | | | _| | _ \| (_) | >  <  
- |_|  |_|\___/   \_/  |___||___||___/ \___/ /_/\_\ "
-                    .to_string()
-            }
+                .to_string()
         };
 
-        let logo_width: u16 = if is_narrow {
+        let logo_width: u16 = if basic_terminal {
             if state.is_tv_mode { 33 } else { 31 }
-        } else if is_wide {
-            if state.is_tv_mode { 75 } else { 73 }
+        } else if state.is_tv_mode {
+            75
         } else {
-            if state.is_tv_mode { 57 } else { 55 }
+            73
         };
         let suggestions_open =
             state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
@@ -426,7 +403,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(r, g, b))
         };
 
-        if is_wide && !state.basic_terminal && state.tick_count < 15 {
+        if !state.basic_terminal && state.tick_count < 15 {
             let rows: Vec<&str> = logo_text.split('\n').collect();
             for (i, row) in rows.iter().enumerate() {
                 let row_tick_start = 1 + i as u64;
