@@ -739,15 +739,34 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let max_title_width = text_area.width.saturating_sub(4) as usize;
                 let display_title = crate::tui::text::truncate_width(&res.title, max_title_width);
 
-                let type_tag = if state.is_tv_mode || res.stype == 3 {
-                    "TV Channel"
+                let mut type_tag = if state.is_tv_mode || res.stype == 3 {
+                    "TV Channel".to_string()
                 } else if res.stype == 1 {
-                    "Movie"
+                    "Movie".to_string()
                 } else if res.stype == 2 {
-                    "Series"
+                    "Series".to_string()
                 } else {
-                    "Unknown"
+                    "".to_string()
                 };
+
+                let is_history = state.search_query.trim().to_lowercase() == "/history";
+                if is_history {
+                    let mut extra = vec![];
+                    if res.season > 0 {
+                        extra.push(format!("S{:02}E{:02}", res.season, res.episode));
+                    }
+                    extra.push(res.provider.to_string());
+
+                    if !extra.is_empty() {
+                        if type_tag.is_empty() {
+                            type_tag = extra.join(" • ");
+                        } else {
+                            type_tag = format!("{} • {}", type_tag, extra.join(" • "));
+                        }
+                    }
+                } else if type_tag.is_empty() {
+                    type_tag = "Unknown".to_string();
+                }
 
                 let title_line = ratatui::text::Line::from(vec![
                     ratatui::text::Span::raw(" "),
@@ -759,11 +778,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                 let mut info_spans = vec![];
 
+                macro_rules! push_year {
+                    () => {
+                        if res.release_year != "Unknown" && !res.release_year.is_empty() {
+                            info_spans
+                                .push(ratatui::text::Span::styled(&res.release_year, theme.text));
+                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        }
+                    };
+                }
+
                 if is_selected {
                     if state.preview_loading || state.is_loading {
-                        info_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        info_spans.push(ratatui::text::Span::styled(type_tag, theme.text));
+                        push_year!();
+                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                         info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                         info_spans.push(ratatui::text::Span::styled("Loading...", theme.text_dim));
                     } else if let Some(meta) = &state.search_preview {
@@ -777,8 +805,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             info_spans.push(ratatui::text::Span::styled(r, theme.text));
                             info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                         }
-                        info_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        push_year!();
 
                         let mut g_names = vec![];
                         if let Some(genres) = meta.get("genres").and_then(|g| g.as_array()) {
@@ -796,16 +823,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 .push(ratatui::text::Span::styled(g_names.join(" • "), theme.text));
                             info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                         }
-                        info_spans.push(ratatui::text::Span::styled(type_tag, theme.text));
+                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                     } else {
-                        info_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        info_spans.push(ratatui::text::Span::styled(type_tag, theme.text));
+                        push_year!();
+                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                     }
                 } else {
-                    info_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                    info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                    info_spans.push(ratatui::text::Span::styled(type_tag, theme.text));
+                    push_year!();
+                    info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                 }
 
                 if text_layout[2].height > 0 && !info_spans.is_empty() {

@@ -57,7 +57,6 @@ pub fn search_to_moviebox_json(response: &CircleFtpSearchResponse) -> Vec<Catalo
                 }
             });
 
-            // Try to construct poster URL if an image is provided
             let poster_url = post
                 .image
                 .as_ref()

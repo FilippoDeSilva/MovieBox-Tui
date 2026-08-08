@@ -112,4 +112,5 @@ pub enum Action {
         crate::tui::state::PlayerKind,
         crate::providers::models::PlaybackSource,
     ),
+    PlayerCrashed(Option<i32>, String),
 }

@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60;
+const STREAM_CACHE_EXPIRY_SECS: u64 = 2 * 60 * 60;
 
 fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value> {
     if path.exists() {
@@ -114,7 +115,7 @@ pub fn get_stream_cache(
 ) -> Option<serde_json::Value> {
     read_json_cache(
         &get_cache_path(subject_id, season, episode),
-        CACHE_EXPIRY_SECS,
+        STREAM_CACHE_EXPIRY_SECS,
     )
 }
 
@@ -125,7 +126,7 @@ pub fn get_provider_stream_cache(
     episode: usize,
 ) -> Option<serde_json::Value> {
     let path = get_provider_stream_path(provider, subject_id, season, episode);
-    let value = read_json_cache(&path, CACHE_EXPIRY_SECS)?;
+    let value = read_json_cache(&path, STREAM_CACHE_EXPIRY_SECS)?;
     if stream_payload_has_results(&value) {
         Some(value)
     } else {

@@ -18,11 +18,14 @@ pub fn detect() -> Vec<PlayerKind> {
     if mpv_executable().is_some() {
         players.push(PlayerKind::Mpv);
     }
+
     if vlc_executable().is_some() {
         players.push(PlayerKind::Vlc);
     }
 
-    if cfg!(target_os = "android") || std::path::Path::new("/system/bin/am").exists() {
+    let is_android = cfg!(target_os = "android") || std::path::Path::new("/system/bin/am").exists();
+
+    if is_android {
         players.push(PlayerKind::AndroidIntent);
     }
 
@@ -97,11 +100,11 @@ fn mpv_command(
     let executable = mpv_executable().unwrap_or_else(|| fallback.into());
     let mut command = if executable.starts_with("flatpak run ") {
         let mut parts = executable.split(' ');
-        let mut cmd = Command::new(parts.next().unwrap());
+        let mut cmd = Command::new(parts.next().unwrap_or("flatpak"));
         cmd.args(parts);
         cmd
     } else {
-        Command::new(executable)
+        Command::new(&executable)
     };
     let prefix = if iina { "--mpv-" } else { "--" };
 
@@ -109,6 +112,10 @@ fn mpv_command(
         .arg(format!("{prefix}autofit=960x540"))
         .arg(format!("{prefix}autofit-larger=640x360"))
         .arg(format!("{prefix}geometry=50%:50%"));
+
+    if !iina {
+        command.arg("--idle=no").arg("--keep-open=no");
+    }
 
     if !headers.is_empty() {
         let fields = headers
@@ -119,10 +126,16 @@ fn mpv_command(
         command.arg(format!("{prefix}http-header-fields={fields}"));
     }
     if let Some(subtitle) = subtitle {
-        if iina {
-            command.arg(format!("--mpv-sub-files={subtitle}"));
+        let sub_arg = if executable.starts_with("flatpak run ") {
+            format!("@@ {} @@", subtitle)
         } else {
-            command.arg(format!("--sub-file={subtitle}"));
+            subtitle.to_string()
+        };
+
+        if iina {
+            command.arg(format!("--mpv-sub-files={sub_arg}"));
+        } else {
+            command.arg(format!("--sub-file={sub_arg}"));
         }
     }
 
@@ -139,25 +152,33 @@ fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)])
         .map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli"))
         .unwrap_or_default();
 
+    let mut is_open = false;
     let mut command = if let Some(executable) = configured {
         Command::new(executable)
     } else if cli_global.exists() {
         let mut c = Command::new(cli_global);
-        c.arg("--keep-running");
+        c.arg("--keep-running").arg("--no-stdin");
         c
     } else if cli_local.exists() {
         let mut c = Command::new(cli_local);
-        c.arg("--keep-running");
+        c.arg("--keep-running").arg("--no-stdin");
         c
     } else if iina_app_exists() {
+        is_open = true;
         let mut c = Command::new("open");
-        c.arg("-W").arg("-a").arg("IINA").arg("--args");
+        c.arg("-W").arg("-a").arg("IINA").arg(url).arg("--args");
         c
     } else {
         Command::new("iina")
     };
+
     let mpv = mpv_command(url, subtitle, headers, true);
-    command.args(mpv.get_args());
+    for arg in mpv.get_args() {
+        if is_open && arg == std::ffi::OsStr::new(url) {
+            continue;
+        }
+        command.arg(arg);
+    }
     command
 }
 
@@ -175,13 +196,16 @@ fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) 
     let executable = vlc_executable().unwrap_or_else(|| fallback.into());
     let mut command = if executable.starts_with("flatpak run ") {
         let mut parts = executable.split(' ');
-        let mut cmd = Command::new(parts.next().unwrap());
+        let mut cmd = Command::new(parts.next().unwrap_or("flatpak"));
         cmd.args(parts);
         cmd
     } else {
-        Command::new(executable)
+        Command::new(&executable)
     };
-    command.arg("--width=960").arg("--height=540").arg(url);
+    command
+        .arg("--width=960")
+        .arg("--height=540")
+        .arg("--play-and-exit");
 
     for (name, value) in headers {
         if name.eq_ignore_ascii_case("referer") {
@@ -191,9 +215,15 @@ fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) 
         }
     }
     if let Some(subtitle) = subtitle {
-        command.arg(format!("--sub-file={subtitle}"));
+        let sub_arg = if executable.starts_with("flatpak run ") {
+            format!("@@ {} @@", subtitle)
+        } else {
+            subtitle.to_string()
+        };
+        command.arg(format!("--sub-file={sub_arg}"));
     }
 
+    command.arg(url);
     command
 }
 
@@ -206,7 +236,7 @@ fn mpv_executable() -> Option<String> {
     } else {
         "mpv"
     };
-    #[allow(unused_mut)]
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
     let mut paths = vec![MPV_WINDOWS.to_string(), MPV_MACOS.to_string()];
     #[cfg(target_os = "macos")]
     if let Some(home) = dirs::home_dir() {
@@ -233,7 +263,7 @@ fn vlc_executable() -> Option<String> {
         "vlc"
     };
 
-    #[allow(unused_mut)]
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
     let mut paths = vec![
         VLC_WINDOWS.to_string(),
         VLC_WINDOWS_X86.to_string(),

@@ -165,9 +165,56 @@ impl App {
             let season = self.state.selected_season;
             let episode = self.state.selected_episode;
             let provider = self.state.active_provider.cache_key();
+
+            let mut title = "Unknown".to_string();
+            let mut cover_url = None;
+            let mut stype = 1;
+            let mut release_year = "Unknown".to_string();
+
+            if let Some(details) = &self.state.selected_details {
+                if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
+                    title = t.to_string();
+                }
+                cover_url = details
+                    .get("poster")
+                    .or_else(|| details.get("cover"))
+                    .or_else(|| details.get("pic"))
+                    .and_then(|c| c.as_str().or_else(|| c.get("url").and_then(|u| u.as_str())))
+                    .map(|s| s.to_string());
+                stype = details
+                    .get("stype")
+                    .or_else(|| details.get("subjectType"))
+                    .and_then(|s| s.as_i64())
+                    .unwrap_or(1);
+                if let Some(y) = details
+                    .get("year")
+                    .or_else(|| details.get("releaseYear"))
+                    .and_then(|y| y.as_str())
+                {
+                    release_year = y.to_string();
+                } else if let Some(y) = details.get("year").and_then(|y| y.as_i64()) {
+                    release_year = y.to_string();
+                }
+            }
+
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
             self.state
                 .history
-                .mark_watched(provider, subject_id, season, episode);
+                .mark_watched(crate::history::WatchHistoryItem {
+                    provider: provider.to_string(),
+                    subject_id: subject_id.clone(),
+                    title,
+                    cover_url,
+                    stype,
+                    release_year,
+                    season,
+                    episode,
+                    timestamp,
+                });
             self.state.dirty = true;
         }
 
@@ -204,7 +251,7 @@ impl App {
                 crate::tui::player::command(kind, &link, local_subtitle.as_deref(), &headers);
             command.stdin(std::process::Stdio::null());
             command.stdout(std::process::Stdio::null());
-            command.stderr(std::process::Stdio::null());
+            command.stderr(std::process::Stdio::piped());
 
             #[cfg(unix)]
             {
@@ -219,21 +266,41 @@ impl App {
 
             match command.spawn() {
                 Ok(mut child) => {
-                    if let Some(path) = temporary_subtitle {
-                        tokio::task::spawn_blocking(move || {
-                            let _ = child.wait();
+                    let start_time = std::time::Instant::now();
+                    let stderr_stream = child.stderr.take();
+
+                    tokio::task::spawn_blocking(move || {
+                        let mut error_output = String::new();
+                        if let Some(mut stderr) = stderr_stream {
+                            use std::io::Read;
+                            let _ = stderr.read_to_string(&mut error_output);
+                        }
+
+                        let result = child.wait();
+
+                        if let Ok(status) = result {
+                            if !status.success() && start_time.elapsed().as_secs() < 3 {
+                                let clean_error = error_output.trim().to_string();
+                                sender
+                                    .send(Action::PlayerCrashed(status.code(), clean_error))
+                                    .ok();
+                            }
+                        }
+
+                        if let Some(path) = temporary_subtitle {
                             let _ = std::fs::remove_file(path);
-                        });
-                    }
+                        }
+                    });
                 }
                 Err(error) => {
                     if let Some(path) = temporary_subtitle {
                         let _ = tokio::fs::remove_file(path).await;
                     }
                     sender
-                        .send(Action::SetStatus(format!(
-                            "Error: failed to launch media player: {error}"
-                        )))
+                        .send(Action::PlayerCrashed(
+                            None,
+                            format!("Failed to spawn player executable: {error}"),
+                        ))
                         .ok();
                 }
             }
@@ -1692,6 +1759,7 @@ impl App {
                         commands.extend(vec![
                             "/discover",
                             "/home",
+                            "/history",
                             "/movies",
                             "/shows",
                             "/tvshows",
@@ -1798,6 +1866,100 @@ impl App {
                 force_refresh,
             } => {
                 let lower_query = query.trim().to_lowercase();
+
+                if lower_query == "/history" {
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.is_loading = false;
+                    self.state.is_homepage_mode = false;
+                    self.state.active_screen = Screen::Home;
+                    self.state.search_results.clear();
+                    self.state.search_posters.clear();
+                    self.state.search_poster_protocols.clear();
+
+                    let mut recent = self.state.history.recent.clone();
+                    if recent.is_empty() {
+                        self.state.notify(
+                            crate::tui::overlay::NotificationKind::Info,
+                            "History",
+                            "No watch history found.",
+                        );
+                    } else {
+                        recent.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
+
+                        for item in recent {
+                            let mut provider = self.state.active_provider;
+                            let cache_key_lower = item.provider.to_lowercase();
+                            if cache_key_lower == "moviebox" {
+                                provider = crate::providers::models::ProviderKind::MovieBox;
+                            } else if cache_key_lower == "fourkhdhub" {
+                                provider = crate::providers::models::ProviderKind::FourKHdHub;
+                            } else if cache_key_lower == "bdixcircleftp" {
+                                provider = crate::providers::models::ProviderKind::BdixCircleFtp;
+                            } else if cache_key_lower == "bdixdhakaflix" {
+                                provider = crate::providers::models::ProviderKind::BdixDhakaFlix;
+                            }
+                            self.state.search_results.push(SearchResult {
+                                id: item.subject_id.clone(),
+                                title: item.title.clone(),
+                                stype: item.stype,
+                                release_year: item.release_year.clone(),
+                                cover_url: item.cover_url.clone(),
+                                season: item.season,
+                                episode: item.episode,
+                                provider,
+                            });
+                        }
+
+                        self.state.search_list_state.select(Some(0));
+
+                        let results_to_fetch = self
+                            .state
+                            .search_results
+                            .iter()
+                            .take(15)
+                            .map(|r| (r.id.clone(), r.stype, r.cover_url.clone()))
+                            .collect::<Vec<_>>();
+
+                        let sender = self.action_sender.clone();
+                        let req_client = self.client.http_client().clone();
+                        tokio::spawn(async move {
+                            let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
+                            for (id, _stype, cover_url) in results_to_fetch {
+                                if let Some(url) = cover_url {
+                                    let permit = sem.clone().acquire_owned().await.ok();
+                                    let tx = sender.clone();
+                                    let client = req_client.clone();
+                                    tokio::spawn(async move {
+                                        let _permit = permit;
+                                        if let Ok(resp) = client
+                                            .get(&url)
+                                            .header("User-Agent", "MovieBox-Tui/1.0")
+                                            .send()
+                                            .await
+                                        {
+                                            if let Ok(bytes) = resp.bytes().await {
+                                                let bytes_clone = bytes.clone();
+                                                if let Ok(Ok(img)) =
+                                                    tokio::task::spawn_blocking(move || {
+                                                        image::load_from_memory(&bytes_clone)
+                                                    })
+                                                    .await
+                                                {
+                                                    tx.send(Action::SearchPosterLoaded(
+                                                        id,
+                                                        Some(std::sync::Arc::new(img)),
+                                                    ))
+                                                    .ok();
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                    return None;
+                }
 
                 if lower_query == "/clear-cache" {
                     self.action_sender.send(Action::ClearCache).ok();
@@ -1926,6 +2088,7 @@ impl App {
                             release_year: c.group.clone(),
                             cover_url: Some(c.logo.clone()),
                             season: 1,
+                            episode: 1,
                             provider: ProviderKind::MovieBox,
                         })
                         .collect();
@@ -2295,6 +2458,7 @@ impl App {
                                 release_year,
                                 cover_url,
                                 season,
+                                episode: 1,
                                 provider: context.provider,
                             });
                         }
@@ -2522,6 +2686,7 @@ impl App {
                             release_year,
                             cover_url,
                             season,
+                            episode: 1,
                             provider: ProviderKind::MovieBox,
                         });
                         count += 1;
@@ -3411,9 +3576,12 @@ impl App {
                         .selected_details
                         .as_ref()
                         .and_then(|d| d.get("id"))
-                        .and_then(|i| i.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                        .and_then(|i| {
+                            i.as_str()
+                                .map(|s| s.to_string())
+                                .or_else(|| i.as_i64().map(|n| n.to_string()))
+                        })
+                        .unwrap_or_default();
                     let resource_id = self.get_selected_resource_id();
 
                     if let Some(rid) = resource_id {
@@ -3436,16 +3604,26 @@ impl App {
                                     .ok();
                                 return;
                             }
-                            if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
-                                crate::cache::set_captions_cache(&subject_id, &rid, &res);
-                                sender
-                                    .send(Action::ShowSubtitlePopup(link_clone, res, open_with))
-                                    .ok();
-                            } else {
-                                if open_with {
-                                    sender.send(Action::ShowPlayerPicker(link_clone, None)).ok();
-                                } else {
-                                    sender.send(Action::LaunchMpv(link_clone, None)).ok();
+                            let result = tokio::time::timeout(
+                                std::time::Duration::from_secs(15),
+                                client.get_ext_captions(&subject_id, &rid),
+                            )
+                            .await;
+                            match result {
+                                Ok(Ok(res)) => {
+                                    crate::cache::set_captions_cache(&subject_id, &rid, &res);
+                                    sender
+                                        .send(Action::ShowSubtitlePopup(link_clone, res, open_with))
+                                        .ok();
+                                }
+                                _ => {
+                                    if open_with {
+                                        sender
+                                            .send(Action::ShowPlayerPicker(link_clone, None))
+                                            .ok();
+                                    } else {
+                                        sender.send(Action::LaunchMpv(link_clone, None)).ok();
+                                    }
                                 }
                             }
                         });
@@ -3811,6 +3989,7 @@ impl App {
                         let action_tx = self.action_sender.clone();
                         let id_clone = id.clone();
                         let provider = context.provider;
+                        let http_client = self.client.http_client().clone();
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id_clone.clone();
@@ -3835,7 +4014,10 @@ impl App {
                                     return;
                                 }
                             }
-                            let client = reqwest::Client::new();
+                            let client = reqwest::Client::builder()
+                                .timeout(std::time::Duration::from_secs(5))
+                                .build()
+                                .unwrap_or(http_client);
                             if let Ok(resp) = client
                                 .get(&url_clone)
                                 .header("User-Agent", "MovieBox-Tui/1.0")
@@ -3915,8 +4097,39 @@ impl App {
                     self.state.available_episode_numbers.push(ep_numbers);
                 }
 
-                self.state.season_list_state.select(Some(0));
-                self.state.episode_list_state.select(Some(0));
+                let mut default_season = 1;
+                let mut default_episode = 1;
+                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
+                    if res.season > 0 {
+                        default_season = res.season;
+                    }
+                    if res.episode > 0 {
+                        default_episode = res.episode;
+                    }
+                }
+
+                let season_idx = self
+                    .state
+                    .available_seasons
+                    .iter()
+                    .position(|s| {
+                        s.get("se")
+                            .and_then(|v| v.as_i64())
+                            .map(|v| v as usize == default_season)
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(0);
+
+                self.state.season_list_state.select(Some(season_idx));
+
+                let ep_idx = self
+                    .state
+                    .available_episode_numbers
+                    .get(season_idx)
+                    .and_then(|eps| eps.iter().position(|&e| e == default_episode))
+                    .unwrap_or(0);
+
+                self.state.episode_list_state.select(Some(ep_idx));
 
                 if let Some(dubs) = payload.get("dubs").and_then(|d| d.as_array()) {
                     let mut current_idx = 0;
@@ -3936,8 +4149,8 @@ impl App {
                 }
 
                 if !self.state.language_chosen {
-                    self.state.selected_season = 1;
-                    self.state.selected_episode = 1;
+                    self.state.selected_season = default_season;
+                    self.state.selected_episode = default_episode;
                 }
 
                 let has_multiple_dubs = payload
@@ -4473,13 +4686,44 @@ impl App {
                             }
 
                             let entry = pool.episode_index.entry((se, ep)).or_insert_with(Vec::new);
+                            let rid = item.get("resourceId").and_then(|r| r.as_str());
                             let link = item
                                 .get("resourceLink")
                                 .and_then(|l| l.as_str())
                                 .unwrap_or("");
-                            if !entry.iter().any(|i| {
-                                i.get("resourceLink").and_then(|l| l.as_str()).unwrap_or("") == link
-                            }) {
+
+                            let mut exists = false;
+                            for i in entry.iter_mut() {
+                                let i_rid = i.get("resourceId").and_then(|r| r.as_str());
+                                if rid.is_some() && i_rid == rid {
+                                    if let Some(obj) = i.as_object_mut() {
+                                        obj.insert(
+                                            "resourceLink".to_string(),
+                                            serde_json::Value::String(link.to_string()),
+                                        );
+                                    }
+                                    exists = true;
+                                    break;
+                                }
+
+                                let i_link =
+                                    i.get("resourceLink").and_then(|l| l.as_str()).unwrap_or("");
+                                let base_link = link.split('?').next().unwrap_or(link);
+                                let i_base_link = i_link.split('?').next().unwrap_or(i_link);
+
+                                if base_link == i_base_link && !base_link.is_empty() {
+                                    if let Some(obj) = i.as_object_mut() {
+                                        obj.insert(
+                                            "resourceLink".to_string(),
+                                            serde_json::Value::String(link.to_string()),
+                                        );
+                                    }
+                                    exists = true;
+                                    break;
+                                }
+                            }
+
+                            if !exists {
                                 entry.push(item);
                             }
                         }
@@ -4705,6 +4949,7 @@ impl App {
                 self.state.subtitle_popup = false;
             }
             Action::ShowPlayerPicker(link, subtitle) => {
+                self.state.is_resolving_playback = false;
                 if self.state.available_players.is_empty() {
                     self.state.notify(
                         NotificationKind::Error,
@@ -4723,6 +4968,7 @@ impl App {
                 self.state.subtitle_popup = false;
             }
             Action::LaunchPlayer(kind, link, sub) => {
+                self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
                 self.launch_player(kind, link, sub, Vec::new());
             }
@@ -4735,6 +4981,27 @@ impl App {
                     return None;
                 }
                 self.launch_player(kind, source.url, source.subtitle, source.headers);
+            }
+            Action::PlayerCrashed(code, error_msg) => {
+                let code_str = code
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "unknown".into());
+
+                let display_err = if error_msg.is_empty() {
+                    "No error output provided by player.".to_string()
+                } else {
+                    error_msg.lines().last().unwrap_or(&error_msg).to_string()
+                };
+
+                self.state.status_message =
+                    format!("Player crashed (code {code_str}): {display_err}");
+                self.state.status_timer = 300;
+
+                self.state.notify(
+                    NotificationKind::Error,
+                    "Player Error",
+                    format!("Crash code: {code_str}\n{display_err}"),
+                );
             }
             Action::CheckForUpdates => {
                 let update_sender = self.action_sender.clone();

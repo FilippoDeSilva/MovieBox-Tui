@@ -3,9 +3,24 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchHistoryItem {
+    pub provider: String,
+    pub subject_id: String,
+    pub title: String,
+    pub cover_url: Option<String>,
+    pub stype: i64,
+    pub release_year: String,
+    pub season: usize,
+    pub episode: usize,
+    pub timestamp: u64,
+}
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct HistoryManager {
     watched: HashSet<String>,
+    #[serde(default)]
+    pub recent: Vec<WatchHistoryItem>,
 }
 
 impl HistoryManager {
@@ -44,15 +59,20 @@ impl HistoryManager {
         format!("{provider}::{subject_id}::{season}::{episode}")
     }
 
-    pub fn mark_watched(
-        &mut self,
-        provider: &str,
-        subject_id: &str,
-        season: usize,
-        episode: usize,
-    ) {
-        let key = Self::key(provider, subject_id, season, episode);
+    pub fn mark_watched(&mut self, item: WatchHistoryItem) {
+        let key = Self::key(&item.provider, &item.subject_id, item.season, item.episode);
         self.watched.insert(key);
+
+        self.recent
+            .retain(|i| !(i.provider == item.provider && i.subject_id == item.subject_id));
+
+        self.recent.push(item);
+
+        if self.recent.len() > 100 {
+            let excess = self.recent.len() - 100;
+            self.recent.drain(0..excess);
+        }
+
         self.save();
     }
 
