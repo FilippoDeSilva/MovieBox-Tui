@@ -1910,26 +1910,11 @@ impl App {
                                     let client = req_client.clone();
                                     tokio::spawn(async move {
                                         let _permit = permit;
-                                        if let Ok(resp) = client
-                                            .get(&url)
-                                            .header("User-Agent", "MovieBox-Tui/1.0")
-                                            .send()
-                                            .await
+                                        if let Some(bytes) = fetch_poster_bytes(&client, &url).await
                                         {
-                                            if let Ok(bytes) = resp.bytes().await {
-                                                let bytes_clone = bytes.clone();
-                                                if let Ok(Ok(img)) =
-                                                    tokio::task::spawn_blocking(move || {
-                                                        image::load_from_memory(&bytes_clone)
-                                                    })
-                                                    .await
-                                                {
-                                                    tx.send(Action::SearchPosterLoaded(
-                                                        id,
-                                                        Some(std::sync::Arc::new(img)),
-                                                    ))
+                                            if let Some(img) = decode_poster(bytes).await {
+                                                tx.send(Action::SearchPosterLoaded(id, Some(img)))
                                                     .ok();
-                                                }
                                             }
                                         }
                                     });
@@ -2103,26 +2088,11 @@ impl App {
                                     let client = req_client.clone();
                                     tokio::spawn(async move {
                                         let _permit = permit;
-                                        if let Ok(resp) = client
-                                            .get(&url)
-                                            .header("User-Agent", "MovieBox-Tui/1.0")
-                                            .send()
-                                            .await
+                                        if let Some(bytes) = fetch_poster_bytes(&client, &url).await
                                         {
-                                            if let Ok(bytes) = resp.bytes().await {
-                                                let bytes_clone = bytes.clone();
-                                                if let Ok(Ok(img)) =
-                                                    tokio::task::spawn_blocking(move || {
-                                                        image::load_from_memory(&bytes_clone)
-                                                    })
-                                                    .await
-                                                {
-                                                    tx.send(Action::SearchPosterLoaded(
-                                                        id,
-                                                        Some(std::sync::Arc::new(img)),
-                                                    ))
+                                            if let Some(img) = decode_poster(bytes).await {
+                                                tx.send(Action::SearchPosterLoaded(id, Some(img)))
                                                     .ok();
-                                                }
                                             }
                                         }
                                     });
@@ -2206,31 +2176,16 @@ impl App {
                             return;
                         }
                     }
-                    let result = match context.provider {
-                        ProviderKind::MovieBox => client
-                            .search(&query_clone, 1)
-                            .await
-                            .map_err(|error| format!("{error:?}")),
-                        ProviderKind::FourKHdHub => fourk_client
-                            .search(&query_clone)
-                            .await
-                            .map(|items| search_to_moviebox_json(&items))
-                            .map_err(|error| error.to_string()),
-                        ProviderKind::BdixCircleFtp => circleftp_client
-                            .search(&query_clone)
-                            .await
-                            .map(|items| {
-                                crate::providers::fourkhdhub::search_to_moviebox_json(&items)
-                            })
-                            .map_err(|error| error.to_string()),
-                        ProviderKind::BdixDhakaFlix => dhakaflix_client
-                            .search(&query_clone)
-                            .await
-                            .map(|items| {
-                                crate::providers::fourkhdhub::search_to_moviebox_json(&items)
-                            })
-                            .map_err(|error| error.to_string()),
-                    };
+                    let result = provider_search(
+                        &client,
+                        &fourk_client,
+                        &circleftp_client,
+                        &dhakaflix_client,
+                        context.provider,
+                        &query_clone,
+                        1,
+                    )
+                    .await;
                     match result {
                         Ok(res) => {
                             let q = query_clone.clone();
@@ -2486,26 +2441,9 @@ impl App {
                                 let client = req_client.clone();
                                 tokio::spawn(async move {
                                     let _permit = permit;
-                                    if let Ok(resp) = client
-                                        .get(&url)
-                                        .header("User-Agent", "MovieBox-Tui/1.0")
-                                        .send()
-                                        .await
-                                    {
-                                        if let Ok(bytes) = resp.bytes().await {
-                                            let bytes_clone = bytes.clone();
-                                            if let Ok(Ok(img)) =
-                                                tokio::task::spawn_blocking(move || {
-                                                    image::load_from_memory(&bytes_clone)
-                                                })
-                                                .await
-                                            {
-                                                tx.send(Action::SearchPosterLoaded(
-                                                    id,
-                                                    Some(std::sync::Arc::new(img)),
-                                                ))
-                                                .ok();
-                                            }
+                                    if let Some(bytes) = fetch_poster_bytes(&client, &url).await {
+                                        if let Some(img) = decode_poster(bytes).await {
+                                            tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
                                         }
                                     }
                                 });
@@ -2702,26 +2640,9 @@ impl App {
                                 let client = req_client.clone();
                                 tokio::spawn(async move {
                                     let _permit = permit;
-                                    if let Ok(resp) = client
-                                        .get(&url)
-                                        .header("User-Agent", "MovieBox-Tui/1.0")
-                                        .send()
-                                        .await
-                                    {
-                                        if let Ok(bytes) = resp.bytes().await {
-                                            let bytes_clone = bytes.clone();
-                                            if let Ok(Ok(img)) =
-                                                tokio::task::spawn_blocking(move || {
-                                                    image::load_from_memory(&bytes_clone)
-                                                })
-                                                .await
-                                            {
-                                                tx.send(Action::SearchPosterLoaded(
-                                                    id,
-                                                    Some(std::sync::Arc::new(img)),
-                                                ))
-                                                .ok();
-                                            }
+                                    if let Some(bytes) = fetch_poster_bytes(&client, &url).await {
+                                        if let Some(img) = decode_poster(bytes).await {
+                                            tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
                                         }
                                     }
                                 });
@@ -2890,27 +2811,16 @@ impl App {
                                 self.state
                                     .set_status(format!("Loading page {}...", next_page), 150);
                                 tokio::spawn(async move {
-                                    let result = match context.provider {
-                                        ProviderKind::MovieBox => client
-                                            .search(&query, next_page)
-                                            .await
-                                            .map_err(|error| format!("{error:?}")),
-                                        ProviderKind::FourKHdHub => fourk_client
-                                            .search(&query)
-                                            .await
-                                            .map(|items| search_to_moviebox_json(&items))
-                                            .map_err(|error| error.to_string()),
-                                        ProviderKind::BdixCircleFtp => circleftp_client
-                                            .search(&query)
-                                            .await
-                                            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
-                                            .map_err(|error| error.to_string()),
-                                        ProviderKind::BdixDhakaFlix => dhakaflix_client
-                                            .search(&query)
-                                            .await
-                                            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
-                                            .map_err(|error| error.to_string()),
-                                    };
+                                    let result = provider_search(
+                                        &client,
+                                        &fourk_client,
+                                        &circleftp_client,
+                                        &dhakaflix_client,
+                                        context.provider,
+                                        &query,
+                                        next_page,
+                                    )
+                                    .await;
                                     match result {
                                         Ok(res) => {
                                             sender
@@ -3153,31 +3063,15 @@ impl App {
                             return;
                         }
                     }
-                    let result = match context.provider {
-                        ProviderKind::MovieBox => client
-                            .get_details(&id_clone)
-                            .await
-                            .map_err(|error| format!("{error:?}")),
-                        ProviderKind::FourKHdHub => fourk_client
-                            .details(&id_clone)
-                            .await
-                            .map(|details| details_to_moviebox_json(&details))
-                            .map_err(|error| error.to_string()),
-                        ProviderKind::BdixCircleFtp => circleftp_client
-                            .details(&id_clone)
-                            .await
-                            .map(|details| {
-                                crate::providers::fourkhdhub::details_to_moviebox_json(&details)
-                            })
-                            .map_err(|error| error.to_string()),
-                        ProviderKind::BdixDhakaFlix => dhakaflix_client
-                            .details(&id_clone)
-                            .await
-                            .map(|details| {
-                                crate::providers::fourkhdhub::details_to_moviebox_json(&details)
-                            })
-                            .map_err(|error| error.to_string()),
-                    };
+                    let result = provider_details(
+                        &client,
+                        &fourk_client,
+                        &circleftp_client,
+                        &dhakaflix_client,
+                        context.provider,
+                        &id_clone,
+                    )
+                    .await;
                     match result {
                         Ok(details) => {
                             let id_for_cache = id_clone.clone();
@@ -3223,49 +3117,28 @@ impl App {
                                     })
                                     .await
                                     {
-                                        if let Ok(Ok(img)) =
-                                            tokio::task::spawn_blocking(move || {
-                                                image::load_from_memory(&bytes)
-                                            })
-                                            .await
-                                        {
-                                            tx.send(Action::SearchPosterLoaded(
-                                                id2,
-                                                Some(std::sync::Arc::new(img)),
-                                            ))
-                                            .ok();
+                                        if let Some(img) = decode_poster(bytes).await {
+                                            tx.send(Action::SearchPosterLoaded(id2, Some(img)))
+                                                .ok();
                                             return;
                                         }
                                     }
-                                    if let Ok(resp) = client
-                                        .get(&cover_url)
-                                        .header("User-Agent", "MovieBox-Tui/1.0")
-                                        .send()
-                                        .await
+                                    if let Some(bytes) =
+                                        fetch_poster_bytes(&client, &cover_url).await
                                     {
-                                        if let Ok(bytes) = resp.bytes().await {
-                                            let bytes_clone = bytes.clone();
-                                            let id_clone = id2.clone();
-                                            let _ = tokio::task::spawn_blocking(move || {
-                                                crate::cache::set_namespaced_image_cache(
-                                                    "iptv",
-                                                    &id_clone,
-                                                    &bytes_clone,
-                                                )
-                                            })
-                                            .await;
-                                            if let Ok(Ok(img)) =
-                                                tokio::task::spawn_blocking(move || {
-                                                    image::load_from_memory(&bytes)
-                                                })
-                                                .await
-                                            {
-                                                tx.send(Action::SearchPosterLoaded(
-                                                    id2,
-                                                    Some(std::sync::Arc::new(img)),
-                                                ))
+                                        let bytes_clone = bytes.clone();
+                                        let id_clone = id2.clone();
+                                        let _ = tokio::task::spawn_blocking(move || {
+                                            crate::cache::set_namespaced_image_cache(
+                                                "iptv",
+                                                &id_clone,
+                                                &bytes_clone,
+                                            )
+                                        })
+                                        .await;
+                                        if let Some(img) = decode_poster(bytes).await {
+                                            tx.send(Action::SearchPosterLoaded(id2, Some(img)))
                                                 .ok();
-                                            }
                                         }
                                     }
                                 });
@@ -3310,40 +3183,20 @@ impl App {
                             })
                             .await
                             {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                    image::load_from_memory(&bytes)
-                                })
-                                .await
-                                {
-                                    tx.send(Action::PosterSuccess(id2, std::sync::Arc::new(img)))
-                                        .ok();
+                                if let Some(img) = decode_poster(bytes).await {
+                                    tx.send(Action::PosterSuccess(id2, img)).ok();
                                     return;
                                 }
                             }
-                            if let Ok(resp) = client
-                                .get(&url)
-                                .header("User-Agent", "MovieBox-Tui/1.0")
-                                .send()
-                                .await
-                            {
-                                if let Ok(bytes) = resp.bytes().await {
-                                    let bytes_clone = bytes.clone();
-                                    let id_clone = id2.clone();
-                                    let _ = tokio::task::spawn_blocking(move || {
-                                        crate::cache::set_image_cache(&id_clone, &bytes_clone)
-                                    })
-                                    .await;
-                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                        image::load_from_memory(&bytes)
-                                    })
-                                    .await
-                                    {
-                                        tx.send(Action::PosterSuccess(
-                                            id2,
-                                            std::sync::Arc::new(img),
-                                        ))
-                                        .ok();
-                                    }
+                            if let Some(bytes) = fetch_poster_bytes(&client, &url).await {
+                                let bytes_clone = bytes.clone();
+                                let id_clone = id2.clone();
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    crate::cache::set_image_cache(&id_clone, &bytes_clone)
+                                })
+                                .await;
+                                if let Some(img) = decode_poster(bytes).await {
+                                    tx.send(Action::PosterSuccess(id2, img)).ok();
                                 }
                             }
                         });
@@ -3431,14 +3284,8 @@ impl App {
                         })
                         .await
                         {
-                            if let Ok(Ok(img)) =
-                                tokio::task::spawn_blocking(move || image::load_from_memory(&bytes))
-                                    .await
-                            {
-                                let _ = action_tx.send(Action::PosterSuccess(
-                                    id_clone,
-                                    std::sync::Arc::new(img),
-                                ));
+                            if let Some(img) = decode_poster(bytes).await {
+                                let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                                 return;
                             }
                         }
@@ -3446,33 +3293,19 @@ impl App {
                             .timeout(std::time::Duration::from_secs(5))
                             .build()
                             .unwrap_or_default();
-                        if let Ok(resp) = client
-                            .get(&url_clone)
-                            .header("User-Agent", "MovieBox-Tui/1.0")
-                            .send()
-                            .await
-                        {
-                            if let Ok(bytes) = resp.bytes().await {
-                                let bytes_clone = bytes.clone();
-                                let id_clone2 = id_clone.clone();
-                                let _ = tokio::task::spawn_blocking(move || {
-                                    crate::cache::set_namespaced_image_cache(
-                                        provider.cache_key(),
-                                        &id_clone2,
-                                        &bytes_clone,
-                                    )
-                                })
-                                .await;
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                    image::load_from_memory(&bytes)
-                                })
-                                .await
-                                {
-                                    let _ = action_tx.send(Action::PosterSuccess(
-                                        id_clone,
-                                        std::sync::Arc::new(img),
-                                    ));
-                                }
+                        if let Some(bytes) = fetch_poster_bytes(&client, &url_clone).await {
+                            let bytes_clone = bytes.clone();
+                            let id_clone2 = id_clone.clone();
+                            let _ = tokio::task::spawn_blocking(move || {
+                                crate::cache::set_namespaced_image_cache(
+                                    provider.cache_key(),
+                                    &id_clone2,
+                                    &bytes_clone,
+                                )
+                            })
+                            .await;
+                            if let Some(img) = decode_poster(bytes).await {
+                                let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                             }
                         }
                     });
@@ -3987,15 +3820,8 @@ impl App {
                             })
                             .await
                             {
-                                if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                    image::load_from_memory(&bytes)
-                                })
-                                .await
-                                {
-                                    let _ = action_tx.send(Action::PosterSuccess(
-                                        id_clone,
-                                        std::sync::Arc::new(img),
-                                    ));
+                                if let Some(img) = decode_poster(bytes).await {
+                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                                     return;
                                 }
                             }
@@ -4003,33 +3829,19 @@ impl App {
                                 .timeout(std::time::Duration::from_secs(5))
                                 .build()
                                 .unwrap_or(http_client);
-                            if let Ok(resp) = client
-                                .get(&url_clone)
-                                .header("User-Agent", "MovieBox-Tui/1.0")
-                                .send()
-                                .await
-                            {
-                                if let Ok(bytes) = resp.bytes().await {
-                                    let bytes_clone = bytes.clone();
-                                    let id_clone2 = id_clone.clone();
-                                    let _ = tokio::task::spawn_blocking(move || {
-                                        crate::cache::set_namespaced_image_cache(
-                                            provider.cache_key(),
-                                            &id_clone2,
-                                            &bytes_clone,
-                                        )
-                                    })
-                                    .await;
-                                    if let Ok(Ok(img)) = tokio::task::spawn_blocking(move || {
-                                        image::load_from_memory(&bytes)
-                                    })
-                                    .await
-                                    {
-                                        let _ = action_tx.send(Action::PosterSuccess(
-                                            id_clone,
-                                            std::sync::Arc::new(img),
-                                        ));
-                                    }
+                            if let Some(bytes) = fetch_poster_bytes(&client, &url_clone).await {
+                                let bytes_clone = bytes.clone();
+                                let id_clone2 = id_clone.clone();
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    crate::cache::set_namespaced_image_cache(
+                                        provider.cache_key(),
+                                        &id_clone2,
+                                        &bytes_clone,
+                                    )
+                                })
+                                .await;
+                                if let Some(img) = decode_poster(bytes).await {
+                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                                 }
                             }
                         });
@@ -5245,5 +5057,86 @@ impl App {
             &self.theme,
             self.state.basic_terminal,
         );
+    }
+}
+
+async fn fetch_poster_bytes(client: &reqwest::Client, url: &str) -> Option<Vec<u8>> {
+    let response = client
+        .get(url)
+        .header("User-Agent", "MovieBox-Tui/1.0")
+        .send()
+        .await
+        .ok()?;
+    Some(response.bytes().await.ok()?.to_vec())
+}
+
+async fn decode_poster(bytes: Vec<u8>) -> Option<std::sync::Arc<image::DynamicImage>> {
+    tokio::task::spawn_blocking(move || image::load_from_memory(&bytes))
+        .await
+        .ok()?
+        .ok()
+        .map(std::sync::Arc::new)
+}
+
+async fn provider_search(
+    moviebox: &MovieBoxClient,
+    fourk: &FourKHdHubClient,
+    circleftp: &crate::providers::bdix::circleftp::CircleFtpClient,
+    dhakaflix: &crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
+    provider: ProviderKind,
+    query: &str,
+    page: usize,
+) -> Result<serde_json::Value, String> {
+    match provider {
+        ProviderKind::MovieBox => moviebox
+            .search(query, page)
+            .await
+            .map_err(|error| format!("{error:?}")),
+        ProviderKind::FourKHdHub => fourk
+            .search(query)
+            .await
+            .map(|items| search_to_moviebox_json(&items))
+            .map_err(|error| error.to_string()),
+        ProviderKind::BdixCircleFtp => circleftp
+            .search(query)
+            .await
+            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
+            .map_err(|error| error.to_string()),
+        ProviderKind::BdixDhakaFlix => dhakaflix
+            .search(query)
+            .await
+            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
+            .map_err(|error| error.to_string()),
+    }
+}
+
+async fn provider_details(
+    moviebox: &MovieBoxClient,
+    fourk: &FourKHdHubClient,
+    circleftp: &crate::providers::bdix::circleftp::CircleFtpClient,
+    dhakaflix: &crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
+    provider: ProviderKind,
+    subject_id: &str,
+) -> Result<serde_json::Value, String> {
+    match provider {
+        ProviderKind::MovieBox => moviebox
+            .get_details(subject_id)
+            .await
+            .map_err(|error| format!("{error:?}")),
+        ProviderKind::FourKHdHub => fourk
+            .details(subject_id)
+            .await
+            .map(|details| details_to_moviebox_json(&details))
+            .map_err(|error| error.to_string()),
+        ProviderKind::BdixCircleFtp => circleftp
+            .details(subject_id)
+            .await
+            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
+            .map_err(|error| error.to_string()),
+        ProviderKind::BdixDhakaFlix => dhakaflix
+            .details(subject_id)
+            .await
+            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
+            .map_err(|error| error.to_string()),
     }
 }
