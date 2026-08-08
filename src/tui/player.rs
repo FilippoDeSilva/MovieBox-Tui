@@ -58,9 +58,13 @@ pub fn command(
 
 fn android_intent_command(url: &str) -> Command {
     let mut command;
-    if command_exists("termux-open") {
+    if executable_on_path("termux-open") {
         command = Command::new("termux-open");
-        command.arg("--content-type").arg("video/*").arg(url);
+        command
+            .arg("--chooser")
+            .arg("--content-type")
+            .arg("video/*")
+            .arg(url);
     } else {
         command = Command::new("am");
         command
@@ -348,4 +352,31 @@ fn command_exists(command: &str) -> bool {
         cmd.creation_flags(0x08000000);
     }
     cmd.output().is_ok_and(|output| output.status.success())
+}
+
+fn executable_on_path(name: &str) -> bool {
+    if std::path::Path::new(name).is_file() {
+        return true;
+    }
+    let Some(path) = std::env::var_os("PATH") else {
+        return false;
+    };
+    std::env::split_paths(&path).any(|dir| {
+        let candidate = dir.join(name);
+        if !candidate.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            candidate
+                .metadata()
+                .map(|m| m.permissions().mode() & 0o111 != 0)
+                .unwrap_or(false)
+        }
+        #[cfg(not(unix))]
+        {
+            true
+        }
+    })
 }
