@@ -314,7 +314,7 @@ impl App {
         if provider == self.state.active_provider {
             return;
         }
-        self.prepare_sixel_redraw();
+        self.prepare_image_refresh();
         self.state
             .fetch_cancel
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -379,11 +379,11 @@ impl App {
         self.switch_provider(next);
     }
 
-    fn prepare_sixel_redraw(&mut self) {
+    fn prepare_image_refresh(&mut self) {
         if self.state.image_picker.as_ref().is_some_and(|picker| {
-            matches!(
+            !matches!(
                 picker.protocol_type(),
-                ratatui_image::picker::ProtocolType::Sixel
+                ratatui_image::picker::ProtocolType::Halfblocks
             )
         }) {
             self.state.clear_terminal_before_draw = true;
@@ -974,13 +974,13 @@ impl App {
                 return Some(());
             }
             Action::FocusChange => {
-                self.prepare_sixel_redraw();
+                self.prepare_image_refresh();
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 if self.state.image_picker.is_some() {}
             }
             Action::Resize(_w, _h) => {
-                self.prepare_sixel_redraw();
+                self.prepare_image_refresh();
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 if self.state.image_picker.is_some() {}
@@ -1600,7 +1600,7 @@ impl App {
                 self.state.status_timer = 150;
             }
             Action::GoBack => {
-                self.prepare_sixel_redraw();
+                self.prepare_image_refresh();
                 if self.state.player_picker_popup {
                     self.state.player_picker_popup = false;
                     self.state.player_picker_link = None;
@@ -2522,6 +2522,8 @@ impl App {
                     });
                 }
 
+                self.prepare_image_refresh();
+
                 self.state.status_message = if self.state.search_results.is_empty() {
                     format!(
                         "No matches for '{}' on {}. Press Ctrl+P to try another provider.",
@@ -2745,6 +2747,8 @@ impl App {
                     self.state.search_list_state.select(None);
                 }
 
+                self.prepare_image_refresh();
+
                 self.state.status_message =
                     format!("Found {} discover items", self.state.search_results.len());
                 self.state.status_timer = 150;
@@ -2756,7 +2760,7 @@ impl App {
             }
             Action::MoveUp => {
                 if self.state.active_screen == Screen::Home {
-                    self.prepare_sixel_redraw();
+                    self.prepare_image_refresh();
                 }
                 if self.state.player_picker_popup {
                     let i = match self.state.player_picker_state.selected() {
@@ -2833,7 +2837,7 @@ impl App {
             }
             Action::MoveDown => {
                 if self.state.active_screen == Screen::Home {
-                    self.prepare_sixel_redraw();
+                    self.prepare_image_refresh();
                 }
                 if self.state.player_picker_popup {
                     let i = match self.state.player_picker_state.selected() {
@@ -2984,6 +2988,7 @@ impl App {
             }
             Action::MoveLeft => {
                 if self.state.active_screen == Screen::Home {
+                    self.prepare_image_refresh();
                     let current = self.state.search_list_state.selected().unwrap_or(0);
                     let jump = self.state.visible_items.max(1);
                     if current > jump {
@@ -3004,6 +3009,7 @@ impl App {
             }
             Action::MoveRight => {
                 if self.state.active_screen == Screen::Home {
+                    self.prepare_image_refresh();
                     let current = self.state.search_list_state.selected().unwrap_or(0);
                     let jump = self.state.visible_items.max(1);
                     let total = self.state.search_results.len();
