@@ -810,18 +810,11 @@ impl App {
         if self.state.image_picker.is_none() && self.state.image_supported {
             match ratatui_image::picker::Picker::from_query_stdio() {
                 Ok(picker) => {
-                    if matches!(
-                        picker.protocol_type(),
-                        ratatui_image::picker::ProtocolType::Halfblocks
-                    ) {
-                        self.state.image_supported = false;
-                    } else {
-                        let cell_h = picker.font_size().height;
-                        if cell_h > 0 {
-                            self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
-                        }
-                        self.state.image_picker = Some(picker);
+                    let cell_h = picker.font_size().height;
+                    if cell_h > 0 {
+                        self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
                     }
+                    self.state.image_picker = Some(picker);
                 }
                 Err(_) => {
                     self.state.image_supported = false;
