@@ -76,7 +76,7 @@ impl MovieBoxClient {
 
     pub async fn init(&self) -> Result<(), ScraperError> {
         let path = "/wefeed-mobile-bff/tab-operating?page=1&tabId=0&version=";
-        let _ = self.get(path).await?;
+        let _ = self.request_hosts("GET", path, None).await?;
 
         let has_token = self
             .runtime_token
@@ -121,6 +121,29 @@ impl MovieBoxClient {
     }
 
     async fn request(
+        &self,
+        method: &str,
+        path_and_query: &str,
+        body: Option<&str>,
+    ) -> Result<Value, ScraperError> {
+        match self.request_hosts(method, path_and_query, body).await {
+            Err(ScraperError::HostsExhausted) => {
+                let has_token = self
+                    .runtime_token
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .is_some();
+                if has_token {
+                    return Err(ScraperError::HostsExhausted);
+                }
+                let _ = self.init().await;
+                self.request_hosts(method, path_and_query, body).await
+            }
+            result => result,
+        }
+    }
+
+    async fn request_hosts(
         &self,
         method: &str,
         path_and_query: &str,
