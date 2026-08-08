@@ -1,6 +1,8 @@
 use reqwest::Client;
 use serde_json::json;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use crate::providers::models::{
@@ -44,14 +46,16 @@ fn parse_title_and_year(raw_title: &str) -> (String, Option<String>) {
     (title, year)
 }
 
-#[derive(Clone)]
-pub struct DhakaFlixClient {
-    client: Client,
-}
-
-impl Default for DhakaFlixClient {
-    fn default() -> Self {
-        Self::new()
+fn quality_score(name: &str) -> u8 {
+    let lower = name.to_lowercase();
+    if lower.contains("2160p") || lower.contains("4k") {
+        3
+    } else if lower.contains("1080p") {
+        2
+    } else if lower.contains("720p") {
+        1
+    } else {
+        0
     }
 }
 
@@ -62,6 +66,20 @@ const SERVERS: &[(&str, &str)] = &[
     ("http://172.16.50.9", "/DHAKA-FLIX-9/"),
 ];
 
+const DEAD_TTL: Duration = Duration::from_secs(60);
+
+#[derive(Clone)]
+pub struct DhakaFlixClient {
+    client: Client,
+    recent_fails: Arc<RwLock<HashMap<String, Instant>>>,
+}
+
+impl Default for DhakaFlixClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DhakaFlixClient {
     pub fn new() -> Self {
         Self {
@@ -70,14 +88,44 @@ impl DhakaFlixClient {
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
+            recent_fails: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub async fn search(&self, query: &str) -> Result<Vec<CatalogItem>, DhakaFlixError> {
-        let mut all_results = Vec::new();
+    fn healthy_servers(&self) -> Vec<(&'static str, &'static str)> {
+        let fails = self.recent_fails.read().unwrap_or_else(|e| e.into_inner());
+        let mut out = Vec::new();
+        for (base, path) in SERVERS {
+            if fails
+                .get(*base)
+                .is_none_or(|failed| failed.elapsed() >= DEAD_TTL)
+            {
+                out.push((*base, *path));
+            }
+        }
+        out
+    }
 
+    fn dedup_best_quality(results: Vec<(CatalogItem, u8)>) -> Vec<CatalogItem> {
+        let mut best: HashMap<(String, Option<String>), (CatalogItem, u8)> = HashMap::new();
+        for (item, quality) in results {
+            let key = (item.title.to_lowercase(), item.year.clone());
+            match best.get(&key) {
+                Some((_, existing)) if *existing >= quality => {}
+                _ => {
+                    best.insert(key, (item, quality));
+                }
+            }
+        }
+        let mut out: Vec<CatalogItem> = best.into_values().map(|(item, _)| item).collect();
+        out.sort_by_key(|item| item.title.to_lowercase());
+        out
+    }
+
+    pub async fn search(&self, query: &str) -> Result<Vec<CatalogItem>, DhakaFlixError> {
+        let servers = self.healthy_servers();
         let mut futures = Vec::new();
-        for (base_url, href) in SERVERS {
+        for (base_url, href) in servers {
             let url = format!("{}{}", base_url, href);
             let body = json!({
                 "action": "get",
@@ -88,58 +136,72 @@ impl DhakaFlixClient {
                 }
             });
             let client = self.client.clone();
+            let recent_fails = self.recent_fails.clone();
 
             futures.push(async move {
-                let mut server_results = Vec::new();
-                if let Ok(resp) = client.post(&url).json(&body).send().await {
-                    if let Ok(text) = resp.text().await {
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                            if let Some(search_arr) = json.get("search").and_then(|v| v.as_array())
-                            {
-                                for item in search_arr {
-                                    if let Some(item_href) =
-                                        item.get("href").and_then(|v| v.as_str())
-                                    {
-                                        let is_dir = item_href.ends_with('/');
-                                        let mut parts: Vec<&str> = item_href
-                                            .split('/')
-                                            .filter(|p| !p.is_empty())
-                                            .collect();
+                let mut server_results: Vec<(CatalogItem, u8)> = Vec::new();
+                match client.post(&url).json(&body).send().await {
+                    Ok(resp) => {
+                        if let Ok(text) = resp.text().await {
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                                if let Some(search_arr) =
+                                    json.get("search").and_then(|v| v.as_array())
+                                {
+                                    for item in search_arr {
+                                        if let Some(item_href) =
+                                            item.get("href").and_then(|v| v.as_str())
+                                        {
+                                            let is_dir = item_href.ends_with('/');
+                                            let mut parts: Vec<&str> = item_href
+                                                .split('/')
+                                                .filter(|p| !p.is_empty())
+                                                .collect();
 
-                                        if !is_dir && parts.len() > 1 {
-                                            parts.pop();
-                                        }
+                                            if !is_dir && parts.len() > 1 {
+                                                parts.pop();
+                                            }
 
-                                        let folder_path = format!("/{}/", parts.join("/"));
+                                            let folder_path = format!("/{}/", parts.join("/"));
 
-                                        if let Some(name) = parts.last() {
-                                            let name_decoded =
-                                                percent_encoding::percent_decode_str(name)
-                                                    .decode_utf8_lossy()
-                                                    .to_string();
-                                            let (clean_title, year) =
-                                                parse_title_and_year(&name_decoded);
+                                            if let Some(name) = parts.last() {
+                                                let name_decoded =
+                                                    percent_encoding::percent_decode_str(name)
+                                                        .decode_utf8_lossy()
+                                                        .to_string();
+                                                let quality = quality_score(&name_decoded);
+                                                let (clean_title, year) =
+                                                    parse_title_and_year(&name_decoded);
 
-                                            server_results.push(CatalogItem {
-                                                id: ProviderMediaId {
-                                                    provider: ProviderKind::BdixDhakaFlix,
-                                                    value: format!(
-                                                        "{}:{}{}",
-                                                        base_url,
-                                                        href,
-                                                        folder_path.trim_start_matches(href)
-                                                    ),
-                                                },
-                                                title: clean_title,
-                                                year,
-                                                media_type: MediaType::Movie,
-                                                poster_url: None,
-                                                season_count: None,
-                                            });
+                                                server_results.push((
+                                                    CatalogItem {
+                                                        id: ProviderMediaId {
+                                                            provider: ProviderKind::BdixDhakaFlix,
+                                                            value: format!(
+                                                                "{}:{}{}",
+                                                                base_url,
+                                                                href,
+                                                                folder_path
+                                                                    .trim_start_matches(href)
+                                                            ),
+                                                        },
+                                                        title: clean_title,
+                                                        year,
+                                                        media_type: MediaType::Movie,
+                                                        poster_url: None,
+                                                        season_count: None,
+                                                    },
+                                                    quality,
+                                                ));
+                                            }
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                    Err(_) => {
+                        if let Ok(mut fails) = recent_fails.write() {
+                            fails.insert(base_url.to_string(), Instant::now());
                         }
                     }
                 }
@@ -148,11 +210,8 @@ impl DhakaFlixClient {
         }
 
         let results_array = futures::future::join_all(futures).await;
-        for mut res in results_array {
-            all_results.append(&mut res);
-        }
-
-        all_results.dedup_by(|a, b| a.title == b.title);
+        let all_results: Vec<(CatalogItem, u8)> = results_array.into_iter().flatten().collect();
+        let mut all_results = Self::dedup_best_quality(all_results);
 
         let mut poster_futures = Vec::new();
         for item in &all_results {
