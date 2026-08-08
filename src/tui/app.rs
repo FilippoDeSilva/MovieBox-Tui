@@ -848,9 +848,8 @@ impl App {
             self.state.manual_update_check = false;
             self.persist_config();
             self.action_sender.send(Action::CheckForUpdates).ok();
-        } else {
-            self.state.active_screen = Screen::Home;
         }
+        self.state.active_screen = Screen::Home;
 
         let player_sender = self.action_sender.clone();
         tokio::task::spawn_blocking(move || {
