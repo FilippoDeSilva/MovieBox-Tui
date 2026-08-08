@@ -10,24 +10,20 @@ const VLC_MACOS: &str = "/Applications/VLC.app/Contents/MacOS/VLC";
 pub fn detect() -> Vec<PlayerKind> {
     let mut players = Vec::new();
 
-    #[cfg(target_os = "android")]
-    {
-        players.push(PlayerKind::AndroidIntent);
+    #[cfg(target_os = "macos")]
+    if iina_available() {
+        players.push(PlayerKind::Iina);
     }
 
-    #[cfg(not(target_os = "android"))]
-    {
-        #[cfg(target_os = "macos")]
-        if iina_available() {
-            players.push(PlayerKind::Iina);
-        }
+    if mpv_executable().is_some() {
+        players.push(PlayerKind::Mpv);
+    }
+    if vlc_executable().is_some() {
+        players.push(PlayerKind::Vlc);
+    }
 
-        if mpv_executable().is_some() {
-            players.push(PlayerKind::Mpv);
-        }
-        if vlc_executable().is_some() {
-            players.push(PlayerKind::Vlc);
-        }
+    if cfg!(target_os = "android") || std::path::Path::new("/system/bin/am").exists() {
+        players.push(PlayerKind::AndroidIntent);
     }
 
     players
@@ -58,15 +54,32 @@ pub fn command(
 }
 
 fn android_intent_command(url: &str) -> Command {
-    let mut command = Command::new("am");
-    command
-        .arg("start")
-        .arg("-a")
-        .arg("android.intent.action.VIEW")
-        .arg("-d")
-        .arg(url)
-        .arg("-t")
-        .arg("video/*");
+    let mut command;
+    if command_exists("termux-open") {
+        command = Command::new("termux-open");
+        command.arg("--content-type").arg("video/*").arg(url);
+    } else {
+        command = Command::new("am");
+        command
+            .arg("start")
+            .arg("--user")
+            .arg("0")
+            .arg("-a")
+            .arg("android.intent.action.VIEW")
+            .arg("-d")
+            .arg(url)
+            .arg("-t")
+            .arg("video/*");
+
+        if cfg!(target_os = "android")
+            || std::env::var("PREFIX")
+                .unwrap_or_default()
+                .contains("com.termux")
+        {
+            command.env_remove("LD_LIBRARY_PATH");
+            command.env_remove("LD_PRELOAD");
+        }
+    }
     command
 }
 

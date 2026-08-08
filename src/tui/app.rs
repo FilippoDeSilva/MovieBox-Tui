@@ -202,6 +202,7 @@ impl App {
 
             let mut command =
                 crate::tui::player::command(kind, &link, local_subtitle.as_deref(), &headers);
+            command.stdin(std::process::Stdio::null());
             command.stdout(std::process::Stdio::null());
             command.stderr(std::process::Stdio::null());
 
@@ -3361,6 +3362,7 @@ impl App {
                             "Preparing playback",
                             "Resolving the selected mirror.",
                         );
+                        let default_player = self.state.available_players.first().copied();
                         let client = if release.provider == ProviderKind::BdixCircleFtp {
                             let sender_clone = self.action_sender.clone();
                             let source = crate::providers::models::PlaybackSource::bare(
@@ -3368,14 +3370,11 @@ impl App {
                                 release.mirrors[0].resolver_url.clone(),
                                 None,
                             );
-                            if open_with {
+                            if open_with || default_player.is_none() {
                                 sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
-                            } else {
+                            } else if let Some(player) = default_player {
                                 sender_clone
-                                    .send(Action::LaunchPlayback(
-                                        crate::tui::state::PlayerKind::Mpv,
-                                        source,
-                                    ))
+                                    .send(Action::LaunchPlayback(player, source))
                                     .ok();
                             }
                             return None;
@@ -3385,16 +3384,12 @@ impl App {
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
                             match client.resolve_release(&release).await {
-                                Ok(source) if open_with => {
-                                    sender.send(Action::ShowPlaybackPicker(source)).ok();
-                                }
                                 Ok(source) => {
-                                    sender
-                                        .send(Action::LaunchPlayback(
-                                            crate::tui::state::PlayerKind::Mpv,
-                                            source,
-                                        ))
-                                        .ok();
+                                    if open_with || default_player.is_none() {
+                                        sender.send(Action::ShowPlaybackPicker(source)).ok();
+                                    } else if let Some(player) = default_player {
+                                        sender.send(Action::LaunchPlayback(player, source)).ok();
+                                    }
                                 }
                                 Err(error) => {
                                     sender
