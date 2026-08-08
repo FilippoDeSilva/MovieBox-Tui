@@ -9,6 +9,17 @@ pub enum PlayerKind {
     AndroidIntent,
 }
 
+impl PlayerKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            PlayerKind::Mpv => "mpv",
+            PlayerKind::Iina => "IINA",
+            PlayerKind::Vlc => "VLC",
+            PlayerKind::AndroidIntent => "Android Player",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     Startup,

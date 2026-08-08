@@ -1134,15 +1134,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let items = state
             .available_players
             .iter()
-            .map(|k| {
-                match k {
-                    crate::tui::state::PlayerKind::Mpv => "mpv",
-                    crate::tui::state::PlayerKind::Iina => "IINA",
-                    crate::tui::state::PlayerKind::Vlc => "VLC",
-                    crate::tui::state::PlayerKind::AndroidIntent => "Android Player",
-                }
-                .to_string()
-            })
+            .map(|k| k.label().to_string())
             .collect::<Vec<_>>();
         crate::tui::overlay::picker(
             frame,

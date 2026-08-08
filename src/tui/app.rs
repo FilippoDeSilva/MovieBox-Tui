@@ -844,12 +844,7 @@ impl App {
         }
         self.state.active_screen = Screen::Home;
 
-        let player_sender = self.action_sender.clone();
-        tokio::task::spawn_blocking(move || {
-            player_sender
-                .send(Action::PlayersDetected(crate::tui::player::detect()))
-                .ok();
-        });
+        self.state.available_players = crate::tui::player::detect();
 
         loop {
             if self.state.clear_terminal_before_draw {
@@ -4928,9 +4923,6 @@ impl App {
                 );
             }
 
-            Action::PlayersDetected(players) => {
-                self.state.available_players = players;
-            }
             Action::ShowPlaybackPicker(source) => {
                 if self.state.available_players.is_empty() {
                     self.state.status_message =

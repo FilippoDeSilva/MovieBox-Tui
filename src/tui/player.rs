@@ -232,68 +232,78 @@ fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) 
 }
 
 fn mpv_executable() -> Option<String> {
-    if let Some(executable) = configured_executable("MOVIEBOX_MPV_PATH") {
-        return Some(executable);
-    }
-    let fallback = if cfg!(target_os = "windows") {
-        "mpv.exe"
-    } else {
-        "mpv"
-    };
-    #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
-    let mut paths = vec![MPV_WINDOWS.to_string(), MPV_MACOS.to_string()];
-    #[cfg(target_os = "macos")]
-    if let Some(home) = dirs::home_dir() {
-        paths.push(
-            home.join("Applications/mpv.app/Contents/MacOS/mpv")
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
-    #[cfg(windows)]
-    if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        paths.push(format!(r"{local}\Programs\mpv\mpv.exe"));
-    }
-    first_executable(&paths, fallback).or_else(|| flatpak_executable("io.mpv.Mpv"))
+    static CACHED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            if let Some(executable) = configured_executable("MOVIEBOX_MPV_PATH") {
+                return Some(executable);
+            }
+            let fallback = if cfg!(target_os = "windows") {
+                "mpv.exe"
+            } else {
+                "mpv"
+            };
+            #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
+            let mut paths = vec![MPV_WINDOWS.to_string(), MPV_MACOS.to_string()];
+            #[cfg(target_os = "macos")]
+            if let Some(home) = dirs::home_dir() {
+                paths.push(
+                    home.join("Applications/mpv.app/Contents/MacOS/mpv")
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+            }
+            #[cfg(windows)]
+            if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                paths.push(format!(r"{local}\Programs\mpv\mpv.exe"));
+            }
+            first_executable(&paths, fallback).or_else(|| flatpak_executable("io.mpv.Mpv"))
+        })
+        .clone()
 }
 
 fn vlc_executable() -> Option<String> {
-    if let Some(executable) = configured_executable("MOVIEBOX_VLC_PATH") {
-        return Some(executable);
-    }
-    let fallback = if cfg!(target_os = "windows") {
-        "vlc.exe"
-    } else {
-        "vlc"
-    };
+    static CACHED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            if let Some(executable) = configured_executable("MOVIEBOX_VLC_PATH") {
+                return Some(executable);
+            }
+            let fallback = if cfg!(target_os = "windows") {
+                "vlc.exe"
+            } else {
+                "vlc"
+            };
 
-    #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
-    let mut paths = vec![
-        VLC_WINDOWS.to_string(),
-        VLC_WINDOWS_X86.to_string(),
-        VLC_MACOS.to_string(),
-    ];
+            #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
+            let mut paths = vec![
+                VLC_WINDOWS.to_string(),
+                VLC_WINDOWS_X86.to_string(),
+                VLC_MACOS.to_string(),
+            ];
 
-    #[cfg(target_os = "macos")]
-    if let Some(home) = dirs::home_dir() {
-        paths.push(
-            home.join("Applications/VLC.app/Contents/MacOS/VLC")
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
+            #[cfg(target_os = "macos")]
+            if let Some(home) = dirs::home_dir() {
+                paths.push(
+                    home.join("Applications/VLC.app/Contents/MacOS/VLC")
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+            }
 
-    #[cfg(windows)]
-    let windows_app_path = std::env::var("LOCALAPPDATA")
-        .map(|l| format!(r"{}\Microsoft\WindowsApps\vlc.exe", l))
-        .unwrap_or_default();
+            #[cfg(windows)]
+            let windows_app_path = std::env::var("LOCALAPPDATA")
+                .map(|l| format!(r"{}\Microsoft\WindowsApps\vlc.exe", l))
+                .unwrap_or_default();
 
-    #[cfg(windows)]
-    if !windows_app_path.is_empty() {
-        paths.push(windows_app_path);
-    }
+            #[cfg(windows)]
+            if !windows_app_path.is_empty() {
+                paths.push(windows_app_path);
+            }
 
-    first_executable(&paths, fallback).or_else(|| flatpak_executable("org.videolan.VLC"))
+            first_executable(&paths, fallback).or_else(|| flatpak_executable("org.videolan.VLC"))
+        })
+        .clone()
 }
 
 #[cfg(target_os = "macos")]
