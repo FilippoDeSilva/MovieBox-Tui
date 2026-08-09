@@ -351,27 +351,7 @@ impl App {
             }
             Action::ShowSubtitlePopup(link, ext_captions, open_with) => {
                 self.state.is_resolving_playback = false;
-                let mut options = vec![("None".to_string(), "".to_string())];
-
-                if let Some(captions_list) =
-                    ext_captions.get("extCaptions").and_then(|c| c.as_array())
-                {
-                    for cap in captions_list {
-                        let name = cap
-                            .get("lanName")
-                            .and_then(|n| n.as_str())
-                            .unwrap_or("Unknown")
-                            .to_string();
-                        let url = cap
-                            .get("url")
-                            .and_then(|u| u.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        if !url.is_empty() {
-                            options.push((name, url));
-                        }
-                    }
-                }
+                let options = crate::tui::state::caption_options(&ext_captions);
 
                 if options.len() > 1 {
                     self.state.show_help = false;
@@ -394,27 +374,7 @@ impl App {
             }
             Action::ShowDownloadSubtitlePopup(ext_captions) => {
                 self.state.is_resolving_playback = false;
-                let mut options = vec![("None".to_string(), "".to_string())];
-
-                if let Some(captions_list) =
-                    ext_captions.get("extCaptions").and_then(|c| c.as_array())
-                {
-                    for cap in captions_list {
-                        let name = cap
-                            .get("lanName")
-                            .and_then(|n| n.as_str())
-                            .unwrap_or("Unknown")
-                            .to_string();
-                        let url = cap
-                            .get("url")
-                            .and_then(|u| u.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        if !url.is_empty() {
-                            options.push((name, url));
-                        }
-                    }
-                }
+                let options = crate::tui::state::caption_options(&ext_captions);
 
                 if options.len() > 1 {
                     self.state.show_help = false;

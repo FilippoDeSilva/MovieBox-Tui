@@ -2129,22 +2129,8 @@ impl App {
                                     if no_pref {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                                     } else if let Some(pref_lang) = pref {
-                                        let mut sub_url = None;
-                                        if let Some(list) =
-                                            res.get("extCaptions").and_then(|c| c.as_array())
-                                        {
-                                            for sub in list {
-                                                if let (Some(lang), Some(url)) = (
-                                                    sub.get("lanName").and_then(|l| l.as_str()),
-                                                    sub.get("url").and_then(|u| u.as_str()),
-                                                ) {
-                                                    if lang == pref_lang {
-                                                        sub_url = Some(url.to_string());
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        let sub_url =
+                                            crate::tui::state::caption_url_for(&res, &pref_lang);
                                         sender.send(Action::DownloadStream(sub_url)).ok();
                                     }
                                 } else {
