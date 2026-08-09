@@ -38,7 +38,7 @@ Logs are sanitized so they can be pasted into a GitHub issue:
 - URLs are reduced to `scheme://host` — file tokens, filenames, and query params are
   removed.
 - Absolute paths are rewritten to `~` so your username does not appear.
-- Headers, `Authorization`/`GITHUB_TOKEN`, search queries, and watch history are never
+- Headers, `Authorization`, search queries, and watch history are never
   logged.
 
 Reproduce the problem, then attach the current log file. See [debugging.md](debugging.md).

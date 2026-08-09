@@ -2,7 +2,18 @@ const OWNER: &str = "mesamirh";
 const REPOSITORY: &str = "MovieBox-Tui";
 
 pub async fn check(current: &str) -> Result<Option<(String, String)>, String> {
-    let release = fetch_release().await?;
+    let release = match fetch_release().await {
+        Ok(release) => release,
+        Err(error) => {
+            log::warn!("update check via API failed ({error}); falling back to release page");
+            let tag = fetch_latest_tag().await?;
+            log::info!("resolved latest release via redirect: {tag}");
+            Release {
+                version: tag.trim_start_matches('v').to_string(),
+                notes: String::new(),
+            }
+        }
+    };
 
     if !is_newer(current, &release.version) {
         return Ok(None);
@@ -23,29 +34,50 @@ async fn fetch_release() -> Result<Release, String> {
     let url = format!("https://api.github.com/repos/{OWNER}/{REPOSITORY}/releases/latest");
     let client = http_client()?;
 
-    let mut request = client.get(&url);
-    if let Some(token) = std::env::var("GITHUB_TOKEN").ok().filter(|t| !t.is_empty()) {
-        request = request.header("Authorization", format!("Bearer {token}"));
-    }
-
-    let resp = request
+    let resp = client
+        .get(&url)
         .send()
         .await
         .map_err(|e| format!("GitHub request failed: {e}"))?;
     let status = resp.status();
+    if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+    {
+        return Err(format!("GitHub API rate limited ({status})"));
+    }
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        log::warn!("GitHub update check failed: {status} {body}");
         return Err(format!("GitHub API {status}: {body}"));
     }
 
     let item: serde_json::Value = resp.json().await.map_err(|e| format!("bad JSON: {e}"))?;
     let tag = item["tag_name"].as_str().ok_or("missing tag_name")?;
-    let body = item["body"].as_str().unwrap_or("").to_string();
+    let notes = item["body"].as_str().unwrap_or("").to_string();
     Ok(Release {
         version: tag.trim_start_matches('v').to_string(),
-        notes: body,
+        notes,
     })
+}
+
+async fn fetch_latest_tag() -> Result<String, String> {
+    let url = format!("https://github.com/{OWNER}/{REPOSITORY}/releases/latest");
+    let client = http_client()?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("GitHub release page failed: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(format!("GitHub release page {status}"));
+    }
+
+    let path = resp.url().path();
+    let tag = path.rsplit('/').next().unwrap_or("");
+    if tag.is_empty() || tag == "latest" {
+        return Err("could not resolve the latest release tag".into());
+    }
+    Ok(tag.to_string())
 }
 
 fn http_client() -> Result<reqwest::Client, String> {

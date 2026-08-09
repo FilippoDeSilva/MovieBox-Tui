@@ -31,7 +31,6 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `MOVIEBOX_IINA_PATH` | Custom IINA/iina-cli executable. |
 | `MOVIEBOX_FOURKHDHUB_URL` | Override the 4KHDHub base URL. |
 | `MOVIEBOX_THEME` | Force a theme (e.g. `Mocha`, `Latte`). |
-| `GITHUB_TOKEN` | Optional token for the update check (avoids rate limits). |
 
 ## CLI
 
