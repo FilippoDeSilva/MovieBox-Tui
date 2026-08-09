@@ -15,6 +15,12 @@ impl Provider for client::MovieBoxClient {
             .map_err(|error| format!("{error:?}"))?;
         Ok(adapt::search_json_to_catalog(&value))
     }
+
+    async fn details(&self, id: &str) -> Result<serde_json::Value, String> {
+        self.get_details(id)
+            .await
+            .map_err(|error| format!("{error:?}"))
+    }
 }
 
 use client::{MovieBoxClient, ScraperError};

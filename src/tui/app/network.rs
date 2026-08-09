@@ -1,6 +1,6 @@
 use crate::providers::{
     Provider,
-    fourkhdhub::{FourKHdHubClient, details_to_moviebox_json, search_to_moviebox_json},
+    fourkhdhub::{FourKHdHubClient, search_to_moviebox_json},
     models::ProviderKind,
     moviebox::client::MovieBoxClient,
 };
@@ -50,24 +50,9 @@ pub(super) async fn provider_details(
     subject_id: &str,
 ) -> Result<serde_json::Value, String> {
     match provider {
-        ProviderKind::MovieBox => moviebox
-            .get_details(subject_id)
-            .await
-            .map_err(|error| format!("{error:?}")),
-        ProviderKind::FourKHdHub => fourk
-            .details(subject_id)
-            .await
-            .map(|details| details_to_moviebox_json(&details))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixCircleFtp => circleftp
-            .details(subject_id)
-            .await
-            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixDhakaFlix => dhakaflix
-            .details(subject_id)
-            .await
-            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
-            .map_err(|error| error.to_string()),
+        ProviderKind::MovieBox => Provider::details(moviebox, subject_id).await,
+        ProviderKind::FourKHdHub => Provider::details(fourk, subject_id).await,
+        ProviderKind::BdixCircleFtp => Provider::details(circleftp, subject_id).await,
+        ProviderKind::BdixDhakaFlix => Provider::details(dhakaflix, subject_id).await,
     }
 }

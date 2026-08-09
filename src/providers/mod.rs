@@ -8,4 +8,5 @@ use models::CatalogItem;
 
 pub(crate) trait Provider {
     async fn search(&self, query: &str, page: usize) -> Result<Vec<CatalogItem>, String>;
+    async fn details(&self, id: &str) -> Result<serde_json::Value, String>;
 }
