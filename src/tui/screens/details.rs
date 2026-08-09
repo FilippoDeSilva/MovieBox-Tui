@@ -120,7 +120,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         .get("title")
         .and_then(|t| t.as_str())
         .unwrap_or("Unknown Title");
-    let title = crate::tui::app::clean_moviebox_title(raw_title);
+    let title = crate::providers::moviebox::clean_moviebox_title(raw_title);
     let intro = details_json
         .get("description")
         .and_then(|d| d.as_str())

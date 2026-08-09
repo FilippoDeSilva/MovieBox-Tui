@@ -612,7 +612,8 @@ impl App {
                             .unwrap_or("Unknown")
                             .to_string();
 
-                        let clean_title = crate::tui::app::clean_moviebox_title(&raw_title);
+                        let clean_title =
+                            crate::providers::moviebox::clean_moviebox_title(&raw_title);
 
                         let normalized_query = query
                             .to_lowercase()
@@ -853,7 +854,7 @@ impl App {
                         .and_then(|t| t.as_str())
                         .unwrap_or("Unknown")
                         .to_string();
-                    let clean_title = crate::tui::app::clean_moviebox_title(&raw_title);
+                    let clean_title = crate::providers::moviebox::clean_moviebox_title(&raw_title);
                     let stype = item
                         .get("subjectType")
                         .and_then(|st| st.as_i64())

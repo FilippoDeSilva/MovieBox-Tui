@@ -1,5 +1,8 @@
 pub mod client;
 pub mod crypto;
+pub mod title;
+
+pub use title::clean_moviebox_title;
 
 use client::{MovieBoxClient, ScraperError};
 use serde_json::{Value, json};
