@@ -1,6 +1,10 @@
 pub mod client;
 
-use crate::providers::{Provider, fourkhdhub::details_to_moviebox_json, models::CatalogItem};
+use crate::providers::{
+    Provider, ReleaseProvider,
+    fourkhdhub::details_to_moviebox_json,
+    models::{CatalogItem, Release},
+};
 
 impl Provider for client::DhakaFlixClient {
     async fn search(&self, query: &str, _page: usize) -> Result<Vec<CatalogItem>, String> {
@@ -12,5 +16,16 @@ impl Provider for client::DhakaFlixClient {
             .await
             .map(|details| details_to_moviebox_json(&details))
             .map_err(|error| error.to_string())
+    }
+}
+
+impl ReleaseProvider for client::DhakaFlixClient {
+    async fn episode_streams(
+        &self,
+        id: &str,
+        _season: usize,
+        _episode: usize,
+    ) -> Result<Vec<Release>, String> {
+        self.streams(id).await.map_err(|error| error.to_string())
     }
 }

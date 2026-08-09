@@ -1698,21 +1698,34 @@ impl App {
                     let dhakaflix_client = self.dhakaflix_client.clone();
                     let id = subject_id.clone();
                     tokio::spawn(async move {
-                        let result = if context.provider == ProviderKind::FourKHdHub {
-                            fourk_client
-                                .releases(&id, season, episode)
+                        let result = match context.provider {
+                            ProviderKind::FourKHdHub => {
+                                crate::providers::ReleaseProvider::episode_streams(
+                                    &fourk_client,
+                                    &id,
+                                    season,
+                                    episode,
+                                )
                                 .await
-                                .map_err(|e| e.to_string())
-                        } else if context.provider == ProviderKind::BdixCircleFtp {
-                            circleftp_client
-                                .releases(&id, Some(season), Some(episode))
+                            }
+                            ProviderKind::BdixCircleFtp => {
+                                crate::providers::ReleaseProvider::episode_streams(
+                                    &circleftp_client,
+                                    &id,
+                                    season,
+                                    episode,
+                                )
                                 .await
-                                .map_err(|e| e.to_string())
-                        } else {
-                            dhakaflix_client
-                                .streams(&id)
+                            }
+                            _ => {
+                                crate::providers::ReleaseProvider::episode_streams(
+                                    &dhakaflix_client,
+                                    &id,
+                                    season,
+                                    episode,
+                                )
                                 .await
-                                .map_err(|e| e.to_string())
+                            }
                         };
                         match result {
                             Ok(releases) if !releases.is_empty() => {
