@@ -224,6 +224,21 @@ impl App {
 
         let client = self.client.http_client().clone();
         let sender = self.action_sender.clone();
+        let cell_size = self
+            .state
+            .image_picker
+            .as_ref()
+            .map(|picker| picker.font_size());
+        let window = crossterm::terminal::size().ok().map(|(cols, rows)| {
+            let (cell_width, cell_height) = cell_size
+                .filter(|size| size.width > 0 && size.height > 0)
+                .map(|size| (size.width as u32, size.height as u32))
+                .unwrap_or((8, 16));
+            (
+                (cols as u32 * cell_width).clamp(320, 1920),
+                (rows as u32 * cell_height).clamp(180, 1080),
+            )
+        });
         tokio::spawn(async move {
             let mut local_subtitle = subtitle.clone();
             let mut temporary_subtitle = None;
@@ -270,8 +285,13 @@ impl App {
                 }
             }
 
-            let mut command =
-                crate::tui::player::command(kind, &link, local_subtitle.as_deref(), &headers);
+            let mut command = crate::tui::player::command(
+                kind,
+                &link,
+                local_subtitle.as_deref(),
+                &headers,
+                window,
+            );
             command.stdin(std::process::Stdio::null());
             command.stdout(std::process::Stdio::null());
             command.stderr(std::process::Stdio::piped());

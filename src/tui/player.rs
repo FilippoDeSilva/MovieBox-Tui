@@ -47,11 +47,12 @@ pub fn command(
     url: &str,
     subtitle: Option<&str>,
     headers: &[(String, String)],
+    window: Option<(u32, u32)>,
 ) -> Command {
     match kind {
-        PlayerKind::Mpv => mpv_command(url, subtitle, headers, false),
-        PlayerKind::Iina => iina_command(url, subtitle, headers),
-        PlayerKind::Vlc => vlc_command(url, subtitle, headers),
+        PlayerKind::Mpv => mpv_command(url, subtitle, headers, false, window),
+        PlayerKind::Iina => iina_command(url, subtitle, headers, window),
+        PlayerKind::Vlc => vlc_command(url, subtitle, headers, window),
         PlayerKind::AndroidIntent => android_intent_command(url),
     }
 }
@@ -95,6 +96,7 @@ fn mpv_command(
     subtitle: Option<&str>,
     headers: &[(String, String)],
     iina: bool,
+    window: Option<(u32, u32)>,
 ) -> Command {
     let fallback = if cfg!(target_os = "windows") {
         "mpv.exe"
@@ -112,9 +114,10 @@ fn mpv_command(
     };
     let prefix = if iina { "--mpv-" } else { "--" };
 
-    command
-        .arg(format!("{prefix}autofit=960x540"))
-        .arg(format!("{prefix}geometry=50%:50%"));
+    if let Some((width, height)) = window {
+        command.arg(format!("{prefix}autofit={width}x{height}"));
+    }
+    command.arg(format!("{prefix}geometry=50%:50%"));
 
     if !iina {
         command.arg("--idle=no").arg("--keep-open=no");
@@ -148,7 +151,12 @@ fn mpv_command(
 }
 
 #[cfg(target_os = "macos")]
-fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
+fn iina_command(
+    url: &str,
+    subtitle: Option<&str>,
+    headers: &[(String, String)],
+    window: Option<(u32, u32)>,
+) -> Command {
     let configured = configured_executable("MOVIEBOX_IINA_PATH");
     let cli_global = std::path::Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
     let cli_local = dirs::home_dir()
@@ -173,7 +181,7 @@ fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)])
         Command::new("iina")
     };
 
-    let mpv = mpv_command(url, subtitle, headers, true);
+    let mpv = mpv_command(url, subtitle, headers, true, window);
     for arg in mpv.get_args() {
         command.arg(arg);
     }
@@ -181,11 +189,21 @@ fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)])
 }
 
 #[cfg(not(target_os = "macos"))]
-fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
-    mpv_command(url, subtitle, headers, false)
+fn iina_command(
+    url: &str,
+    subtitle: Option<&str>,
+    headers: &[(String, String)],
+    window: Option<(u32, u32)>,
+) -> Command {
+    mpv_command(url, subtitle, headers, false, window)
 }
 
-fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) -> Command {
+fn vlc_command(
+    url: &str,
+    subtitle: Option<&str>,
+    headers: &[(String, String)],
+    window: Option<(u32, u32)>,
+) -> Command {
     let fallback = if cfg!(target_os = "windows") {
         "vlc.exe"
     } else {
@@ -200,10 +218,12 @@ fn vlc_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)]) 
     } else {
         Command::new(&executable)
     };
-    command
-        .arg("--width=960")
-        .arg("--height=540")
-        .arg("--play-and-exit");
+    if let Some((width, height)) = window {
+        command
+            .arg(format!("--width={width}"))
+            .arg(format!("--height={height}"));
+    }
+    command.arg("--play-and-exit");
 
     for (name, value) in headers {
         if name.eq_ignore_ascii_case("referer") {
