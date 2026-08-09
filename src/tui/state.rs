@@ -337,6 +337,43 @@ impl AppState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TvManagerRow {
+    Header(&'static str),
+    Playlist(usize),
+    AddUrl,
+    AddFile,
+    Reload,
+    Done,
+}
+
+fn playlist_is_url(source: &str) -> bool {
+    let trimmed = source.trim_start();
+    trimmed.starts_with("http://") || trimmed.starts_with("https://")
+}
+
+impl AppState {
+    pub fn tv_manager_rows(&self) -> Vec<TvManagerRow> {
+        let mut rows = vec![TvManagerRow::Header("URL playlists")];
+        for (index, source) in self.tv_playlists.iter().enumerate() {
+            if playlist_is_url(source) {
+                rows.push(TvManagerRow::Playlist(index));
+            }
+        }
+        rows.push(TvManagerRow::AddUrl);
+        rows.push(TvManagerRow::Header("File playlists"));
+        for (index, source) in self.tv_playlists.iter().enumerate() {
+            if !playlist_is_url(source) {
+                rows.push(TvManagerRow::Playlist(index));
+            }
+        }
+        rows.push(TvManagerRow::AddFile);
+        rows.push(TvManagerRow::Reload);
+        rows.push(TvManagerRow::Done);
+        rows
+    }
+}
+
 pub fn subject_id(value: &serde_json::Value) -> Option<String> {
     value
         .as_i64()

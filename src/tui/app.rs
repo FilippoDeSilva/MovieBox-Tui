@@ -210,28 +210,35 @@ impl App {
         });
     }
 
-    fn tv_manager_row_count(&self) -> usize {
-        self.state.tv_playlists.len() + 4
-    }
-
     fn tv_manager_activate(&mut self) {
-        let index = self.state.tv_manager_selected;
-        let playlist_count = self.state.tv_playlists.len();
-        if index >= playlist_count {
-            match index - playlist_count {
-                0 => {
-                    self.action_sender.send(Action::TvInputToggle(false)).ok();
-                }
-                1 => {
-                    self.action_sender.send(Action::TvInputToggle(true)).ok();
-                }
-                2 => {
-                    self.action_sender.send(Action::TvReloadPlaylists).ok();
-                }
-                _ => {
-                    self.state.tv_config_popup = false;
-                }
+        use crate::tui::state::TvManagerRow;
+        let Some(row) = self
+            .state
+            .tv_manager_rows()
+            .get(self.state.tv_manager_selected)
+            .copied()
+        else {
+            return;
+        };
+        match row {
+            TvManagerRow::Playlist(index) => {
+                self.action_sender
+                    .send(Action::TvPlaylistRemove(index))
+                    .ok();
             }
+            TvManagerRow::AddUrl => {
+                self.action_sender.send(Action::TvInputToggle(false)).ok();
+            }
+            TvManagerRow::AddFile => {
+                self.action_sender.send(Action::TvInputToggle(true)).ok();
+            }
+            TvManagerRow::Reload => {
+                self.action_sender.send(Action::TvReloadPlaylists).ok();
+            }
+            TvManagerRow::Done => {
+                self.state.tv_config_popup = false;
+            }
+            TvManagerRow::Header(_) => {}
         }
     }
 
@@ -1333,30 +1340,58 @@ impl App {
                                         self.state.tv_config_popup = false;
                                     }
                                     KeyCode::Up => {
-                                        let total = self.tv_manager_row_count();
-                                        if self.state.tv_manager_selected == 0 {
-                                            self.state.tv_manager_selected =
-                                                total.saturating_sub(1);
+                                        use crate::tui::state::TvManagerRow;
+                                        let rows = self.state.tv_manager_rows();
+                                        let total = rows.len();
+                                        let mut next = if self.state.tv_manager_selected == 0 {
+                                            total.saturating_sub(1)
                                         } else {
-                                            self.state.tv_manager_selected -= 1;
+                                            self.state.tv_manager_selected - 1
+                                        };
+                                        while next != self.state.tv_manager_selected
+                                            && matches!(
+                                                rows.get(next),
+                                                Some(TvManagerRow::Header(_))
+                                            )
+                                        {
+                                            next = if next == 0 {
+                                                total.saturating_sub(1)
+                                            } else {
+                                                next - 1
+                                            };
                                         }
+                                        self.state.tv_manager_selected = next;
                                     }
                                     KeyCode::Down => {
-                                        let total = self.tv_manager_row_count();
-                                        if self.state.tv_manager_selected + 1 >= total {
-                                            self.state.tv_manager_selected = 0;
-                                        } else {
-                                            self.state.tv_manager_selected += 1;
+                                        use crate::tui::state::TvManagerRow;
+                                        let rows = self.state.tv_manager_rows();
+                                        let total = rows.len();
+                                        let mut next =
+                                            if self.state.tv_manager_selected + 1 >= total {
+                                                0
+                                            } else {
+                                                self.state.tv_manager_selected + 1
+                                            };
+                                        while next != self.state.tv_manager_selected
+                                            && matches!(
+                                                rows.get(next),
+                                                Some(TvManagerRow::Header(_))
+                                            )
+                                        {
+                                            next = if next + 1 >= total { 0 } else { next + 1 };
                                         }
+                                        self.state.tv_manager_selected = next;
                                     }
                                     KeyCode::Char('d') => {
-                                        if self.state.tv_manager_selected
-                                            < self.state.tv_playlists.len()
+                                        use crate::tui::state::TvManagerRow;
+                                        if let Some(TvManagerRow::Playlist(index)) = self
+                                            .state
+                                            .tv_manager_rows()
+                                            .get(self.state.tv_manager_selected)
+                                            .copied()
                                         {
                                             self.action_sender
-                                                .send(Action::TvPlaylistRemove(
-                                                    self.state.tv_manager_selected,
-                                                ))
+                                                .send(Action::TvPlaylistRemove(index))
                                                 .ok();
                                         }
                                     }
@@ -1627,7 +1662,7 @@ impl App {
                     self.state.is_download_subtitle_popup = false;
                     self.state.tv_config_popup = true;
                     self.state.input_mode = crate::tui::state::InputMode::Normal;
-                    self.state.tv_manager_selected = 0;
+                    self.state.tv_manager_selected = 1;
                     self.state.tv_input_active = false;
                     self.state.tv_input_buffer.clear();
                 }

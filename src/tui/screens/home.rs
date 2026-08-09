@@ -990,8 +990,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
     }
     if state.tv_config_popup {
-        let action_rows = 4usize;
-        let total_rows = state.tv_playlists.len() + action_rows;
+        let rows = state.tv_manager_rows();
+        let total_rows = rows.len();
         let content_width = state
             .tv_playlists
             .iter()
@@ -1057,29 +1057,27 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 sections[0],
             );
         } else {
-            let mut items: Vec<ratatui::widgets::ListItem> = state
-                .tv_playlists
+            let items: Vec<ratatui::widgets::ListItem> = rows
                 .iter()
-                .enumerate()
-                .map(|(index, source)| {
-                    ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
-                        ratatui::text::Span::styled(format!("{} ", index + 1), theme.muted),
-                        ratatui::text::Span::styled(source, theme.text),
-                    ]))
+                .map(|row| {
+                    use crate::tui::state::TvManagerRow;
+                    let (text, style) = match row {
+                        TvManagerRow::Header(label) => (label.to_string(), theme.muted),
+                        TvManagerRow::Playlist(index) => {
+                            let source =
+                                state.tv_playlists.get(*index).cloned().unwrap_or_default();
+                            (format!("{} {}", index + 1, source), theme.text)
+                        }
+                        TvManagerRow::AddUrl => ("[ Add URL ]".to_string(), theme.sapphire),
+                        TvManagerRow::AddFile => ("[ Add file ]".to_string(), theme.sapphire),
+                        TvManagerRow::Reload => ("[ Reload ]".to_string(), theme.rating),
+                        TvManagerRow::Done => ("[ Done ]".to_string(), theme.success),
+                    };
+                    ratatui::widgets::ListItem::new(ratatui::text::Line::from(
+                        ratatui::text::Span::styled(text, style),
+                    ))
                 })
                 .collect();
-            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
-                ratatui::text::Span::styled("[ Add URL ]", theme.sapphire),
-            )));
-            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
-                ratatui::text::Span::styled("[ Add file ]", theme.sapphire),
-            )));
-            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
-                ratatui::text::Span::styled("[ Reload ]", theme.rating),
-            )));
-            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
-                ratatui::text::Span::styled("[ Done ]", theme.success),
-            )));
 
             let list = ratatui::widgets::List::new(items)
                 .highlight_style(crate::tui::overlay::selection_style(
