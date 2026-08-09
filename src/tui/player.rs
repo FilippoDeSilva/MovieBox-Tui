@@ -23,7 +23,10 @@ pub fn detect() -> Vec<PlayerKind> {
         players.push(PlayerKind::Vlc);
     }
 
-    let is_android = cfg!(target_os = "android") || std::path::Path::new("/system/bin/am").exists();
+    let is_android = cfg!(target_os = "android")
+        || std::path::Path::new("/system/bin/am").exists()
+        || executable_on_path("termux-open")
+        || executable_on_path("am");
 
     if is_android {
         players.push(PlayerKind::AndroidIntent);
@@ -34,6 +37,10 @@ pub fn detect() -> Vec<PlayerKind> {
 
 pub fn supports_headers(kind: PlayerKind, headers: &[(String, String)]) -> bool {
     if kind == PlayerKind::AndroidIntent {
+        return false;
+    }
+    #[cfg(target_os = "macos")]
+    if kind == PlayerKind::Iina && !iina_cli_exists() {
         return false;
     }
     kind != PlayerKind::Vlc
@@ -343,6 +350,18 @@ fn iina_available() -> bool {
 fn iina_app_exists() -> bool {
     Path::new("/Applications/IINA.app").exists()
         || dirs::home_dir().is_some_and(|home| home.join("Applications/IINA.app").exists())
+}
+
+#[cfg(target_os = "macos")]
+fn iina_cli_exists() -> bool {
+    let cli_global = Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
+    let cli_local = dirs::home_dir()
+        .map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli"))
+        .unwrap_or_default();
+    configured_executable("MOVIEBOX_IINA_PATH").is_some()
+        || cli_global.exists()
+        || cli_local.exists()
+        || command_exists("iina")
 }
 
 fn flatpak_executable(app_id: &str) -> Option<String> {
