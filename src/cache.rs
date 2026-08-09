@@ -293,10 +293,6 @@ fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
     path
 }
 
-pub fn get_image_cache(id: &str) -> Option<Vec<u8>> {
-    get_namespaced_image_cache(ProviderKind::MovieBox.cache_key(), id)
-}
-
 pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> {
     let path = get_namespaced_image_path(namespace, id);
     if path.exists() {
@@ -313,10 +309,6 @@ pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> 
         return std::fs::read(&path).ok();
     }
     None
-}
-
-pub fn set_image_cache(id: &str, bytes: &[u8]) {
-    set_namespaced_image_cache(ProviderKind::MovieBox.cache_key(), id, bytes);
 }
 
 pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {

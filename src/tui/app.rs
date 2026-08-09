@@ -3267,10 +3267,16 @@ impl App {
                         let tx = self.action_sender.clone();
                         let id2 = id.clone();
                         let client = self.client.http_client().clone();
+                        let prov = prov;
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id2.clone();
-                                move || crate::cache::get_image_cache(&id_clone)
+                                move || {
+                                    crate::cache::get_namespaced_image_cache(
+                                        prov.cache_key(),
+                                        &id_clone,
+                                    )
+                                }
                             })
                             .await
                             {
@@ -3283,7 +3289,11 @@ impl App {
                                 let bytes_clone = bytes.clone();
                                 let id_clone = id2.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
-                                    crate::cache::set_image_cache(&id_clone, &bytes_clone)
+                                    crate::cache::set_namespaced_image_cache(
+                                        prov.cache_key(),
+                                        &id_clone,
+                                        &bytes_clone,
+                                    )
                                 })
                                 .await;
                                 if let Some(img) = decode_poster(bytes).await {
