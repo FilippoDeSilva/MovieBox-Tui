@@ -160,6 +160,81 @@ impl App {
         }
     }
 
+    fn save_tv_playlists(&self) {
+        if let Some(config_dir) = dirs::config_dir() {
+            let app_dir = config_dir.join("moviebox-tui");
+            let _ = std::fs::create_dir_all(&app_dir);
+            let path = app_dir.join("tv_config.json");
+            if let Ok(json) = serde_json::to_string(&self.state.tv_playlists) {
+                if let Err(error) = std::fs::write(&path, json) {
+                    log::warn!("failed to save tv playlists: {error}");
+                }
+            }
+        }
+    }
+
+    fn load_tv_playlists_from_config(&mut self) {
+        if let Some(config_dir) = dirs::config_dir() {
+            let path = config_dir.join("moviebox-tui").join("tv_config.json");
+            if let Ok(content) = std::fs::read_to_string(path)
+                && let Ok(list) = serde_json::from_str::<Vec<String>>(&content)
+                && !list.is_empty()
+            {
+                self.state.tv_playlists = list;
+            }
+        }
+    }
+
+    fn reload_tv_playlists(&self) {
+        let playlists = self.state.tv_playlists.clone();
+        let sender = self.action_sender.clone();
+        tokio::spawn(async move {
+            let parser = crate::providers::iptv_org::m3u::M3UParser::new();
+            let mut all_channels = Vec::new();
+            let mut failed = 0usize;
+            for source in &playlists {
+                match parser.fetch_playlist(source).await {
+                    Ok(channels) => all_channels.extend(channels),
+                    Err(error) => {
+                        failed += 1;
+                        log::warn!("tv playlist failed ({source}): {error}");
+                    }
+                }
+            }
+            if failed > 0 {
+                let _ = sender.send(Action::SetStatus(format!(
+                    "Error: {failed} playlist(s) failed to load."
+                )));
+            }
+            sender.send(Action::TvChannelsLoaded(all_channels)).ok();
+        });
+    }
+
+    fn tv_manager_row_count(&self) -> usize {
+        self.state.tv_playlists.len() + 4
+    }
+
+    fn tv_manager_activate(&mut self) {
+        let index = self.state.tv_manager_selected;
+        let playlist_count = self.state.tv_playlists.len();
+        if index >= playlist_count {
+            match index - playlist_count {
+                0 => {
+                    self.action_sender.send(Action::TvInputToggle(false)).ok();
+                }
+                1 => {
+                    self.action_sender.send(Action::TvInputToggle(true)).ok();
+                }
+                2 => {
+                    self.action_sender.send(Action::TvReloadPlaylists).ok();
+                }
+                _ => {
+                    self.state.tv_config_popup = false;
+                }
+            }
+        }
+    }
+
     fn launch_player(
         &mut self,
         kind: crate::tui::state::PlayerKind,
@@ -1224,147 +1299,69 @@ impl App {
                         Screen::Startup => {}
                         Screen::Home => {
                             if self.state.tv_config_popup {
+                                if self.state.tv_input_active {
+                                    match key.code {
+                                        KeyCode::Esc => {
+                                            self.state.tv_input_active = false;
+                                            self.state.tv_input_buffer.clear();
+                                        }
+                                        KeyCode::Enter => {
+                                            let buffer =
+                                                self.state.tv_input_buffer.trim().to_string();
+                                            self.state.tv_input_active = false;
+                                            self.state.tv_input_buffer.clear();
+                                            if !buffer.is_empty() {
+                                                self.action_sender
+                                                    .send(Action::TvPlaylistAdd(buffer))
+                                                    .ok();
+                                            }
+                                        }
+                                        KeyCode::Backspace => {
+                                            crate::tui::text::remove_last_grapheme(
+                                                &mut self.state.tv_input_buffer,
+                                            );
+                                        }
+                                        KeyCode::Char(c) if !c.is_control() => {
+                                            self.state.tv_input_buffer.push(c);
+                                        }
+                                        _ => {}
+                                    }
+                                    return None;
+                                }
                                 match key.code {
                                     KeyCode::Esc => {
-                                        if self.state.tv_wizard_step == 1 {
-                                            self.state.tv_wizard_step = 0;
-                                            self.state.tv_wizard_selected_idx = 0;
-                                            self.state.tv_wizard_options = vec![
-                                                "Grouped by category".to_string(),
-                                                "Grouped by language".to_string(),
-                                                "Grouped by broadcast area".to_string(),
-                                            ];
-                                        } else {
-                                            self.state.tv_config_popup = false;
-                                        }
+                                        self.state.tv_config_popup = false;
                                     }
                                     KeyCode::Up => {
-                                        if self.state.tv_wizard_selected_idx > 0 {
-                                            self.state.tv_wizard_selected_idx -= 1;
+                                        let total = self.tv_manager_row_count();
+                                        if self.state.tv_manager_selected == 0 {
+                                            self.state.tv_manager_selected =
+                                                total.saturating_sub(1);
                                         } else {
-                                            self.state.tv_wizard_selected_idx = self
-                                                .state
-                                                .tv_wizard_options
-                                                .len()
-                                                .saturating_sub(1);
+                                            self.state.tv_manager_selected -= 1;
                                         }
                                     }
                                     KeyCode::Down => {
-                                        if self.state.tv_wizard_selected_idx
-                                            < self.state.tv_wizard_options.len().saturating_sub(1)
-                                        {
-                                            self.state.tv_wizard_selected_idx += 1;
+                                        let total = self.tv_manager_row_count();
+                                        if self.state.tv_manager_selected + 1 >= total {
+                                            self.state.tv_manager_selected = 0;
                                         } else {
-                                            self.state.tv_wizard_selected_idx = 0;
+                                            self.state.tv_manager_selected += 1;
                                         }
                                     }
-                                    KeyCode::Char(' ') => {
-                                        if self.state.tv_wizard_step == 1 {
-                                            if let Some(opt) = self
-                                                .state
-                                                .tv_wizard_options
-                                                .get(self.state.tv_wizard_selected_idx)
-                                                .cloned()
-                                            {
-                                                if self.state.tv_wizard_selections.contains(&opt) {
-                                                    self.state.tv_wizard_selections.remove(&opt);
-                                                } else {
-                                                    self.state.tv_wizard_selections.insert(opt);
-                                                }
-                                            }
+                                    KeyCode::Char('d') => {
+                                        if self.state.tv_manager_selected
+                                            < self.state.tv_playlists.len()
+                                        {
+                                            self.action_sender
+                                                .send(Action::TvPlaylistRemove(
+                                                    self.state.tv_manager_selected,
+                                                ))
+                                                .ok();
                                         }
                                     }
                                     KeyCode::Enter => {
-                                        if self.state.tv_wizard_step == 0 {
-                                            if let Some(selected_group) = self
-                                                .state
-                                                .tv_wizard_options
-                                                .get(self.state.tv_wizard_selected_idx)
-                                                .cloned()
-                                            {
-                                                self.state.tv_wizard_step = 1;
-                                                self.state.tv_wizard_selected_idx = 0;
-                                                if selected_group == "Grouped by category" {
-                                                    self.state.tv_wizard_options =
-                                                        crate::tui::iptv_data::CATEGORIES
-                                                            .iter()
-                                                            .map(|s| s.to_string())
-                                                            .collect();
-                                                } else if selected_group == "Grouped by language" {
-                                                    self.state.tv_wizard_options =
-                                                        crate::tui::iptv_data::LANGUAGES
-                                                            .iter()
-                                                            .map(|(n, _)| n.to_string())
-                                                            .collect();
-                                                } else {
-                                                    self.state.tv_wizard_options =
-                                                        crate::tui::iptv_data::COUNTRIES
-                                                            .iter()
-                                                            .map(|(n, _)| n.to_string())
-                                                            .collect();
-                                                }
-                                            }
-                                        } else {
-                                            self.state.tv_config_popup = false;
-
-                                            self.state.is_loading = true;
-                                            self.state.set_status(
-                                                "Fetching TV channels...".to_string(),
-                                                150,
-                                            );
-
-                                            let mut urls_to_fetch = Vec::new();
-                                            for sel in &self.state.tv_wizard_selections {
-                                                if crate::tui::iptv_data::CATEGORIES
-                                                    .contains(&sel.as_str())
-                                                {
-                                                    urls_to_fetch.push(format!("https://iptv-org.github.io/iptv/categories/{}.m3u", sel.to_lowercase()));
-                                                } else if let Some((_, code)) =
-                                                    crate::tui::iptv_data::LANGUAGES
-                                                        .iter()
-                                                        .find(|(n, _)| n == sel)
-                                                {
-                                                    urls_to_fetch.push(format!("https://iptv-org.github.io/iptv/languages/{}.m3u", code));
-                                                } else if let Some((_, code)) =
-                                                    crate::tui::iptv_data::COUNTRIES
-                                                        .iter()
-                                                        .find(|(n, _)| n == sel)
-                                                {
-                                                    urls_to_fetch.push(format!("https://iptv-org.github.io/iptv/countries/{}.m3u", code));
-                                                }
-                                            }
-
-                                            let sender = self.action_sender.clone();
-                                            tokio::spawn(async move {
-                                                let mut config_path = dirs::config_dir()
-                                                    .unwrap_or_else(|| {
-                                                        std::path::PathBuf::from(".")
-                                                    });
-                                                config_path.push("moviebox-tui");
-                                                std::fs::create_dir_all(&config_path).ok();
-                                                config_path.push("tv_config.json");
-                                                if let Ok(json) =
-                                                    serde_json::to_string(&urls_to_fetch)
-                                                {
-                                                    std::fs::write(&config_path, json).ok();
-                                                }
-
-                                                let parser =
-                                                    crate::providers::iptv_org::m3u::M3UParser::new(
-                                                    );
-                                                let mut all_channels = Vec::new();
-                                                for url in urls_to_fetch {
-                                                    if let Ok(channels) =
-                                                        parser.fetch_playlist(&url).await
-                                                    {
-                                                        all_channels.extend(channels);
-                                                    }
-                                                }
-                                                sender
-                                                    .send(Action::TvChannelsLoaded(all_channels))
-                                                    .ok();
-                                            });
-                                        }
+                                        self.tv_manager_activate();
                                     }
                                     _ => {}
                                 }
@@ -1610,45 +1607,19 @@ impl App {
                     self.state.search_query.clear();
                     self.state.search_results.clear();
                     self.state
-                        .set_status("Initializing Moviebox TV Mode...".to_string(), 200);
-
-                    let sender = self.action_sender.clone();
-                    tokio::spawn(async move {
-                        let mut config_path =
-                            dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-                        config_path.push("moviebox-tui");
-                        config_path.push("tv_config.json");
-
-                        let mut loaded_urls = Vec::new();
-                        if let Ok(content) = std::fs::read_to_string(&config_path) {
-                            if let Ok(urls) = serde_json::from_str::<Vec<String>>(&content) {
-                                if !urls.is_empty() {
-                                    loaded_urls = urls;
-                                }
-                            }
-                        }
-
-                        if !loaded_urls.is_empty() {
-                            let parser = crate::providers::iptv_org::m3u::M3UParser::new();
-                            let mut all_channels = Vec::new();
-                            for url in loaded_urls {
-                                if let Ok(channels) = parser.fetch_playlist(&url).await {
-                                    all_channels.extend(channels);
-                                }
-                            }
-                            sender.send(Action::TvChannelsLoaded(all_channels)).ok();
-                        } else {
-                            tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
-                            sender.send(Action::ShowTvWizard).ok();
-                        }
-                    });
+                        .set_status("Loading TV playlists...".to_string(), 200);
+                    self.load_tv_playlists_from_config();
+                    self.reload_tv_playlists();
+                    if self.state.tv_playlists.is_empty() {
+                        self.action_sender.send(Action::ShowTvConfig).ok();
+                    }
                 } else {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
                 }
             }
-            Action::ShowTvWizard => {
+            Action::ShowTvConfig => {
                 if self.state.is_tv_mode {
                     self.state.show_help = false;
                     self.state.player_picker_popup = false;
@@ -1656,15 +1627,69 @@ impl App {
                     self.state.is_download_subtitle_popup = false;
                     self.state.tv_config_popup = true;
                     self.state.input_mode = crate::tui::state::InputMode::Normal;
+                    self.state.tv_manager_selected = 0;
+                    self.state.tv_input_active = false;
+                    self.state.tv_input_buffer.clear();
                 }
             }
+            Action::TvPlaylistAdd(source) => {
+                let source = source.trim().to_string();
+                if !source.is_empty()
+                    && !self
+                        .state
+                        .tv_playlists
+                        .iter()
+                        .any(|existing| existing == &source)
+                {
+                    self.state.tv_playlists.push(source);
+                    self.save_tv_playlists();
+                    self.reload_tv_playlists();
+                }
+            }
+            Action::TvPlaylistRemove(index) => {
+                if index < self.state.tv_playlists.len() {
+                    self.state.tv_playlists.remove(index);
+                    if self.state.tv_manager_selected > self.state.tv_playlists.len() {
+                        self.state.tv_manager_selected = self.state.tv_playlists.len();
+                    }
+                    self.save_tv_playlists();
+                    self.reload_tv_playlists();
+                }
+            }
+            Action::TvReloadPlaylists => {
+                self.state
+                    .set_status("Reloading TV playlists...".to_string(), 150);
+                self.reload_tv_playlists();
+            }
+            Action::TvInputToggle(is_file) => {
+                self.state.tv_input_active = true;
+                self.state.tv_input_is_file = is_file;
+                self.state.tv_input_buffer.clear();
+            }
             Action::TvChannelsLoaded(channels) => {
-                self.state.tv_channels = channels;
+                let mut seen = std::collections::HashSet::new();
+                self.state.tv_channels = channels
+                    .into_iter()
+                    .filter(|channel| {
+                        !channel.stream_url.is_empty() && seen.insert(channel.stream_url.clone())
+                    })
+                    .collect();
                 self.state.is_loading = false;
-                self.state.set_status(
-                    format!("Loaded {} TV channels.", self.state.tv_channels.len()),
-                    150,
-                );
+                if self.state.tv_channels.is_empty() {
+                    self.state.set_status(
+                        "No TV channels found. Add a playlist (/config).".to_string(),
+                        200,
+                    );
+                } else {
+                    self.state.set_status(
+                        format!(
+                            "{} TV channels imported from {} playlist(s).",
+                            self.state.tv_channels.len(),
+                            self.state.tv_playlists.len().max(1)
+                        ),
+                        200,
+                    );
+                }
             }
             Action::GoBack => {
                 self.prepare_image_refresh();
@@ -2101,7 +2126,7 @@ impl App {
 
                 if self.state.is_tv_mode {
                     if lower_query == "/config" {
-                        self.action_sender.send(Action::ShowTvWizard).ok();
+                        self.action_sender.send(Action::ShowTvConfig).ok();
                         self.state.search_query.clear();
                         return None;
                     }

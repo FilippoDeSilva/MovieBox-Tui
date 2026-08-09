@@ -56,16 +56,26 @@ impl M3UParser {
         }
 
         let content = if needs_download {
-            let res = self
-                .client
-                .get(url)
-                .send()
-                .await?
-                .error_for_status()?
-                .text()
-                .await?;
-            let _ = tokio::fs::write(&file_path, &res).await;
-            res
+            let trimmed = url.trim();
+            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                let res = self
+                    .client
+                    .get(trimmed)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .text()
+                    .await?;
+                let _ = tokio::fs::write(&file_path, &res).await;
+                res
+            } else {
+                let path = std::path::PathBuf::from(trimmed);
+                let local = tokio::fs::read_to_string(&path).await.map_err(|error| {
+                    format!("failed to read playlist file {}: {error}", trimmed)
+                })?;
+                let _ = tokio::fs::write(&file_path, &local).await;
+                local
+            }
         } else {
             tokio::fs::read_to_string(&file_path).await?
         };

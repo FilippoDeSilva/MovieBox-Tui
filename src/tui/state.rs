@@ -179,10 +179,11 @@ pub struct AppState {
     pub is_tv_mode: bool,
     pub tv_config_popup: bool,
     pub tv_channels: Vec<crate::providers::iptv_org::m3u::Channel>,
-    pub tv_wizard_step: usize,
-    pub tv_wizard_options: Vec<String>,
-    pub tv_wizard_selected_idx: usize,
-    pub tv_wizard_selections: std::collections::HashSet<String>,
+    pub tv_playlists: Vec<String>,
+    pub tv_manager_selected: usize,
+    pub tv_input_active: bool,
+    pub tv_input_buffer: String,
+    pub tv_input_is_file: bool,
     pub history: crate::history::HistoryManager,
 }
 
@@ -285,14 +286,11 @@ impl Default for AppState {
             is_tv_mode: false,
             tv_config_popup: false,
             tv_channels: Vec::new(),
-            tv_wizard_step: 0,
-            tv_wizard_options: vec![
-                "Grouped by category".to_string(),
-                "Grouped by language".to_string(),
-                "Grouped by broadcast area".to_string(),
-            ],
-            tv_wizard_selected_idx: 0,
-            tv_wizard_selections: std::collections::HashSet::new(),
+            tv_playlists: Vec::new(),
+            tv_manager_selected: 0,
+            tv_input_active: false,
+            tv_input_buffer: String::new(),
+            tv_input_is_file: false,
             history: crate::history::HistoryManager::new(),
         }
     }

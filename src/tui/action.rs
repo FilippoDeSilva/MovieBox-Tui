@@ -13,8 +13,12 @@ pub enum Action {
     ToggleHelp,
     ToggleTvMode,
     SwitchProvider(crate::providers::models::ProviderKind),
-    ShowTvWizard,
+    ShowTvConfig,
     TvChannelsLoaded(Vec<crate::providers::iptv_org::m3u::Channel>),
+    TvPlaylistAdd(String),
+    TvPlaylistRemove(usize),
+    TvReloadPlaylists,
+    TvInputToggle(bool),
     Search {
         query: String,
         force_refresh: bool,

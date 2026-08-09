@@ -990,36 +990,34 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
     }
     if state.tv_config_popup {
-        let content_height = state.tv_wizard_options.len() as u16;
+        let action_rows = 4usize;
+        let total_rows = state.tv_playlists.len() + action_rows;
         let content_width = state
-            .tv_wizard_options
+            .tv_playlists
             .iter()
-            .map(|option| crate::tui::text::width(option))
+            .map(|source| crate::tui::text::width(source))
             .max()
-            .unwrap_or(32)
+            .unwrap_or(28)
+            .max(40)
             .max(crate::tui::text::width(
-                "[↑↓] Move  [Space] Toggle  [Enter] Confirm  [Esc] Back",
+                "[ Add URL ] [ Add file ] [ Reload ] [ Done ]",
             ));
-        let popup_area = crate::tui::overlay::centered(
-            area,
-            content_width.saturating_add(6) as u16,
-            content_height.min(8) + 4,
-            36,
-            64,
-        );
-        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
-        let title_text = if state.tv_wizard_step == 0 {
-            "TV Setup: Select Grouping"
+        let (popup_width, popup_height) = if state.tv_input_active {
+            (content_width.saturating_add(6) as u16, 6)
         } else {
-            "TV Setup: Select Items"
+            (
+                content_width.saturating_add(6) as u16,
+                total_rows.min(10).saturating_add(5) as u16,
+            )
         };
-        let title = format!(
-            " {} · {}/{} ",
-            title_text,
-            state.tv_wizard_selected_idx.saturating_add(1),
-            state.tv_wizard_options.len().max(1)
-        );
+        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 70);
+        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
 
+        let title = format!(
+            " TV Playlists · {}/{} ",
+            state.tv_manager_selected.saturating_add(1),
+            total_rows.max(1)
+        );
         let popup_block = ratatui::widgets::Block::default()
             .title(title)
             .title_style(theme.title)
@@ -1040,60 +1038,64 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         ])
         .split(inner_area);
 
-        let items: Vec<ratatui::widgets::ListItem> = state
-            .tv_wizard_options
-            .iter()
-            .map(|opt| {
-                let is_checked = state.tv_wizard_selections.contains(opt);
-
-                let checkbox = if state.tv_wizard_step == 1 {
-                    if is_checked { "[x] " } else { "[ ] " }
+        if state.tv_input_active {
+            let prompt = format!(
+                "{}: {}{}",
+                if state.tv_input_is_file {
+                    "Enter playlist file path"
                 } else {
-                    ""
-                };
+                    "Enter playlist URL"
+                },
+                state.tv_input_buffer,
+                "_"
+            );
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(ratatui::text::Line::from(
+                    ratatui::text::Span::styled(prompt, theme.text),
+                ))
+                .wrap(ratatui::widgets::Wrap { trim: true }),
+                sections[0],
+            );
+        } else {
+            let mut items: Vec<ratatui::widgets::ListItem> = state
+                .tv_playlists
+                .iter()
+                .enumerate()
+                .map(|(index, source)| {
+                    ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                        ratatui::text::Span::styled(format!("{} ", index + 1), theme.muted),
+                        ratatui::text::Span::styled(source, theme.text),
+                    ]))
+                })
+                .collect();
+            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
+                ratatui::text::Span::styled("[ Add URL ]", theme.sapphire),
+            )));
+            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
+                ratatui::text::Span::styled("[ Add file ]", theme.sapphire),
+            )));
+            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
+                ratatui::text::Span::styled("[ Reload ]", theme.rating),
+            )));
+            items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
+                ratatui::text::Span::styled("[ Done ]", theme.success),
+            )));
 
-                let line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
-                    format!("{}{}", checkbox, opt),
-                    theme.text,
-                )]);
-                ratatui::widgets::ListItem::new(line)
-            })
-            .collect();
+            let list = ratatui::widgets::List::new(items)
+                .highlight_style(crate::tui::overlay::selection_style(
+                    theme,
+                    state.basic_terminal,
+                ))
+                .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
 
-        let list = ratatui::widgets::List::new(items)
-            .highlight_style(crate::tui::overlay::selection_style(
-                theme,
-                state.basic_terminal,
-            ))
-            .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-
-        let mut list_state = ratatui::widgets::ListState::default();
-        list_state.select(Some(state.tv_wizard_selected_idx));
-
-        frame.render_stateful_widget(list, sections[0], &mut list_state);
-
-        if state.tv_wizard_options.len() > sections[0].height as usize {
-            let scrollbar = ratatui::widgets::Scrollbar::new(
-                ratatui::widgets::ScrollbarOrientation::VerticalRight,
-            )
-            .thumb_style(theme.lavender)
-            .track_style(theme.surface1)
-            .begin_symbol(Some("▲"))
-            .end_symbol(Some("▼"));
-
-            let mut scrollbar_state =
-                ratatui::widgets::ScrollbarState::new(state.tv_wizard_options.len())
-                    .viewport_content_length(sections[0].height as usize)
-                    .position(list_state.offset());
-
-            frame.render_stateful_widget(scrollbar, sections[0], &mut scrollbar_state);
+            let mut list_state = ratatui::widgets::ListState::default();
+            list_state.select(Some(state.tv_manager_selected));
+            frame.render_stateful_widget(list, sections[0], &mut list_state);
         }
 
-        let footer = if state.tv_wizard_step == 0 {
+        let footer = if state.tv_input_active {
             ratatui::text::Line::from(vec![
-                crate::tui::overlay::key_hint("↑↓", "Move", theme),
-                ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Enter", "Select", theme),
+                crate::tui::overlay::key_hint("Enter", "Add", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Esc", "Cancel", theme),
             ])
@@ -1101,11 +1103,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ratatui::text::Line::from(vec![
                 crate::tui::overlay::key_hint("↑↓", "Move", theme),
                 ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Space", "Toggle", theme),
+                crate::tui::overlay::key_hint("Enter", "Select", theme),
                 ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Enter", "Confirm", theme),
+                crate::tui::overlay::key_hint("d", "Remove", theme),
                 ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Esc", "Back", theme),
+                crate::tui::overlay::key_hint("Esc", "Close", theme),
             ])
         };
 
