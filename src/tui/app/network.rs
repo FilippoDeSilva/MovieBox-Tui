@@ -1,8 +1,5 @@
 use crate::providers::{
-    Provider,
-    fourkhdhub::{FourKHdHubClient, search_to_moviebox_json},
-    models::ProviderKind,
-    moviebox::client::MovieBoxClient,
+    Provider, fourkhdhub::FourKHdHubClient, models::ProviderKind, moviebox::client::MovieBoxClient,
 };
 
 pub(super) async fn fetch_poster_bytes(client: &reqwest::Client, url: &str) -> Option<Vec<u8>> {
@@ -32,13 +29,12 @@ pub(super) async fn provider_search(
     query: &str,
     page: usize,
 ) -> Result<serde_json::Value, String> {
-    let result = match provider {
+    match provider {
         ProviderKind::MovieBox => Provider::search(moviebox, query, page).await,
         ProviderKind::FourKHdHub => Provider::search(fourk, query, page).await,
         ProviderKind::BdixCircleFtp => Provider::search(circleftp, query, page).await,
         ProviderKind::BdixDhakaFlix => Provider::search(dhakaflix, query, page).await,
-    };
-    result.map(|items| search_to_moviebox_json(&items))
+    }
 }
 
 pub(super) async fn provider_details(

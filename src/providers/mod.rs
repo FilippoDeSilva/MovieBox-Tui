@@ -4,10 +4,10 @@ pub mod m3u;
 pub mod models;
 pub mod moviebox;
 
-use models::{CatalogItem, Release};
+use models::Release;
 
 pub(crate) trait Provider {
-    async fn search(&self, query: &str, page: usize) -> Result<Vec<CatalogItem>, String>;
+    async fn search(&self, query: &str, page: usize) -> Result<serde_json::Value, String>;
     async fn details(&self, id: &str) -> Result<serde_json::Value, String>;
 }
 

@@ -5,15 +5,13 @@ pub mod title;
 
 pub use title::clean_moviebox_title;
 
-use crate::providers::{Provider, models::CatalogItem};
+use crate::providers::Provider;
 
 impl Provider for client::MovieBoxClient {
-    async fn search(&self, query: &str, page: usize) -> Result<Vec<CatalogItem>, String> {
-        let value = self
-            .search(query, page)
+    async fn search(&self, query: &str, page: usize) -> Result<serde_json::Value, String> {
+        self.search(query, page)
             .await
-            .map_err(|error| format!("{error:?}"))?;
-        Ok(adapt::search_json_to_catalog(&value))
+            .map_err(|error| format!("{error:?}"))
     }
 
     async fn details(&self, id: &str) -> Result<serde_json::Value, String> {

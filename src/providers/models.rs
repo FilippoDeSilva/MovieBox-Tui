@@ -118,15 +118,6 @@ pub struct SourceMirror {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StreamItem {
-    pub resource_id: String,
-    pub link: String,
-    pub resolution: Option<u32>,
-    pub season: Option<usize>,
-    pub episode: Option<usize>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubtitleOption {
     pub name: String,
     pub url: String,

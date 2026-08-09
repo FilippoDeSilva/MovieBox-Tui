@@ -18,12 +18,17 @@ default (`bdix_enabled` in config; `/enable-bdix`).
 
 ## Shared flow
 
-Search, details, and episode-streams are dispatched per provider. A crate-internal
-`Provider` trait (in `providers/mod.rs`) gives every client one `search` interface
-returning the typed `CatalogItem` list; `app/network.rs::provider_search` dispatches
-through it and normalizes to the moviebox JSON the UI consumes. `provider_details` still
-uses the concrete clients pending typed details wiring. Each provider keeps its own
-internal format and adapter.
+Search, details, and episode-streams are dispatched per provider. Crate-internal seams
+in `providers/mod.rs` give every client one interface and one error type:
+
+- `Provider::search` / `Provider::details` return the moviebox-JSON payload the UI
+  consumes: MovieBox provides it natively; the other providers convert their typed
+  models via `fourkhdhub`'s adapters. `app/network.rs` dispatches both through the trait.
+- `ReleaseProvider::episode_streams` returns the typed `Release` list for the three
+  release-based providers; MovieBox keeps its own paginated resource path.
+
+Note: only the MovieBox search honors the `page` argument; the other providers ignore it.
+Each provider keeps its own internal format behind its adapter.
 
 Playback resolves to a `PlaybackSource { provider, url, headers, subtitle, source_label }`,
 which `app/playback.rs::launch_player` feeds to the external player.
