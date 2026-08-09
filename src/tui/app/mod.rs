@@ -3074,173 +3074,21 @@ impl App {
                     }
                 }
             }
-            Action::DownloadStream(subtitle_url) => {
-                if self.state.is_resolving_playback {
-                    return None;
-                }
-                self.state.is_resolving_playback = true;
-                if self.state.active_provider == ProviderKind::FourKHdHub {
-                    if let Some(release) = self.get_selected_release() {
-                        self.state.notify(
-                            NotificationKind::Info,
-                            "Preparing download",
-                            "Resolving the selected mirror.",
-                        );
-                        let client = if release.provider == ProviderKind::BdixCircleFtp {
-                            let sender_clone = self.action_sender.clone();
-                            let source = crate::providers::models::PlaybackSource::bare(
-                                ProviderKind::BdixCircleFtp,
-                                release.mirrors[0].resolver_url.clone(),
-                                None,
-                            );
-                            sender_clone
-                                .send(Action::StartDownload(subtitle_url, Some(source.url)))
-                                .ok();
-                            return None;
-                        } else {
-                            self.fourk_client.clone()
-                        };
-                        let sender = self.action_sender.clone();
-                        tokio::spawn(async move {
-                            match client.resolve_release(&release).await {
-                                Ok(source) => {
-                                    sender
-                                        .send(Action::StartDownload(subtitle_url, Some(source.url)))
-                                        .ok();
-                                }
-                                Err(error) => {
-                                    log::error!("stream resolve failed: {error}");
-                                    sender
-                                        .send(Action::SetStatus(format!("Resolve failed: {error}")))
-                                        .ok();
-                                }
-                            }
-                        });
-                    } else {
-                        self.action_sender
-                            .send(Action::StartDownload(subtitle_url, None))
-                            .ok();
-                    }
-                } else {
-                    self.action_sender
-                        .send(Action::StartDownload(
-                            subtitle_url,
-                            self.get_selected_link(),
-                        ))
-                        .ok();
-                }
-                return None;
-            }
-            Action::StartDownload(subtitle_url, link) => {
-                self.state.is_resolving_playback = false;
-                self.start_resilient_download(subtitle_url, link);
-                return None;
-            }
-            Action::PromptDownloadEpisode => {
-                self.state.show_episode_download_confirm = true;
-                self.state.episode_download_confirm_yes_selected = false;
-            }
 
-            Action::ConfirmDownloadEpisode => {
-                self.state.show_episode_download_confirm = false;
-
-                let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
-                let resource_id = self.get_selected_resource_id();
-
-                if let Some(rid) = resource_id {
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Preparing download",
-                        "Fetching subtitles.",
-                    );
-                    let client = self.client.clone();
-                    let sender = self.action_sender.clone();
-                    tokio::spawn(async move {
-                        if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
-                            sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
-                        } else {
-                            sender.send(Action::DownloadStream(None)).ok();
-                        }
-                    });
-                } else {
-                    self.action_sender.send(Action::DownloadStream(None)).ok();
-                }
-            }
-
-            Action::PromptDownloadSeason => {
-                self.state.show_season_download_confirm = true;
-                self.state.season_download_confirm_yes_selected = false;
-            }
-
-            Action::ConfirmDownloadSeason => {
-                self.state.show_season_download_confirm = false;
-                self.state.season_subtitle_preference = None;
-                let season_num = self.state.selected_season;
-
-                let season_array_idx = self.state.available_seasons.iter().position(|s| {
-                    s.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize == season_num
-                });
-
-                if let Some(idx) = season_array_idx {
-                    if idx < self.state.available_episode_numbers.len() {
-                        let ep_numbers = self.state.available_episode_numbers[idx].clone();
-                        self.state.download_queue.clear();
-
-                        for ep in ep_numbers {
-                            self.state.download_queue.push_back((season_num, ep));
-                        }
-                        self.state.download_queue_total = self.state.download_queue.len();
-                        self.action_sender.send(Action::ProcessDownloadQueue).ok();
-                    }
-                }
-            }
-
-            Action::ProcessDownloadQueue => {
-                if self.state.download_progress.is_some() {
-                    let sender = self.action_sender.clone();
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                        sender.send(Action::ProcessDownloadQueue).ok();
-                    });
-                    return None;
-                }
-
-                if let Some((season, episode)) = self.state.download_queue.pop_front() {
-                    self.state.selected_season = season;
-                    self.state.selected_episode = episode;
-                    let remaining = self.state.download_queue.len();
-                    let total = self.state.download_queue_total;
-                    let num = total - remaining;
-
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Preparing episode",
-                        format!("S{season:02}E{episode:02} · {num}/{total}"),
-                    );
-
-                    let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
-
-                    self.state.selected_resources = None;
-                    self.state.is_fetching_streams = true;
-
-                    self.action_sender
-                        .send(Action::FetchEpisodeStreams {
-                            subject_id,
-                            season,
-                            episode,
-                            force_refresh: false,
-                        })
-                        .ok();
-
-                    self.action_sender.send(Action::DownloadStream(None)).ok();
-                } else if self.state.download_queue_total > 0 {
-                    self.state.notify(
-                        NotificationKind::Success,
-                        "Season downloaded",
-                        format!("{} files completed.", self.state.download_queue_total),
-                    );
-                    self.state.download_queue_total = 0;
-                }
+            Action::DownloadStream(..)
+            | Action::StartDownload(..)
+            | Action::PromptDownloadEpisode
+            | Action::ConfirmDownloadEpisode
+            | Action::PromptDownloadSeason
+            | Action::ConfirmDownloadSeason
+            | Action::ProcessDownloadQueue
+            | Action::UpdateDownload(..)
+            | Action::DownloadCompleted(..)
+            | Action::DownloadFailed(..)
+            | Action::DownloadPaused(..)
+            | Action::ClearDownload
+            | Action::CancelDownload => {
+                self.handle_download(action).await;
             }
 
             Action::DetailsSuccess(context, id, payload) => {
@@ -4115,74 +3963,6 @@ impl App {
                 );
                 self.state.stream_error = Some(err.clone());
                 self.state.set_status(format!("Error: {}", err), 150);
-            }
-            Action::UpdateDownload(prog, stat) => {
-                if self.state.download_progress != prog || self.state.download_status != stat {
-                    self.state.download_progress = prog;
-                    self.state.download_status = stat;
-                    self.state.dirty = true;
-                }
-            }
-            Action::DownloadCompleted(path) => {
-                self.state.download_progress = Some(100.0);
-                self.state.download_status = Some("Completed".into());
-                self.state.notify(
-                    NotificationKind::Success,
-                    "Download complete",
-                    format!("Saved to {path}"),
-                );
-                let sender = self.action_sender.clone();
-                tokio::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    sender.send(Action::ClearDownload).ok();
-                });
-            }
-            Action::DownloadFailed(error) => {
-                self.state.download_progress = None;
-                self.state.download_status = None;
-                self.state.download_queue.clear();
-                self.state.download_queue_total = 0;
-                self.state.notify(
-                    NotificationKind::Error,
-                    "Download failed",
-                    format!("Partial file preserved. {error}"),
-                );
-            }
-            Action::DownloadPaused(path) => {
-                self.state.download_progress = None;
-                self.state.download_status = None;
-                self.state.download_queue.clear();
-                self.state.download_queue_total = 0;
-                self.state.notify(
-                    NotificationKind::Warning,
-                    "Download paused",
-                    format!("Start again to resume {path}.part"),
-                );
-            }
-            Action::ClearDownload => {
-                self.state.download_progress = None;
-                self.state.download_status = None;
-                if !self.state.download_queue.is_empty() {
-                    self.action_sender.send(Action::ProcessDownloadQueue).ok();
-                } else if self.state.download_queue_total > 0 {
-                    self.state.notify(
-                        NotificationKind::Success,
-                        "Season downloaded",
-                        format!("{} files completed.", self.state.download_queue_total),
-                    );
-                    self.state.download_queue_total = 0;
-                }
-            }
-            Action::CancelDownload => {
-                self.state
-                    .cancel_download
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
-                self.state.download_status = Some("Cancelling...".to_string());
-                self.state.notify(
-                    NotificationKind::Warning,
-                    "Cancelling download",
-                    "Partial data will be preserved.",
-                );
             }
 
             Action::ShowPlaybackPicker(source) => {
