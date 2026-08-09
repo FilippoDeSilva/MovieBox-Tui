@@ -45,6 +45,8 @@ src/
   tui/
     action.rs        The Action enum: every UI event/message (input, network
                      results, downloads, playback, tv, system).
+    config.rs        Config struct: load/save config.json (provider, theme,
+                     auto-update, default player, bdix flag).
     state.rs         AppState: all UI state, LRU image/preview caches, and the
                      PlayerKind enum + label()/parse(), tv manager row model.
     event.rs         EventHandler: crossterm event stream + tick interval,

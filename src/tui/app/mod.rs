@@ -1,9 +1,7 @@
 use tokio::sync::mpsc;
 
 use crate::providers::{
-    fourkhdhub::FourKHdHubClient,
-    models::{ProviderKind, RequestContext},
-    moviebox::client::MovieBoxClient,
+    fourkhdhub::FourKHdHubClient, models::RequestContext, moviebox::client::MovieBoxClient,
 };
 use crate::tui::{action::Action, state::AppState, theme::Theme};
 
@@ -39,42 +37,13 @@ impl App {
         let (action_sender, action_receiver) = mpsc::unbounded_channel();
         let mut state = AppState::default();
 
-        if let Some(config_dir) = dirs::config_dir() {
-            let config_path = config_dir.join("moviebox-tui").join("config.json");
-            if let Ok(config_str) = std::fs::read_to_string(config_path) {
-                if let Ok(config_json) = serde_json::from_str::<serde_json::Value>(&config_str) {
-                    if let Some(auto_update) =
-                        config_json.get("auto_update").and_then(|v| v.as_bool())
-                    {
-                        state.auto_update = auto_update;
-                    }
-                    if let Some(last_check) = config_json
-                        .get("last_update_check")
-                        .and_then(|v| v.as_u64())
-                    {
-                        state.last_update_check = last_check;
-                    }
-                    if config_json.get("active_provider").and_then(|v| v.as_str())
-                        == Some(ProviderKind::FourKHdHub.cache_key())
-                    {
-                        state.active_provider = ProviderKind::FourKHdHub;
-                    }
-                    if let Some(theme_val) =
-                        config_json.get("active_theme").and_then(|v| v.as_str())
-                    {
-                        state.active_theme_kind = theme_val.to_string();
-                    }
-                    if let Some(bdix) = config_json.get("bdix_enabled").and_then(|v| v.as_bool()) {
-                        state.bdix_enabled = bdix;
-                    }
-                    if let Some(default_player) =
-                        config_json.get("default_player").and_then(|v| v.as_str())
-                    {
-                        state.default_player = Some(default_player.to_string());
-                    }
-                }
-            }
-        }
+        let config = crate::tui::config::load();
+        state.auto_update = config.auto_update;
+        state.last_update_check = config.last_update_check;
+        state.active_provider = config.active_provider;
+        state.active_theme_kind = config.active_theme;
+        state.bdix_enabled = config.bdix_enabled;
+        state.default_player = config.default_player;
 
         let mut theme = crate::tui::theme::Theme::new();
         if !state.active_theme_kind.is_empty() {
@@ -110,28 +79,15 @@ impl App {
     }
 
     fn persist_config(&self) {
-        if let Some(config_dir) = dirs::config_dir() {
-            let app_dir = config_dir.join("moviebox-tui");
-            if std::fs::create_dir_all(&app_dir).is_err() {
-                return;
-            }
-            let config = serde_json::json!({
-                "auto_update": self.state.auto_update,
-                "last_update_check": self.state.last_update_check,
-                "active_provider": self.state.active_provider.cache_key(),
-                "active_theme": self.state.active_theme_kind,
-                "bdix_enabled": self.state.bdix_enabled,
-                "default_player": self.state.default_player
-            });
-            let path = app_dir.join("config.json");
-            let temporary = app_dir.join(format!("config.{}.tmp", std::process::id()));
-            if std::fs::write(&temporary, config.to_string()).is_ok()
-                && std::fs::rename(&temporary, &path).is_err()
-            {
-                let _ = std::fs::remove_file(&path);
-                let _ = std::fs::rename(&temporary, &path);
-            }
-        }
+        let config = crate::tui::config::Config {
+            auto_update: self.state.auto_update,
+            last_update_check: self.state.last_update_check,
+            active_provider: self.state.active_provider,
+            active_theme: self.state.active_theme_kind.clone(),
+            bdix_enabled: self.state.bdix_enabled,
+            default_player: self.state.default_player.clone(),
+        };
+        crate::tui::config::save(&config);
     }
 
     fn save_tv_playlists(&self) {

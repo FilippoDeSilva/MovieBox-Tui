@@ -39,6 +39,7 @@ src/
       system.rs                 help, refresh, cache, theme, updates, focus, resize
     state.rs                    AppState: all UI state + in-memory LRU caches
     action.rs                   the Action enum (event/message model)
+    config.rs                   Config load/save (config.json)
     event.rs                    EventHandler: input events + tick → Action channel
     player.rs                   player detection and command construction
     overlay.rs                  popups, pickers, notifications
