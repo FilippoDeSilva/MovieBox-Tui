@@ -211,6 +211,8 @@ impl App {
                     episode,
                     timestamp,
                 });
+            let history = self.state.history.clone();
+            tokio::task::spawn_blocking(move || history.save());
             self.state.dirty = true;
         }
 
@@ -4700,6 +4702,7 @@ impl App {
             }
 
             Action::ShowPlaybackPicker(source) => {
+                self.state.is_resolving_playback = false;
                 if self.state.available_players.is_empty() {
                     self.state
                         .set_status("No media player found. Install mpv, IINA, or VLC.", 150);
@@ -4739,6 +4742,7 @@ impl App {
                 self.launch_player(kind, link, sub, Vec::new());
             }
             Action::LaunchPlayback(kind, source) => {
+                self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
                 if !crate::tui::player::supports_headers(kind, &source.headers) {
                     self.state.set_status(

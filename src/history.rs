@@ -16,7 +16,7 @@ pub struct WatchHistoryItem {
     pub timestamp: u64,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct HistoryManager {
     watched: HashSet<String>,
     #[serde(default)]
@@ -72,8 +72,6 @@ impl HistoryManager {
             let excess = self.recent.len() - 100;
             self.recent.drain(0..excess);
         }
-
-        self.save();
     }
 
     pub fn is_watched(
