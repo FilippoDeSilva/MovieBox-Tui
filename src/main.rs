@@ -16,6 +16,27 @@ fn restore_terminal() {
     let _ = crossterm::terminal::disable_raw_mode();
 }
 
+fn purge_stale_subtitles() {
+    tokio::task::spawn_blocking(|| {
+        let max_age = 24 * 60 * 60;
+        if let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) {
+            for entry in entries.flatten() {
+                if entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("moviebox_sub_")
+                    && let Ok(metadata) = entry.metadata()
+                    && let Ok(modified) = metadata.modified()
+                    && let Ok(elapsed) = modified.elapsed()
+                    && elapsed.as_secs() > max_age
+                {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+    });
+}
+
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         restore_terminal();
@@ -52,6 +73,7 @@ async fn main() -> std::io::Result<()> {
     )?;
 
     moviebox_tui::cache::clean_old_cache_background();
+    purge_stale_subtitles();
 
     let mut app = App::new();
     app.run(&mut terminal).await

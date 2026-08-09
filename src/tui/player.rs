@@ -114,7 +114,6 @@ fn mpv_command(
 
     command
         .arg(format!("{prefix}autofit=960x540"))
-        .arg(format!("{prefix}autofit-larger=640x360"))
         .arg(format!("{prefix}geometry=50%:50%"));
 
     if !iina {
@@ -156,7 +155,6 @@ fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)])
         .map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli"))
         .unwrap_or_default();
 
-    let mut is_open = false;
     let mut command = if let Some(executable) = configured {
         Command::new(executable)
     } else if cli_global.exists() {
@@ -168,19 +166,15 @@ fn iina_command(url: &str, subtitle: Option<&str>, headers: &[(String, String)])
         c.arg("--keep-running").arg("--no-stdin");
         c
     } else if iina_app_exists() {
-        is_open = true;
         let mut c = Command::new("open");
-        c.arg("-W").arg("-a").arg("IINA").arg(url).arg("--args");
-        c
+        c.arg("-a").arg("IINA").arg(url);
+        return c;
     } else {
         Command::new("iina")
     };
 
     let mpv = mpv_command(url, subtitle, headers, true);
     for arg in mpv.get_args() {
-        if is_open && arg == std::ffi::OsStr::new(url) {
-            continue;
-        }
         command.arg(arg);
     }
     command

@@ -93,6 +93,11 @@ impl App {
                     if let Some(bdix) = config_json.get("bdix_enabled").and_then(|v| v.as_bool()) {
                         state.bdix_enabled = bdix;
                     }
+                    if let Some(default_player) =
+                        config_json.get("default_player").and_then(|v| v.as_str())
+                    {
+                        state.default_player = Some(default_player.to_string());
+                    }
                 }
             }
         }
@@ -141,7 +146,8 @@ impl App {
                 "last_update_check": self.state.last_update_check,
                 "active_provider": self.state.active_provider.cache_key(),
                 "active_theme": self.state.active_theme_kind,
-                "bdix_enabled": self.state.bdix_enabled
+                "bdix_enabled": self.state.bdix_enabled,
+                "default_player": self.state.default_player
             });
             let path = app_dir.join("config.json");
             let temporary = app_dir.join(format!("config.{}.tmp", std::process::id()));
@@ -225,23 +231,42 @@ impl App {
                 kind,
                 crate::tui::state::PlayerKind::Vlc | crate::tui::state::PlayerKind::Iina
             ) && let Some(url) = subtitle
-                && let Ok(Ok(response)) =
-                    tokio::time::timeout(std::time::Duration::from_secs(30), client.get(url).send())
-                        .await
-                && let Ok(response) = response.error_for_status()
-                && let Ok(bytes) = response.bytes().await
             {
-                let path = std::env::temp_dir().join(format!(
-                    "moviebox_sub_{}_{}.srt",
-                    std::process::id(),
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos()
-                ));
-                if tokio::fs::write(&path, bytes).await.is_ok() {
-                    local_subtitle = Some(path.to_string_lossy().into_owned());
-                    temporary_subtitle = Some(path);
+                let mut request = client.get(&url);
+                for (name, value) in &headers {
+                    request = request.header(name.as_str(), value.as_str());
+                }
+                let mut downloaded = false;
+                if let Ok(Ok(response)) =
+                    tokio::time::timeout(std::time::Duration::from_secs(30), request.send()).await
+                    && let Ok(response) = response.error_for_status()
+                    && let Ok(bytes) = response.bytes().await
+                {
+                    let extension = url
+                        .rsplit('.')
+                        .next()
+                        .map(|e| e.to_ascii_lowercase())
+                        .filter(|e| matches!(e.as_str(), "srt" | "vtt" | "ass" | "ssa" | "sub"))
+                        .unwrap_or_else(|| "srt".to_string());
+                    let path = std::env::temp_dir().join(format!(
+                        "moviebox_sub_{}_{}.{}",
+                        std::process::id(),
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_nanos(),
+                        extension
+                    ));
+                    if tokio::fs::write(&path, bytes).await.is_ok() {
+                        local_subtitle = Some(path.to_string_lossy().into_owned());
+                        temporary_subtitle = Some(path);
+                        downloaded = true;
+                    }
+                }
+                if !downloaded {
+                    let _ = sender.send(Action::SetStatus(
+                        "Subtitles unavailable; playing without subtitles.".to_string(),
+                    ));
                 }
             }
 
@@ -277,8 +302,11 @@ impl App {
                         let result = child.wait();
 
                         if let Ok(status) = result {
-                            if !status.success() && start_time.elapsed().as_secs() < 3 {
-                                let clean_error = error_output.trim().to_string();
+                            let clean_error = error_output.trim().to_string();
+                            if !status.success()
+                                && start_time.elapsed().as_secs() < 3
+                                && !clean_error.is_empty()
+                            {
                                 sender
                                     .send(Action::PlayerCrashed(status.code(), clean_error))
                                     .ok();
@@ -841,6 +869,25 @@ impl App {
         self.state.active_screen = Screen::Home;
 
         self.state.available_players = crate::tui::player::detect();
+        let preferred = std::env::var("MOVIEBOX_PLAYER")
+            .ok()
+            .and_then(|value| crate::tui::state::PlayerKind::parse(&value))
+            .or_else(|| {
+                self.state
+                    .default_player
+                    .as_deref()
+                    .and_then(crate::tui::state::PlayerKind::parse)
+            });
+        if let Some(preferred) = preferred
+            && let Some(index) = self
+                .state
+                .available_players
+                .iter()
+                .position(|&k| k == preferred)
+        {
+            let kind = self.state.available_players.remove(index);
+            self.state.available_players.insert(0, kind);
+        }
 
         loop {
             if self.state.clear_terminal_before_draw {
@@ -4749,7 +4796,10 @@ impl App {
                 self.state.player_picker_popup = false;
                 if !crate::tui::player::supports_headers(kind, &source.headers) {
                     self.state.set_status(
-                        "This source needs headers VLC cannot provide; use mpv or IINA.",
+                        format!(
+                            "This source needs headers {} cannot provide; use mpv or IINA.",
+                            kind.label()
+                        ),
                         180,
                     );
                     return None;

@@ -18,6 +18,16 @@ impl PlayerKind {
             PlayerKind::AndroidIntent => "Android Player",
         }
     }
+
+    pub fn parse(value: &str) -> Option<PlayerKind> {
+        match value.to_ascii_lowercase().as_str() {
+            "mpv" => Some(PlayerKind::Mpv),
+            "iina" => Some(PlayerKind::Iina),
+            "vlc" => Some(PlayerKind::Vlc),
+            "android" | "androidintent" | "android-intent" => Some(PlayerKind::AndroidIntent),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,6 +146,7 @@ pub struct AppState {
     pub player_picker_subtitle: Option<String>,
     pub player_picker_playback: Option<crate::providers::models::PlaybackSource>,
     pub available_players: Vec<PlayerKind>,
+    pub default_player: Option<String>,
     pub is_loading: bool,
     pub is_resolving_playback: bool,
     pub status_message: String,
@@ -244,6 +255,7 @@ impl Default for AppState {
             player_picker_subtitle: None,
             player_picker_playback: None,
             available_players: Vec::new(),
+            default_player: None,
             dirty: true,
             is_loading: false,
             is_resolving_playback: false,
