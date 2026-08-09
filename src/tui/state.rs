@@ -178,7 +178,7 @@ pub struct AppState {
 
     pub is_tv_mode: bool,
     pub tv_config_popup: bool,
-    pub tv_channels: Vec<crate::providers::iptv_org::m3u::Channel>,
+    pub tv_channels: Vec<crate::providers::m3u::Channel>,
     pub tv_playlists: Vec<String>,
     pub tv_manager_selected: usize,
     pub tv_input_active: bool,

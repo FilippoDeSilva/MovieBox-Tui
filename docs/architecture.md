@@ -23,7 +23,7 @@ src/
     fourkhdhub/                 4KHDHub provider (client, hubcloud resolver, parser)
     bdix/circleftp/             BDIX CircleFTP provider
     bdix/dhakaflix/             BDIX DhakaFlix provider
-    iptv_org/m3u.rs             M3U playlist parser (URL and local file)
+    m3u.rs                      M3U playlist parser (URL and local file)
   tui/
     app/                        the application object and all behavior
       mod.rs                    App struct, App::new, helpers, handle_action
