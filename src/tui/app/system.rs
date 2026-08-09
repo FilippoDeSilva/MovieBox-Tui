@@ -186,6 +186,18 @@ impl App {
 
             Action::ClearCache => {
                 tokio::task::spawn_blocking(crate::cache::clear_all_cache);
+                self.state.stream_pool.clear();
+                self.state.image_cache.clear();
+                self.state.search_posters.clear();
+                self.state.search_poster_protocols.clear();
+                self.state.preview_cache.clear();
+                self.state.poster_image = None;
+                self.state.poster_protocol = None;
+                self.state.search_preview = None;
+                self.state.selected_resources = None;
+                self.state.available_seasons.clear();
+                self.state.available_episode_numbers.clear();
+                self.prepare_image_refresh();
                 self.state
                     .set_status("Cache cleared completely.".to_string(), 150);
             }

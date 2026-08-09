@@ -32,7 +32,9 @@ The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
 - **Validation**: search/stream entries are only cached (and only served) if they
   contain real results, so empty responses are never reused.
 - **Purge**: `clean_old_cache_background` (startup) deletes entries older than 7 days.
-  `ClearCache` (`/clear-cache`) removes the whole cache tree.
+  `ClearCache` (`/clear-cache`) removes the whole cache tree, the legacy
+  `data_dir/moviebox-tui/iptv_cache` directory, and resets the in-memory caches so the
+  next fetch is genuinely fresh.
 
 ## In-memory caches (AppState)
 

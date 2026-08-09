@@ -232,6 +232,12 @@ pub fn clear_all_cache() {
     if path.exists() {
         let _ = fs::remove_dir_all(&path);
     }
+    if let Some(data_dir) = dirs::data_dir() {
+        let legacy = data_dir.join("moviebox-tui").join("iptv_cache");
+        if legacy.exists() {
+            let _ = fs::remove_dir_all(&legacy);
+        }
+    }
 }
 
 pub fn clean_old_cache_background() {
