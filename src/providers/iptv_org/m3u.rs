@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -129,7 +128,14 @@ impl M3UParser {
 }
 
 fn cache_filename(raw: &str) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    raw.hash(&mut hasher);
-    format!("{:016x}.m3u", hasher.finish())
+    use md5::{Digest, Md5};
+    let mut hasher = Md5::new();
+    hasher.update(raw.as_bytes());
+    let result = hasher.finalize();
+    let mut name = String::with_capacity(32);
+    for byte in result {
+        use std::fmt::Write;
+        let _ = write!(&mut name, "{byte:02x}");
+    }
+    format!("{name}.m3u")
 }
