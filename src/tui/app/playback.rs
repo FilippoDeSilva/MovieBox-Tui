@@ -1,5 +1,6 @@
 use super::App;
-use crate::tui::action::Action;
+use crate::providers::models::ProviderKind;
+use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 impl App {
     pub(super) fn launch_player(
@@ -203,5 +204,340 @@ impl App {
                 }
             }
         });
+    }
+}
+
+impl App {
+    pub(super) async fn handle_playback(&mut self, action: Action) -> Option<()> {
+        match action {
+            Action::PlayStream(open_with) => {
+                if self.state.is_resolving_playback {
+                    return None;
+                }
+                self.state.is_resolving_playback = true;
+                if self.state.active_provider == ProviderKind::FourKHdHub {
+                    if let Some(release) = self.get_selected_release() {
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Preparing playback",
+                            "Resolving the selected mirror.",
+                        );
+                        let default_player = self.state.available_players.first().copied();
+                        let client = if release.provider == ProviderKind::BdixCircleFtp {
+                            let sender_clone = self.action_sender.clone();
+                            let source = crate::providers::models::PlaybackSource::bare(
+                                ProviderKind::BdixCircleFtp,
+                                release.mirrors[0].resolver_url.clone(),
+                                None,
+                            );
+                            if open_with || default_player.is_none() {
+                                sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
+                            } else if let Some(player) = default_player {
+                                sender_clone
+                                    .send(Action::LaunchPlayback(player, source))
+                                    .ok();
+                            }
+                            return None;
+                        } else {
+                            self.fourk_client.clone()
+                        };
+                        let sender = self.action_sender.clone();
+                        tokio::spawn(async move {
+                            match client.resolve_release(&release).await {
+                                Ok(source) => {
+                                    if open_with || default_player.is_none() {
+                                        sender.send(Action::ShowPlaybackPicker(source)).ok();
+                                    } else if let Some(player) = default_player {
+                                        sender.send(Action::LaunchPlayback(player, source)).ok();
+                                    }
+                                }
+                                Err(error) => {
+                                    log::error!("4KHDHub resolve failed: {error}");
+                                    sender
+                                        .send(Action::SetStatus(format!(
+                                            "Error: 4KHDHub source failed: {error}"
+                                        )))
+                                        .ok();
+                                }
+                            }
+                        });
+                    }
+                    return None;
+                }
+                if self.state.active_screen == Screen::Details
+                    && let Some(link) = self.get_selected_link()
+                {
+                    let subject_id = self
+                        .state
+                        .selected_details
+                        .as_ref()
+                        .and_then(|d| d.get("id"))
+                        .and_then(crate::tui::state::subject_id)
+                        .unwrap_or_default();
+                    let resource_id = self.get_selected_resource_id();
+
+                    if let Some(rid) = resource_id {
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Preparing playback",
+                            "Fetching subtitles.",
+                        );
+                        let client = self.client.clone();
+                        let sender = self.action_sender.clone();
+                        let link_clone = link.clone();
+                        tokio::spawn(async move {
+                            let cached = tokio::task::spawn_blocking({
+                                let subject_id = subject_id.clone();
+                                let rid = rid.clone();
+                                move || crate::cache::get_captions_cache(&subject_id, &rid)
+                            })
+                            .await
+                            .ok()
+                            .flatten();
+                            if let Some(res) = cached {
+                                sender
+                                    .send(Action::ShowSubtitlePopup(
+                                        link_clone.clone(),
+                                        res,
+                                        open_with,
+                                    ))
+                                    .ok();
+                                return;
+                            }
+                            let result = tokio::time::timeout(
+                                std::time::Duration::from_secs(15),
+                                client.get_ext_captions(&subject_id, &rid),
+                            )
+                            .await;
+                            match result {
+                                Ok(Ok(res)) => {
+                                    let subject_id = subject_id.clone();
+                                    let rid = rid.clone();
+                                    let res_for_cache = res.clone();
+                                    tokio::task::spawn_blocking(move || {
+                                        crate::cache::set_captions_cache(
+                                            &subject_id,
+                                            &rid,
+                                            &res_for_cache,
+                                        );
+                                    });
+                                    sender
+                                        .send(Action::ShowSubtitlePopup(link_clone, res, open_with))
+                                        .ok();
+                                }
+                                _ => {
+                                    if open_with {
+                                        sender
+                                            .send(Action::ShowPlayerPicker(link_clone, None))
+                                            .ok();
+                                    } else {
+                                        sender.send(Action::LaunchMpv(link_clone, None)).ok();
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        if open_with {
+                            self.action_sender
+                                .send(Action::ShowPlayerPicker(link, None))
+                                .ok();
+                        } else {
+                            self.action_sender.send(Action::LaunchMpv(link, None)).ok();
+                        }
+                    }
+                } else {
+                    self.state.is_resolving_playback = false;
+                }
+            }
+            Action::ShowSubtitlePopup(link, ext_captions, open_with) => {
+                self.state.is_resolving_playback = false;
+                let mut options = vec![("None".to_string(), "".to_string())];
+
+                if let Some(captions_list) =
+                    ext_captions.get("extCaptions").and_then(|c| c.as_array())
+                {
+                    for cap in captions_list {
+                        let name = cap
+                            .get("lanName")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+                        let url = cap
+                            .get("url")
+                            .and_then(|u| u.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if !url.is_empty() {
+                            options.push((name, url));
+                        }
+                    }
+                }
+
+                if options.len() > 1 {
+                    self.state.show_help = false;
+                    self.state.player_picker_popup = false;
+                    self.state.is_download_subtitle_popup = false;
+                    self.state.subtitle_popup = true;
+                    self.state.subtitle_list = options;
+                    self.state.subtitle_list_state.select(Some(0));
+                    self.state.pending_play_link = Some(link);
+                    self.state.pending_open_with = open_with;
+                } else {
+                    if open_with {
+                        self.action_sender
+                            .send(Action::ShowPlayerPicker(link, None))
+                            .ok();
+                    } else {
+                        self.action_sender.send(Action::LaunchMpv(link, None)).ok();
+                    }
+                }
+            }
+            Action::ShowDownloadSubtitlePopup(ext_captions) => {
+                self.state.is_resolving_playback = false;
+                let mut options = vec![("None".to_string(), "".to_string())];
+
+                if let Some(captions_list) =
+                    ext_captions.get("extCaptions").and_then(|c| c.as_array())
+                {
+                    for cap in captions_list {
+                        let name = cap
+                            .get("lanName")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+                        let url = cap
+                            .get("url")
+                            .and_then(|u| u.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if !url.is_empty() {
+                            options.push((name, url));
+                        }
+                    }
+                }
+
+                if options.len() > 1 {
+                    self.state.show_help = false;
+                    self.state.player_picker_popup = false;
+                    self.state.subtitle_popup = false;
+                    self.state.is_download_subtitle_popup = true;
+                    self.state.subtitle_list = options;
+                    self.state.subtitle_list_state.select(Some(0));
+                } else {
+                    self.action_sender.send(Action::DownloadStream(None)).ok();
+                }
+            }
+            Action::LaunchMpv(link, subtitle_url) => {
+                self.state.is_resolving_playback = false;
+                let player = self.state.available_players.first().cloned();
+                match player {
+                    None => {
+                        self.state.notify(
+                            NotificationKind::Error,
+                            "Player unavailable",
+                            "Install mpv, IINA, or VLC.",
+                        );
+                    }
+                    Some(kind) => {
+                        let player_name = match kind {
+                            crate::tui::state::PlayerKind::Mpv => "MPV",
+                            crate::tui::state::PlayerKind::Iina => "IINA",
+                            crate::tui::state::PlayerKind::Vlc => "VLC",
+                            crate::tui::state::PlayerKind::AndroidIntent => "Android Player",
+                        };
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Opening player",
+                            format!("Launching {player_name}."),
+                        );
+
+                        self.action_sender
+                            .send(Action::LaunchPlayer(kind, link, subtitle_url))
+                            .ok();
+                    }
+                }
+            }
+
+            Action::ShowPlaybackPicker(source) => {
+                self.state.is_resolving_playback = false;
+                if self.state.available_players.is_empty() {
+                    self.state
+                        .set_status("No media player found. Install mpv, IINA, or VLC.", 150);
+                    return None;
+                }
+                self.state.show_help = false;
+                self.state.tv_config_popup = false;
+                self.state.player_picker_popup = true;
+                self.state.player_picker_playback = Some(source);
+                self.state.player_picker_link = None;
+                self.state.player_picker_subtitle = None;
+                self.state.player_picker_state.select(Some(0));
+                self.state.subtitle_popup = false;
+            }
+            Action::ShowPlayerPicker(link, subtitle) => {
+                self.state.is_resolving_playback = false;
+                if self.state.available_players.is_empty() {
+                    self.state.notify(
+                        NotificationKind::Error,
+                        "Player unavailable",
+                        "Install mpv, IINA, or VLC.",
+                    );
+                    return None;
+                }
+                self.state.show_help = false;
+                self.state.tv_config_popup = false;
+                self.state.player_picker_popup = true;
+                self.state.player_picker_playback = None;
+                self.state.player_picker_link = Some(link);
+                self.state.player_picker_subtitle = subtitle;
+                self.state.player_picker_state.select(Some(0));
+                self.state.subtitle_popup = false;
+            }
+            Action::LaunchPlayer(kind, link, sub) => {
+                self.state.is_resolving_playback = false;
+                self.state.player_picker_popup = false;
+                self.launch_player(kind, link, sub, Vec::new());
+            }
+            Action::LaunchPlayback(kind, source) => {
+                self.state.is_resolving_playback = false;
+                self.state.player_picker_popup = false;
+                if !crate::tui::player::supports_headers(kind, &source.headers) {
+                    self.state.set_status(
+                        format!(
+                            "This source needs headers {} cannot provide; use mpv or IINA.",
+                            kind.label()
+                        ),
+                        180,
+                    );
+                    return None;
+                }
+                self.launch_player(kind, source.url, source.subtitle, source.headers);
+            }
+            Action::PlayerCrashed(code, error_msg) => {
+                let code_str = code
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "unknown".into());
+                log::error!("player crashed (code {code_str}): {error_msg}");
+
+                let display_err = if error_msg.is_empty() {
+                    "No error output provided by player.".to_string()
+                } else {
+                    error_msg.lines().last().unwrap_or(&error_msg).to_string()
+                };
+
+                self.state.set_status(
+                    format!("Player crashed (code {code_str}): {display_err}"),
+                    300,
+                );
+
+                self.state.notify(
+                    NotificationKind::Error,
+                    "Player Error",
+                    format!("Crash code: {code_str}\n{display_err}"),
+                );
+            }
+            _ => return None,
+        }
+        None
     }
 }
