@@ -13,6 +13,12 @@ Search, browse, play, and download movies, series, anime, and IPTV streams from 
 
 </div>
 
+## Documentation
+
+The [`docs/`](docs/README.md) folder contains detailed documentation — architecture,
+providers, players, cache, logging, TV mode, configuration, and debugging — written so
+anyone can understand the project without reading the whole codebase.
+
 ## Features
 
 ### Catalogs & Browsing

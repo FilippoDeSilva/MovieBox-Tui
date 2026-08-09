@@ -1,0 +1,106 @@
+# Architecture
+
+MovieBox-Tui is a terminal client (ratatui + crossterm + tokio) for streaming movies,
+series and TV channels from multiple providers. This document describes the shape of the
+code and how data flows through it.
+
+## Module map
+
+```
+src/
+  main.rs                       entry point: logging init, panic hook, raw mode,
+                                alternate screen, App::new + App::run
+  lib.rs                        crate root, module declarations
+  cache.rs                      disk cache: provider-namespaced, TTL'd, atomic writes
+  download.rs                   download engine (resume, ranges, segments, retry)
+  history.rs                    watch history persistence
+  logging.rs                    file logging (rotation, sanitization)
+  providers/
+    mod.rs                      provider module tree
+    models.rs                   shared typed models (ProviderKind, CatalogItem,
+                                MediaDetails, Release, PlaybackSource, …)
+    moviebox/                   primary provider (client + request signing)
+    fourkhdhub/                 4KHDHub provider (client, hubcloud resolver, parser)
+    bdix/circleftp/             BDIX CircleFTP provider
+    bdix/dhakaflix/             BDIX DhakaFlix provider
+    iptv_org/m3u.rs             M3U playlist parser (URL and local file)
+  tui/
+    app/                        the application object and all behavior
+      mod.rs                    App struct, App::new, handle_action dispatcher,
+                                run(), draw(), config persistence
+      network.rs                poster fetch + provider dispatch helpers
+      playback.rs               player launching + playback actions
+      download.rs               download orchestration actions
+      requests.rs               search/homepage/details/preview/episode-stream actions
+      navigation.rs             list navigation and submit actions
+      tv.rs                     TV mode: playlist manager + playback
+      system.rs                 help, refresh, cache, theme, updates, focus, resize
+      keyboard.rs               raw key-event handling
+      run.rs                    terminal event loop and rendering
+    state.rs                    AppState: all UI state + in-memory LRU caches
+    action.rs                   the Action enum (event/message model)
+    event.rs                    EventHandler: input events + tick → Action channel
+    player.rs                   player detection and command construction
+    overlay.rs                  popups, pickers, notifications
+    screens/                    render-only modules (home, details, help, startup)
+    terminal.rs                 terminal capability probes
+    theme.rs                    color themes
+    text.rs                     grapheme-safe text helpers
+    updater.rs                  GitHub release update check
+```
+
+## The event loop
+
+`App::run` (in `app/mod.rs`) owns the only loop:
+
+1. If `clear_terminal_before_draw` is set, the terminal buffer is cleared.
+2. If `state.dirty`, the screen is drawn (`App::draw`).
+3. `tokio::select!` waits for either:
+   - an `Action` from the `EventHandler` (keyboard/mouse/focus/resize/tick), or
+   - an `Action` pushed by a background task (network results, downloads, posters).
+
+`EventHandler` (`event.rs`) spawns one task that reads crossterm events and a `Tick`
+interval, forwarding them into the action channel (capacity 128).
+
+## Async model
+
+- The tokio runtime is multi-threaded (`rt-multi-thread`).
+- **State is single-threaded**: all mutations to `AppState` happen inside
+  `handle_action`, which is driven by the single event-loop task. Actions are
+  serialized through the channel, so there are no data races on UI state.
+- **Network** uses async `reqwest` clients (one per provider) plus per-provider signing.
+- **Blocking work** (disk cache reads/writes, image decoding, M3U parsing, watch-history
+  save, log cleanup) runs on `tokio::task::spawn_blocking` so the event loop is never
+  blocked.
+- Background tasks send `Action` messages back (e.g. `SearchSuccess`,
+  `EpisodeStreamsReady`, `DownloadCompleted`), which `handle_action` consumes.
+
+## Data flow — a typical search
+
+1. User types a query; the `Key` handler updates `search_query` and sends `Action::Search`.
+2. `handle_action` resolves the active provider, dispatches to the provider client
+   (async), and spawns the request in a background task.
+3. On success the task sends `Action::SearchSuccess`; `handle_action` stores
+   `search_results`, marks `dirty`, and writes the provider search cache.
+4. Posters for result rows are fetched by background tasks and delivered via
+   `SearchPosterLoaded`/`PosterSuccess`; image protocols are cached per terminal.
+5. `App::draw` renders the results; `dirty` is cleared.
+
+## Playback flow
+
+1. User selects a result → `Action::PlayStream` (moviebox) or 4KHDHub/BDIX resolve.
+2. The provider resolves a `PlaybackSource` (url + optional headers/subtitle).
+3. `launch_player` builds the player command (`player.rs`), optionally downloads the
+   subtitle to a temp file, and spawns the player with null stdin/stdout and piped
+   stderr; a blocking task waits and reports crashes.
+4. Playback is handed to mpv / VLC / IINA / Android intent per the active player.
+
+## Configuration and persistence
+
+- `config.json` — settings (theme, provider, auto-update, `default_player`, BDIX).
+- `tv_config.json` — user M3U playlist sources (URLs or file paths).
+- `history.json` — watch history.
+- Cache lives under the system cache dir, keyed per provider.
+- Logs live under the system data dir with rotation.
+
+See `config.md` and `logging.md` for exact locations and formats.
