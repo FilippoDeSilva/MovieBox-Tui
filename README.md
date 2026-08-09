@@ -330,11 +330,11 @@ Then try the installation command again.
 
 ## Development
 
-Before submitting changes, ensure your code is formatted, linted, audited for security vulnerabilities, and packages correctly:
+Formatting and linting are enforced automatically by the pre-commit hook on every
+commit (see [CONTRIBUTING.md](CONTRIBUTING.md)); there is no need to run them manually.
+Before opening a PR, also run the CI-only checks:
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets --locked -- -D warnings
 cargo audit
 cargo package --locked
 ```

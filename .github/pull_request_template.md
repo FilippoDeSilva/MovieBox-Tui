@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] `cargo fmt --all` passes
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` passes
 - [ ] `cargo build` succeeds
 - [ ] Docs updated if this changes features, keybindings, or usage
+
+> Formatting and linting are enforced automatically by the pre-commit hook and CI.
