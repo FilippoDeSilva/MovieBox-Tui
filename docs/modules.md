@@ -1,0 +1,85 @@
+# Modules
+
+The crate (`moviebox_tui`) is split into top-level modules and, inside `tui`, an `app`
+directory that holds the application object. Below is the full tree with each module's
+responsibility.
+
+```
+src/
+  main.rs            Entry point. Logging init, panic hook, raw mode, alternate
+                     screen, TerminalGuard, App::new + App::run.
+  lib.rs             Crate root: declares pub mod cache/download/history/logging/
+                     providers/tui.
+
+  cache.rs           Disk cache: provider-namespaced directories, TTL expiry,
+                     atomic temp-file writes, payload validation, background purge.
+
+  download.rs        Download engine (pure, async): resume via .part files,
+                     HTTP ranges, optional multi-segment download, retries, cancel
+                     via an AtomicBool, Windows-safe file stems.
+
+  history.rs         Watch history: read/write history.json, dedupe, cap 100.
+
+  logging.rs         File logging: flexi_logger, rotation (5MB, keep 3),
+                     MOVIEBOX_LOG level, URL/path sanitization for sharing.
+
+  providers/
+    mod.rs           Module declarations.
+    models.rs        Shared types: ProviderKind, CatalogItem, MediaDetails,
+                     Release, PlaybackSource, RequestContext, SourceMirror.
+    moviebox/        Primary provider.
+      client.rs      Async reqwest client with signed requests (anti-bot).
+      crypto.rs      Request signing: HMAC-MD5 signature, client token,
+                     spoofed device identity (by design of the scraper).
+      title.rs       clean_moviebox_title: strip quality/site suffix noise.
+    fourkhdhub/      Secondary provider.
+      client.rs      Search/details/stream resolution + preflight validation.
+      hubcloud.rs    Mirror resolver: fetch drive pages, extract playable links.
+      parser.rs      HTML parsing into typed CatalogItem/MediaDetails/Release,
+                     plus moviebox-JSON adapters.
+    bdix/
+      circleftp/     BDIX CircleFTP provider (client + parser).
+      dhakaflix/     BDIX DhakaFlix provider (client + parser).
+    m3u.rs           M3U playlist parser (http(s) URL or local file).
+
+  tui/
+    action.rs        The Action enum: every UI event/message (input, network
+                     results, downloads, playback, tv, system).
+    state.rs         AppState: all UI state, LRU image/preview caches, and the
+                     PlayerKind enum + label()/parse(), tv manager row model.
+    event.rs         EventHandler: crossterm event stream + tick interval,
+                     forwards to the action channel.
+    player.rs        Player detection (OnceLock) and command construction for
+                     mpv / VLC / IINA / Android intent, subtitle args, headers,
+                     terminal-sized window.
+    overlay.rs       Popups: notifications, pickers, confirmation, modal centering.
+    screens/
+      home.rs        Home/startup + search list rendering (streaming and TV).
+      details.rs     Details screen rendering.
+      help.rs        Keybinding help (mode-aware).
+      startup.rs     Startup splash.
+    terminal.rs      Terminal capability probes (basic UI, image querying).
+    theme.rs         Color themes + terminal color detection.
+    text.rs          Grapheme-safe width/truncation helpers.
+    updater.rs       GitHub release update check.
+
+  tui/app/           The application object (App) and all behavior.
+    mod.rs           App struct, App::new, small helpers, handle_action
+                     dispatcher (thin routing table over action groups).
+    run.rs           App::run (event loop) and App::draw (rendering).
+    network.rs       fetch_poster_bytes, decode_poster, provider_search,
+                     provider_details.
+    requests.rs      handle_requests: search/homepage/suggest/details/preview/
+                     episode-streams/poster actions.
+    playback.rs      handle_playback: play/subtitle/picker/launch/crash actions
+                     + launch_player.
+    download.rs      handle_download: download orchestration + start_resilient_download.
+    navigation.rs    handle_navigation + provider/nav helpers.
+    keyboard.rs      handle_key: raw key-event handling.
+    system.rs        handle_system: tick/quit/focus/resize/help/refresh/cache/
+                     theme/status/updates.
+    tv.rs            handle_tv: playlist manager + TV actions.
+```
+
+See [architecture.md](architecture.md) for the event loop, async model and data flow,
+and the per-topic docs for details.
