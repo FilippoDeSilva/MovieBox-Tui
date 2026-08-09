@@ -26,17 +26,17 @@ src/
     iptv_org/m3u.rs             M3U playlist parser (URL and local file)
   tui/
     app/                        the application object and all behavior
-      mod.rs                    App struct, App::new, handle_action dispatcher,
-                                run(), draw(), config persistence
+      mod.rs                    App struct, App::new, helpers, handle_action
+                                dispatcher (thin routing table)
+      run.rs                    terminal event loop (run) and rendering (draw)
       network.rs                poster fetch + provider dispatch helpers
       playback.rs               player launching + playback actions
       download.rs               download orchestration actions
       requests.rs               search/homepage/details/preview/episode-stream actions
-      navigation.rs             list navigation and submit actions
+      navigation.rs             list navigation, submit actions, provider helpers
       tv.rs                     TV mode: playlist manager + playback
-      system.rs                 help, refresh, cache, theme, updates, focus, resize
       keyboard.rs               raw key-event handling
-      run.rs                    terminal event loop and rendering
+      system.rs                 help, refresh, cache, theme, updates, focus, resize
     state.rs                    AppState: all UI state + in-memory LRU caches
     action.rs                   the Action enum (event/message model)
     event.rs                    EventHandler: input events + tick → Action channel
