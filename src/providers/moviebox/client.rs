@@ -190,6 +190,7 @@ impl MovieBoxClient {
                     let status = resp.status().as_u16();
 
                     if RETRY_STATUS_CODES.contains(&status) {
+                        log::warn!("moviebox host {idx} returned retryable status {status}: {url}");
                         continue;
                     }
 
@@ -197,13 +198,20 @@ impl MovieBoxClient {
 
                     match self.parse_response(resp).await {
                         Ok(val) => return Ok(val),
-                        Err(_) => continue,
+                        Err(error) => {
+                            log::warn!("moviebox host {idx} parse failed: {error} [{url}]");
+                            continue;
+                        }
                     }
                 }
-                Err(_) => continue,
+                Err(error) => {
+                    log::warn!("moviebox host {idx} request failed: {error} [{url}]");
+                    continue;
+                }
             }
         }
 
+        log::error!("moviebox: all hosts exhausted for {path_and_query}");
         Err(ScraperError::HostsExhausted)
     }
 

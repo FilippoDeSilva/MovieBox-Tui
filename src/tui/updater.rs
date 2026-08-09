@@ -35,6 +35,7 @@ async fn fetch_release() -> Result<Release, String> {
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
+        log::warn!("GitHub update check failed: {status} {body}");
         return Err(format!("GitHub API {status}: {body}"));
     }
 

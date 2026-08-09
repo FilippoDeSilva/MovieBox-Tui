@@ -123,6 +123,7 @@ impl FourKHdHubClient {
                     }
                     match self.preflight(&url, &merged).await {
                         Ok(playable_url) => {
+                            log::info!("4KHDHub mirror playable: {label} ({playable_url})");
                             return Ok(PlaybackSource {
                                 provider: ProviderKind::FourKHdHub,
                                 url: playable_url,
@@ -131,11 +132,22 @@ impl FourKHdHubClient {
                                 source_label: label,
                             });
                         }
-                        Err(error) => last_error = Some(error.to_string()),
+                        Err(error) => {
+                            log::warn!("4KHDHub mirror rejected ({label}): {error} [{url}]");
+                            last_error = Some(error.to_string());
+                        }
                     }
                 }
+            } else if let Err(error) = candidates {
+                log::warn!("4KHDHub mirror candidates failed: {error}");
+                last_error = Some(error.to_string());
             }
         }
+        log::error!(
+            "4KHDHub: no playable mirror for release {:?} (last: {:?})",
+            release.filename,
+            last_error
+        );
         Err(FourKHdHubError::NoPlayableMirror(
             last_error.unwrap_or_else(|| "all mirrors rejected the stream probe".into()),
         ))

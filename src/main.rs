@@ -45,9 +45,12 @@ impl Drop for TerminalGuard {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    moviebox_tui::logging::init();
+
     std::panic::set_hook(Box::new(|info| {
+        log::error!("panic: {info}");
         restore_terminal();
-        eprintln!("{}", info);
+        eprintln!("{info}");
     }));
 
     let args: Vec<String> = std::env::args().collect();

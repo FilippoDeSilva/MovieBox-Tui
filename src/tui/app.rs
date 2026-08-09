@@ -279,6 +279,11 @@ impl App {
                     }
                 }
                 if !downloaded {
+                    log::warn!(
+                        "subtitle download failed for {:?} player, playing without subtitles (url was {})",
+                        kind,
+                        url
+                    );
                     let _ = sender.send(Action::SetStatus(
                         "Subtitles unavailable; playing without subtitles.".to_string(),
                     ));
@@ -339,6 +344,7 @@ impl App {
                     });
                 }
                 Err(error) => {
+                    log::error!("failed to spawn player {:?} for {}: {error}", kind, link);
                     if let Some(path) = temporary_subtitle {
                         let _ = tokio::fs::remove_file(path).await;
                     }
@@ -2556,6 +2562,10 @@ impl App {
                 if !self.context_is_current(context) {
                     return None;
                 }
+                log::error!(
+                    "search failed (provider {}): {err}",
+                    context.provider.cache_key()
+                );
                 self.state.is_loading = false;
                 self.state.search_error = Some(err.clone());
                 self.state
@@ -2742,6 +2752,7 @@ impl App {
                 );
             }
             Action::HomepageFailure(err) => {
+                log::error!("discover failed: {err}");
                 self.state.is_loading = false;
                 self.state
                     .set_status(format!("Discover failed: {}", err), 150);
@@ -3451,6 +3462,7 @@ impl App {
                                     }
                                 }
                                 Err(error) => {
+                                    log::error!("4KHDHub resolve failed: {error}");
                                     sender
                                         .send(Action::SetStatus(format!(
                                             "Error: 4KHDHub source failed: {error}"
@@ -3709,6 +3721,7 @@ impl App {
                                         .ok();
                                 }
                                 Err(error) => {
+                                    log::error!("stream resolve failed: {error}");
                                     sender
                                         .send(Action::SetStatus(format!("Resolve failed: {error}")))
                                         .ok();
@@ -4059,6 +4072,10 @@ impl App {
                 if !self.context_is_current(context) {
                     return None;
                 }
+                log::error!(
+                    "details fetch failed (provider {}): {err}",
+                    context.provider.cache_key()
+                );
                 self.state.is_loading = false;
                 self.state
                     .set_status(format!("Details fetch failed: {}", err), 150);
@@ -4066,6 +4083,7 @@ impl App {
             Action::SetStatus(msg) => {
                 self.state.is_resolving_playback = false;
                 if msg.starts_with("Error:") {
+                    log::error!("{msg}");
                     self.state.notify(
                         NotificationKind::Error,
                         "Operation failed",
@@ -4699,6 +4717,12 @@ impl App {
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
                 self.state.selected_resources = None;
+                log::error!(
+                    "episode streams failed ({} s{}e{}): {err}",
+                    context.provider.cache_key(),
+                    target_se,
+                    target_ep
+                );
                 self.state.stream_error = Some(err.clone());
                 self.state.set_status(format!("Error: {}", err), 150);
             }
@@ -4830,6 +4854,7 @@ impl App {
                 let code_str = code
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "unknown".into());
+                log::error!("player crashed (code {code_str}): {error_msg}");
 
                 let display_err = if error_msg.is_empty() {
                     "No error output provided by player.".to_string()

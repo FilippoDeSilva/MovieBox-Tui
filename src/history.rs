@@ -50,7 +50,9 @@ impl HistoryManager {
     pub fn save(&self) {
         if let Some(path) = Self::history_file_path() {
             if let Ok(content) = serde_json::to_string(self) {
-                let _ = fs::write(path, content);
+                if let Err(error) = fs::write(&path, content) {
+                    log::warn!("failed to save watch history: {error}");
+                }
             }
         }
     }
