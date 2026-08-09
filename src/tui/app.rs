@@ -1700,7 +1700,7 @@ impl App {
                 _ => {}
             },
             Action::ClearCache => {
-                crate::cache::clear_all_cache();
+                tokio::task::spawn_blocking(crate::cache::clear_all_cache);
                 self.state
                     .set_status("Cache cleared completely.".to_string(), 150);
             }
@@ -3412,7 +3412,15 @@ impl App {
                         let sender = self.action_sender.clone();
                         let link_clone = link.clone();
                         tokio::spawn(async move {
-                            if let Some(res) = crate::cache::get_captions_cache(&subject_id, &rid) {
+                            let cached = tokio::task::spawn_blocking({
+                                let subject_id = subject_id.clone();
+                                let rid = rid.clone();
+                                move || crate::cache::get_captions_cache(&subject_id, &rid)
+                            })
+                            .await
+                            .ok()
+                            .flatten();
+                            if let Some(res) = cached {
                                 sender
                                     .send(Action::ShowSubtitlePopup(
                                         link_clone.clone(),
@@ -3429,7 +3437,16 @@ impl App {
                             .await;
                             match result {
                                 Ok(Ok(res)) => {
-                                    crate::cache::set_captions_cache(&subject_id, &rid, &res);
+                                    let subject_id = subject_id.clone();
+                                    let rid = rid.clone();
+                                    let res_for_cache = res.clone();
+                                    tokio::task::spawn_blocking(move || {
+                                        crate::cache::set_captions_cache(
+                                            &subject_id,
+                                            &rid,
+                                            &res_for_cache,
+                                        );
+                                    });
                                     sender
                                         .send(Action::ShowSubtitlePopup(link_clone, res, open_with))
                                         .ok();
@@ -4240,36 +4257,6 @@ impl App {
                     let is_movie = season == 0 && episode == 0;
 
                     tokio::spawn(async move {
-                        if !force_refresh {
-                            let id_for_cache = id_clone.clone();
-                            if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                                crate::cache::get_provider_stream_cache(
-                                    context.provider,
-                                    &id_for_cache,
-                                    season,
-                                    episode,
-                                )
-                            })
-                            .await
-                            {
-                                tokio::time::sleep(std::time::Duration::from_millis(120)).await;
-                                sender
-                                    .send(Action::SetStatus("Loaded from cache.".to_string()))
-                                    .ok();
-                                sender
-                                    .send(Action::EpisodeStreamsReady(
-                                        context,
-                                        request_id,
-                                        subject_id.clone(),
-                                        season,
-                                        episode,
-                                        cached,
-                                    ))
-                                    .ok();
-                                return;
-                            }
-                        }
-
                         sender
                             .send(Action::SetStatus("Fetching streams...".to_string()))
                             .ok();

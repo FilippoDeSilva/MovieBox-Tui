@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60;
 const STREAM_CACHE_EXPIRY_SECS: u64 = 2 * 60 * 60;
+const HOMEPAGE_CACHE_EXPIRY_SECS: u64 = 60 * 60;
 
 fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value> {
     if path.exists() {
@@ -59,10 +60,6 @@ fn stream_payload_has_results(data: &serde_json::Value) -> bool {
     })
 }
 
-pub fn get_cache_dir(subdir: &str) -> PathBuf {
-    get_provider_cache_dir(ProviderKind::MovieBox, subdir)
-}
-
 fn hash_key(value: &str) -> String {
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
@@ -87,10 +84,6 @@ pub fn get_provider_cache_dir(provider: ProviderKind, subdir: &str) -> PathBuf {
     path
 }
 
-pub fn get_cache_path(subject_id: &str, season: usize, episode: usize) -> PathBuf {
-    get_provider_stream_path(ProviderKind::MovieBox, subject_id, season, episode)
-}
-
 pub fn get_provider_stream_path(
     provider: ProviderKind,
     subject_id: &str,
@@ -106,17 +99,6 @@ pub fn get_provider_stream_path(
     let hashed_id = hash_key(subject_id);
     path.push(format!("{schema}{hashed_id}_{season}_{episode}.json"));
     path
-}
-
-pub fn get_stream_cache(
-    subject_id: &str,
-    season: usize,
-    episode: usize,
-) -> Option<serde_json::Value> {
-    read_json_cache(
-        &get_cache_path(subject_id, season, episode),
-        STREAM_CACHE_EXPIRY_SECS,
-    )
 }
 
 pub fn get_provider_stream_cache(
@@ -135,10 +117,6 @@ pub fn get_provider_stream_cache(
     }
 }
 
-pub fn get_details_path(subject_id: &str) -> PathBuf {
-    get_provider_details_path(ProviderKind::MovieBox, subject_id)
-}
-
 pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(provider, "details");
     let schema = if provider == ProviderKind::FourKHdHub {
@@ -149,10 +127,6 @@ pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> Pa
     let hashed_id = hash_key(subject_id);
     path.push(format!("details_{schema}{hashed_id}.json"));
     path
-}
-
-pub fn get_details_cache(subject_id: &str) -> Option<serde_json::Value> {
-    read_json_cache(&get_details_path(subject_id), CACHE_EXPIRY_SECS)
 }
 
 pub fn get_provider_details_cache(
@@ -170,19 +144,11 @@ pub fn invalidate_provider_details_cache(provider: ProviderKind, subject_id: &st
     let _ = fs::remove_file(path);
 }
 
-pub fn get_search_path(query: &str) -> PathBuf {
-    get_provider_search_path(ProviderKind::MovieBox, query)
-}
-
 pub fn get_provider_search_path(provider: ProviderKind, query: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(provider, "search");
     let hashed = hash_key(query);
     path.push(format!("{hashed}.json"));
     path
-}
-
-pub fn get_search_cache(query: &str) -> Option<serde_json::Value> {
-    read_json_cache(&get_search_path(query), CACHE_EXPIRY_SECS)
 }
 
 pub fn get_provider_search_cache(provider: ProviderKind, query: &str) -> Option<serde_json::Value> {
@@ -194,11 +160,6 @@ pub fn get_provider_search_cache(provider: ProviderKind, query: &str) -> Option<
         let _ = fs::remove_file(path);
         None
     }
-}
-
-pub fn set_search_cache(query: &str, data: &serde_json::Value) {
-    let path = get_search_path(query);
-    write_json_cache(&path, data);
 }
 
 pub fn set_provider_search_cache(provider: ProviderKind, query: &str, data: &serde_json::Value) {
@@ -219,11 +180,6 @@ fn search_payload_has_results(data: &serde_json::Value) -> bool {
         .is_some_and(|subjects| !subjects.is_empty())
 }
 
-pub fn set_details_cache(subject_id: &str, data: &serde_json::Value) {
-    let path = get_details_path(subject_id);
-    write_json_cache(&path, data);
-}
-
 pub fn set_provider_details_cache(
     provider: ProviderKind,
     subject_id: &str,
@@ -231,13 +187,6 @@ pub fn set_provider_details_cache(
 ) {
     let path = get_provider_details_path(provider, subject_id);
     write_json_cache(&path, data);
-}
-
-pub fn set_stream_cache(subject_id: &str, season: usize, episode: usize, data: &serde_json::Value) {
-    let path = get_cache_path(subject_id, season, episode);
-    if stream_payload_has_results(data) {
-        write_json_cache(&path, data);
-    }
 }
 
 pub fn set_provider_stream_cache(
@@ -251,10 +200,6 @@ pub fn set_provider_stream_cache(
     if stream_payload_has_results(data) {
         write_json_cache(&path, data);
     }
-}
-
-pub fn invalidate_stream_cache(subject_id: &str, season: usize, episode: usize) {
-    invalidate_provider_stream_cache(ProviderKind::MovieBox, subject_id, season, episode);
 }
 
 pub fn invalidate_provider_stream_cache(
@@ -317,16 +262,12 @@ fn get_homepage_path(tab_id: &str, page: usize) -> PathBuf {
 }
 
 pub fn get_homepage_cache(tab_id: &str, page: usize) -> Option<serde_json::Value> {
-    read_json_cache(&get_homepage_path(tab_id, page), 3600)
+    read_json_cache(&get_homepage_path(tab_id, page), HOMEPAGE_CACHE_EXPIRY_SECS)
 }
 
 pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
     let path = get_homepage_path(tab_id, page);
     write_json_cache(&path, data);
-}
-
-pub fn get_image_path(id: &str) -> PathBuf {
-    get_namespaced_image_path(ProviderKind::MovieBox.cache_key(), id)
 }
 
 fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
@@ -335,15 +276,7 @@ fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
     path.push(namespace);
     path.push("images");
     let _ = fs::create_dir_all(&path);
-    use md5::{Digest, Md5};
-    let mut hasher = Md5::new();
-    hasher.update(id.as_bytes());
-    let result = hasher.finalize();
-    let mut safe_name = String::with_capacity(32);
-    for b in result {
-        use std::fmt::Write;
-        let _ = write!(&mut safe_name, "{:02x}", b);
-    }
+    let safe_name = hash_key(id);
     path.push(format!("{safe_name}.img"));
     path
 }
