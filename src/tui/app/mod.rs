@@ -18,6 +18,16 @@ use crate::tui::{
     theme::Theme,
 };
 
+mod download;
+mod keyboard;
+mod navigation;
+mod network;
+mod playback;
+mod requests;
+mod run;
+mod system;
+mod tv;
+
 pub fn clean_moviebox_title(raw_title: &str) -> String {
     let mut end = raw_title.len();
 
