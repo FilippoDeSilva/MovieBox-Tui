@@ -448,6 +448,12 @@ impl App {
         }
     }
 
+    fn prepare_image_soft_refresh(&mut self) {
+        self.state.poster_protocol = None;
+        self.state.search_poster_protocols.clear();
+        self.state.dirty = true;
+    }
+
     fn cycle_details_pane(&mut self, forward: bool) {
         use crate::tui::state::DetailsPane;
 
@@ -1043,9 +1049,7 @@ impl App {
                 return Some(());
             }
             Action::FocusChange => {
-                self.prepare_image_refresh();
-                self.state.poster_protocol = None;
-                self.state.search_poster_protocols.clear();
+                self.prepare_image_soft_refresh();
             }
             Action::Resize(_w, _h) => {
                 self.prepare_image_refresh();
