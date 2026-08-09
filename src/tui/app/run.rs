@@ -369,12 +369,7 @@ impl App {
                 .take(3)
                 .collect::<Vec<_>>();
             for line in note_lines {
-                let mut truncated = line.to_string();
-                if truncated.len() > 55 {
-                    truncated.truncate(55);
-                    truncated.push_str("...");
-                }
-                text.push(Line::from(truncated));
+                text.push(Line::from(crate::tui::text::truncate_width(line, 55)));
             }
             if notes.lines().count() > 3 {
                 text.push(Line::from(Span::styled(

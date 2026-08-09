@@ -158,17 +158,16 @@ impl App {
                         recent.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
 
                         for item in recent {
-                            let mut provider = self.state.active_provider;
-                            let cache_key_lower = item.provider.to_lowercase();
-                            if cache_key_lower == "moviebox" {
-                                provider = crate::providers::models::ProviderKind::MovieBox;
-                            } else if cache_key_lower == "fourkhdhub" {
-                                provider = crate::providers::models::ProviderKind::FourKHdHub;
-                            } else if cache_key_lower == "bdixcircleftp" {
-                                provider = crate::providers::models::ProviderKind::BdixCircleFtp;
-                            } else if cache_key_lower == "bdixdhakaflix" {
-                                provider = crate::providers::models::ProviderKind::BdixDhakaFlix;
-                            }
+                            use crate::providers::models::ProviderKind;
+                            let stored = item.provider.to_ascii_lowercase();
+                            let provider = ProviderKind::ENABLED
+                                .iter()
+                                .copied()
+                                .find(|provider| {
+                                    stored == provider.label().to_ascii_lowercase()
+                                        || stored == provider.cache_key()
+                                })
+                                .unwrap_or(self.state.active_provider);
                             self.state.search_results.push(SearchResult {
                                 id: item.subject_id.clone(),
                                 title: item.title.clone(),
