@@ -33,7 +33,7 @@ pub struct CircleFtpEpisode {
     pub link: Option<String>,
 }
 
-pub fn search_to_moviebox_json(response: &CircleFtpSearchResponse) -> Vec<CatalogItem> {
+pub fn circleftp_search_to_catalog(response: &CircleFtpSearchResponse) -> Vec<CatalogItem> {
     let mut items = Vec::new();
     if let Some(posts) = &response.posts {
         for post in posts {

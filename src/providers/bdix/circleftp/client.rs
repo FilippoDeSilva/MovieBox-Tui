@@ -6,7 +6,7 @@ use crate::providers::models::{
     SourceMirror,
 };
 
-use super::parser::{CircleFtpSearchResponse, search_to_moviebox_json};
+use super::parser::{CircleFtpSearchResponse, circleftp_search_to_catalog};
 
 #[derive(Debug, Error)]
 pub enum CircleFtpError {
@@ -46,7 +46,7 @@ impl CircleFtpClient {
         let resp = self.client.get(url).send().await?;
 
         let search_resp: CircleFtpSearchResponse = resp.json().await?;
-        Ok(search_to_moviebox_json(&search_resp))
+        Ok(circleftp_search_to_catalog(&search_resp))
     }
 
     pub async fn details(&self, id: &str) -> Result<MediaDetails, CircleFtpError> {
