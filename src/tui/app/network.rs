@@ -1,4 +1,5 @@
 use crate::providers::{
+    Provider,
     fourkhdhub::{FourKHdHubClient, details_to_moviebox_json, search_to_moviebox_json},
     models::ProviderKind,
     moviebox::client::MovieBoxClient,
@@ -31,27 +32,13 @@ pub(super) async fn provider_search(
     query: &str,
     page: usize,
 ) -> Result<serde_json::Value, String> {
-    match provider {
-        ProviderKind::MovieBox => moviebox
-            .search(query, page)
-            .await
-            .map_err(|error| format!("{error:?}")),
-        ProviderKind::FourKHdHub => fourk
-            .search(query)
-            .await
-            .map(|items| search_to_moviebox_json(&items))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixCircleFtp => circleftp
-            .search(query)
-            .await
-            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixDhakaFlix => dhakaflix
-            .search(query)
-            .await
-            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
-            .map_err(|error| error.to_string()),
-    }
+    let result = match provider {
+        ProviderKind::MovieBox => Provider::search(moviebox, query, page).await,
+        ProviderKind::FourKHdHub => Provider::search(fourk, query, page).await,
+        ProviderKind::BdixCircleFtp => Provider::search(circleftp, query, page).await,
+        ProviderKind::BdixDhakaFlix => Provider::search(dhakaflix, query, page).await,
+    };
+    result.map(|items| search_to_moviebox_json(&items))
 }
 
 pub(super) async fn provider_details(

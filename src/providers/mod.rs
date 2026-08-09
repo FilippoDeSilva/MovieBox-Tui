@@ -3,3 +3,9 @@ pub mod fourkhdhub;
 pub mod m3u;
 pub mod models;
 pub mod moviebox;
+
+use models::CatalogItem;
+
+pub(crate) trait Provider {
+    async fn search(&self, query: &str, page: usize) -> Result<Vec<CatalogItem>, String>;
+}

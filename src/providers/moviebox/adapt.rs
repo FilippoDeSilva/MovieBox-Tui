@@ -69,7 +69,8 @@ pub fn search_json_to_catalog(payload: &serde_json::Value) -> Vec<CatalogItem> {
                 year: year(item),
                 poster_url: cover_url(item),
                 season_count: item
-                    .get("seasonCount")
+                    .get("season")
+                    .or_else(|| item.get("seasonCount"))
                     .and_then(|s| s.as_u64())
                     .map(|n| n as usize),
             })

@@ -18,10 +18,12 @@ default (`bdix_enabled` in config; `/enable-bdix`).
 
 ## Shared flow
 
-Search, details, and episode-streams are dispatched per provider in
-`app/network.rs` (`provider_search`, `provider_details`) and `app/requests.rs`.
-Each provider returns typed models; non-moviebox results are converted to the moviebox
-JSON schema by `fourkhdhub/parser.rs` adapters before reaching the UI.
+Search, details, and episode-streams are dispatched per provider. A crate-internal
+`Provider` trait (in `providers/mod.rs`) gives every client one `search` interface
+returning the typed `CatalogItem` list; `app/network.rs::provider_search` dispatches
+through it and normalizes to the moviebox JSON the UI consumes. `provider_details` still
+uses the concrete clients pending typed details wiring. Each provider keeps its own
+internal format and adapter.
 
 Playback resolves to a `PlaybackSource { provider, url, headers, subtitle, source_label }`,
 which `app/playback.rs::launch_player` feeds to the external player.
