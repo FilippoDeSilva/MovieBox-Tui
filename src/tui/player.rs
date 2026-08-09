@@ -105,9 +105,15 @@ fn mpv_command(
     };
     let executable = mpv_executable().unwrap_or_else(|| fallback.into());
     let mut command = if executable.starts_with("flatpak run ") {
-        let mut parts = executable.split(' ');
-        let mut cmd = Command::new(parts.next().unwrap_or("flatpak"));
-        cmd.args(parts);
+        let parts = executable.split(' ').collect::<Vec<_>>();
+        let mut cmd = Command::new(parts.first().unwrap_or(&"flatpak"));
+        if parts.len() > 1 && parts[1] == "run" {
+            cmd.arg("run");
+            cmd.arg("--file-forwarding");
+            cmd.args(&parts[2..]);
+        } else {
+            cmd.args(&parts[1..]);
+        }
         cmd
     } else {
         Command::new(&executable)
@@ -211,9 +217,15 @@ fn vlc_command(
     };
     let executable = vlc_executable().unwrap_or_else(|| fallback.into());
     let mut command = if executable.starts_with("flatpak run ") {
-        let mut parts = executable.split(' ');
-        let mut cmd = Command::new(parts.next().unwrap_or("flatpak"));
-        cmd.args(parts);
+        let parts = executable.split(' ').collect::<Vec<_>>();
+        let mut cmd = Command::new(parts.first().unwrap_or(&"flatpak"));
+        if parts.len() > 1 && parts[1] == "run" {
+            cmd.arg("run");
+            cmd.arg("--file-forwarding");
+            cmd.args(&parts[2..]);
+        } else {
+            cmd.args(&parts[1..]);
+        }
         cmd
     } else {
         Command::new(&executable)
@@ -382,25 +394,43 @@ fn executable_on_path(name: &str) -> bool {
     if std::path::Path::new(name).is_file() {
         return true;
     }
+    #[cfg(windows)]
+    if std::path::Path::new(&format!("{name}.exe")).is_file()
+        || std::path::Path::new(&format!("{name}.cmd")).is_file()
+    {
+        return true;
+    }
+
     let Some(path) = std::env::var_os("PATH") else {
         return false;
     };
     std::env::split_paths(&path).any(|dir| {
         let candidate = dir.join(name);
-        if !candidate.is_file() {
-            return false;
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            candidate
-                .metadata()
-                .map(|m| m.permissions().mode() & 0o111 != 0)
-                .unwrap_or(false)
-        }
-        #[cfg(not(unix))]
-        {
-            true
-        }
+        #[cfg(windows)]
+        let candidates = vec![
+            candidate.clone(),
+            candidate.with_extension("exe"),
+            candidate.with_extension("cmd"),
+        ];
+        #[cfg(not(windows))]
+        let candidates = vec![candidate];
+
+        candidates.into_iter().any(|candidate| {
+            if !candidate.is_file() {
+                return false;
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                candidate
+                    .metadata()
+                    .map(|m| m.permissions().mode() & 0o111 != 0)
+                    .unwrap_or(false)
+            }
+            #[cfg(not(unix))]
+            {
+                true
+            }
+        })
     })
 }

@@ -19,18 +19,23 @@ fn restore_terminal() {
 fn purge_stale_subtitles() {
     tokio::task::spawn_blocking(|| {
         let max_age = 24 * 60 * 60;
-        if let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) {
-            for entry in entries.flatten() {
-                if entry
-                    .file_name()
-                    .to_string_lossy()
-                    .starts_with("moviebox_sub_")
-                    && let Ok(metadata) = entry.metadata()
-                    && let Ok(modified) = metadata.modified()
-                    && let Ok(elapsed) = modified.elapsed()
-                    && elapsed.as_secs() > max_age
-                {
-                    let _ = std::fs::remove_file(entry.path());
+        let mut dirs = vec![std::env::temp_dir().join("moviebox-tui/subs")];
+        if cfg!(target_os = "android") {
+            if let Some(home) = dirs::home_dir() {
+                dirs.push(home.join("storage/downloads/moviebox_subs"));
+            }
+        }
+
+        for dir in dirs {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    if let Ok(metadata) = entry.metadata()
+                        && let Ok(modified) = metadata.modified()
+                        && let Ok(elapsed) = modified.elapsed()
+                        && elapsed.as_secs() > max_age
+                    {
+                        let _ = std::fs::remove_file(entry.path());
+                    }
                 }
             }
         }

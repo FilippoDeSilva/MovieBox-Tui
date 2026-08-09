@@ -106,8 +106,20 @@ impl App {
                         .map(|e| e.to_ascii_lowercase())
                         .filter(|e| matches!(e.as_str(), "srt" | "vtt" | "ass" | "ssa" | "sub"))
                         .unwrap_or_else(|| "srt".to_string());
-                    let path = std::env::temp_dir().join(format!(
-                        "moviebox_sub_{}_{}.{}",
+                    let base_dir = if cfg!(target_os = "android") {
+                        if let Some(home) = dirs::home_dir() {
+                            let storage = home.join("storage/downloads/moviebox_subs");
+                            let _ = std::fs::create_dir_all(&storage);
+                            storage
+                        } else {
+                            std::env::temp_dir().join("moviebox-tui/subs")
+                        }
+                    } else {
+                        std::env::temp_dir().join("moviebox-tui/subs")
+                    };
+                    let _ = std::fs::create_dir_all(&base_dir);
+                    let path = base_dir.join(format!(
+                        "{}_{}.{}",
                         std::process::id(),
                         std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
