@@ -25,11 +25,7 @@ fn search_view_state(state: &AppState) -> SearchViewState {
         SearchViewState::Editing
     } else if state.is_loading {
         SearchViewState::Loading
-    } else if state
-        .status_message
-        .to_ascii_lowercase()
-        .contains("search failed")
-    {
+    } else if state.search_error.is_some() {
         SearchViewState::Error
     } else if !state.search_results.is_empty() {
         SearchViewState::Results

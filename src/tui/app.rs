@@ -1308,16 +1308,12 @@ impl App {
                                 KeyCode::Enter => {
                                     if self.state.search_results.is_empty()
                                         && !self.state.search_query.trim().is_empty()
-                                        && (self
-                                            .state
-                                            .status_message
-                                            .to_ascii_lowercase()
-                                            .starts_with("no matches")
+                                        && (self.state.search_error.is_some()
                                             || self
                                                 .state
                                                 .status_message
                                                 .to_ascii_lowercase()
-                                                .contains("search failed"))
+                                                .starts_with("no matches"))
                                     {
                                         self.action_sender
                                             .send(Action::Search {
@@ -1615,6 +1611,7 @@ impl App {
                         {
                             self.state.search_poster_protocols.clear();
                             self.state.search_results.clear();
+                            self.state.search_error = None;
                             self.state.search_query.clear();
                             self.state.search_preview = None;
                             self.state.set_status("Search cleared.".to_string(), 150);
@@ -1854,6 +1851,7 @@ impl App {
                     self.state.is_homepage_mode = false;
                     self.state.active_screen = Screen::Home;
                     self.state.search_results.clear();
+                    self.state.search_error = None;
                     self.state.search_posters.clear();
                     self.state.search_poster_protocols.clear();
 
@@ -2144,6 +2142,7 @@ impl App {
                 self.state.selected_details = None;
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
+                self.state.search_error = None;
                 self.state.search_list_state.select(Some(0));
                 self.state.search_suggestions.clear();
                 self.state.suggest_index = None;
@@ -2229,6 +2228,7 @@ impl App {
                 self.state.selected_details = None;
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
+                self.state.search_error = None;
                 if page == 1 {
                     self.state.search_results.clear();
                     self.state.search_list_state.select(Some(0));
@@ -2294,6 +2294,7 @@ impl App {
                 if !self.context_is_current(context) || query != self.state.search_query.trim() {
                     return None;
                 }
+                self.state.search_error = None;
                 self.state.is_loading = false;
                 if self.state.current_page <= 1 {
                     self.state.search_results.clear();
@@ -2489,6 +2490,7 @@ impl App {
                     return None;
                 }
                 self.state.is_loading = false;
+                self.state.search_error = Some(err.clone());
                 self.state
                     .set_status(format!("Search failed: {}", err), 150);
             }
@@ -2503,6 +2505,7 @@ impl App {
                 self.state.is_loading = false;
                 if page == 1 {
                     self.state.search_results.clear();
+                    self.state.search_error = None;
                 }
 
                 let mut extracted_subjects = Vec::new();
