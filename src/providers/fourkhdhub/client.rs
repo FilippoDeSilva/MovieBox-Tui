@@ -3,6 +3,7 @@ use crate::providers::models::{CatalogItem, MediaDetails, PlaybackSource, Provid
 use reqwest::Url;
 
 const DEFAULT_BASE_URL: &str = "https://4khdhub.one/";
+const BROWSER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 #[derive(thiserror::Error, Debug)]
 pub enum FourKHdHubError {
@@ -12,8 +13,8 @@ pub enum FourKHdHubError {
     InvalidUrl(String),
     #[error("parse error: {0}")]
     Parse(String),
-    #[error("Stream links are dead/deleted on the host (No playable mirrors)")]
-    NoPlayableMirror,
+    #[error("no playable mirrors: {0}")]
+    NoPlayableMirror(String),
 }
 
 #[derive(Clone)]
@@ -94,6 +95,8 @@ impl FourKHdHubClient {
                 "release belongs to another provider".into(),
             ));
         }
+        let referer = self.base_url.as_str().trim_end_matches('/').to_string();
+        let mut last_error = None;
         for mirror in &release.mirrors {
             let candidates = if mirror.resolver_url.contains("hubcloud.") {
                 hubcloud::resolve(&self.client, &mirror.resolver_url).await
@@ -105,19 +108,37 @@ impl FourKHdHubClient {
             };
             if let Ok(candidates) = candidates {
                 for (url, label, headers) in candidates {
-                    if let Ok(playable_url) = self.preflight(&url, &headers).await {
-                        return Ok(PlaybackSource {
-                            provider: ProviderKind::FourKHdHub,
-                            url: playable_url,
-                            headers,
-                            subtitle: None,
-                            source_label: label,
-                        });
+                    let mut merged = headers;
+                    if !merged
+                        .iter()
+                        .any(|(name, _)| name.eq_ignore_ascii_case("referer"))
+                    {
+                        merged.push(("Referer".to_string(), referer.clone()));
+                    }
+                    if !merged
+                        .iter()
+                        .any(|(name, _)| name.eq_ignore_ascii_case("user-agent"))
+                    {
+                        merged.push(("User-Agent".to_string(), BROWSER_UA.to_string()));
+                    }
+                    match self.preflight(&url, &merged).await {
+                        Ok(playable_url) => {
+                            return Ok(PlaybackSource {
+                                provider: ProviderKind::FourKHdHub,
+                                url: playable_url,
+                                headers: merged,
+                                subtitle: None,
+                                source_label: label,
+                            });
+                        }
+                        Err(error) => last_error = Some(error.to_string()),
                     }
                 }
             }
         }
-        Err(FourKHdHubError::NoPlayableMirror)
+        Err(FourKHdHubError::NoPlayableMirror(
+            last_error.unwrap_or_else(|| "all mirrors rejected the stream probe".into()),
+        ))
     }
 
     async fn preflight(
@@ -129,7 +150,7 @@ impl FourKHdHubClient {
         let mut request = self
             .client
             .get(url)
-            .header(reqwest::header::RANGE, "bytes=0-0");
+            .header(reqwest::header::RANGE, "bytes=0-");
         for (name, value) in headers {
             request = request.header(name, value);
         }
@@ -158,7 +179,7 @@ impl FourKHdHubClient {
             let mut wrapped_request = self
                 .client
                 .get(&wrapped)
-                .header(reqwest::header::RANGE, "bytes=0-0");
+                .header(reqwest::header::RANGE, "bytes=0-");
             for (name, value) in headers {
                 wrapped_request = wrapped_request.header(name, value);
             }
@@ -204,7 +225,7 @@ fn build_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .connect_timeout(std::time::Duration::from_secs(5))
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .user_agent(BROWSER_UA)
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .unwrap_or_default()

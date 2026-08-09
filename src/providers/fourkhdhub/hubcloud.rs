@@ -62,7 +62,9 @@ pub async fn resolve(
         .collect::<Vec<_>>();
     resolved.dedup_by(|left, right| left.0 == right.0);
     if resolved.is_empty() {
-        Err(FourKHdHubError::NoPlayableMirror)
+        Err(FourKHdHubError::NoPlayableMirror(
+            "no candidates found".into(),
+        ))
     } else {
         Ok(resolved)
     }
