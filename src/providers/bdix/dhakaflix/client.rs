@@ -200,7 +200,10 @@ impl DhakaFlixClient {
                         }
                     }
                     Err(error) => {
-                        log::warn!("dhakaflix search request failed: {error} [{base_url}]");
+                        log::warn!(
+                            "dhakaflix search request failed: {error} [{}]",
+                            crate::logging::sanitize_url(base_url)
+                        );
                         if let Ok(mut fails) = recent_fails.write() {
                             fails.insert(base_url.to_string(), Instant::now());
                         }

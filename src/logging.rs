@@ -44,11 +44,11 @@ pub fn init() {
         "session started | moviebox-tui {} | {} | log file: {}",
         env!("CARGO_PKG_VERSION"),
         std::env::consts::OS,
-        log_file_path().display()
+        display_path()
     );
     eprintln!(
         "[moviebox-tui] logging to {} (MOVIEBOX_LOG={})",
-        log_file_path().display(),
+        display_path(),
         spec
     );
 }
@@ -61,4 +61,47 @@ pub fn log_file_path() -> std::path::PathBuf {
                 .join("moviebox-tui_rCURRENT.log")
         })
         .unwrap_or_else(std::env::temp_dir)
+}
+
+pub fn display_path() -> String {
+    sanitize_path(log_file_path())
+}
+
+pub fn sanitize_path(path: impl AsRef<std::path::Path>) -> String {
+    let raw = path.as_ref().to_string_lossy().into_owned();
+    dirs::home_dir()
+        .and_then(|home| home.to_str().map(|home| home.to_string()))
+        .map(|home| raw.replacen(&home, "~", 1))
+        .unwrap_or(raw)
+}
+
+pub fn sanitize_url(raw: &str) -> String {
+    match url::Url::parse(raw) {
+        Ok(parsed) => {
+            let host = parsed.host_str().unwrap_or("unknown");
+            let scheme = parsed.scheme();
+            if host.is_empty() {
+                "[redacted]".to_string()
+            } else {
+                format!("{scheme}://{host}")
+            }
+        }
+        Err(_) => {
+            let lower = raw.to_ascii_lowercase();
+            let host_start = lower.find("://").map(|index| index + 3);
+            match host_start {
+                Some(start) => {
+                    let rest = &raw[start..];
+                    let host_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+                    let host = &rest[..host_end];
+                    if host.is_empty() {
+                        "[redacted]".to_string()
+                    } else {
+                        format!("https://{host}")
+                    }
+                }
+                None => "[redacted]".to_string(),
+            }
+        }
+    }
 }

@@ -282,7 +282,7 @@ impl App {
                     log::warn!(
                         "subtitle download failed for {:?} player, playing without subtitles (url was {})",
                         kind,
-                        url
+                        crate::logging::sanitize_url(&url)
                     );
                     let _ = sender.send(Action::SetStatus(
                         "Subtitles unavailable; playing without subtitles.".to_string(),
@@ -344,7 +344,11 @@ impl App {
                     });
                 }
                 Err(error) => {
-                    log::error!("failed to spawn player {:?} for {}: {error}", kind, link);
+                    log::error!(
+                        "failed to spawn player {:?} for {}: {error}",
+                        kind,
+                        crate::logging::sanitize_url(&link)
+                    );
                     if let Some(path) = temporary_subtitle {
                         let _ = tokio::fs::remove_file(path).await;
                     }

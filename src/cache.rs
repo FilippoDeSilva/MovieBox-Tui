@@ -30,7 +30,10 @@ fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value
 
 fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
     let Ok(content) = serde_json::to_vec(data) else {
-        log::warn!("failed to serialize cache for {}", path.display());
+        log::warn!(
+            "failed to serialize cache for {}",
+            crate::logging::sanitize_path(path)
+        );
         return;
     };
     let stamp = std::time::SystemTime::now()
@@ -39,13 +42,19 @@ fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
         .as_nanos();
     let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
     if fs::write(&temporary, content).is_err() {
-        log::warn!("failed to write cache to {}", temporary.display());
+        log::warn!(
+            "failed to write cache to {}",
+            crate::logging::sanitize_path(&temporary)
+        );
         return;
     }
     if fs::rename(&temporary, path).is_err() {
         let _ = fs::remove_file(path);
         if fs::rename(&temporary, path).is_err() {
-            log::warn!("failed to commit cache to {}", path.display());
+            log::warn!(
+                "failed to commit cache to {}",
+                crate::logging::sanitize_path(path)
+            );
             let _ = fs::remove_file(temporary);
         }
     }
@@ -318,13 +327,19 @@ pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {
         .as_nanos();
     let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
     if std::fs::write(&temporary, bytes).is_err() {
-        log::warn!("failed to write image cache to {}", temporary.display());
+        log::warn!(
+            "failed to write image cache to {}",
+            crate::logging::sanitize_path(&temporary)
+        );
         return;
     }
     if std::fs::rename(&temporary, &path).is_err() {
         let _ = std::fs::remove_file(&path);
         if std::fs::rename(&temporary, &path).is_err() {
-            log::warn!("failed to commit image cache to {}", path.display());
+            log::warn!(
+                "failed to commit image cache to {}",
+                crate::logging::sanitize_path(&path)
+            );
             let _ = std::fs::remove_file(temporary);
         }
     }

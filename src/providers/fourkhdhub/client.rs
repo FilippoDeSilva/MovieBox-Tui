@@ -123,7 +123,10 @@ impl FourKHdHubClient {
                     }
                     match self.preflight(&url, &merged).await {
                         Ok(playable_url) => {
-                            log::info!("4KHDHub mirror playable: {label} ({playable_url})");
+                            log::info!(
+                                "4KHDHub mirror playable: {label} ({})",
+                                crate::logging::sanitize_url(&playable_url)
+                            );
                             return Ok(PlaybackSource {
                                 provider: ProviderKind::FourKHdHub,
                                 url: playable_url,
@@ -133,7 +136,10 @@ impl FourKHdHubClient {
                             });
                         }
                         Err(error) => {
-                            log::warn!("4KHDHub mirror rejected ({label}): {error} [{url}]");
+                            log::warn!(
+                                "4KHDHub mirror rejected ({label}): {error} [{}]",
+                                crate::logging::sanitize_url(&url)
+                            );
                             last_error = Some(error.to_string());
                         }
                     }
