@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
-    let mut help_text = vec![
+    let global = vec![
         Line::from(vec![Span::styled(
             "  Global",
             theme.header.add_modifier(ratatui::style::Modifier::BOLD),
@@ -25,19 +25,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Go Back / Clear", theme.text),
         ]),
         Line::from(vec![
-            Span::styled("    [Ctrl+P]   ", theme.header),
-            Span::styled(
-                format!(
-                    "Switch Provider (active: {})",
-                    state.active_provider.label()
-                ),
-                theme.text,
-            ),
-        ]),
-        Line::from(vec![
             Span::styled("    [Ctrl+T]   ", theme.header),
             Span::styled("Switch Streaming / TV Mode", theme.text),
         ]),
+    ];
+
+    let navigation = vec![
         Line::from(vec![]),
         Line::from(vec![Span::styled(
             "  Navigation",
@@ -49,28 +42,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![
             Span::styled("    [←] / [→]  ", theme.header),
-            Span::styled("Page Through Search Results", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [Tab]      ", theme.header),
-            Span::styled("Next Details Pane", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [Shift+Tab]", theme.header),
-            Span::styled("Previous Details Pane", theme.text),
+            Span::styled("Page Through Results", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Enter]    ", theme.header),
             Span::styled("Select / Submit", theme.text),
         ]),
-        Line::from(vec![]),
     ];
-    if state.is_tv_mode {
-        help_text.remove(4);
-    }
 
+    let mut help_text = global;
     if state.is_tv_mode {
+        help_text.extend(navigation);
         help_text.extend(vec![
+            Line::from(vec![]),
             Line::from(vec![Span::styled(
                 "  TV Controls",
                 theme.header.add_modifier(ratatui::style::Modifier::BOLD),
@@ -80,41 +64,40 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Play Channel", theme.text),
             ]),
             Line::from(vec![
+                Span::styled("    [r]        ", theme.header),
+                Span::styled("Reload Playlists", theme.text),
+            ]),
+            Line::from(vec![
                 Span::styled("    /list      ", theme.header),
                 Span::styled("Show Available Channels", theme.text),
             ]),
             Line::from(vec![
                 Span::styled("    /config    ", theme.header),
-                Span::styled("Open TV Config Popup", theme.text),
-            ]),
-            Line::from(vec![]),
-            Line::from(vec![Span::styled(
-                "  System",
-                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-            )]),
-            Line::from(vec![
-                Span::styled("    [r]        ", theme.header),
-                Span::styled("Refresh Channels/Search", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /clear-cache   ", theme.header),
-                Span::styled("Clear App Cache", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /enable-bdix   ", theme.header),
-                Span::styled("Enable BDIX FTP", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /disable-bdix  ", theme.header),
-                Span::styled("Disable BDIX FTP", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /theme         ", theme.header),
-                Span::styled("Change UI Theme", theme.text),
+                Span::styled("Add / Remove Playlists", theme.text),
             ]),
         ]);
     } else {
+        help_text.extend(vec![Line::from(vec![
+            Span::styled("    [Ctrl+P]   ", theme.header),
+            Span::styled(
+                format!(
+                    "Switch Provider (active: {})",
+                    state.active_provider.label()
+                ),
+                theme.text,
+            ),
+        ])]);
+        help_text.extend(navigation);
         help_text.extend(vec![
+            Line::from(vec![
+                Span::styled("    [Tab]      ", theme.header),
+                Span::styled("Next Details Pane", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    [Shift+Tab]", theme.header),
+                Span::styled("Previous Details Pane", theme.text),
+            ]),
+            Line::from(vec![]),
             Line::from(vec![Span::styled(
                 "  Playback & Download",
                 theme.header.add_modifier(ratatui::style::Modifier::BOLD),
@@ -138,10 +121,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             )]),
             Line::from(vec![
                 Span::styled("    /home      ", theme.header),
-                Span::styled("Trending & Featured", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /discover  ", theme.header),
                 Span::styled("Trending & Featured", theme.text),
             ]),
             Line::from(vec![

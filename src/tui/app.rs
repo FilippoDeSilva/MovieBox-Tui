@@ -1778,10 +1778,9 @@ impl App {
                     let query = self.state.search_query.trim().to_string();
                     if self.state.is_tv_mode {
                         if query.is_empty() {
-                            self.state.set_status(
-                                "TV Mode channels are loaded from local config.".to_string(),
-                                150,
-                            );
+                            self.state
+                                .set_status("Reloading TV playlists...".to_string(), 150);
+                            self.reload_tv_playlists();
                         } else {
                             self.action_sender
                                 .send(Action::Search {
@@ -2165,10 +2164,7 @@ impl App {
                         self.state.search_query.clear();
                         return None;
                     }
-                    if matches!(
-                        lower_query.as_str(),
-                        "/home" | "/discover" | "/movies" | "/shows" | "/tvshows" | "/anime"
-                    ) {
+                    if lower_query.starts_with('/') && lower_query != "/list" {
                         self.state.set_status(
                             "Switch to streaming mode to use this command".to_string(),
                             150,
