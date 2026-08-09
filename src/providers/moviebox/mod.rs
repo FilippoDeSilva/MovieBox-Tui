@@ -1,3 +1,4 @@
+pub mod adapt;
 pub mod client;
 pub mod crypto;
 pub mod title;
