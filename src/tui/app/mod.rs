@@ -3,10 +3,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::providers::{
-    fourkhdhub::{
-        FourKHdHubClient, details_to_moviebox_json, releases_to_moviebox_json,
-        search_to_moviebox_json,
-    },
+    fourkhdhub::{FourKHdHubClient, releases_to_moviebox_json},
     models::{ProviderKind, Release, RequestContext},
     moviebox::client::MovieBoxClient,
 };
@@ -2060,9 +2057,10 @@ impl App {
                                     let client = req_client.clone();
                                     tokio::spawn(async move {
                                         let _permit = permit;
-                                        if let Some(bytes) = fetch_poster_bytes(&client, &url).await
+                                        if let Some(bytes) =
+                                            network::fetch_poster_bytes(&client, &url).await
                                         {
-                                            if let Some(img) = decode_poster(bytes).await {
+                                            if let Some(img) = network::decode_poster(bytes).await {
                                                 tx.send(Action::SearchPosterLoaded(id, Some(img)))
                                                     .ok();
                                             }
@@ -2235,9 +2233,10 @@ impl App {
                                     let client = req_client.clone();
                                     tokio::spawn(async move {
                                         let _permit = permit;
-                                        if let Some(bytes) = fetch_poster_bytes(&client, &url).await
+                                        if let Some(bytes) =
+                                            network::fetch_poster_bytes(&client, &url).await
                                         {
-                                            if let Some(img) = decode_poster(bytes).await {
+                                            if let Some(img) = network::decode_poster(bytes).await {
                                                 tx.send(Action::SearchPosterLoaded(id, Some(img)))
                                                     .ok();
                                             }
@@ -2324,7 +2323,7 @@ impl App {
                             return;
                         }
                     }
-                    let result = provider_search(
+                    let result = network::provider_search(
                         &client,
                         &fourk_client,
                         &circleftp_client,
@@ -2591,8 +2590,10 @@ impl App {
                                 let client = req_client.clone();
                                 tokio::spawn(async move {
                                     let _permit = permit;
-                                    if let Some(bytes) = fetch_poster_bytes(&client, &url).await {
-                                        if let Some(img) = decode_poster(bytes).await {
+                                    if let Some(bytes) =
+                                        network::fetch_poster_bytes(&client, &url).await
+                                    {
+                                        if let Some(img) = network::decode_poster(bytes).await {
                                             tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
                                         }
                                     }
@@ -2796,8 +2797,10 @@ impl App {
                                 let client = req_client.clone();
                                 tokio::spawn(async move {
                                     let _permit = permit;
-                                    if let Some(bytes) = fetch_poster_bytes(&client, &url).await {
-                                        if let Some(img) = decode_poster(bytes).await {
+                                    if let Some(bytes) =
+                                        network::fetch_poster_bytes(&client, &url).await
+                                    {
+                                        if let Some(img) = network::decode_poster(bytes).await {
                                             tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
                                         }
                                     }
@@ -2968,7 +2971,7 @@ impl App {
                                 self.state
                                     .set_status(format!("Loading page {}...", next_page), 150);
                                 tokio::spawn(async move {
-                                    let result = provider_search(
+                                    let result = network::provider_search(
                                         &client,
                                         &fourk_client,
                                         &circleftp_client,
@@ -3220,7 +3223,7 @@ impl App {
                             return;
                         }
                     }
-                    let result = provider_details(
+                    let result = network::provider_details(
                         &client,
                         &fourk_client,
                         &circleftp_client,
@@ -3274,14 +3277,14 @@ impl App {
                                     })
                                     .await
                                     {
-                                        if let Some(img) = decode_poster(bytes).await {
+                                        if let Some(img) = network::decode_poster(bytes).await {
                                             tx.send(Action::SearchPosterLoaded(id2, Some(img)))
                                                 .ok();
                                             return;
                                         }
                                     }
                                     if let Some(bytes) =
-                                        fetch_poster_bytes(&client, &cover_url).await
+                                        network::fetch_poster_bytes(&client, &cover_url).await
                                     {
                                         let bytes_clone = bytes.clone();
                                         let id_clone = id2.clone();
@@ -3293,7 +3296,7 @@ impl App {
                                             )
                                         })
                                         .await;
-                                        if let Some(img) = decode_poster(bytes).await {
+                                        if let Some(img) = network::decode_poster(bytes).await {
                                             tx.send(Action::SearchPosterLoaded(id2, Some(img)))
                                                 .ok();
                                         }
@@ -3346,12 +3349,12 @@ impl App {
                             })
                             .await
                             {
-                                if let Some(img) = decode_poster(bytes).await {
+                                if let Some(img) = network::decode_poster(bytes).await {
                                     tx.send(Action::PosterSuccess(id2, img)).ok();
                                     return;
                                 }
                             }
-                            if let Some(bytes) = fetch_poster_bytes(&client, &url).await {
+                            if let Some(bytes) = network::fetch_poster_bytes(&client, &url).await {
                                 let bytes_clone = bytes.clone();
                                 let id_clone = id2.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
@@ -3362,7 +3365,7 @@ impl App {
                                     )
                                 })
                                 .await;
-                                if let Some(img) = decode_poster(bytes).await {
+                                if let Some(img) = network::decode_poster(bytes).await {
                                     tx.send(Action::PosterSuccess(id2, img)).ok();
                                 }
                             }
@@ -3451,7 +3454,7 @@ impl App {
                         })
                         .await
                         {
-                            if let Some(img) = decode_poster(bytes).await {
+                            if let Some(img) = network::decode_poster(bytes).await {
                                 let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                                 return;
                             }
@@ -3460,7 +3463,8 @@ impl App {
                             .timeout(std::time::Duration::from_secs(5))
                             .build()
                             .unwrap_or_default();
-                        if let Some(bytes) = fetch_poster_bytes(&client, &url_clone).await {
+                        if let Some(bytes) = network::fetch_poster_bytes(&client, &url_clone).await
+                        {
                             let bytes_clone = bytes.clone();
                             let id_clone2 = id_clone.clone();
                             let _ = tokio::task::spawn_blocking(move || {
@@ -3471,7 +3475,7 @@ impl App {
                                 )
                             })
                             .await;
-                            if let Some(img) = decode_poster(bytes).await {
+                            if let Some(img) = network::decode_poster(bytes).await {
                                 let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                             }
                         }
@@ -4006,7 +4010,7 @@ impl App {
                             })
                             .await
                             {
-                                if let Some(img) = decode_poster(bytes).await {
+                                if let Some(img) = network::decode_poster(bytes).await {
                                     let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                                     return;
                                 }
@@ -4015,7 +4019,9 @@ impl App {
                                 .timeout(std::time::Duration::from_secs(5))
                                 .build()
                                 .unwrap_or(http_client);
-                            if let Some(bytes) = fetch_poster_bytes(&client, &url_clone).await {
+                            if let Some(bytes) =
+                                network::fetch_poster_bytes(&client, &url_clone).await
+                            {
                                 let bytes_clone = bytes.clone();
                                 let id_clone2 = id_clone.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
@@ -4026,7 +4032,7 @@ impl App {
                                     )
                                 })
                                 .await;
-                                if let Some(img) = decode_poster(bytes).await {
+                                if let Some(img) = network::decode_poster(bytes).await {
                                     let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
                                 }
                             }
@@ -5230,86 +5236,5 @@ impl App {
             &self.theme,
             self.state.basic_terminal,
         );
-    }
-}
-
-async fn fetch_poster_bytes(client: &reqwest::Client, url: &str) -> Option<Vec<u8>> {
-    let response = client
-        .get(url)
-        .header("User-Agent", "MovieBox-Tui/1.0")
-        .send()
-        .await
-        .ok()?;
-    Some(response.bytes().await.ok()?.to_vec())
-}
-
-async fn decode_poster(bytes: Vec<u8>) -> Option<std::sync::Arc<image::DynamicImage>> {
-    tokio::task::spawn_blocking(move || image::load_from_memory(&bytes))
-        .await
-        .ok()?
-        .ok()
-        .map(std::sync::Arc::new)
-}
-
-async fn provider_search(
-    moviebox: &MovieBoxClient,
-    fourk: &FourKHdHubClient,
-    circleftp: &crate::providers::bdix::circleftp::CircleFtpClient,
-    dhakaflix: &crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
-    provider: ProviderKind,
-    query: &str,
-    page: usize,
-) -> Result<serde_json::Value, String> {
-    match provider {
-        ProviderKind::MovieBox => moviebox
-            .search(query, page)
-            .await
-            .map_err(|error| format!("{error:?}")),
-        ProviderKind::FourKHdHub => fourk
-            .search(query)
-            .await
-            .map(|items| search_to_moviebox_json(&items))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixCircleFtp => circleftp
-            .search(query)
-            .await
-            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixDhakaFlix => dhakaflix
-            .search(query)
-            .await
-            .map(|items| crate::providers::fourkhdhub::search_to_moviebox_json(&items))
-            .map_err(|error| error.to_string()),
-    }
-}
-
-async fn provider_details(
-    moviebox: &MovieBoxClient,
-    fourk: &FourKHdHubClient,
-    circleftp: &crate::providers::bdix::circleftp::CircleFtpClient,
-    dhakaflix: &crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
-    provider: ProviderKind,
-    subject_id: &str,
-) -> Result<serde_json::Value, String> {
-    match provider {
-        ProviderKind::MovieBox => moviebox
-            .get_details(subject_id)
-            .await
-            .map_err(|error| format!("{error:?}")),
-        ProviderKind::FourKHdHub => fourk
-            .details(subject_id)
-            .await
-            .map(|details| details_to_moviebox_json(&details))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixCircleFtp => circleftp
-            .details(subject_id)
-            .await
-            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
-            .map_err(|error| error.to_string()),
-        ProviderKind::BdixDhakaFlix => dhakaflix
-            .details(subject_id)
-            .await
-            .map(|details| crate::providers::fourkhdhub::details_to_moviebox_json(&details))
-            .map_err(|error| error.to_string()),
     }
 }
