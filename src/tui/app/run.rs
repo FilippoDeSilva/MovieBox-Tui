@@ -103,12 +103,15 @@ impl App {
             self.state.dirty = true;
         }
         match action {
+            Action::Quit => {
+                return Some(());
+            }
+
             Action::Key(key) => {
                 self.handle_key(key).await;
             }
 
             Action::Tick
-            | Action::Quit
             | Action::FocusChange
             | Action::Resize(..)
             | Action::SwitchProvider(..)

@@ -92,10 +92,6 @@ impl App {
                 }
             }
 
-            Action::Quit => {
-                return Some(());
-            }
-
             Action::FocusChange => {
                 self.prepare_image_soft_refresh();
             }
