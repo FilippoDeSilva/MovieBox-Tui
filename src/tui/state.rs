@@ -391,35 +391,17 @@ pub fn stype(value: &serde_json::Value) -> i64 {
 
 pub fn caption_options(payload: &serde_json::Value) -> Vec<(String, String)> {
     let mut options = vec![("None".to_string(), "".to_string())];
-    if let Some(list) = payload.get("extCaptions").and_then(|c| c.as_array()) {
-        for cap in list {
-            let name = cap
-                .get("lanName")
-                .and_then(|n| n.as_str())
-                .unwrap_or("Unknown")
-                .to_string();
-            let url = cap
-                .get("url")
-                .and_then(|u| u.as_str())
-                .unwrap_or("")
-                .to_string();
-            if !url.is_empty() {
-                options.push((name, url));
-            }
-        }
-    }
+    options.extend(
+        crate::providers::moviebox::adapt::captions_json_to_options(payload)
+            .into_iter()
+            .map(|subtitle| (subtitle.name, subtitle.url)),
+    );
     options
 }
 
 pub fn caption_url_for(payload: &serde_json::Value, language: &str) -> Option<String> {
-    payload
-        .get("extCaptions")
-        .and_then(|c| c.as_array())
-        .and_then(|list| {
-            list.iter().find_map(|cap| {
-                let lang = cap.get("lanName").and_then(|l| l.as_str())?;
-                let url = cap.get("url").and_then(|u| u.as_str())?;
-                (lang == language).then(|| url.to_string())
-            })
-        })
+    crate::providers::moviebox::adapt::captions_json_to_options(payload)
+        .into_iter()
+        .find(|subtitle| subtitle.name == language)
+        .map(|subtitle| subtitle.url)
 }
