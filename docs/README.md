@@ -19,8 +19,10 @@ anchors that stay accurate as the code evolves.
 | [downloads.md](downloads.md) | Download engine: resume, ranges, segments, retry, cancel | current |
 | [cross-platform.md](cross-platform.md) | OS support, terminal protocols, Termux, focus handling | current |
 | [debugging.md](debugging.md) | Reproducing issues and what to include in GitHub reports | current |
-| [contributing.md](contributing.md) | Build, lint gate, commit conventions | current |
 | [known-issues.md](known-issues.md) | Known limitations and how they are tracked | current |
+
+> Contribution guidance lives in the repository-root `CONTRIBUTING.md` (the canonical
+> doc GitHub surfaces for PRs), not in this folder.
 
 > Keep this index accurate: when a behavior change lands, update the matching doc in
 > the same change and flip its status to current.

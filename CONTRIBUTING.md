@@ -27,16 +27,23 @@ To test playback and download features locally, install `mpv` (see the [README](
 
 ## Project layout
 
-The app is divided into three core layers: UI, Providers, and Core Utilities.
+The app is message-driven and organized into focused modules. Full maps live in
+[`docs/architecture.md`](docs/architecture.md) and [`docs/modules.md`](docs/modules.md).
 
 Short version:
-- `src/tui/`: The terminal interface, built on Ratatui.
-  - `src/tui/app.rs`: The central event loop. Every user action and background task funnels through its `match` statement. This is the best place to start reading.
-- `src/providers/`: HTTP clients for various streaming sources (`moviebox`, `bdix`, `fourkhdhub`, `iptv_org`).
-- `src/download.rs`: Handles background media downloading.
-- `src/cache.rs`: Local disk caching system to minimize API calls.
+- `src/tui/app/`: The application object (`App`). `mod.rs` holds the thin `handle_action`
+  dispatcher that routes every `Action` to a `handle_*` method in its module
+  (`run.rs`, `requests.rs`, `playback.rs`, `download.rs`, `navigation.rs`, `tv.rs`,
+  `system.rs`, `keyboard.rs`, `network.rs`).
+- `src/tui/`: UI state, event loop plumbing, player commands, screens, themes.
+- `src/providers/`: HTTP clients for the streaming sources (`moviebox`, `fourkhdhub`,
+  `bdix`), plus `m3u.rs` for TV playlists.
+- `src/download.rs`: Background media downloading.
+- `src/cache.rs`: Local disk caching to minimize API calls.
 
-The app is message-driven. User input and background tasks produce `Action` values, handled in `app.rs`. When adding behavior, prefer adding a new `Action` variant over blocking the UI thread.
+The app is message-driven. User input and background tasks produce `Action` values,
+handled by the dispatcher in `src/tui/app/mod.rs`. When adding behavior, prefer adding a
+new `Action` variant over blocking the UI thread.
 
 ## Workflow
 
