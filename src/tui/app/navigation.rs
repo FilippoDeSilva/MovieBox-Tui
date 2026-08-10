@@ -304,12 +304,17 @@ impl App {
                     self.state.player_picker_popup = false;
                     self.state.player_picker_link = None;
                     self.state.player_picker_subtitle = None;
+                    self.state.player_picker_playback = None;
+                    self.state.player_picker_state.select(None);
                     return None;
                 }
                 if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
                     self.state.subtitle_popup = false;
                     self.state.is_download_subtitle_popup = false;
                     self.state.pending_play_link = None;
+                    self.state.pending_open_with = false;
+                    self.state.subtitle_list.clear();
+                    self.state.subtitle_list_state.select(None);
                     return None;
                 }
                 if self.state.show_help {
