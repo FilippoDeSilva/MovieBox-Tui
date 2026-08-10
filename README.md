@@ -144,6 +144,12 @@ Portable or custom installations can be selected with environment variables:
 | VLC    | `MOVIEBOX_VLC_PATH`  |
 | IINA   | `MOVIEBOX_IINA_PATH` |
 
+You can also force the preferred detected player order with:
+
+```bash
+export MOVIEBOX_PLAYER=mpv
+```
+
 macOS/Linux example:
 
 ```bash
@@ -188,11 +194,14 @@ moviebox-tui
 | Command              | Action                                    |
 | -------------------- | ----------------------------------------- |
 | `/discover`, `/home` | Open discovery view                       |
+| `/history`           | Show watch history                        |
 | `/movies`            | Browse movies                             |
 | `/shows`             | Browse series                             |
 | `/anime`             | Browse anime                              |
 | `/list`              | Show IPTV channels                        |
 | `/config`            | Configure IPTV playlists                  |
+| `/github`            | Open the project repository               |
+| `/theme`, `/themes`  | Open the theme picker                     |
 | `/update`            | Check for a newer release                 |
 | `/toggle-update`     | Enable or disable automatic update checks |
 | `/clear-cache`       | Remove cached application data            |
@@ -226,6 +235,10 @@ MovieBox-TUI uses standard OS directories:
 | Windows  | `%APPDATA%\moviebox-tui`                     | `%LOCALAPPDATA%\moviebox-tui`              |
 
 Catalog providers use separate cache namespaces. Expired or invalid cache entries are discarded automatically; files older than seven days are cleaned at startup.
+
+The current theme, active provider, default player, BDIX visibility, and update
+preference are persisted in `config.json`. See [`docs/config.md`](docs/config.md)
+for the full config and environment-variable reference.
 
 ## Updates
 
@@ -331,13 +344,20 @@ Then try the installation command again.
 ## Development
 
 Formatting and linting are enforced automatically by the pre-commit hook on every
-commit (see [CONTRIBUTING.md](CONTRIBUTING.md)); there is no need to run them manually.
-Before opening a PR, also run the CI-only checks:
+commit (see [CONTRIBUTING.md](CONTRIBUTING.md)). Before opening a PR, run the same
+local checks the repository expects plus the CI-only verification steps:
 
 ```bash
+cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo check --locked
+cargo test --locked
 cargo audit
 cargo package --locked
 ```
+
+GitHub Actions also verifies cross-platform builds on Linux, macOS, and Windows,
+plus an Android/Termux cross-build lane.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance.
 
