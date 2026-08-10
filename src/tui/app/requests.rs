@@ -181,37 +181,14 @@ impl App {
 
                         self.state.search_list_state.select(Some(0));
 
-                        let results_to_fetch = self
-                            .state
-                            .search_results
-                            .iter()
-                            .take(15)
-                            .map(|r| (r.id.clone(), r.stype, r.cover_url.clone()))
-                            .collect::<Vec<_>>();
-
-                        let sender = self.action_sender.clone();
-                        let req_client = self.client.http_client().clone();
-                        tokio::spawn(async move {
-                            let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
-                            for (id, _stype, cover_url) in results_to_fetch {
-                                if let Some(url) = cover_url {
-                                    let permit = sem.clone().acquire_owned().await.ok();
-                                    let tx = sender.clone();
-                                    let client = req_client.clone();
-                                    tokio::spawn(async move {
-                                        let _permit = permit;
-                                        if let Some(bytes) =
-                                            network::fetch_poster_bytes(&client, &url).await
-                                        {
-                                            if let Some(img) = network::decode_poster(bytes).await {
-                                                tx.send(Action::SearchPosterLoaded(id, Some(img)))
-                                                    .ok();
-                                            }
-                                        }
-                                    });
-                                }
-                            }
-                        });
+                        self.spawn_search_posters(
+                            self.state
+                                .search_results
+                                .iter()
+                                .take(15)
+                                .map(|r| (r.id.clone(), r.cover_url.clone()))
+                                .collect(),
+                        );
                     }
                     return None;
                 }
@@ -235,70 +212,8 @@ impl App {
                     );
                     return None;
                 }
-                self.state.is_homepage_mode = true;
-                self.state.current_tab_id = tab_id.clone();
-                self.state.current_page = page;
-                self.state.active_screen = Screen::Home;
-                self.state.selected_details = None;
-                self.state.selected_resources = None;
-                self.state.is_loading = true;
-                self.state.search_error = None;
-                if page == 1 {
-                    self.state.search_results.clear();
-                    self.state.search_list_state.select(Some(0));
-                }
-                self.state.search_suggestions.clear();
-                self.state.suggest_index = None;
-                self.state
-                    .set_status("Loading discover tab...".to_string(), 150);
-
-                let client = self.client.clone();
-                let sender = self.action_sender.clone();
-                let force_refresh = false;
-
-                tokio::spawn(async move {
-                    if !force_refresh {
-                        let t_clone = tab_id.clone();
-                        let p_clone = page;
-                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                            crate::cache::get_homepage_cache(&t_clone, p_clone)
-                        })
-                        .await
-                        {
-                            sender
-                                .send(Action::HomepageSuccess {
-                                    tab_id: tab_id.clone(),
-                                    page,
-                                    payload: cached,
-                                })
-                                .ok();
-                            return;
-                        }
-                    }
-
-                    match client.get_homepage(&tab_id, page).await {
-                        Ok(res) => {
-                            let r_clone = res.clone();
-                            let t_clone = tab_id.clone();
-                            let p_clone = page;
-                            tokio::task::spawn_blocking(move || {
-                                crate::cache::set_homepage_cache(&t_clone, p_clone, &r_clone);
-                            });
-                            sender
-                                .send(Action::HomepageSuccess {
-                                    tab_id,
-                                    page,
-                                    payload: res,
-                                })
-                                .ok();
-                        }
-                        Err(e) => {
-                            sender
-                                .send(Action::HomepageFailure(format!("{:?}", e)))
-                                .ok();
-                        }
-                    }
-                });
+                self.prepare_homepage_request(&tab_id, page);
+                self.run_homepage_request(tab_id, page);
             }
 
             Action::SearchSuccess {
@@ -631,37 +546,15 @@ impl App {
                 }
 
                 if count > 0 {
-                    let results_to_fetch = self
-                        .state
-                        .search_results
-                        .iter()
-                        .skip(if page == 1 { 0 } else { (page - 1) * 20 })
-                        .take(20)
-                        .map(|r| (r.id.clone(), r.stype, r.cover_url.clone()))
-                        .collect::<Vec<_>>();
-
-                    let sender = self.action_sender.clone();
-                    let req_client = self.client.http_client().clone();
-                    tokio::spawn(async move {
-                        let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
-                        for (id, _stype, cover_url) in results_to_fetch {
-                            if let Some(url) = cover_url {
-                                let permit = sem.clone().acquire_owned().await.ok();
-                                let tx = sender.clone();
-                                let client = req_client.clone();
-                                tokio::spawn(async move {
-                                    let _permit = permit;
-                                    if let Some(bytes) =
-                                        network::fetch_poster_bytes(&client, &url).await
-                                    {
-                                        if let Some(img) = network::decode_poster(bytes).await {
-                                            tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                    });
+                    self.spawn_search_posters(
+                        self.state
+                            .search_results
+                            .iter()
+                            .skip(if page == 1 { 0 } else { (page - 1) * 20 })
+                            .take(20)
+                            .map(|r| (r.id.clone(), r.cover_url.clone()))
+                            .collect(),
+                    );
                 }
 
                 if count > 0 && self.state.current_page <= 1 {

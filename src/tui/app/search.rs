@@ -271,6 +271,69 @@ impl App {
         });
     }
 
+    pub(super) fn prepare_homepage_request(&mut self, tab_id: &str, page: usize) {
+        self.state.is_homepage_mode = true;
+        self.state.current_tab_id = tab_id.to_string();
+        self.state.current_page = page;
+        self.state.active_screen = Screen::Home;
+        self.state.selected_details = None;
+        self.state.selected_resources = None;
+        self.state.is_loading = true;
+        self.state.search_error = None;
+        if page == 1 {
+            self.state.search_results.clear();
+            self.state.search_list_state.select(Some(0));
+        }
+        self.state.search_suggestions.clear();
+        self.state.suggest_index = None;
+        self.state
+            .set_status("Loading discover tab...".to_string(), 150);
+    }
+
+    pub(super) fn run_homepage_request(&self, tab_id: String, page: usize) {
+        let client = self.client.clone();
+        let sender = self.action_sender.clone();
+        tokio::spawn(async move {
+            let t_clone = tab_id.clone();
+            if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                crate::cache::get_homepage_cache(&t_clone, page)
+            })
+            .await
+            {
+                sender
+                    .send(Action::HomepageSuccess {
+                        tab_id: tab_id.clone(),
+                        page,
+                        payload: cached,
+                    })
+                    .ok();
+                return;
+            }
+
+            match client.get_homepage(&tab_id, page).await {
+                Ok(res) => {
+                    let r_clone = res.clone();
+                    let t_clone = tab_id.clone();
+                    tokio::task::spawn_blocking(move || {
+                        crate::cache::set_homepage_cache(&t_clone, page, &r_clone);
+                    });
+                    sender
+                        .send(Action::HomepageSuccess {
+                            tab_id,
+                            page,
+                            payload: res,
+                        })
+                        .ok();
+                }
+                Err(error) => {
+                    sender
+                        .send(Action::HomepageFailure(format!("{:?}", error)))
+                        .ok();
+                }
+            }
+        });
+    }
+
     pub(super) fn spawn_search_posters(&self, results: Vec<(String, Option<String>)>) {
         let sender = self.action_sender.clone();
         let req_client = self.client.http_client().clone();
