@@ -18,6 +18,9 @@ impl App {
         self.state.show_season_download_confirm = false;
         self.state.show_episode_download_confirm = false;
         self.state.is_resolving_playback = false;
+        self.state.tv_input_active = false;
+        self.state.tv_input_buffer.clear();
+        self.state.tv_input_is_file = false;
     }
 
     pub(super) async fn handle_tv(&mut self, action: Action) -> Option<()> {
