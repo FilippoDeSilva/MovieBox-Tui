@@ -1931,14 +1931,15 @@ impl App {
                         };
 
                         if !target_ok || all_items.is_empty() {
+                            let err_msg = if all_items.is_empty() {
+                                "No matches"
+                            } else {
+                                "Rate Limit"
+                            }
+                            .into();
                             sender
                                 .send(Action::EpisodeStreamsFailed(
-                                    context,
-                                    request_id,
-                                    id_clone,
-                                    season,
-                                    episode,
-                                    "Rate Limit".into(),
+                                    context, request_id, id_clone, season, episode, err_msg,
                                 ))
                                 .ok();
                         } else {
