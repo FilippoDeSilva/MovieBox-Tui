@@ -18,6 +18,7 @@ pub struct WatchHistoryItem {
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct HistoryManager {
+    #[serde(default)]
     watched: HashSet<String>,
     #[serde(default)]
     pub recent: Vec<WatchHistoryItem>,
@@ -28,7 +29,8 @@ impl HistoryManager {
         if let Some(path) = Self::history_file_path() {
             if path.exists() {
                 if let Ok(content) = fs::read_to_string(&path) {
-                    if let Ok(history) = serde_json::from_str(&content) {
+                    if let Ok(mut history) = serde_json::from_str::<Self>(&content) {
+                        history.rebuild_watched_index();
                         return history;
                     }
                 }
@@ -59,6 +61,14 @@ impl HistoryManager {
 
     fn key(provider: &str, subject_id: &str, season: usize, episode: usize) -> String {
         format!("{provider}::{subject_id}::{season}::{episode}")
+    }
+
+    fn rebuild_watched_index(&mut self) {
+        self.watched = self
+            .recent
+            .iter()
+            .map(|item| Self::key(&item.provider, &item.subject_id, item.season, item.episode))
+            .collect();
     }
 
     pub fn mark_watched(&mut self, item: WatchHistoryItem) {
