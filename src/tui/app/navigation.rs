@@ -24,6 +24,7 @@ impl App {
         if provider == self.state.active_provider {
             return;
         }
+        self.reset_transient_overlays();
         self.prepare_image_refresh();
         self.state
             .fetch_cancel
