@@ -216,10 +216,14 @@ impl App {
 
             Action::SearchSuccess {
                 context,
+                request_id,
                 query,
                 page,
                 payload,
             } => {
+                if request_id != self.state.active_search_request {
+                    return None;
+                }
                 if !self.context_is_current(context) || query != self.state.search_query.trim() {
                     return None;
                 }
@@ -396,7 +400,10 @@ impl App {
                 }
             }
 
-            Action::SearchFailure(context, page, err) => {
+            Action::SearchFailure(context, request_id, page, err) => {
+                if request_id != self.state.active_search_request {
+                    return None;
+                }
                 if !self.context_is_current(context) {
                     return None;
                 }

@@ -504,6 +504,7 @@ impl App {
                                 let dhakaflix_client = self.dhakaflix_client.clone();
                                 let sender = self.action_sender.clone();
                                 let context = self.request_context();
+                                let request_id = self.state.active_search_request;
                                 self.state.is_loading = true;
                                 self.state
                                     .set_status(format!("Loading page {}...", next_page), 150);
@@ -523,6 +524,7 @@ impl App {
                                             sender
                                                 .send(Action::SearchSuccess {
                                                     context,
+                                                    request_id,
                                                     query,
                                                     page: next_page,
                                                     payload: res,
@@ -531,7 +533,9 @@ impl App {
                                         }
                                         Err(e) => {
                                             sender
-                                                .send(Action::SearchFailure(context, next_page, e))
+                                                .send(Action::SearchFailure(
+                                                    context, request_id, next_page, e,
+                                                ))
                                                 .ok();
                                         }
                                     }

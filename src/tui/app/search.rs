@@ -188,6 +188,7 @@ impl App {
     }
 
     pub(super) fn prepare_search_request(&mut self, query: &str) -> RequestContext {
+        self.state.active_search_request = self.state.active_search_request.wrapping_add(1);
         self.state.is_homepage_mode = false;
         self.state.current_page = 1;
         self.state.active_screen = Screen::Home;
@@ -214,6 +215,7 @@ impl App {
         force_refresh: bool,
         context: RequestContext,
     ) {
+        let request_id = self.state.active_search_request;
         let page = 1;
         let sender = self.action_sender.clone();
         let client = self.client.clone();
@@ -232,6 +234,7 @@ impl App {
                     sender
                         .send(Action::SearchSuccess {
                             context,
+                            request_id,
                             query: query.clone(),
                             page,
                             payload: cached,
@@ -262,6 +265,7 @@ impl App {
                     sender
                         .send(Action::SearchSuccess {
                             context,
+                            request_id,
                             query,
                             page,
                             payload: res,
@@ -270,7 +274,7 @@ impl App {
                 }
                 Err(error) => {
                     sender
-                        .send(Action::SearchFailure(context, page, error))
+                        .send(Action::SearchFailure(context, request_id, page, error))
                         .ok();
                 }
             }

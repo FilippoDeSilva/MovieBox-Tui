@@ -28,11 +28,12 @@ pub enum Action {
     },
     SearchSuccess {
         context: crate::providers::models::RequestContext,
+        request_id: u64,
         query: String,
         page: usize,
         payload: serde_json::Value,
     },
-    SearchFailure(crate::providers::models::RequestContext, usize, String),
+    SearchFailure(crate::providers::models::RequestContext, u64, usize, String),
     FetchHomepage {
         tab_id: String,
         page: usize,
