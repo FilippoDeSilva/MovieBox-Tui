@@ -41,7 +41,7 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### IPTV
 
-- Watch live TV by loading local `.m3u` playlists organized by category
+- Watch live TV by loading remote or local `.m3u` playlists organized by category
 
 ### User Interface & App
 
