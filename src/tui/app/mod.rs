@@ -141,12 +141,9 @@ impl App {
                     }
                 }
             }
-            if failed > 0 {
-                let _ = sender.send(Action::SetStatus(format!(
-                    "Error: {failed} playlist(s) failed to load."
-                )));
-            }
-            sender.send(Action::TvChannelsLoaded(all_channels)).ok();
+            sender
+                .send(Action::TvChannelsLoaded(all_channels, failed))
+                .ok();
         });
     }
 

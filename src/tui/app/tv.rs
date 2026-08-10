@@ -92,7 +92,7 @@ impl App {
                 self.state.tv_input_buffer.clear();
             }
 
-            Action::TvChannelsLoaded(channels) => {
+            Action::TvChannelsLoaded(channels, failed) => {
                 let mut seen = std::collections::HashSet::new();
                 self.state.tv_channels = channels
                     .into_iter()
@@ -108,19 +108,24 @@ impl App {
                     return None;
                 }
                 if self.state.tv_channels.is_empty() {
-                    self.state.set_status(
-                        "No TV channels found. Add a playlist (/config).".to_string(),
-                        200,
-                    );
-                } else {
-                    self.state.set_status(
+                    let status = if failed > 0 {
                         format!(
-                            "{} TV channels imported from {} playlist(s).",
-                            self.state.tv_channels.len(),
-                            self.state.tv_playlists.len().max(1)
-                        ),
-                        200,
+                            "No TV channels found. {failed} playlist(s) failed to load. Add a playlist (/config)."
+                        )
+                    } else {
+                        "No TV channels found. Add a playlist (/config).".to_string()
+                    };
+                    self.state.set_status(status, 200);
+                } else {
+                    let mut status = format!(
+                        "{} TV channels imported from {} playlist(s).",
+                        self.state.tv_channels.len(),
+                        self.state.tv_playlists.len().max(1)
                     );
+                    if failed > 0 {
+                        status.push_str(&format!(" {failed} playlist(s) failed to load."));
+                    }
+                    self.state.set_status(status, 200);
                 }
             }
             _ => return None,
