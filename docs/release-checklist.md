@@ -24,6 +24,9 @@ Confirm the main GitHub Actions workflows are green:
 - `Publish to Crates.io` when applicable
 - `Update Homebrew Formula` when applicable
 
+If you manually dispatch `Publish to Crates.io` or `Update Homebrew Formula`,
+run them against the explicit release tag, not a branch head.
+
 ## 2. Desktop playback checks
 
 Verify at least one real playback launch on each supported desktop OS:

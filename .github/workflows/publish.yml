@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag/version to publish (e.g. v0.1.8)'
-        required: false
+        description: 'Release tag to publish (e.g. v0.1.10)'
+        required: true
 
 jobs:
   publish:
@@ -20,10 +20,8 @@ jobs:
       - name: Determine ref
         id: ref
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             REF="${{ github.event.inputs.tag }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            REF="${{ github.ref }}"
           else
             REF="${{ github.event.workflow_run.head_sha }}"
           fi
@@ -37,6 +35,10 @@ jobs:
         run: |
           VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
           echo "Publishing version $VERSION from ${{ steps.ref.outputs.target_ref }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "v$VERSION" != "${{ github.event.inputs.tag }}" ]; then
+            echo "Cargo.toml version v$VERSION does not match requested tag ${{ github.event.inputs.tag }}"
+            exit 1
+          fi
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
