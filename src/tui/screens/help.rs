@@ -120,7 +120,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 theme.header.add_modifier(ratatui::style::Modifier::BOLD),
             )]),
             Line::from(vec![
-                Span::styled("    /home      ", theme.header),
+                Span::styled("    /home,/discover ", theme.header),
                 Span::styled("Trending & Featured", theme.text),
             ]),
             Line::from(vec![
@@ -132,7 +132,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Discover Movies", theme.text),
             ]),
             Line::from(vec![
-                Span::styled("    /shows     ", theme.header),
+                Span::styled("    /shows,/tvshows ", theme.header),
                 Span::styled("Discover TV Shows", theme.text),
             ]),
             Line::from(vec![
@@ -173,7 +173,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Disable BDIX FTP", theme.text),
             ]),
             Line::from(vec![
-                Span::styled("    /theme         ", theme.header),
+                Span::styled("    /theme,/themes ", theme.header),
                 Span::styled("Change UI Theme", theme.text),
             ]),
         ]);

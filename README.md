@@ -202,7 +202,7 @@ moviebox-tui
 | `/discover`, `/home` | Open discovery view                       |
 | `/history`           | Show watch history                        |
 | `/movies`            | Browse movies                             |
-| `/shows`             | Browse series                             |
+| `/shows`, `/tvshows` | Browse series                             |
 | `/anime`             | Browse anime                              |
 | `/list`              | Show IPTV channels                        |
 | `/config`            | Configure IPTV playlists                  |
