@@ -574,6 +574,8 @@ impl App {
                 {
                     self.state.preview_loading = false;
                     self.state.search_preview = None;
+                    self.state.poster_image = None;
+                    self.state.poster_protocol = None;
                     return None;
                 }
                 if let Some(cached) = self.state.preview_cache.get(&id).cloned() {
