@@ -66,6 +66,9 @@ commit is rejected if either fails. There is no need to run them manually.
 If the hook rejects a commit, run `cargo fmt` to auto-fix the formatting, then stage and
 commit again.
 
+For release readiness, static checks are not enough on their own. Before declaring a
+release production-ready, work through [`docs/release-checklist.md`](docs/release-checklist.md).
+
 **Guidelines:**
 - Follow idiomatic Rust and standard `rustfmt` defaults. Don't hand-format.
 - Keep the async, message-passing architecture intact.

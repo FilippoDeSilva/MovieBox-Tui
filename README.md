@@ -393,7 +393,9 @@ cargo package --locked
 GitHub Actions also verifies cross-platform builds on Linux, macOS, and Windows,
 plus an Android/Termux cross-build lane.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and
+[`docs/release-checklist.md`](docs/release-checklist.md) for the runtime checks still
+required before calling a release production-ready.
 
 ## License
 
