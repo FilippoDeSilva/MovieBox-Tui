@@ -304,14 +304,16 @@ impl App {
             Action::SearchSuccess {
                 context,
                 query,
+                page,
                 payload,
             } => {
                 if !self.context_is_current(context) || query != self.state.search_query.trim() {
                     return None;
                 }
+                self.state.current_page = page;
                 self.state.search_error = None;
                 self.state.is_loading = false;
-                if self.state.current_page <= 1 {
+                if page <= 1 {
                     self.state.search_results.clear();
                 }
                 let subjects_opt = payload
@@ -469,7 +471,7 @@ impl App {
                     },
                     150,
                 );
-                if self.state.current_page <= 1 {
+                if page <= 1 {
                     if let Some(res) = self.state.search_results.first() {
                         self.state.search_list_state.select(Some(0));
                         self.action_sender
@@ -481,9 +483,12 @@ impl App {
                 }
             }
 
-            Action::SearchFailure(context, err) => {
+            Action::SearchFailure(context, page, err) => {
                 if !self.context_is_current(context) {
                     return None;
+                }
+                if page > 1 && self.state.current_page >= page {
+                    self.state.current_page = page - 1;
                 }
                 log::error!(
                     "search failed (provider {}): {err}",

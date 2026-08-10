@@ -118,6 +118,7 @@ impl App {
             | Action::ToggleHelp
             | Action::Refresh
             | Action::ClearCache
+            | Action::CacheCleared(..)
             | Action::ToggleThemePopup
             | Action::SelectTheme(..)
             | Action::SetStatus(..)

@@ -455,7 +455,6 @@ impl App {
                                     })
                                     .ok();
                             } else {
-                                self.state.current_page = next_page;
                                 let query = self.state.search_query.clone();
                                 let client = self.client.clone();
                                 let fourk_client = self.fourk_client.clone();
@@ -483,12 +482,15 @@ impl App {
                                                 .send(Action::SearchSuccess {
                                                     context,
                                                     query,
+                                                    page: next_page,
                                                     payload: res,
                                                 })
                                                 .ok();
                                         }
                                         Err(e) => {
-                                            sender.send(Action::SearchFailure(context, e)).ok();
+                                            sender
+                                                .send(Action::SearchFailure(context, next_page, e))
+                                                .ok();
                                         }
                                     }
                                 });

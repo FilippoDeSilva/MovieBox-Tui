@@ -208,6 +208,7 @@ impl App {
         force_refresh: bool,
         context: RequestContext,
     ) {
+        let page = 1;
         let sender = self.action_sender.clone();
         let client = self.client.clone();
         let fourk_client = self.fourk_client.clone();
@@ -226,6 +227,7 @@ impl App {
                         .send(Action::SearchSuccess {
                             context,
                             query: query.clone(),
+                            page,
                             payload: cached,
                         })
                         .ok();
@@ -240,7 +242,7 @@ impl App {
                 &dhakaflix_client,
                 context.provider,
                 &query,
-                1,
+                page,
             )
             .await;
             match result {
@@ -255,12 +257,15 @@ impl App {
                         .send(Action::SearchSuccess {
                             context,
                             query,
+                            page,
                             payload: res,
                         })
                         .ok();
                 }
                 Err(error) => {
-                    sender.send(Action::SearchFailure(context, error)).ok();
+                    sender
+                        .send(Action::SearchFailure(context, page, error))
+                        .ok();
                 }
             }
         });

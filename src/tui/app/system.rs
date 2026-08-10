@@ -185,7 +185,17 @@ impl App {
             },
 
             Action::ClearCache => {
-                tokio::task::spawn_blocking(crate::cache::clear_all_cache);
+                let sender = self.action_sender.clone();
+                tokio::spawn(async move {
+                    let result = tokio::task::spawn_blocking(|| {
+                        crate::cache::clear_all_cache();
+                        Ok::<(), String>(())
+                    })
+                    .await
+                    .map_err(|error| format!("cache clear task failed: {error}"))
+                    .and_then(|result| result);
+                    sender.send(Action::CacheCleared(result)).ok();
+                });
                 self.state.stream_pool.clear();
                 self.state.image_cache.clear();
                 self.state.search_posters.clear();
@@ -198,9 +208,20 @@ impl App {
                 self.state.available_seasons.clear();
                 self.state.available_episode_numbers.clear();
                 self.prepare_image_refresh();
-                self.state
-                    .set_status("Cache cleared completely.".to_string(), 150);
+                self.state.set_status("Clearing cache...".to_string(), 150);
             }
+
+            Action::CacheCleared(result) => match result {
+                Ok(()) => {
+                    self.state
+                        .set_status("Cache cleared completely.".to_string(), 150);
+                }
+                Err(error) => {
+                    log::error!("cache clear failed: {error}");
+                    self.state
+                        .notify(NotificationKind::Error, "Cache clear failed", error);
+                }
+            },
 
             Action::ToggleThemePopup => {
                 self.state.show_theme_popup = !self.state.show_theme_popup;
@@ -220,6 +241,7 @@ impl App {
                 let kind = crate::tui::theme::ThemeKind::parse(&theme_name);
                 self.state.active_theme_kind = kind.as_str().to_string();
                 self.theme = crate::tui::theme::Theme::from_kind(kind);
+                self.persist_config();
                 self.state.dirty = true;
             }
 

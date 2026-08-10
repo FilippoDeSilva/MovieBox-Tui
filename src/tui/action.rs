@@ -29,9 +29,10 @@ pub enum Action {
     SearchSuccess {
         context: crate::providers::models::RequestContext,
         query: String,
+        page: usize,
         payload: serde_json::Value,
     },
-    SearchFailure(crate::providers::models::RequestContext, String),
+    SearchFailure(crate::providers::models::RequestContext, usize, String),
     FetchHomepage {
         tab_id: String,
         page: usize,
@@ -111,6 +112,7 @@ pub enum Action {
     SetStatus(String),
     Refresh,
     ClearCache,
+    CacheCleared(Result<(), String>),
     LaunchPlayback(
         crate::tui::state::PlayerKind,
         crate::providers::models::PlaybackSource,
