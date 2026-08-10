@@ -145,16 +145,21 @@ fn mpv_command(
         command.arg(format!("{prefix}http-header-fields={fields}"));
     }
     if let Some(subtitle) = subtitle {
-        let sub_arg = if executable.starts_with("flatpak run ") {
-            format!("@@ {} @@", subtitle)
+        if executable.starts_with("flatpak run ") {
+            let opt = if iina {
+                "--mpv-sub-files"
+            } else {
+                "--sub-file"
+            };
+            command.arg(opt);
+            command.arg("@@").arg(subtitle).arg("@@");
         } else {
-            subtitle.to_string()
-        };
-
-        if iina {
-            command.arg(format!("--mpv-sub-files={sub_arg}"));
-        } else {
-            command.arg(format!("--sub-file={sub_arg}"));
+            let opt = if iina {
+                "--mpv-sub-files"
+            } else {
+                "--sub-file"
+            };
+            command.arg(format!("{}={}", opt, subtitle));
         }
     }
 
@@ -252,12 +257,11 @@ fn vlc_command(
         }
     }
     if let Some(subtitle) = subtitle {
-        let sub_arg = if executable.starts_with("flatpak run ") {
-            format!("@@ {} @@", subtitle)
+        if executable.starts_with("flatpak run ") {
+            command.arg("--sub-file").arg("@@").arg(subtitle).arg("@@");
         } else {
-            subtitle.to_string()
-        };
-        command.arg(format!("--sub-file={sub_arg}"));
+            command.arg(format!("--sub-file={subtitle}"));
+        }
     }
 
     command.arg(url);

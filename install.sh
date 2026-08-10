@@ -88,8 +88,15 @@ if [ -d "$INSTALL_DIR" ] && [ -w "$INSTALL_DIR" ]; then
     install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH"
 elif command -v sudo >/dev/null 2>&1; then
     log_info "Requires sudo privileges to write to $INSTALL_DIR..."
-    sudo mkdir -p "$INSTALL_DIR"
-    sudo install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH"
+    if sudo mkdir -p "$INSTALL_DIR" && sudo install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH"; then
+        :
+    else
+        log_warn "Sudo access failed or was cancelled. Falling back to local installation..."
+        INSTALL_DIR="$HOME/.local/bin"
+        APP_PATH="$INSTALL_DIR/$BIN_NAME"
+        mkdir -p "$INSTALL_DIR"
+        install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH"
+    fi
 else
     INSTALL_DIR="$HOME/.local/bin"
     APP_PATH="$INSTALL_DIR/$BIN_NAME"
