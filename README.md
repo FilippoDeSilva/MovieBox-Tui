@@ -25,7 +25,7 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ### Catalogs & Browsing
 
 - Search and browse movies, TV series, and anime from multiple content catalogs
-- Filter search results by resolution and subtitle availability
+- Inspect stream quality groupings and subtitle options before playback
 
 > **Note on BDIX:** BDIX sources are only accessible from supported Bangladeshi ISP networks. Because of this, they are hidden by default. You can enable them manually if your network supports it.
 
