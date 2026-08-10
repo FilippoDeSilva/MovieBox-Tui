@@ -26,9 +26,9 @@ src/
     m3u.rs                      M3U playlist parser (URL and local file)
   tui/
     app/                        the application object and all behavior
-      mod.rs                    App struct, App::new, helpers, handle_action
-                                dispatcher (thin routing table)
-      run.rs                    terminal event loop (run) and rendering (draw)
+      mod.rs                    App struct, App::new, helpers
+      run.rs                    terminal event loop (run), rendering (draw),
+                                and handle_action dispatcher (thin routing table)
       network.rs                poster fetch + provider dispatch helpers
       search.rs                 search command routing, search request setup,
                                 provider search dispatch, poster prefetch
