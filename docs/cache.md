@@ -14,7 +14,7 @@ Disk caching lives in `cache.rs`; in-memory caches live in `AppState`.
   moviebox/
     homepage/<tab>_<page>.json
     captions/captions_<hash>.json
-  tv_playlists/<md5>.m3u
+  tv_playlists/<md5>.m3u       cached remote playlist snapshots
 ```
 
 The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
@@ -26,7 +26,8 @@ The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
   different providers never collide. Image caches are namespaced by provider (or
   `iptv` for channel logos).
 - **TTL**: streams expire after 2h; search/details/captions/images after 24h;
-  homepage after 1h.
+  homepage after 1h; remote TV playlist snapshots after 24h. Local file playlists are
+  reread directly instead of being served from the cache.
 - **Atomic writes**: data is written to a temp file then renamed, so a crash never
   leaves a corrupt cache entry.
 - **Validation**: search/stream entries are only cached (and only served) if they

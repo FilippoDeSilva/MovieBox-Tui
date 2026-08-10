@@ -18,8 +18,9 @@ groups, dedupes and lets you search and play them.
 2. Select `[ Add URL ]` or `[ Add file ]`, type the source, `Enter` to add.
    - URL example: `https://example.com/playlist.m3u`
    - File example: `~/playlists/mine.m3u`
-3. Sources persist in `tv_config.json` (under the config dir) and are re-fetched on
-   every TV-mode entry.
+3. Sources persist in `tv_config.json` (under the config dir). Local file playlists are
+   reread directly on every TV-mode entry; remote URL playlists may reuse a recent
+   cached snapshot for up to 24 hours.
 4. Highlight a source and press `d` (or `Enter`) to remove it; the list reloads.
 
 ## Parsing and search

@@ -40,24 +40,24 @@ impl M3UParser {
         &self,
         url: &str,
     ) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
-        let file_path = self.cache_dir.join(cache_filename(url));
-        let mut needs_download = true;
+        let trimmed = url.trim();
+        let content = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            let file_path = self.cache_dir.join(cache_filename(trimmed));
+            let mut needs_download = true;
 
-        if file_path.exists() {
-            if let Ok(metadata) = tokio::fs::metadata(&file_path).await {
-                if let Ok(modified) = metadata.modified() {
-                    if let Ok(duration) = SystemTime::now().duration_since(modified) {
-                        if duration.as_secs() < 24 * 3600 {
-                            needs_download = false;
+            if file_path.exists() {
+                if let Ok(metadata) = tokio::fs::metadata(&file_path).await {
+                    if let Ok(modified) = metadata.modified() {
+                        if let Ok(duration) = SystemTime::now().duration_since(modified) {
+                            if duration.as_secs() < 24 * 3600 {
+                                needs_download = false;
+                            }
                         }
                     }
                 }
             }
-        }
 
-        let content = if needs_download {
-            let trimmed = url.trim();
-            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            if needs_download {
                 let res = self
                     .client
                     .get(trimmed)
@@ -69,15 +69,13 @@ impl M3UParser {
                 let _ = tokio::fs::write(&file_path, &res).await;
                 res
             } else {
-                let path = std::path::PathBuf::from(trimmed);
-                let local = tokio::fs::read_to_string(&path).await.map_err(|error| {
-                    format!("failed to read playlist file {}: {error}", trimmed)
-                })?;
-                let _ = tokio::fs::write(&file_path, &local).await;
-                local
+                tokio::fs::read_to_string(&file_path).await?
             }
         } else {
-            tokio::fs::read_to_string(&file_path).await?
+            let path = std::path::PathBuf::from(trimmed);
+            tokio::fs::read_to_string(&path)
+                .await
+                .map_err(|error| format!("failed to read playlist file {}: {error}", trimmed))?
         };
 
         Ok(self.parse_m3u(&content))
