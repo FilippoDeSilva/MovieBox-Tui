@@ -79,6 +79,15 @@ impl DetailsLayoutTier {
     }
 }
 
+fn subject_provider(state: &AppState, subject_id: &str) -> crate::providers::models::ProviderKind {
+    state
+        .search_results
+        .iter()
+        .find(|result| result.id == subject_id)
+        .map(|result| result.provider)
+        .unwrap_or(state.active_provider)
+}
+
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
     let tier = DetailsLayoutTier::for_area(area);
     let header_height = tier.header_height(area, state.selected_details.as_ref());
@@ -308,7 +317,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     let is_currently_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
-        let provider = state.active_provider.cache_key();
+        let provider = subject_provider(state, subject_id).cache_key();
         let (se, ep) = if type_val == 2 {
             let se_idx = state.season_list_state.selected().unwrap_or(0);
             let ep_idx = state.episode_list_state.selected().unwrap_or(0);
@@ -653,7 +662,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .and_then(|v| v.as_i64())
                 .unwrap_or(1) as usize;
             let subject_id = state.active_subject_id.as_deref().unwrap_or("");
-            let provider = state.active_provider.cache_key();
+            let provider = subject_provider(state, subject_id).cache_key();
 
             ep_numbers
                 .iter()
@@ -1362,7 +1371,7 @@ fn render_workflow(
             },
         ));
         let is_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
-            let provider = state.active_provider.cache_key();
+            let provider = subject_provider(state, subject_id).cache_key();
             state.history.is_watched(
                 provider,
                 subject_id,

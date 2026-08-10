@@ -244,7 +244,7 @@ MovieBox-TUI uses standard OS directories:
 Catalog providers use separate cache namespaces. Expired or invalid cache entries are discarded automatically; files older than seven days are cleaned at startup.
 
 The current theme, active provider, default player, BDIX visibility, and update
-preference are persisted in `config.json`. See [`docs/config.md`](docs/config.md)
+preferences are persisted in `config.json`. See [`docs/config.md`](docs/config.md)
 for the full config and environment-variable reference.
 
 ## Updates
