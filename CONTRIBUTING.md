@@ -60,7 +60,7 @@ new `Action` variant over blocking the UI thread.
 
 Formatting and linting are enforced automatically: the pre-commit hook (enabled during
 setup with `git config core.hooksPath .githooks`) runs `cargo fmt --check` and
-`cargo clippy --all-targets --all-features -- -D warnings` on every commit, and the
+`cargo clippy --all-targets --locked -- -D warnings` on every commit, and the
 commit is rejected if either fails. There is no need to run them manually.
 
 If the hook rejects a commit, run `cargo fmt` to auto-fix the formatting, then stage and

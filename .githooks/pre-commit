@@ -22,7 +22,7 @@ fi
 echo "${GREEN}✅ Code formatting is perfect.${NC}\n"
 
 echo "${YELLOW}🦀 2/2 Checking Linter Warnings (cargo clippy)...${NC}"
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets --locked -- -D warnings; then
     echo "\n${RED}❌ Error: Clippy found warnings or errors in your code!${NC}"
     echo "${RED}Please fix the warnings above before committing.${NC}"
     exit 1
