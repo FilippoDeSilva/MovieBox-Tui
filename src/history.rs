@@ -96,8 +96,12 @@ impl HistoryManager {
         let key = Self::key(&item.provider, &item.subject_id, item.season, item.episode);
         self.watched.insert(key);
 
-        self.recent
-            .retain(|i| !(i.provider == item.provider && i.subject_id == item.subject_id));
+        self.recent.retain(|i| {
+            !(i.provider == item.provider
+                && i.subject_id == item.subject_id
+                && i.season == item.season
+                && i.episode == item.episode)
+        });
 
         self.recent.push(item);
 

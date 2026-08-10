@@ -18,7 +18,8 @@ src/
                      HTTP ranges, optional multi-segment download, retries, cancel
                      via an AtomicBool, Windows-safe file stems.
 
-  history.rs         Watch history: read/write history.json, dedupe, cap 100.
+  history.rs         Watch history: read/write history.json, dedupe exact
+                     provider/subject/episode entries, cap 100.
 
   logging.rs         File logging: flexi_logger, rotation (5MB, keep 3),
                      MOVIEBOX_LOG level, URL/path sanitization for sharing.
