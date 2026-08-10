@@ -127,10 +127,15 @@ jobs:
       - name: Archive Windows
         if: matrix.os == 'windows-latest'
         run: |
-          mkdir dist
-          cp target\${{ matrix.target }}\release\moviebox-tui.exe dist\
-          cp README.md dist\
-          cp LICENSE-* dist\ || echo "No license files found"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\moviebox-tui.exe" "dist\"
+          Copy-Item "README.md" "dist\"
+          $licenses = Get-ChildItem "LICENSE-*" -ErrorAction SilentlyContinue
+          if ($licenses) {
+            Copy-Item $licenses.FullName "dist\"
+          } else {
+            Write-Host "No license files found"
+          }
           if ("${{ matrix.target }}" -eq "aarch64-pc-windows-msvc") {
             Compress-Archive -Path dist\* -DestinationPath MovieBox_Windows_arm64.zip
           } else {
