@@ -528,10 +528,7 @@ impl App {
                     }
                     return None;
                 }
-                let mut prov = self.state.active_provider;
-                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
-                    prov = res.provider;
-                }
+                let prov = self.provider_for_subject(&id);
 
                 if prov == ProviderKind::FourKHdHub
                     || prov == ProviderKind::BdixCircleFtp
@@ -557,7 +554,6 @@ impl App {
                         let tx = self.action_sender.clone();
                         let id2 = id.clone();
                         let client = self.client.http_client().clone();
-                        let prov = prov;
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id2.clone();
@@ -663,7 +659,7 @@ impl App {
                     let url_clone = url.to_string();
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
-                    let provider = self.state.active_provider;
+                    let provider = self.provider_for_subject(&id);
                     tokio::spawn(async move {
                         if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                             let id_clone = id_clone.clone();
