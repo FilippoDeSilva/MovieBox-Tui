@@ -14,7 +14,8 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 Resolution runs once at startup and is cached (`OnceLock`). A preferred player can be
 forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`,
 `vlc`, `android`), which reorders the list. Player picker (`Open with`) lists every
-detected player.
+detected player and saves the chosen player as the next default unless
+`MOVIEBOX_PLAYER` is set.
 
 ## Command construction
 

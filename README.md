@@ -216,6 +216,9 @@ moviebox-tui
 
 `/update` checks availability and shows the release location; it does not replace the running binary. Re-run the installer or Homebrew upgrade command to update.
 
+Choosing a player from `Open with` updates the saved default player for later launches,
+unless `MOVIEBOX_PLAYER` is set in the environment.
+
 ## Downloads
 
 Downloads are stored under the operating system Downloads directory:

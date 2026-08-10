@@ -3,6 +3,20 @@ use crate::providers::models::{ProviderKind, Release};
 use crate::tui::{action::Action, state::Screen};
 
 impl App {
+    fn remember_player_preference(&mut self, player: crate::tui::state::PlayerKind) {
+        self.state.default_player = Some(player.config_key().to_string());
+        if let Some(index) = self
+            .state
+            .available_players
+            .iter()
+            .position(|&kind| kind == player)
+        {
+            let preferred = self.state.available_players.remove(index);
+            self.state.available_players.insert(0, preferred);
+        }
+        self.persist_config();
+    }
+
     pub(super) fn switch_provider(&mut self, provider: ProviderKind) {
         if self.state.is_tv_mode {
             return;
@@ -627,6 +641,7 @@ impl App {
                     self.state.player_picker_popup = false;
                     let idx = self.state.player_picker_state.selected().unwrap_or(0);
                     if let Some(player) = self.state.available_players.get(idx).copied() {
+                        self.remember_player_preference(player);
                         if let Some(source) = self.state.player_picker_playback.take() {
                             self.action_sender
                                 .send(Action::LaunchPlayback(player, source))

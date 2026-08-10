@@ -12,7 +12,7 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `active_provider` | string | Last provider (`moviebox`, `fourkhdhub`, …). |
 | `active_theme` | string | Theme name. |
 | `bdix_enabled` | bool | Show BDIX providers (Bangladesh-only). |
-| `default_player` | string | Preferred player: `mpv`, `iina`, `vlc`, `android`. |
+| `default_player` | string | Preferred player: `mpv`, `iina`, `vlc`, `android`; updated when you choose a player from the in-app picker. |
 
 ## Other persisted files
 

@@ -19,6 +19,15 @@ impl PlayerKind {
         }
     }
 
+    pub fn config_key(&self) -> &'static str {
+        match self {
+            PlayerKind::Mpv => "mpv",
+            PlayerKind::Iina => "iina",
+            PlayerKind::Vlc => "vlc",
+            PlayerKind::AndroidIntent => "android",
+        }
+    }
+
     pub fn parse(value: &str) -> Option<PlayerKind> {
         match value.to_ascii_lowercase().as_str() {
             "mpv" => Some(PlayerKind::Mpv),
