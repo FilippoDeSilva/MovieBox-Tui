@@ -334,6 +334,125 @@ impl App {
         });
     }
 
+    pub(super) fn extract_homepage_subjects(payload: &serde_json::Value) -> Vec<serde_json::Value> {
+        let mut extracted_subjects = Vec::new();
+        if let Some(items) = payload.get("items").and_then(|i| i.as_array()) {
+            for item in items {
+                if let Some(banner) = item
+                    .get("banner")
+                    .and_then(|b| b.get("banners"))
+                    .and_then(|b| b.as_array())
+                {
+                    for banner_item in banner {
+                        if let Some(subject) = banner_item.get("subject") {
+                            extracted_subjects.push(subject.clone());
+                        }
+                    }
+                }
+                if let Some(custom_data) = item
+                    .get("customData")
+                    .and_then(|c| c.get("items"))
+                    .and_then(|i| i.as_array())
+                {
+                    for custom_item in custom_data {
+                        if let Some(subject) = custom_item.get("subject") {
+                            extracted_subjects.push(subject.clone());
+                        }
+                    }
+                }
+                if let Some(subjects) = item.get("subjects").and_then(|s| s.as_array()) {
+                    for subject in subjects {
+                        extracted_subjects.push(subject.clone());
+                    }
+                }
+            }
+        }
+        extracted_subjects
+    }
+
+    pub(super) fn append_homepage_subjects(&mut self, subjects: Vec<serde_json::Value>) -> usize {
+        let mut count = 0;
+        for item in subjects {
+            let id = item
+                .get("subjectId")
+                .and_then(|si| si.as_str())
+                .unwrap_or("")
+                .to_string();
+            let raw_title = item
+                .get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("Unknown")
+                .to_string();
+            let clean_title = crate::providers::moviebox::clean_moviebox_title(&raw_title);
+            let stype = item
+                .get("subjectType")
+                .and_then(|st| st.as_i64())
+                .unwrap_or(0);
+            let release_year = item
+                .get("releaseDate")
+                .and_then(|rd| rd.as_str())
+                .unwrap_or("")
+                .split('-')
+                .next()
+                .unwrap_or("")
+                .to_string();
+            let cover_url = item
+                .get("cover")
+                .and_then(|c| c.get("url"))
+                .and_then(|u| u.as_str())
+                .map(|s| s.to_string());
+            let season = item.get("season").and_then(|s| s.as_u64()).unwrap_or(0) as usize;
+
+            if let Some(existing) = self.state.search_results.iter_mut().find(|r| r.id == id) {
+                if season > existing.season {
+                    existing.season = season;
+                    existing.title = clean_title;
+                    existing.stype = stype;
+                    existing.release_year = release_year;
+                    existing.cover_url = cover_url;
+                }
+                continue;
+            }
+
+            let raw_lower = raw_title.to_lowercase();
+            let is_dub = raw_lower.contains("[hindi]")
+                || raw_lower.contains("[tamil]")
+                || raw_lower.contains("[telugu]")
+                || raw_lower.contains("[english]");
+
+            if is_dub
+                && self
+                    .state
+                    .search_results
+                    .iter()
+                    .any(|r| r.title == clean_title && r.stype == stype)
+            {
+                continue;
+            }
+
+            if self.state.search_results.iter().any(|r| {
+                r.title == clean_title && r.release_year == release_year && r.stype == stype
+            }) {
+                continue;
+            }
+
+            if !id.is_empty() {
+                self.state.search_results.push(SearchResult {
+                    id,
+                    title: clean_title,
+                    stype,
+                    release_year,
+                    cover_url,
+                    season,
+                    episode: 1,
+                    provider: ProviderKind::MovieBox,
+                });
+                count += 1;
+            }
+        }
+        count
+    }
+
     pub(super) fn spawn_search_posters(&self, results: Vec<(String, Option<String>)>) {
         let sender = self.action_sender.clone();
         let req_client = self.client.http_client().clone();
