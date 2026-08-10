@@ -290,6 +290,80 @@ impl App {
             .set_status("Loading discover tab...".to_string(), 150);
     }
 
+    pub(super) fn prepare_details_request(&mut self, id: &str) -> RequestContext {
+        self.state.poster_protocol = None;
+        self.state.is_loading = true;
+        self.state
+            .fetch_cancel
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        self.state
+            .set_status("Fetching details...".to_string(), 150);
+        self.state.stream_pool.clear();
+
+        let provider = self.provider_for_subject(id);
+        let mut context = self.request_context();
+        context.provider = provider;
+        context
+    }
+
+    pub(super) fn run_details_request(
+        &self,
+        id: String,
+        force_refresh: bool,
+        context: RequestContext,
+    ) {
+        let client = self.client.clone();
+        let fourk_client = self.fourk_client.clone();
+        let circleftp_client = self.circleftp_client.clone();
+        let dhakaflix_client = self.dhakaflix_client.clone();
+        let sender = self.action_sender.clone();
+        tokio::spawn(async move {
+            if !force_refresh {
+                let id_for_cache = id.clone();
+                if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                    crate::cache::get_provider_details_cache(context.provider, &id_for_cache)
+                })
+                .await
+                {
+                    sender
+                        .send(Action::DetailsSuccess(context, id.clone(), cached))
+                        .ok();
+                    return;
+                }
+            }
+
+            let result = network::provider_details(
+                &client,
+                &fourk_client,
+                &circleftp_client,
+                &dhakaflix_client,
+                context.provider,
+                &id,
+            )
+            .await;
+            match result {
+                Ok(details) => {
+                    let id_for_cache = id.clone();
+                    let details_for_cache = details.clone();
+                    let _ = tokio::task::spawn_blocking(move || {
+                        crate::cache::set_provider_details_cache(
+                            context.provider,
+                            &id_for_cache,
+                            &details_for_cache,
+                        )
+                    })
+                    .await;
+                    sender
+                        .send(Action::DetailsSuccess(context, id, details))
+                        .ok();
+                }
+                Err(error) => {
+                    sender.send(Action::DetailsFailure(context, error)).ok();
+                }
+            }
+        });
+    }
+
     pub(super) fn run_homepage_request(&self, tab_id: String, page: usize) {
         let client = self.client.clone();
         let sender = self.action_sender.clone();

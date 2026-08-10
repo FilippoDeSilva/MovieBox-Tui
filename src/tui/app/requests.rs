@@ -471,74 +471,8 @@ impl App {
             }
 
             Action::FetchDetails(id, force_refresh) => {
-                self.state.poster_protocol = None;
-                self.state.is_loading = true;
-                self.state
-                    .fetch_cancel
-                    .store(false, std::sync::atomic::Ordering::Relaxed);
-                self.state
-                    .set_status("Fetching details...".to_string(), 150);
-                self.state.stream_pool.clear();
-                let client = self.client.clone();
-                let fourk_client = self.fourk_client.clone();
-                let circleftp_client = self.circleftp_client.clone();
-                let dhakaflix_client = self.dhakaflix_client.clone();
-                let sender = self.action_sender.clone();
-                let id_clone = id.clone();
-                let mut target_prov = self.state.active_provider;
-                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
-                    target_prov = res.provider;
-                }
-                let mut context = self.request_context();
-                context.provider = target_prov;
-
-                tokio::spawn(async move {
-                    if !force_refresh {
-                        let id_for_cache = id_clone.clone();
-                        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                            crate::cache::get_provider_details_cache(
-                                context.provider,
-                                &id_for_cache,
-                            )
-                        })
-                        .await
-                        {
-                            sender
-                                .send(Action::DetailsSuccess(context, id_clone.clone(), cached))
-                                .ok();
-                            return;
-                        }
-                    }
-                    let result = network::provider_details(
-                        &client,
-                        &fourk_client,
-                        &circleftp_client,
-                        &dhakaflix_client,
-                        context.provider,
-                        &id_clone,
-                    )
-                    .await;
-                    match result {
-                        Ok(details) => {
-                            let id_for_cache = id_clone.clone();
-                            let details_for_cache = details.clone();
-                            let _ = tokio::task::spawn_blocking(move || {
-                                crate::cache::set_provider_details_cache(
-                                    context.provider,
-                                    &id_for_cache,
-                                    &details_for_cache,
-                                )
-                            })
-                            .await;
-                            sender
-                                .send(Action::DetailsSuccess(context, id_clone, details))
-                                .ok();
-                        }
-                        Err(e) => {
-                            sender.send(Action::DetailsFailure(context, e)).ok();
-                        }
-                    }
-                });
+                let context = self.prepare_details_request(&id);
+                self.run_details_request(id, force_refresh, context);
             }
 
             Action::FetchPreview(id) => {
