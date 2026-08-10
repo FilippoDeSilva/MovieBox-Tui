@@ -737,12 +737,15 @@ impl App {
             Action::PosterSuccess(id, img) => {
                 self.state.image_cache.put(id.clone(), img.clone());
 
-                let current_id = self
-                    .state
-                    .search_list_state
-                    .selected()
-                    .and_then(|idx| self.state.search_results.get(idx))
-                    .map(|res| res.id.clone());
+                let current_id = if self.state.active_screen == Screen::Details {
+                    self.state.active_subject_id.clone()
+                } else {
+                    self.state
+                        .search_list_state
+                        .selected()
+                        .and_then(|idx| self.state.search_results.get(idx))
+                        .map(|res| res.id.clone())
+                };
 
                 if current_id.as_deref() == Some(id.as_str()) {
                     self.state.poster_image = Some((*img).clone());
