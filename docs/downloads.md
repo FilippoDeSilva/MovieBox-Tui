@@ -29,6 +29,10 @@ A season download enqueues every episode (`download_queue`) and processes them o
 time, each resolving its stream and subtitle. Progress is reported through
 `Action::UpdateDownload` and the status bar; failures pause and preserve partial data.
 
+Selected subtitle sidecars are saved next to the video using the subtitle URL's
+supported extension (`.srt`, `.vtt`, `.ass`, `.ssa`, `.sub`) so external players see
+the correct format.
+
 ## Outcomes
 
 `DownloadCompleted` / `DownloadPaused` / `DownloadFailed` drive the UI status and

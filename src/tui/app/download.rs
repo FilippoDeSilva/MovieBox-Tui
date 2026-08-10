@@ -136,7 +136,15 @@ impl App {
             }
 
             if let Some(subtitle_url) = subtitle_url {
-                let subtitle_path = destination.with_extension("srt");
+                let subtitle_extension = subtitle_url
+                    .rsplit('.')
+                    .next()
+                    .map(|extension| extension.to_ascii_lowercase())
+                    .filter(|extension| {
+                        matches!(extension.as_str(), "srt" | "vtt" | "ass" | "ssa" | "sub")
+                    })
+                    .unwrap_or_else(|| "srt".to_string());
+                let subtitle_path = destination.with_extension(subtitle_extension);
                 let result = tokio::time::timeout(
                     std::time::Duration::from_secs(30),
                     client.get(subtitle_url).send(),
