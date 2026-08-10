@@ -97,8 +97,17 @@ impl App {
             let _ = std::fs::create_dir_all(&app_dir);
             let path = app_dir.join("tv_config.json");
             if let Ok(json) = serde_json::to_string(&self.state.tv_playlists) {
-                if let Err(error) = std::fs::write(&path, json) {
+                let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+                if let Err(error) = std::fs::write(&temporary, json) {
                     log::warn!("failed to save tv playlists: {error}");
+                    return;
+                }
+                if std::fs::rename(&temporary, &path).is_err() {
+                    let _ = std::fs::remove_file(&path);
+                    if let Err(error) = std::fs::rename(&temporary, &path) {
+                        let _ = std::fs::remove_file(&temporary);
+                        log::warn!("failed to commit tv playlists: {error}");
+                    }
                 }
             }
         }

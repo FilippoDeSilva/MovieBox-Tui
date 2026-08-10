@@ -11,6 +11,10 @@ INSTALL_DIR="/usr/local/bin"
 BIN_NAME="moviebox-tui"
 APP_PATH="$INSTALL_DIR/$BIN_NAME"
 
+sync_app_path() {
+    APP_PATH="$INSTALL_DIR/$BIN_NAME"
+}
+
 command -v curl >/dev/null 2>&1 || log_err "curl is required but not installed. Please install it."
 command -v tar >/dev/null 2>&1 || log_err "tar is required but not installed. Please install it."
 
@@ -45,6 +49,7 @@ elif [ -n "${PREFIX:-}" ] && [[ "$PREFIX" == *com.termux* ]]; then
     if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
         FILE="MovieBox_Termux_arm64.tar.gz"
         INSTALL_DIR="$PREFIX/bin"
+        sync_app_path
     else
         log_err "Unsupported Termux architecture ($ARCH). Only arm64/aarch64 is natively hosted. Please use cargo install."
     fi
@@ -101,13 +106,13 @@ elif command -v sudo >/dev/null 2>&1; then
     else
         log_warn "Sudo access failed or was cancelled. Falling back to local installation..."
         INSTALL_DIR="$HOME/.local/bin"
-        APP_PATH="$INSTALL_DIR/$BIN_NAME"
+        sync_app_path
         mkdir -p "$INSTALL_DIR"
         install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH"
     fi
 else
     INSTALL_DIR="$HOME/.local/bin"
-    APP_PATH="$INSTALL_DIR/$BIN_NAME"
+    sync_app_path
     mkdir -p "$INSTALL_DIR"
     install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH"
 fi
