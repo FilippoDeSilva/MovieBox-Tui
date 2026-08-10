@@ -30,7 +30,7 @@ impl HistoryManager {
             if path.exists() {
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(mut history) = serde_json::from_str::<Self>(&content) {
-                        history.rebuild_watched_index();
+                        history.hydrate_watched_index();
                         return history;
                     }
                 }
@@ -63,12 +63,24 @@ impl HistoryManager {
         format!("{provider}::{subject_id}::{season}::{episode}")
     }
 
-    fn rebuild_watched_index(&mut self) {
-        self.watched = self
-            .recent
-            .iter()
-            .map(|item| Self::key(&item.provider, &item.subject_id, item.season, item.episode))
-            .collect();
+    fn hydrate_watched_index(&mut self) {
+        if self.watched.is_empty() {
+            self.watched = self
+                .recent
+                .iter()
+                .map(|item| Self::key(&item.provider, &item.subject_id, item.season, item.episode))
+                .collect();
+            return;
+        }
+
+        for item in &self.recent {
+            self.watched.insert(Self::key(
+                &item.provider,
+                &item.subject_id,
+                item.season,
+                item.episode,
+            ));
+        }
     }
 
     pub fn mark_watched(&mut self, item: WatchHistoryItem) {
