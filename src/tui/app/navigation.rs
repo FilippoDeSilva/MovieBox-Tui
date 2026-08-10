@@ -334,7 +334,13 @@ impl App {
                             self.state.search_results.clear();
                             self.state.search_error = None;
                             self.state.search_query.clear();
+                            self.state.search_suggestions.clear();
+                            self.state.suggest_index = None;
                             self.state.search_preview = None;
+                            self.state.preview_loading = false;
+                            self.state.poster_image = None;
+                            self.state.poster_protocol = None;
+                            self.state.search_list_state.select(None);
                             self.state.set_status("Search cleared.".to_string(), 150);
                         }
                     }
