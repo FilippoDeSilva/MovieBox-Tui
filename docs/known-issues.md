@@ -4,10 +4,10 @@ Tracked here so future work and issue reports reference the same facts.
 
 ## Latent / by-design
 
-- **`supports_headers` gate is currently never triggered** — every `PlaybackSource`
-  today either carries no headers or only `referer`/`user-agent`. If a provider ever
-  adds other headers, the VLC path would reject them (by design) and the gate message
-  would matter. Keep `player.rs::supports_headers` in sync with `vlc_command`'s filter.
+- **`supports_headers` is compatibility policy, not just a parser guard.** Sources that
+  carry playback headers already exercise it for Android intent playback, and any future
+  provider that needs headers beyond `referer`/`user-agent` will also trip it for VLC.
+  Keep `player.rs::supports_headers` in sync with `vlc_command`'s filter.
 - **BDIX clients use nested `if let Ok` pyramids** in search handling; they work and
   are logged, but are harder to read. Flattening is deferred (behavior-neutral refactor
   with moderate churn).
