@@ -55,7 +55,7 @@ src/
 
 ## The event loop
 
-`App::run` (in `app/mod.rs`) owns the only loop:
+`App::run` (in `app/run.rs`) owns the only loop:
 
 1. If `clear_terminal_before_draw` is set, the terminal buffer is cleared.
 2. If `state.dirty`, the screen is drawn (`App::draw`).
