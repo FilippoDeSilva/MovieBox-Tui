@@ -304,6 +304,7 @@ impl App {
     pub(super) fn prepare_details_request(&mut self, id: &str) -> RequestContext {
         self.state.poster_protocol = None;
         self.state.is_loading = true;
+        self.state.active_details_request = self.state.active_details_request.wrapping_add(1);
         self.state
             .fetch_cancel
             .store(false, std::sync::atomic::Ordering::Relaxed);
@@ -323,6 +324,7 @@ impl App {
         force_refresh: bool,
         context: RequestContext,
     ) {
+        let request_id = self.state.active_details_request;
         let client = self.client.clone();
         let fourk_client = self.fourk_client.clone();
         let circleftp_client = self.circleftp_client.clone();
@@ -337,7 +339,12 @@ impl App {
                 .await
                 {
                     sender
-                        .send(Action::DetailsSuccess(context, id.clone(), cached))
+                        .send(Action::DetailsSuccess(
+                            context,
+                            request_id,
+                            id.clone(),
+                            cached,
+                        ))
                         .ok();
                     return;
                 }
@@ -365,11 +372,13 @@ impl App {
                     })
                     .await;
                     sender
-                        .send(Action::DetailsSuccess(context, id, details))
+                        .send(Action::DetailsSuccess(context, request_id, id, details))
                         .ok();
                 }
                 Err(error) => {
-                    sender.send(Action::DetailsFailure(context, error)).ok();
+                    sender
+                        .send(Action::DetailsFailure(context, request_id, error))
+                        .ok();
                 }
             }
         });

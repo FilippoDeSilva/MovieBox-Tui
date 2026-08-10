@@ -727,7 +727,10 @@ impl App {
                     .set_status(format!("Preview failed: {}", err), 150);
             }
 
-            Action::DetailsSuccess(context, id, payload) => {
+            Action::DetailsSuccess(context, request_id, id, payload) => {
+                if request_id != self.state.active_details_request {
+                    return None;
+                }
                 if !self.context_is_current(context) || self.state.active_screen != Screen::Details
                 {
                     return None;
@@ -943,7 +946,10 @@ impl App {
                 }
             }
 
-            Action::DetailsFailure(context, err) => {
+            Action::DetailsFailure(context, request_id, err) => {
+                if request_id != self.state.active_details_request {
+                    return None;
+                }
                 if !self.context_is_current(context) {
                     return None;
                 }

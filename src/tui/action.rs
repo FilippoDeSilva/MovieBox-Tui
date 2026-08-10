@@ -77,10 +77,11 @@ pub enum Action {
     FetchDetails(String, bool),
     DetailsSuccess(
         crate::providers::models::RequestContext,
+        u64,
         String,
         serde_json::Value,
     ),
-    DetailsFailure(crate::providers::models::RequestContext, String),
+    DetailsFailure(crate::providers::models::RequestContext, u64, String),
     InitStreamPool(String),
     StreamPoolInitialized(String, Vec<u32>),
     FetchEpisodeStreams {
