@@ -339,9 +339,21 @@ impl App {
                         self.state
                             .fetch_cancel
                             .store(true, std::sync::atomic::Ordering::Relaxed);
+                        self.state.active_details_request =
+                            self.state.active_details_request.wrapping_add(1);
+                        self.state.active_resource_request =
+                            self.state.active_resource_request.wrapping_add(1);
                         self.state.stream_pool.clear();
                         self.state.pending_episode_fetch = None;
+                        self.state.selected_details = None;
                         self.state.selected_resources = None;
+                        self.state.active_subject_id = None;
+                        self.state.available_seasons.clear();
+                        self.state.available_episode_numbers.clear();
+                        self.state.is_fetching_streams = false;
+                        self.state.stream_error = None;
+                        self.state.poster_image = None;
+                        self.state.poster_protocol = None;
                         self.state.active_screen = Screen::Home;
                         self.state.is_loading = false;
                         self.state.language_chosen = false;
