@@ -101,9 +101,9 @@ interval, forwarding them into the action channel (capacity 128).
 
 ## Configuration and persistence
 
-- `config.json` — settings (theme, provider, auto-update, `default_player`, BDIX).
-- `tv_config.json` — user M3U playlist sources (URLs or file paths).
-- `history.json` — watch history.
+- `config.json` — settings (theme, provider, auto-update, `default_player`, BDIX) in the config dir.
+- `tv_config.json` — user M3U playlist sources (URLs or file paths) in the config dir.
+- `history.json` — watch history in the system data dir.
 - Cache lives under the system cache dir, keyed per provider.
 - Logs live under the system data dir with rotation.
 

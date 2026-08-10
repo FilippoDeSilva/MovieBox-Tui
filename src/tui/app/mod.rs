@@ -41,9 +41,13 @@ impl App {
         let config = crate::tui::config::load();
         state.auto_update = config.auto_update;
         state.last_update_check = config.last_update_check;
-        state.active_provider = config.active_provider;
-        state.active_theme_kind = config.active_theme;
         state.bdix_enabled = config.bdix_enabled;
+        state.active_provider = if !state.bdix_enabled && config.active_provider.is_bdix() {
+            crate::providers::models::ProviderKind::MovieBox
+        } else {
+            config.active_provider
+        };
+        state.active_theme_kind = config.active_theme;
         state.default_player = config.default_player;
 
         let mut theme = crate::tui::theme::Theme::new();
