@@ -108,6 +108,7 @@ impl App {
                 if matches!(self.state.active_screen, Screen::Home | Screen::Details) {
                     self.state.show_help = !self.state.show_help;
                     if self.state.show_help {
+                        self.state.show_theme_popup = false;
                         self.state.tv_config_popup = false;
                         self.state.player_picker_popup = false;
                         self.state.subtitle_popup = false;
@@ -227,8 +228,11 @@ impl App {
             },
 
             Action::ToggleThemePopup => {
-                self.state.show_theme_popup = !self.state.show_theme_popup;
-                if self.state.show_theme_popup {
+                let open = !self.state.show_theme_popup;
+                if open {
+                    self.reset_transient_overlays();
+                    self.state.tv_config_popup = false;
+                    self.state.show_theme_popup = true;
                     if let Some(idx) = crate::tui::theme::AVAILABLE_THEMES
                         .iter()
                         .position(|&t| t.eq_ignore_ascii_case(&self.state.active_theme_kind))
@@ -237,6 +241,8 @@ impl App {
                     } else {
                         self.state.theme_list_state.select(Some(0));
                     }
+                } else {
+                    self.state.show_theme_popup = false;
                 }
             }
 

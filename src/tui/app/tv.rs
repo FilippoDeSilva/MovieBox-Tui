@@ -4,6 +4,7 @@ use crate::tui::action::Action;
 impl App {
     pub(super) fn reset_transient_overlays(&mut self) {
         self.state.show_help = false;
+        self.state.show_theme_popup = false;
         self.state.player_picker_popup = false;
         self.state.player_picker_link = None;
         self.state.player_picker_subtitle = None;
