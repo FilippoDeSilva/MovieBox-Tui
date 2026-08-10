@@ -18,6 +18,8 @@ impl App {
                         "/update",
                         "/toggle-update",
                         "/github",
+                        "/theme",
+                        "/themes",
                         "/enable-bdix",
                         "/disable-bdix",
                     ];
