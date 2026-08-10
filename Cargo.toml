@@ -5,7 +5,6 @@ exclude = [
     ".github/",
     ".githooks/",
     "Formula/",
-    "scripts/",
     "install.sh",
     "install.ps1",
 ]
