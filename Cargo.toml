@@ -1,6 +1,14 @@
 [package]
 name = "moviebox-tui"
-exclude = ["assets/", ".github/", "scripts/", "install.sh", "install.ps1"]
+exclude = [
+    "assets/",
+    ".github/",
+    ".githooks/",
+    "Formula/",
+    "scripts/",
+    "install.sh",
+    "install.ps1",
+]
 version = "0.1.10"
 edition = "2024"
 description = "A terminal client for finding and streaming movies, TV shows, and anime from the MovieBox catalog."
@@ -62,4 +70,3 @@ reqwest = { version = "0.13.4", default-features = false, features = ["json", "r
 
 [target.'cfg(target_os = "android")'.dependencies]
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "hickory-dns"] }
-
