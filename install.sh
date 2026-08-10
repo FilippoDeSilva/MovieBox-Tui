@@ -6,10 +6,6 @@ log_success() { echo -e "\033[0;32m$1\033[0m"; }
 log_warn() { echo -e "\033[1;33mWARNING: $1\033[0m"; }
 log_err() { echo -e "\033[0;31mERROR: $1\033[0m"; exit 1; }
 
-if [ -n "${PREFIX:-}" ] && [[ "$PREFIX" == *com.termux* ]]; then
-    log_err "Prebuilt binaries are not available for Termux yet. Please install via Cargo:\n\n  pkg install rust openssl pkg-config\n  cargo install moviebox-tui --locked\n"
-fi
-
 INSTALL_DIR="/usr/local/bin"
 
 BIN_NAME="moviebox-tui"
@@ -45,6 +41,13 @@ ARCH="$(uname -m)"
 
 if [ "$OS" = "Darwin" ]; then
     FILE="MovieBox_macOS_Universal.tar.gz"
+elif [ -n "${PREFIX:-}" ] && [[ "$PREFIX" == *com.termux* ]]; then
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+        FILE="MovieBox_Termux_arm64.tar.gz"
+        INSTALL_DIR="$PREFIX/bin"
+    else
+        log_err "Unsupported Termux architecture ($ARCH). Only arm64/aarch64 is natively hosted. Please use cargo install."
+    fi
 elif [ "$OS" = "Linux" ]; then
     if [ "$ARCH" = "x86_64" ]; then
         FILE="MovieBox_Linux_x64.tar.gz"

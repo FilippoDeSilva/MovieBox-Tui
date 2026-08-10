@@ -61,5 +61,5 @@ strip = true
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "native-tls"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "hickory-dns"] }
 
