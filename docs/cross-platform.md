@@ -10,7 +10,7 @@ Supported: macOS, Linux, Windows, and Android (Termux). The codebase uses
 | macOS | IINA preferred player (via bundled `iina-cli`); VLC/mpv `.app` paths detected. `process_group(0)` on spawn. |
 | Windows | mpv/VLC detected via Program Files + `%LOCALAPPDATA%`; players spawned with `CREATE_NO_WINDOW`; path-safe file stems. |
 | Linux | Flatpak mpv/VLC supported (`flatpak run …`); xdg data/cache dirs. |
-| Android (Termux) | `cfg(target_os = "android")`; playback falls back to `termux-open --chooser` (or `am start`), with `LD_LIBRARY_PATH` cleared. |
+| Android (Termux) | Dynamic filesystem checks for `/system/bin/am` or `termux-open`; playback intelligently strips `LD_LIBRARY_PATH` and `LD_PRELOAD`. Works gracefully in Proot Linux containers and Termux X11 natively. |
 
 ## Terminal capabilities
 

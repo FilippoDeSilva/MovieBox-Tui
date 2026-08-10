@@ -23,7 +23,7 @@ detected player.
 | mpv | `mpv --autofit=WxH --geometry=50%:50% --idle=no --keep-open=no [--referrer=..] [--user-agent=..] [--sub-file=..] <url>` | Window sized to the terminal. Flatpak mpv is launched via `flatpak run`. |
 | VLC | `vlc --width=W --height=H --play-and-exit [--http-referrer=..] [--http-user-agent=..] [--sub-file=..] <url>` | |
 | IINA | `iina-cli --keep-running --no-stdin --mpv-autofit=.. --mpv-<option> .. <url>` | Uses the bundled `iina-cli`; falls back to `open -a IINA <url>` only if the CLI is absent. |
-| Android | `termux-open --chooser --content-type video/* <url>` (or `am start` fallback) | Opens an app chooser on the device. |
+| Android / Proot | `termux-open --chooser --content-type video/* <url>` (or absolute `/system/bin/am start` fallback, ensuring `.so` injections are dropped) | Opens an app chooser on the device. Falls back natively to mpv/VLC if in Termux X11. |
 
 Window size is derived from the live terminal size times the real font cell size
 (reported by the image picker), clamped to a sane range.
