@@ -34,5 +34,5 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 
 ## CLI
 
-- `moviebox-tui --version` prints the version and exits.
+- `moviebox-tui --version`, `moviebox-tui -v`, and `moviebox-tui -V` print the version and exit.
 - No other flags.
