@@ -639,9 +639,21 @@ impl App {
                     return None;
                 }
                 if self.state.player_picker_popup {
-                    self.state.player_picker_popup = false;
                     let idx = self.state.player_picker_state.selected().unwrap_or(0);
                     if let Some(player) = self.state.available_players.get(idx).copied() {
+                        if let Some(source) = self.state.player_picker_playback.clone() {
+                            if !crate::tui::player::supports_headers(player, &source.headers) {
+                                self.state.set_status(
+                                    format!(
+                                        "{} cannot play this source; choose mpv or IINA.",
+                                        player.label()
+                                    ),
+                                    180,
+                                );
+                                return None;
+                            }
+                        }
+                        self.state.player_picker_popup = false;
                         self.remember_player_preference(player);
                         if let Some(source) = self.state.player_picker_playback.take() {
                             self.action_sender

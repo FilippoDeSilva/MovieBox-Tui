@@ -3,6 +3,17 @@ use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 impl App {
+    fn preferred_playback_player(
+        &self,
+        source: &crate::providers::models::PlaybackSource,
+    ) -> Option<crate::tui::state::PlayerKind> {
+        self.state
+            .available_players
+            .iter()
+            .copied()
+            .find(|kind| crate::tui::player::supports_headers(*kind, &source.headers))
+    }
+
     fn build_watch_history_item(&self) -> Option<crate::history::WatchHistoryItem> {
         let subject_id = self.state.active_subject_id.as_ref()?;
         let provider = self.provider_for_subject(subject_id).cache_key();
@@ -234,7 +245,14 @@ impl App {
                             "Preparing playback",
                             "Resolving the selected mirror.",
                         );
-                        let default_player = self.state.available_players.first().copied();
+                        let default_player = self.preferred_playback_player(
+                            &crate::providers::models::PlaybackSource::bare(
+                                release.provider,
+                                release.mirrors[0].resolver_url.clone(),
+                                None,
+                            ),
+                        );
+                        let available_players = self.state.available_players.clone();
                         let client = if release.provider == ProviderKind::BdixCircleFtp {
                             let sender_clone = self.action_sender.clone();
                             let source = crate::providers::models::PlaybackSource::bare(
@@ -257,6 +275,13 @@ impl App {
                         tokio::spawn(async move {
                             match client.resolve_release(&release).await {
                                 Ok(source) => {
+                                    let default_player =
+                                        available_players.iter().copied().find(|kind| {
+                                            crate::tui::player::supports_headers(
+                                                *kind,
+                                                &source.headers,
+                                            )
+                                        });
                                     if open_with || default_player.is_none() {
                                         sender.send(Action::ShowPlaybackPicker(source)).ok();
                                     } else if let Some(player) = default_player {
