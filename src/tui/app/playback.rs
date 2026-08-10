@@ -3,6 +3,56 @@ use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 impl App {
+    fn build_watch_history_item(&self) -> Option<crate::history::WatchHistoryItem> {
+        let subject_id = self.state.active_subject_id.as_ref()?;
+        let provider = self.provider_for_subject(subject_id).cache_key();
+        let season = self.state.selected_season;
+        let episode = self.state.selected_episode;
+        let mut title = "Unknown".to_string();
+        let mut cover_url = None;
+        let mut stype = 1;
+        let mut release_year = "Unknown".to_string();
+
+        if let Some(details) = &self.state.selected_details {
+            if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
+                title = t.to_string();
+            }
+            cover_url = details
+                .get("poster")
+                .or_else(|| details.get("cover"))
+                .or_else(|| details.get("pic"))
+                .and_then(|c| c.as_str().or_else(|| c.get("url").and_then(|u| u.as_str())))
+                .map(|s| s.to_string());
+            stype = crate::tui::state::stype(details);
+            if let Some(y) = details
+                .get("year")
+                .or_else(|| details.get("releaseYear"))
+                .and_then(|y| y.as_str())
+            {
+                release_year = y.to_string();
+            } else if let Some(y) = details.get("year").and_then(|y| y.as_i64()) {
+                release_year = y.to_string();
+            }
+        }
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        Some(crate::history::WatchHistoryItem {
+            provider: provider.to_string(),
+            subject_id: subject_id.clone(),
+            title,
+            cover_url,
+            stype,
+            release_year,
+            season,
+            episode,
+            timestamp,
+        })
+    }
+
     pub(super) fn launch_player(
         &mut self,
         kind: crate::tui::state::PlayerKind,
@@ -10,60 +60,7 @@ impl App {
         subtitle: Option<String>,
         headers: Vec<(String, String)>,
     ) {
-        if let Some(subject_id) = &self.state.active_subject_id {
-            let season = self.state.selected_season;
-            let episode = self.state.selected_episode;
-            let provider = self.provider_for_subject(subject_id).cache_key();
-
-            let mut title = "Unknown".to_string();
-            let mut cover_url = None;
-            let mut stype = 1;
-            let mut release_year = "Unknown".to_string();
-
-            if let Some(details) = &self.state.selected_details {
-                if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
-                    title = t.to_string();
-                }
-                cover_url = details
-                    .get("poster")
-                    .or_else(|| details.get("cover"))
-                    .or_else(|| details.get("pic"))
-                    .and_then(|c| c.as_str().or_else(|| c.get("url").and_then(|u| u.as_str())))
-                    .map(|s| s.to_string());
-                stype = crate::tui::state::stype(details);
-                if let Some(y) = details
-                    .get("year")
-                    .or_else(|| details.get("releaseYear"))
-                    .and_then(|y| y.as_str())
-                {
-                    release_year = y.to_string();
-                } else if let Some(y) = details.get("year").and_then(|y| y.as_i64()) {
-                    release_year = y.to_string();
-                }
-            }
-
-            let timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-
-            self.state
-                .history
-                .mark_watched(crate::history::WatchHistoryItem {
-                    provider: provider.to_string(),
-                    subject_id: subject_id.clone(),
-                    title,
-                    cover_url,
-                    stype,
-                    release_year,
-                    season,
-                    episode,
-                    timestamp,
-                });
-            let history = self.state.history.clone();
-            tokio::task::spawn_blocking(move || history.save());
-            self.state.dirty = true;
-        }
+        let history_item = self.build_watch_history_item();
 
         let client = self.client.http_client().clone();
         let sender = self.action_sender.clone();
@@ -169,6 +166,9 @@ impl App {
 
             match command.spawn() {
                 Ok(mut child) => {
+                    if let Some(item) = history_item {
+                        sender.send(Action::MarkWatched(item)).ok();
+                    }
                     let start_time = std::time::Instant::now();
                     let stderr_stream = child.stderr.take();
 
@@ -486,6 +486,11 @@ impl App {
                     return None;
                 }
                 self.launch_player(kind, source.url, source.subtitle, source.headers);
+            }
+            Action::MarkWatched(item) => {
+                self.state.history.mark_watched(item);
+                let history = self.state.history.clone();
+                tokio::task::spawn_blocking(move || history.save());
             }
             Action::PlayerCrashed(code, error_msg) => {
                 let code_str = code

@@ -52,8 +52,17 @@ impl HistoryManager {
     pub fn save(&self) {
         if let Some(path) = Self::history_file_path() {
             if let Ok(content) = serde_json::to_string(self) {
-                if let Err(error) = fs::write(&path, content) {
+                let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+                if let Err(error) = fs::write(&temporary, content) {
                     log::warn!("failed to save watch history: {error}");
+                    return;
+                }
+                if fs::rename(&temporary, &path).is_err() {
+                    let _ = fs::remove_file(&path);
+                    if let Err(error) = fs::rename(&temporary, &path) {
+                        let _ = fs::remove_file(&temporary);
+                        log::warn!("failed to commit watch history: {error}");
+                    }
                 }
             }
         }

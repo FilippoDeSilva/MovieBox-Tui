@@ -182,6 +182,7 @@ impl App {
             | Action::LaunchMpv(..)
             | Action::LaunchPlayback(..)
             | Action::LaunchPlayer(..)
+            | Action::MarkWatched(..)
             | Action::PlayerCrashed(..) => {
                 self.handle_playback(action).await;
             }

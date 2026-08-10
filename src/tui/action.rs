@@ -117,5 +117,6 @@ pub enum Action {
         crate::tui::state::PlayerKind,
         crate::providers::models::PlaybackSource,
     ),
+    MarkWatched(crate::history::WatchHistoryItem),
     PlayerCrashed(Option<i32>, String),
 }
