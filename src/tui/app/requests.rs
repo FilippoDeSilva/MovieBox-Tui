@@ -488,6 +488,9 @@ impl App {
             }
 
             Action::FetchPreview(id) => {
+                self.state.active_preview_request =
+                    self.state.active_preview_request.wrapping_add(1);
+                let request_id = self.state.active_preview_request;
                 if self.state.is_tv_mode {
                     self.state.preview_loading = false;
                     if !self.state.image_cache.contains(&id) {
@@ -616,7 +619,7 @@ impl App {
                     .await
                     {
                         sender
-                            .send(Action::PreviewSuccess(id_clone, cached_disk))
+                            .send(Action::PreviewSuccess(request_id, id_clone, cached_disk))
                             .ok();
                         return;
                     }
@@ -629,16 +632,23 @@ impl App {
                                 crate::cache::set_provider_details_cache(prov, &id_save, &det_save)
                             })
                             .await;
-                            sender.send(Action::PreviewSuccess(id_clone, details)).ok();
+                            sender
+                                .send(Action::PreviewSuccess(request_id, id_clone, details))
+                                .ok();
                         }
                         Err(e) => {
-                            sender.send(Action::PreviewFailure(format!("{:?}", e))).ok();
+                            sender
+                                .send(Action::PreviewFailure(request_id, format!("{:?}", e)))
+                                .ok();
                         }
                     }
                 });
             }
 
-            Action::PreviewSuccess(id, json) => {
+            Action::PreviewSuccess(request_id, id, json) => {
+                if request_id != self.state.active_preview_request {
+                    return None;
+                }
                 let current_id = if self.state.active_screen == Screen::Details {
                     self.state
                         .selected_details
@@ -735,7 +745,10 @@ impl App {
                 }
             }
 
-            Action::PreviewFailure(err) => {
+            Action::PreviewFailure(request_id, err) => {
+                if request_id != self.state.active_preview_request {
+                    return None;
+                }
                 self.state.preview_loading = false;
                 self.state
                     .set_status(format!("Preview failed: {}", err), 150);
