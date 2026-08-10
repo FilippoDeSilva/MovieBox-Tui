@@ -42,7 +42,8 @@ impl App {
         state.auto_update = config.auto_update;
         state.last_update_check = config.last_update_check;
         state.bdix_enabled = config.bdix_enabled;
-        state.active_provider = if !state.bdix_enabled && config.active_provider.is_bdix() {
+        let provider_was_sanitized = !state.bdix_enabled && config.active_provider.is_bdix();
+        state.active_provider = if provider_was_sanitized {
             crate::providers::models::ProviderKind::MovieBox
         } else {
             config.active_provider
@@ -63,7 +64,7 @@ impl App {
             state.active_theme_kind = "Mocha".to_string();
         }
 
-        Self {
+        let app = Self {
             theme,
             state,
             client: MovieBoxClient::new(),
@@ -72,7 +73,11 @@ impl App {
             dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient::new(),
             action_sender,
             action_receiver,
+        };
+        if provider_was_sanitized {
+            app.persist_config();
         }
+        app
     }
 
     fn request_context(&self) -> RequestContext {
