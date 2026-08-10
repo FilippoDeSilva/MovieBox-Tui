@@ -198,14 +198,26 @@ impl App {
                 self.state.selected_resources = None;
                 self.state.available_seasons.clear();
                 self.state.available_episode_numbers.clear();
+                if self.state.is_tv_mode {
+                    self.state.tv_channels.clear();
+                    self.state.search_results.clear();
+                }
                 self.prepare_image_refresh();
                 self.state.set_status("Clearing cache...".to_string(), 150);
             }
 
             Action::CacheCleared(result) => match result {
                 Ok(()) => {
-                    self.state
-                        .set_status("Cache cleared completely.".to_string(), 150);
+                    if self.state.is_tv_mode && !self.state.tv_playlists.is_empty() {
+                        self.state.set_status(
+                            "Cache cleared. Reloading TV playlists...".to_string(),
+                            150,
+                        );
+                        self.reload_tv_playlists();
+                    } else {
+                        self.state
+                            .set_status("Cache cleared completely.".to_string(), 150);
+                    }
                 }
                 Err(error) => {
                     log::error!("cache clear failed: {error}");
