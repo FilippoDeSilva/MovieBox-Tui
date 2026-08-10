@@ -44,10 +44,18 @@ pub fn load() -> Config {
     if let Some(v) = value.get("last_update_check").and_then(|v| v.as_u64()) {
         config.last_update_check = v;
     }
-    if value.get("active_provider").and_then(|v| v.as_str())
-        == Some(ProviderKind::FourKHdHub.cache_key())
-    {
-        config.active_provider = ProviderKind::FourKHdHub;
+    if let Some(provider) = value.get("active_provider").and_then(|v| v.as_str()) {
+        config.active_provider = match provider {
+            value if value == ProviderKind::MovieBox.cache_key() => ProviderKind::MovieBox,
+            value if value == ProviderKind::FourKHdHub.cache_key() => ProviderKind::FourKHdHub,
+            value if value == ProviderKind::BdixCircleFtp.cache_key() => {
+                ProviderKind::BdixCircleFtp
+            }
+            value if value == ProviderKind::BdixDhakaFlix.cache_key() => {
+                ProviderKind::BdixDhakaFlix
+            }
+            _ => config.active_provider,
+        };
     }
     if let Some(v) = value.get("active_theme").and_then(|v| v.as_str()) {
         config.active_theme = v.to_string();
