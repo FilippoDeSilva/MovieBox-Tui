@@ -433,8 +433,10 @@ impl App {
             Action::ShowPlaybackPicker(source) => {
                 self.state.is_resolving_playback = false;
                 if self.state.available_players.is_empty() {
-                    self.state
-                        .set_status("No media player found. Install mpv, IINA, or VLC.", 150);
+                    self.state.set_status(
+                        "No media player found. Install mpv, IINA, VLC, or use Android Player.",
+                        150,
+                    );
                     return None;
                 }
                 self.state.show_help = false;
@@ -452,7 +454,7 @@ impl App {
                     self.state.notify(
                         NotificationKind::Error,
                         "Player unavailable",
-                        "Install mpv, IINA, or VLC.",
+                        "Install mpv, IINA, VLC, or use Android Player.",
                     );
                     return None;
                 }
