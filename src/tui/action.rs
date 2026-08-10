@@ -46,7 +46,7 @@ pub enum Action {
     },
     HomepageFailure(u64, String),
     Suggest(String),
-    SuggestSuccess(String, serde_json::Value),
+    SuggestSuccess(u64, String, serde_json::Value),
     MoveUp,
     MoveDown,
     MoveLeft,

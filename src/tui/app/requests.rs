@@ -9,6 +9,9 @@ impl App {
     pub(super) async fn handle_requests(&mut self, action: Action) -> Option<()> {
         match action {
             Action::Suggest(query) => {
+                self.state.active_suggest_request =
+                    self.state.active_suggest_request.wrapping_add(1);
+                let request_id = self.state.active_suggest_request;
                 if query.starts_with('/') {
                     let mut commands = vec![
                         "/clear-cache",
@@ -45,7 +48,7 @@ impl App {
                             }]
                         });
                         self.action_sender
-                            .send(Action::SuggestSuccess(query, fake_payload))
+                            .send(Action::SuggestSuccess(request_id, query, fake_payload))
                             .ok();
                     }
                     return None;
@@ -64,12 +67,20 @@ impl App {
                 let query_clone = query.clone();
                 tokio::spawn(async move {
                     if let Ok(res) = client.suggest(&query_clone).await {
-                        sender.send(Action::SuggestSuccess(query_clone, res)).ok();
+                        sender
+                            .send(Action::SuggestSuccess(request_id, query_clone, res))
+                            .ok();
                     }
                 });
             }
 
-            Action::SuggestSuccess(query, payload) => {
+            Action::SuggestSuccess(request_id, query, payload) => {
+                if request_id != self.state.active_suggest_request {
+                    return None;
+                }
+                if self.state.is_tv_mode || self.state.active_provider != ProviderKind::MovieBox {
+                    return None;
+                }
                 if self.state.suggest_index.is_some() {
                     return None;
                 }
