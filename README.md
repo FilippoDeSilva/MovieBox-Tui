@@ -67,8 +67,7 @@ Prebuilt binaries are available for macOS, Linux, Windows, and Termux arm64 rele
 
 ```bash
 brew tap mesamirh/moviebox-tui https://github.com/mesamirh/MovieBox-Tui
-brew trust mesamirh/moviebox-tui
-brew install moviebox-tui
+brew install mesamirh/moviebox-tui/moviebox-tui
 ```
 
 The formula selects the correct macOS, Linux x86_64, or Linux ARM64 release.
