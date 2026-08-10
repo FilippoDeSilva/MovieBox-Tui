@@ -154,10 +154,20 @@ impl App {
                     self.state.is_loading = false;
                     self.state.is_homepage_mode = false;
                     self.state.active_screen = Screen::Home;
+                    self.state.active_subject_id = None;
+                    self.state.active_preview_request =
+                        self.state.active_preview_request.wrapping_add(1);
                     self.state.search_results.clear();
                     self.state.search_error = None;
+                    self.state.search_preview = None;
+                    self.state.preview_loading = false;
+                    self.state.poster_image = None;
+                    self.state.poster_protocol = None;
                     self.state.search_posters.clear();
                     self.state.search_poster_protocols.clear();
+                    self.state.search_list_state.select(None);
+                    self.state.search_suggestions.clear();
+                    self.state.suggest_index = None;
 
                     let mut recent = self.state.history.recent.clone();
                     if recent.is_empty() {
