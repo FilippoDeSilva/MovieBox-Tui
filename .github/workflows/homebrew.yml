@@ -14,10 +14,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Determine ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ github.ref }}"
+          else
+            REF="${{ github.event.workflow_run.head_sha }}"
+          fi
+          echo "target_ref=$REF" >> $GITHUB_OUTPUT
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
+          ref: ${{ steps.ref.outputs.target_ref }}
           fetch-depth: 0
 
       - name: Get Release Data
