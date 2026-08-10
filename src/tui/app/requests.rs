@@ -1142,7 +1142,7 @@ impl App {
             }
 
             Action::InitStreamPool(subject_id) => {
-                if self.state.active_provider != ProviderKind::MovieBox {
+                if self.provider_for_subject(&subject_id) != ProviderKind::MovieBox {
                     self.state
                         .stream_pool
                         .insert(subject_id.clone(), Default::default());

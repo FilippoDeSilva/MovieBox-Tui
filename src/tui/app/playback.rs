@@ -13,7 +13,7 @@ impl App {
         if let Some(subject_id) = &self.state.active_subject_id {
             let season = self.state.selected_season;
             let episode = self.state.selected_episode;
-            let provider = self.state.active_provider.cache_key();
+            let provider = self.provider_for_subject(subject_id).cache_key();
 
             let mut title = "Unknown".to_string();
             let mut cover_url = None;
@@ -227,7 +227,7 @@ impl App {
                     return None;
                 }
                 self.state.is_resolving_playback = true;
-                if self.state.active_provider == ProviderKind::FourKHdHub {
+                if self.current_subject_provider() == ProviderKind::FourKHdHub {
                     if let Some(release) = self.get_selected_release() {
                         self.state.notify(
                             NotificationKind::Info,

@@ -94,6 +94,28 @@ impl App {
         self.state.dirty = true;
     }
 
+    pub(super) fn provider_for_subject(&self, subject_id: &str) -> ProviderKind {
+        self.state
+            .search_results
+            .iter()
+            .find(|result| result.id == subject_id)
+            .map(|result| result.provider)
+            .or_else(|| {
+                self.get_selected_release()
+                    .as_ref()
+                    .map(|release| release.provider)
+            })
+            .unwrap_or(self.state.active_provider)
+    }
+
+    pub(super) fn current_subject_provider(&self) -> ProviderKind {
+        self.state
+            .active_subject_id
+            .as_deref()
+            .map(|subject_id| self.provider_for_subject(subject_id))
+            .unwrap_or(self.state.active_provider)
+    }
+
     pub(super) fn cycle_details_pane(&mut self, forward: bool) {
         use crate::tui::state::DetailsPane;
 

@@ -258,7 +258,7 @@ impl App {
                     return None;
                 }
                 self.state.is_resolving_playback = true;
-                if self.state.active_provider == ProviderKind::FourKHdHub {
+                if self.current_subject_provider() == ProviderKind::FourKHdHub {
                     if let Some(release) = self.get_selected_release() {
                         self.state.notify(
                             NotificationKind::Info,

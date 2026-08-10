@@ -157,7 +157,7 @@ impl App {
                         };
                         let id_clone = id.clone();
                         let id_clone_2 = id.clone();
-                        let provider = self.state.active_provider;
+                        let provider = self.provider_for_subject(&id);
                         tokio::task::spawn_blocking(move || {
                             crate::cache::invalidate_provider_stream_cache(
                                 provider, &id_clone, se, ep,
