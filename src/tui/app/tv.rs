@@ -2,11 +2,29 @@ use super::App;
 use crate::tui::action::Action;
 
 impl App {
+    fn reset_tv_mode_overlays(&mut self) {
+        self.state.show_help = false;
+        self.state.player_picker_popup = false;
+        self.state.player_picker_link = None;
+        self.state.player_picker_subtitle = None;
+        self.state.player_picker_playback = None;
+        self.state.subtitle_popup = false;
+        self.state.is_download_subtitle_popup = false;
+        self.state.pending_play_link = None;
+        self.state.pending_open_with = false;
+        self.state.subtitle_list.clear();
+        self.state.subtitle_list_state.select(None);
+        self.state.show_season_download_confirm = false;
+        self.state.show_episode_download_confirm = false;
+        self.state.is_resolving_playback = false;
+    }
+
     pub(super) async fn handle_tv(&mut self, action: Action) -> Option<()> {
         match action {
             Action::ToggleTvMode => {
                 self.state.is_tv_mode = !self.state.is_tv_mode;
                 self.state.tick_count = 0;
+                self.reset_tv_mode_overlays();
                 if self.state.is_tv_mode {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
@@ -27,10 +45,7 @@ impl App {
 
             Action::ShowTvConfig => {
                 if self.state.is_tv_mode {
-                    self.state.show_help = false;
-                    self.state.player_picker_popup = false;
-                    self.state.subtitle_popup = false;
-                    self.state.is_download_subtitle_popup = false;
+                    self.reset_tv_mode_overlays();
                     self.state.tv_config_popup = true;
                     self.state.input_mode = crate::tui::state::InputMode::Normal;
                     self.state.tv_manager_selected = 1;
