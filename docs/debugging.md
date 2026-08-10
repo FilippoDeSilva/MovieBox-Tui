@@ -10,7 +10,7 @@ only shows a short status line. See [logging.md](logging.md) for location and se
 2. Reproduce the problem (search, open details, play, download, TV).
 3. Grab the current log file (path printed at startup, and in the log's session header):
    - macOS: `~/Library/Application Support/moviebox-tui/logs/moviebox-tui_rCURRENT.log`
-   - Windows: `%APPDATA%\moviebox-tui\logs\moviebox-tui_rCURRENT.log`
+   - Windows: `%LOCALAPPDATA%\moviebox-tui\logs\moviebox-tui_rCURRENT.log`
    - Linux: `$XDG_DATA_HOME/moviebox-tui/logs/moviebox-tui_rCURRENT.log`
      (else `~/.local/share/moviebox-tui/logs/moviebox-tui_rCURRENT.log`)
 4. Include it when opening an issue.
