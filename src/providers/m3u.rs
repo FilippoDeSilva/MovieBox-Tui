@@ -66,7 +66,7 @@ impl M3UParser {
                     .error_for_status()?
                     .text()
                     .await?;
-                let _ = tokio::fs::write(&file_path, &res).await;
+                let _ = write_cache_file(&file_path, res.as_bytes()).await;
                 res
             } else {
                 tokio::fs::read_to_string(&file_path).await?
@@ -133,6 +133,23 @@ impl M3UParser {
 
         channels
     }
+}
+
+async fn write_cache_file(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    let stamp = SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
+    tokio::fs::write(&temporary, bytes).await?;
+    if tokio::fs::rename(&temporary, path).await.is_err() {
+        let _ = tokio::fs::remove_file(path).await;
+        if let Err(error) = tokio::fs::rename(&temporary, path).await {
+            let _ = tokio::fs::remove_file(&temporary).await;
+            return Err(error);
+        }
+    }
+    Ok(())
 }
 
 fn cache_filename(raw: &str) -> String {
