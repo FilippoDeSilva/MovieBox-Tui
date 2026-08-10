@@ -18,7 +18,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
       is_new: ${{ steps.check.outputs.is_new }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
       - name: Get version from Cargo.toml
         id: check
         run: |
@@ -41,7 +41,7 @@ jobs:
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
@@ -80,7 +80,7 @@ jobs:
             os: windows-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -156,7 +156,7 @@ jobs:
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
 
       - name: Download x86_64 artifact
         uses: actions/download-artifact@v8
