@@ -71,7 +71,9 @@ src/
     run.rs           App::run (event loop) and App::draw (rendering).
     network.rs       fetch_poster_bytes, decode_poster, provider_search,
                      provider_details.
-    requests.rs      handle_requests: search/homepage/suggest/details/preview/
+    search.rs        Search-mode command routing, search state setup, provider
+                     search dispatch, poster prefetch helpers.
+    requests.rs      handle_requests: suggest/history/homepage/details/preview/
                      episode-streams/poster actions.
     playback.rs      handle_playback: play/subtitle/picker/launch/crash actions
                      + launch_player.

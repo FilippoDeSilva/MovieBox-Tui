@@ -9,7 +9,7 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 
 - macOS: IINA (if present), then mpv, then VLC.
 - Linux/Windows: mpv, then VLC.
-- Android/Termux: the Android intent fallback is always available last.
+- Android/Termux: the Android intent fallback is attempted last when `termux-open` or `am` is available.
 
 Resolution runs once at startup and is cached (`OnceLock`). A preferred player can be
 forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`,
@@ -23,7 +23,7 @@ detected player.
 | mpv | `mpv --autofit=WxH --geometry=50%:50% --idle=no --keep-open=no [--referrer=..] [--user-agent=..] [--sub-file=..] <url>` | Window sized to the terminal. Flatpak mpv is launched via `flatpak run`. |
 | VLC | `vlc --width=W --height=H --play-and-exit [--http-referrer=..] [--http-user-agent=..] [--sub-file=..] <url>` | |
 | IINA | `iina-cli --keep-running --no-stdin --mpv-autofit=.. --mpv-<option> .. <url>` | Uses the bundled `iina-cli`; falls back to `open -a IINA <url>` only if the CLI is absent. |
-| Android / Proot | `termux-open --chooser --content-type video/* <url>` (or absolute `/system/bin/am start` fallback, ensuring `.so` injections are dropped) | Opens an app chooser on the device. Falls back natively to mpv/VLC if in Termux X11. |
+| Android / Proot | `termux-open --chooser --content-type video/* <url>` (or absolute `/system/bin/am start` fallback, ensuring `.so` injections are dropped) | Opens an app chooser on the device. Real-device chooser behavior should be confirmed for each release. |
 
 Window size is derived from the live terminal size times the real font cell size
 (reported by the image picker), clamped to a sane range.

@@ -48,7 +48,7 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - View rich graphical posters in supported terminals (Kitty, iTerm2, Sixel) or fallback to text art
 - Let the app automatically manage configuration and clean up expired caches
 
-MovieBox-TUI resolves links from upstream services. Availability can change when those services change.
+MovieBox-TUI resolves links from upstream services. Availability can change when those services change, and some mirrors are region- or rate-limit-dependent.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ MovieBox-TUI resolves links from upstream services. Availability can change when
 
 ## Installation
 
-Prebuilt binaries are available for all supported platforms. All official installers verify the release SHA-256 checksum automatically.
+Prebuilt binaries are available for macOS, Linux, Windows, and Termux arm64 releases. The official install scripts verify the release SHA-256 checksum automatically.
 
 ### macOS or Linux
 
@@ -93,7 +93,7 @@ The installer selects x86_64 or ARM64, installs under `%LOCALAPPDATA%\MovieBox-T
 
 ### Android (Termux)
 
-MovieBox-Tui runs natively in Termux and opens videos directly in your installed Android video apps (VLC, MX Player, etc).
+MovieBox-Tui runs natively in Termux and opens videos through the Android app chooser on supported devices.
 
 Preferred install via TUR (Termux User Repository):
 
@@ -105,7 +105,8 @@ termux-setup-storage
 
 TUR packages are distributed separately from crates.io. New MovieBox-Tui GitHub
 releases may take some time to appear in TUR, and users still need to update
-packages normally in Termux (for example via `pkg upgrade`).
+packages normally in Termux (for example via `pkg upgrade`). Termux playback
+should be rechecked on real devices for each release.
 If you previously installed MovieBox-Tui with `cargo install`, see
 [Troubleshooting](#troubleshooting) for the Termux PATH fix.
 
@@ -170,7 +171,7 @@ $env:MOVIEBOX_VLC_PATH = "D:\Apps\VLC\vlc.exe"
 moviebox-tui
 ```
 
-IINA is macOS-only. mpv provides the broadest source-header compatibility.
+IINA is macOS-only. mpv provides the broadest source-header compatibility. Android intent playback depends on device chooser behavior and cannot attach subtitles.
 
 ## Usage
 

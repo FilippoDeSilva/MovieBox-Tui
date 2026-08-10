@@ -12,6 +12,7 @@ mod network;
 mod playback;
 mod requests;
 mod run;
+mod search;
 mod system;
 mod tv;
 

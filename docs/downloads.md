@@ -20,7 +20,8 @@ and optional segmentation. Orchestration lives in `app/download.rs`.
 
 `safe_file_stem` sanitizes titles for all platforms: control/whitespace/illegal
 characters are replaced, Windows reserved names (`CON`, `COM1`-`COM9`, …) are avoided,
-and length is capped. Files go to the user's download directory (on Android Proot, Termux X11, or native JVM, it dynamically scopes to `storage/downloads` when present, safely dropping filesystem target boundaries).
+and length is capped. Files go to the user's download directory. On Android-family
+environments the code prefers shared `storage/downloads` when present.
 
 ## Seasons
 

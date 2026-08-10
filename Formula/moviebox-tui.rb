@@ -7,7 +7,7 @@ class MovieboxTui < Formula
   desc "Stream movies, shows, anime, and live TV from your terminal"
   homepage "https://github.com/mesamirh/MovieBox-Tui"
   version VERSION
-  license "MIT"
+  license any_of: ["MIT", "Apache-2.0"]
 
   on_macos do
     url "https://github.com/mesamirh/MovieBox-Tui/releases/download/v#{VERSION}/MovieBox_macOS_Universal.tar.gz"

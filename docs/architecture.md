@@ -30,9 +30,12 @@ src/
                                 dispatcher (thin routing table)
       run.rs                    terminal event loop (run) and rendering (draw)
       network.rs                poster fetch + provider dispatch helpers
+      search.rs                 search command routing, search request setup,
+                                provider search dispatch, poster prefetch
       playback.rs               player launching + playback actions
       download.rs               download orchestration actions
-      requests.rs               search/homepage/details/preview/episode-stream actions
+      requests.rs               suggest/history/homepage/details/preview/
+                                episode-stream actions
       navigation.rs             list navigation, submit actions, provider helpers
       tv.rs                     TV mode: playlist manager + playback
       keyboard.rs               raw key-event handling
