@@ -8,8 +8,6 @@ function Write-Err { param([string]$Message) Write-Host "ERROR: $Message" -Foreg
 
 $InstallDir = "$env:LOCALAPPDATA\MovieBox-Tui"
 $ExePath = "$InstallDir\moviebox-tui.exe"
-$TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("moviebox-tui-" + [guid]::NewGuid())
-New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
 
 Write-Info "Fetching latest version information..."
 try {
@@ -61,6 +59,8 @@ if ($Architecture -eq "ARM64") {
 } else {
     Write-Err "Unsupported Windows architecture: $Architecture"
 }
+$TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("moviebox-tui-" + [guid]::NewGuid())
+New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
 $ZipFile = Join-Path $TempDir $ArchiveName
 $ChecksumFile = Join-Path $TempDir "SHA256SUMS"
 $BaseUrl = "https://github.com/mesamirh/MovieBox-Tui/releases/download/$Version"
