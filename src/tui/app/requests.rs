@@ -158,15 +158,13 @@ impl App {
 
                         for item in recent {
                             use crate::providers::models::ProviderKind;
-                            let stored = item.provider.to_ascii_lowercase();
-                            let provider = ProviderKind::ENABLED
-                                .iter()
-                                .copied()
-                                .find(|provider| {
-                                    stored == provider.label().to_ascii_lowercase()
-                                        || stored == provider.cache_key()
-                                })
-                                .unwrap_or(self.state.active_provider);
+                            let provider = ProviderKind::parse(&item.provider).unwrap_or_else(|| {
+                                log::warn!(
+                                    "unknown watch-history provider '{}'; defaulting to MovieBox",
+                                    item.provider
+                                );
+                                ProviderKind::MovieBox
+                            });
                             self.state.search_results.push(SearchResult {
                                 id: item.subject_id.clone(),
                                 title: item.title.clone(),

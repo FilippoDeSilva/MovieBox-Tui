@@ -37,6 +37,16 @@ impl ProviderKind {
         }
     }
 
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "moviebox" => Some(Self::MovieBox),
+            "4khdhub" | "fourkhdhub" => Some(Self::FourKHdHub),
+            "bdix_circleftp" | "circleftp (bdix)" => Some(Self::BdixCircleFtp),
+            "bdix_dhakaflix" | "dhakaflix (bdix)" => Some(Self::BdixDhakaFlix),
+            _ => None,
+        }
+    }
+
     pub const fn is_bdix(self) -> bool {
         matches!(self, Self::BdixCircleFtp | Self::BdixDhakaFlix)
     }
