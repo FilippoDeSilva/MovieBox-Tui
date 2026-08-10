@@ -20,9 +20,10 @@ fn purge_stale_subtitles() {
     tokio::task::spawn_blocking(|| {
         let max_age = 24 * 60 * 60;
         let mut dirs = vec![std::env::temp_dir().join("moviebox-tui/subs")];
-        if cfg!(target_os = "android") {
-            if let Some(home) = dirs::home_dir() {
-                dirs.push(home.join("storage/downloads/moviebox_subs"));
+        if let Some(home) = dirs::home_dir() {
+            let android_storage = home.join("storage/downloads/moviebox_subs");
+            if home.join("storage/downloads").exists() {
+                dirs.push(android_storage);
             }
         }
 

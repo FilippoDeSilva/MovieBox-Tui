@@ -75,7 +75,6 @@ impl App {
             .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
             .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-        #[cfg(target_os = "android")]
         let base_dir = if let Some(home) = dirs::home_dir() {
             let android_storage = home.join("storage/downloads");
             if android_storage.exists() {
