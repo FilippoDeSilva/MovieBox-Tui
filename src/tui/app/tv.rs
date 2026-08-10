@@ -22,9 +22,24 @@ impl App {
     pub(super) async fn handle_tv(&mut self, action: Action) -> Option<()> {
         match action {
             Action::ToggleTvMode => {
+                self.state
+                    .fetch_cancel
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                self.state.fetch_cancel =
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
                 self.state.is_tv_mode = !self.state.is_tv_mode;
                 self.state.tick_count = 0;
                 self.reset_transient_overlays();
+                self.state.is_loading = false;
+                self.state.is_fetching_streams = false;
+                self.state.pending_episode_fetch = None;
+                self.state.selected_details = None;
+                self.state.selected_resources = None;
+                self.state.active_subject_id = None;
+                self.state.search_preview = None;
+                self.state.poster_image = None;
+                self.state.poster_protocol = None;
                 if self.state.is_tv_mode {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
