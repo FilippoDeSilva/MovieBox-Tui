@@ -28,6 +28,8 @@ impl App {
                 self.state.fetch_cancel =
                     std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                 self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
+                self.state.active_preview_request =
+                    self.state.active_preview_request.wrapping_add(1);
                 self.state.is_tv_mode = !self.state.is_tv_mode;
                 self.state.tick_count = 0;
                 self.reset_transient_overlays();

@@ -189,6 +189,7 @@ impl App {
 
     pub(super) fn prepare_search_request(&mut self, query: &str) -> RequestContext {
         self.state.active_search_request = self.state.active_search_request.wrapping_add(1);
+        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
         self.state.is_homepage_mode = false;
         self.state.current_page = 1;
         self.state.active_screen = Screen::Home;
@@ -283,6 +284,7 @@ impl App {
 
     pub(super) fn prepare_homepage_request(&mut self, tab_id: &str, page: usize) {
         self.state.active_homepage_request = self.state.active_homepage_request.wrapping_add(1);
+        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
         self.state.is_homepage_mode = true;
         self.state.current_tab_id = tab_id.to_string();
         self.state.current_page = page;

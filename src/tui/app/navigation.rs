@@ -31,6 +31,7 @@ impl App {
             .store(true, std::sync::atomic::Ordering::SeqCst);
         self.state.fetch_cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
+        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
         self.state.active_provider = provider;
         self.state.active_screen = Screen::Home;
         self.state.is_homepage_mode = false;
@@ -327,6 +328,8 @@ impl App {
                         if !self.state.search_results.is_empty()
                             || !self.state.search_query.is_empty()
                         {
+                            self.state.active_preview_request =
+                                self.state.active_preview_request.wrapping_add(1);
                             self.state.search_poster_protocols.clear();
                             self.state.search_results.clear();
                             self.state.search_error = None;
@@ -339,6 +342,8 @@ impl App {
                         self.state
                             .fetch_cancel
                             .store(true, std::sync::atomic::Ordering::Relaxed);
+                        self.state.active_preview_request =
+                            self.state.active_preview_request.wrapping_add(1);
                         self.state.active_details_request =
                             self.state.active_details_request.wrapping_add(1);
                         self.state.active_resource_request =
