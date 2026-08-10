@@ -191,6 +191,7 @@ impl App {
         self.state.is_homepage_mode = false;
         self.state.current_page = 1;
         self.state.active_screen = Screen::Home;
+        self.state.active_subject_id = None;
         self.state.selected_details = None;
         self.state.selected_resources = None;
         self.state.is_loading = true;
@@ -200,6 +201,8 @@ impl App {
         self.state.suggest_index = None;
         self.state.search_preview = None;
         self.state.preview_loading = false;
+        self.state.poster_image = None;
+        self.state.poster_protocol = None;
         self.state
             .set_status(format!("Searching for '{}'...", query), 150);
         self.request_context()
@@ -279,6 +282,7 @@ impl App {
         self.state.current_tab_id = tab_id.to_string();
         self.state.current_page = page;
         self.state.active_screen = Screen::Home;
+        self.state.active_subject_id = None;
         self.state.selected_details = None;
         self.state.selected_resources = None;
         self.state.is_loading = true;
@@ -289,6 +293,10 @@ impl App {
         }
         self.state.search_suggestions.clear();
         self.state.suggest_index = None;
+        self.state.search_preview = None;
+        self.state.preview_loading = false;
+        self.state.poster_image = None;
+        self.state.poster_protocol = None;
         self.state
             .set_status("Loading discover tab...".to_string(), 150);
     }
