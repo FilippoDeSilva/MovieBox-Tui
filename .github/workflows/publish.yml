@@ -22,6 +22,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
             REF="${{ github.event.inputs.tag }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ github.ref }}"
           else
             REF="${{ github.event.workflow_run.head_sha }}"
           fi
