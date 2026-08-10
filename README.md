@@ -95,23 +95,29 @@ The installer selects x86_64 or ARM64, installs under `%LOCALAPPDATA%\MovieBox-T
 
 MovieBox-Tui runs natively in Termux and opens videos directly in your installed Android video apps (VLC, MX Player, etc).
 
+Preferred install via TUR (Termux User Repository):
+
+```bash
+pkg install tur-repo
+pkg install moviebox-tui
+termux-setup-storage
+```
+
+TUR packages are distributed separately from crates.io. New MovieBox-Tui GitHub
+releases may take some time to appear in TUR, and users still need to update
+packages normally in Termux (for example via `pkg upgrade`).
+If you previously installed MovieBox-Tui with `cargo install`, see
+[Troubleshooting](#troubleshooting) for the Termux PATH fix.
+
+Alternative source-based install:
+
 ```bash
 pkg install rust openssl pkg-config
 cargo install moviebox-tui --locked
 termux-setup-storage
 ```
-*(Running `termux-setup-storage` ensures downloads are saved to your real Android `Download` folder)*
-
-<details>
-<summary><b>Cargo</b></summary>
-
-Requires Rust 1.90 or newer (this only applies to Cargo and source builds; binary users do not need Rust installed):
-
-```bash
-cargo install moviebox-tui --locked
-```
-
-</details>
+*`termux-setup-storage` is recommended if you want downloads saved to the real
+Android `Download` folder.*
 
 <details>
 <summary><b>Build from source</b></summary>
@@ -312,6 +318,34 @@ MovieBox-TUI supports inline images via Kitty, Sixel, and iTerm2 protocols.
 - If images don't show, ensure you are using a compatible terminal emulator (like Kitty, WezTerm, iTerm2, or Windows Terminal Preview).
 - If your terminal does not support graphics, the UI gracefully falls back to text-based posters and remains fully usable.
 - If you experience crashes when resizing the window (specifically with Sixel), please report it with your OS, terminal name, and version.
+
+</details>
+
+<details>
+<summary><b>Termux: TUR install works, but `moviebox-tui` still points to `~/.cargo/bin`</b></summary>
+
+This usually means you installed MovieBox-Tui with Cargo earlier and your shell
+is still preferring the old Cargo path over the TUR package in `$PREFIX/bin`.
+
+Check the installed TUR binary directly:
+
+```bash
+$PREFIX/bin/moviebox-tui --version
+```
+
+Then clear the shell command cache:
+
+```bash
+hash -r
+```
+
+If needed, move Termux's bin directory earlier in your shell startup file:
+
+```bash
+export PATH="$PREFIX/bin:$HOME/.cargo/bin:$PATH"
+```
+
+Then reload your shell and try `moviebox-tui` again.
 
 </details>
 
