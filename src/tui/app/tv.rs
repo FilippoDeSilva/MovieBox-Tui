@@ -86,6 +86,12 @@ impl App {
                     })
                     .collect();
                 self.state.is_loading = false;
+                let query = self.state.search_query.trim().to_string();
+                let lower_query = query.to_lowercase();
+                if !query.is_empty() {
+                    self.apply_tv_search_results(&query, &lower_query);
+                    return None;
+                }
                 if self.state.tv_channels.is_empty() {
                     self.state.set_status(
                         "No TV channels found. Add a playlist (/config).".to_string(),

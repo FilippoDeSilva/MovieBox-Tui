@@ -122,18 +122,9 @@ impl App {
                 Screen::Home => {
                     let query = self.state.search_query.trim().to_string();
                     if self.state.is_tv_mode {
-                        if query.is_empty() {
-                            self.state
-                                .set_status("Reloading TV playlists...".to_string(), 150);
-                            self.reload_tv_playlists();
-                        } else {
-                            self.action_sender
-                                .send(Action::Search {
-                                    query,
-                                    force_refresh: true,
-                                })
-                                .ok();
-                        }
+                        self.state
+                            .set_status("Reloading TV playlists...".to_string(), 150);
+                        self.reload_tv_playlists();
                     } else if !query.is_empty() {
                         self.action_sender
                             .send(Action::Search {

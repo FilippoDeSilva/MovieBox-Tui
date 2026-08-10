@@ -7,6 +7,55 @@ use crate::tui::{
 };
 
 impl App {
+    pub(super) fn apply_tv_search_results(&mut self, query: &str, lower_query: &str) {
+        self.state.search_results = self
+            .state
+            .tv_channels
+            .iter()
+            .filter(|channel| {
+                lower_query == "/list"
+                    || channel.name.to_lowercase().contains(lower_query)
+                    || channel.group.to_lowercase().contains(lower_query)
+            })
+            .map(|channel| SearchResult {
+                id: channel.stream_url.clone(),
+                title: channel.name.clone(),
+                stype: 3,
+                release_year: channel.group.clone(),
+                cover_url: Some(channel.logo.clone()),
+                season: 1,
+                episode: 1,
+                provider: ProviderKind::MovieBox,
+            })
+            .collect();
+        self.state.is_loading = false;
+        self.state
+            .search_list_state
+            .select(if self.state.search_results.is_empty() {
+                None
+            } else {
+                Some(0)
+            });
+        if !self.state.search_results.is_empty() {
+            self.spawn_search_posters(
+                self.state
+                    .search_results
+                    .iter()
+                    .take(15)
+                    .map(|result| (result.id.clone(), result.cover_url.clone()))
+                    .collect(),
+            );
+        }
+        self.state.set_status(
+            if self.state.search_results.is_empty() {
+                format!("No matches for '{}'.", query)
+            } else {
+                format!("Found {} channels.", self.state.search_results.len())
+            },
+            150,
+        );
+    }
+
     pub(super) fn handle_search_command(&mut self, query: &str, lower_query: &str) -> Option<bool> {
         if lower_query == "/clear-cache" {
             self.action_sender.send(Action::ClearCache).ok();
@@ -108,53 +157,7 @@ impl App {
                 return Some(true);
             }
 
-            let q = lower_query.to_string();
-            self.state.search_results = self
-                .state
-                .tv_channels
-                .iter()
-                .filter(|c| {
-                    q == "/list"
-                        || c.name.to_lowercase().contains(&q)
-                        || c.group.to_lowercase().contains(&q)
-                })
-                .map(|c| SearchResult {
-                    id: c.stream_url.clone(),
-                    title: c.name.clone(),
-                    stype: 3,
-                    release_year: c.group.clone(),
-                    cover_url: Some(c.logo.clone()),
-                    season: 1,
-                    episode: 1,
-                    provider: ProviderKind::MovieBox,
-                })
-                .collect();
-            self.state.is_loading = false;
-            self.state
-                .search_list_state
-                .select(if self.state.search_results.is_empty() {
-                    None
-                } else {
-                    Some(0)
-                });
-            if !self.state.search_results.is_empty() {
-                self.spawn_search_posters(
-                    self.state
-                        .search_results
-                        .iter()
-                        .take(15)
-                        .map(|r| (r.id.clone(), r.cover_url.clone()))
-                        .collect(),
-                );
-            }
-            self.state.set_status(
-                if self.state.search_results.is_empty() {
-                    format!("No matches for '{}'.", query)
-                } else {
-                    format!("Found {} channels.", self.state.search_results.len())
-                },
-                150,
-            );
+            self.apply_tv_search_results(query, lower_query);
             return Some(true);
         }
 
