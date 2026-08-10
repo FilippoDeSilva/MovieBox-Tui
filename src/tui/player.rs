@@ -74,7 +74,12 @@ fn android_intent_command(url: &str) -> Command {
             .arg("video/*")
             .arg(url);
     } else {
-        command = Command::new("am");
+        let am_path = if std::path::Path::new("/system/bin/am").exists() {
+            "/system/bin/am"
+        } else {
+            "am"
+        };
+        command = Command::new(am_path);
         command
             .arg("start")
             .arg("--user")
@@ -85,16 +90,11 @@ fn android_intent_command(url: &str) -> Command {
             .arg(url)
             .arg("-t")
             .arg("video/*");
-
-        if cfg!(target_os = "android")
-            || std::env::var("PREFIX")
-                .unwrap_or_default()
-                .contains("com.termux")
-        {
-            command.env_remove("LD_LIBRARY_PATH");
-            command.env_remove("LD_PRELOAD");
-        }
     }
+
+    command.env_remove("LD_LIBRARY_PATH");
+    command.env_remove("LD_PRELOAD");
+
     command
 }
 
