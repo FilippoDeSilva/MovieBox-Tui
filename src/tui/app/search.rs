@@ -278,6 +278,7 @@ impl App {
     }
 
     pub(super) fn prepare_homepage_request(&mut self, tab_id: &str, page: usize) {
+        self.state.active_homepage_request = self.state.active_homepage_request.wrapping_add(1);
         self.state.is_homepage_mode = true;
         self.state.current_tab_id = tab_id.to_string();
         self.state.current_page = page;
@@ -385,6 +386,7 @@ impl App {
     }
 
     pub(super) fn run_homepage_request(&self, tab_id: String, page: usize) {
+        let request_id = self.state.active_homepage_request;
         let client = self.client.clone();
         let sender = self.action_sender.clone();
         tokio::spawn(async move {
@@ -396,6 +398,7 @@ impl App {
             {
                 sender
                     .send(Action::HomepageSuccess {
+                        request_id,
                         tab_id: tab_id.clone(),
                         page,
                         payload: cached,
@@ -413,6 +416,7 @@ impl App {
                     });
                     sender
                         .send(Action::HomepageSuccess {
+                            request_id,
                             tab_id,
                             page,
                             payload: res,
@@ -421,7 +425,7 @@ impl App {
                 }
                 Err(error) => {
                     sender
-                        .send(Action::HomepageFailure(format!("{:?}", error)))
+                        .send(Action::HomepageFailure(request_id, format!("{:?}", error)))
                         .ok();
                 }
             }

@@ -38,11 +38,12 @@ pub enum Action {
         page: usize,
     },
     HomepageSuccess {
+        request_id: u64,
         tab_id: String,
         page: usize,
         payload: serde_json::Value,
     },
-    HomepageFailure(String),
+    HomepageFailure(u64, String),
     Suggest(String),
     SuggestSuccess(String, serde_json::Value),
     MoveUp,

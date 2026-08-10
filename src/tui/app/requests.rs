@@ -414,10 +414,14 @@ impl App {
             }
 
             Action::HomepageSuccess {
+                request_id,
                 tab_id,
                 page,
                 payload,
             } => {
+                if request_id != self.state.active_homepage_request {
+                    return None;
+                }
                 if !self.state.is_homepage_mode || self.state.current_tab_id != tab_id {
                     return None;
                 }
@@ -461,7 +465,10 @@ impl App {
                 );
             }
 
-            Action::HomepageFailure(err) => {
+            Action::HomepageFailure(request_id, err) => {
+                if request_id != self.state.active_homepage_request {
+                    return None;
+                }
                 log::error!("discover failed: {err}");
                 self.state.is_loading = false;
                 self.state

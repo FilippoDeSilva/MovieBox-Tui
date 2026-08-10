@@ -147,6 +147,7 @@ pub struct AppState {
     pub visible_items: usize,
 
     pub active_resource_request: u64,
+    pub active_homepage_request: u64,
     pub active_details_request: u64,
     pub pending_episode_fetch: Option<(String, usize, usize)>,
     pub last_episode_nav: std::time::Instant,
@@ -258,6 +259,7 @@ impl Default for AppState {
             show_help: false,
             visible_items: 10,
             active_resource_request: 0,
+            active_homepage_request: 0,
             active_details_request: 0,
             pending_episode_fetch: None,
             last_episode_nav: std::time::Instant::now(),
