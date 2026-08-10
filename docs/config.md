@@ -16,8 +16,8 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 
 ## Other persisted files
 
-- `tv_config.json` — list of M3U playlist sources (see [tv-mode.md](tv-mode.md)).
-- `history.json` — watch history.
+- `tv_config.json` — list of M3U playlist sources in the config directory (see [tv-mode.md](tv-mode.md)).
+- `history.json` — watch history in the system data directory (`dirs::data_dir()/moviebox-tui/`).
 - `iptv_cache/` — legacy TV image cache directory that `ClearCache` still removes.
 
 ## Environment variables
