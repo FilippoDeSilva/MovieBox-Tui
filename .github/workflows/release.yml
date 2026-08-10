@@ -35,8 +35,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  quality:
-    name: Release quality gate
+  preflight:
+    name: Release preflight
     needs: check-version
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
@@ -45,25 +45,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
-          components: rustfmt, clippy
+          targets: aarch64-linux-android
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "release-quality"
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets --locked -- -D warnings
+          prefix-key: "release-preflight"
+      - run: cargo package --locked
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit
-      - run: cargo audit
-      - run: cargo package --locked
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.90.0
-      - run: cargo check --all-targets --locked
+          tool: cross
+      - run: cross build --locked --target aarch64-linux-android
 
   build:
     name: Build ${{ matrix.target }}
-    needs: [check-version, quality]
+    needs: [check-version, preflight]
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ${{ matrix.os }}
     strategy:

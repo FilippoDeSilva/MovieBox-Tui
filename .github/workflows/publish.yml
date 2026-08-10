@@ -17,15 +17,24 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Determine Ref
+      - name: Determine ref
         id: ref
         run: |
-          REF="${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+            REF="${{ github.event.inputs.tag }}"
+          else
+            REF="${{ github.event.workflow_run.head_sha }}"
+          fi
           echo "target_ref=$REF" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.ref.outputs.target_ref }}
+
+      - name: Confirm version
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
+          echo "Publishing version $VERSION from ${{ steps.ref.outputs.target_ref }}"
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

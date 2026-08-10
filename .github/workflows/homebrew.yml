@@ -17,15 +17,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Get Release Data
         id: release
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
-          if [ -z "$VERSION" ]; then
-            VERSION=$(curl -sI "https://github.com/${{ github.repository }}/releases/latest" | grep -i '^location:' | awk -F '/' '{print $NF}' | tr -d '\r')
-          fi
+          VERSION="v$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')"
           CLEAN_VERSION="${VERSION#v}"
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
           echo "tag=$VERSION" >> $GITHUB_OUTPUT
