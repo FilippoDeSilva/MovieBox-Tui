@@ -7,6 +7,11 @@ log_warn() { echo -e "\033[1;33mWARNING: $1\033[0m"; }
 log_err() { echo -e "\033[0;31mERROR: $1\033[0m"; exit 1; }
 
 INSTALL_DIR="/usr/local/bin"
+
+if [ -n "${PREFIX:-}" ] && [[ "$PREFIX" == *com.termux* ]]; then
+    INSTALL_DIR="$PREFIX/bin"
+fi
+
 BIN_NAME="moviebox-tui"
 APP_PATH="$INSTALL_DIR/$BIN_NAME"
 
