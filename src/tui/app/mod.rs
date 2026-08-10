@@ -177,6 +177,7 @@ impl App {
                 self.action_sender.send(Action::TvReloadPlaylists).ok();
             }
             TvManagerRow::Done => {
+                self.reset_transient_overlays();
                 self.state.tv_config_popup = false;
             }
             TvManagerRow::Header(_) => {}

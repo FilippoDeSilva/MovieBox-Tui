@@ -202,6 +202,7 @@ impl App {
                         }
                         match key.code {
                             KeyCode::Esc => {
+                                self.reset_transient_overlays();
                                 self.state.tv_config_popup = false;
                             }
                             KeyCode::Up => {
