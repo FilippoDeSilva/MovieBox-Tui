@@ -240,6 +240,15 @@ impl App {
                 self.state.is_resolving_playback = true;
                 if self.current_subject_provider() == ProviderKind::FourKHdHub {
                     if let Some(release) = self.get_selected_release() {
+                        let Some(first_mirror) = release.mirrors.first().cloned() else {
+                            self.state.is_resolving_playback = false;
+                            self.state.notify(
+                                NotificationKind::Error,
+                                "Playback unavailable",
+                                "No playable mirrors were found for this release.",
+                            );
+                            return None;
+                        };
                         self.state.notify(
                             NotificationKind::Info,
                             "Preparing playback",
@@ -248,7 +257,7 @@ impl App {
                         let default_player = self.preferred_playback_player(
                             &crate::providers::models::PlaybackSource::bare(
                                 release.provider,
-                                release.mirrors[0].resolver_url.clone(),
+                                first_mirror.resolver_url.clone(),
                                 None,
                             ),
                         );
@@ -257,7 +266,7 @@ impl App {
                             let sender_clone = self.action_sender.clone();
                             let source = crate::providers::models::PlaybackSource::bare(
                                 ProviderKind::BdixCircleFtp,
-                                release.mirrors[0].resolver_url.clone(),
+                                first_mirror.resolver_url.clone(),
                                 None,
                             );
                             if open_with || default_player.is_none() {
