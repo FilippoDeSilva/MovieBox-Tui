@@ -232,6 +232,7 @@ MovieBox-TUI/
 - **Sequential downloads:** Entire seasons are downloaded one by one to limit disk and network pressure.
 - **Smart subtitles:** Your subtitle language choice for the first episode is applied to the remaining episodes. Missing subtitles do not discard completed video files.
 - **Robust resuming:** Interrupted downloads preserve `.part` and metadata files, and can be resumed without losing progress.
+- On Android/Termux, the app prefers shared `storage/downloads` when it exists.
 
 ## Configuration & Cache
 
