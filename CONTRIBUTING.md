@@ -31,10 +31,10 @@ The app is message-driven and organized into focused modules. Full maps live in
 [`docs/architecture.md`](docs/architecture.md) and [`docs/modules.md`](docs/modules.md).
 
 Short version:
-- `src/tui/app/`: The application object (`App`). `mod.rs` holds the thin `handle_action`
-  dispatcher that routes every `Action` to a `handle_*` method in its module
-  (`run.rs`, `requests.rs`, `playback.rs`, `download.rs`, `navigation.rs`, `tv.rs`,
-  `system.rs`, `keyboard.rs`, `network.rs`).
+- `src/tui/app/`: The application object (`App`). `run.rs` holds the thin
+  `handle_action` dispatcher that routes every `Action` to a `handle_*` method in its
+  module (`run.rs`, `requests.rs`, `playback.rs`, `download.rs`, `navigation.rs`,
+  `tv.rs`, `system.rs`, `keyboard.rs`, `network.rs`).
 - `src/tui/`: UI state, event loop plumbing, player commands, screens, themes.
 - `src/providers/`: HTTP clients for the streaming sources (`moviebox`, `fourkhdhub`,
   `bdix`), plus `m3u.rs` for TV playlists.
