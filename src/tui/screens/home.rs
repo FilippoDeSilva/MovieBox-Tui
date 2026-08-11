@@ -178,7 +178,7 @@ fn render_search_state(
             };
             Line::from(vec![
                 Span::styled(format!("{symbol} "), style),
-                Span::styled(format!("Nothing found for “{query}”"), theme.text),
+                Span::styled(format!("No matches for “{query}”"), theme.text),
             ])
         }
         SearchViewState::Error => {
