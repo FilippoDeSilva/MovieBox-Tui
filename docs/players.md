@@ -34,7 +34,7 @@ Window size is derived from the live terminal size times the real font cell size
 Playback sources (e.g. 4KHD) may carry `Referer`/`User-Agent` headers. mpv/IINA send
 them via `http-header-fields` (`--http-header-fields=...` or `--mpv-http-header-fields=...`),
 while VLC maps them to `--http-referrer` / `--http-user-agent`. The `supports_headers`
-gate in `LaunchPlayback` warns when a player cannot satisfy a source's headers.
+gate in `app/playback.rs` warns when a player cannot satisfy a source's headers.
 
 ## Subtitles
 
