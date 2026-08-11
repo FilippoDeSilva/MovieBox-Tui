@@ -250,7 +250,11 @@ fn render_search_bar(
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
     let result_status = if view == SearchViewState::Results {
-        Some(format!("{} results", state.search_results.len()))
+        Some(if state.search_results.len() == 1 {
+            "1 result".to_string()
+        } else {
+            format!("{} results", state.search_results.len())
+        })
     } else {
         None
     };
