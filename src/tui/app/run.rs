@@ -42,9 +42,7 @@ impl App {
             .as_secs();
 
         if self.state.auto_update && now.saturating_sub(self.state.last_update_check) > 3600 {
-            self.state.last_update_check = now;
             self.state.manual_update_check = false;
-            self.persist_config();
             self.action_sender.send(Action::CheckForUpdates).ok();
         }
         self.state.active_screen = Screen::Home;

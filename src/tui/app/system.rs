@@ -308,6 +308,11 @@ impl App {
                 }
 
                 if version == "none" {
+                    self.state.last_update_check = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    self.persist_config();
                     if self.state.manual_update_check {
                         self.state.notify(
                             NotificationKind::Success,
@@ -327,6 +332,11 @@ impl App {
                     }
                     self.state.manual_update_check = false;
                 } else {
+                    self.state.last_update_check = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    self.persist_config();
                     self.state.manual_update_check = false;
                     self.state.update_available = Some((version, notes));
                 }
