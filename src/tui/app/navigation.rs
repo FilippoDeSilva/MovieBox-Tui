@@ -56,7 +56,6 @@ impl App {
         self.state.preview_cache.clear();
         self.state.poster_image = None;
         self.state.poster_protocol = None;
-        self.state.search_poster_protocols.clear();
         self.state.search_list_state.select(None);
         self.state.resource_list_state.select(None);
         self.state.set_status(
