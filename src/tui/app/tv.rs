@@ -52,6 +52,7 @@ impl App {
                 if self.state.is_tv_mode {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
+                    self.state.tv_channels.clear();
                     self.state.search_results.clear();
                     self.state
                         .set_status("Loading TV playlists...".to_string(), 200);
@@ -131,6 +132,13 @@ impl App {
                     self.apply_tv_search_results(&query, &lower_query);
                     return None;
                 }
+                self.state
+                    .search_list_state
+                    .select(if self.state.tv_channels.is_empty() {
+                        None
+                    } else {
+                        Some(0)
+                    });
                 if self.state.tv_channels.is_empty() {
                     let status = if failed > 0 {
                         format!(

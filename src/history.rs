@@ -34,6 +34,7 @@ impl HistoryManager {
                         return history;
                     }
                 }
+                let _ = fs::remove_file(path);
             }
         }
         Self::default()

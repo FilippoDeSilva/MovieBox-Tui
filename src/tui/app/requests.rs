@@ -438,6 +438,15 @@ impl App {
                     context.provider.cache_key()
                 );
                 self.state.is_loading = false;
+                if page <= 1 {
+                    self.state.search_results.clear();
+                    self.state.search_list_state.select(None);
+                    self.state.search_preview = None;
+                    self.state.poster_image = None;
+                    self.state.poster_protocol = None;
+                    self.state.search_posters.clear();
+                    self.state.search_poster_protocols.clear();
+                }
                 self.state.search_error = Some(err.clone());
                 self.state
                     .set_status(format!("Search failed: {}", err), 150);
@@ -501,6 +510,13 @@ impl App {
                 }
                 log::error!("discover failed: {err}");
                 self.state.is_loading = false;
+                self.state.search_results.clear();
+                self.state.search_list_state.select(None);
+                self.state.search_preview = None;
+                self.state.poster_image = None;
+                self.state.poster_protocol = None;
+                self.state.search_posters.clear();
+                self.state.search_poster_protocols.clear();
                 self.state
                     .set_status(format!("Discover failed: {}", err), 150);
             }
@@ -1013,6 +1029,23 @@ impl App {
                     context.provider.cache_key()
                 );
                 self.state.is_loading = false;
+                self.state.selected_details = None;
+                self.state.selected_resources = None;
+                self.state.active_subject_id = None;
+                self.state.details_pane = crate::tui::state::DetailsPane::default();
+                self.state.selected_season = 1;
+                self.state.selected_episode = 1;
+                self.state.language_chosen = false;
+                self.state.season_list_state.select(None);
+                self.state.episode_list_state.select(None);
+                self.state.language_list_state.select(None);
+                self.state.available_seasons.clear();
+                self.state.available_episode_numbers.clear();
+                self.state.stream_pool.clear();
+                self.state.poster_image = None;
+                self.state.poster_protocol = None;
+                self.state.search_preview = None;
+                self.state.preview_loading = false;
                 self.state
                     .set_status(format!("Details fetch failed: {}", err), 150);
             }

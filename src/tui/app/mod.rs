@@ -127,13 +127,23 @@ impl App {
     }
 
     fn load_tv_playlists_from_config(&mut self) {
+        self.state.tv_playlists.clear();
         if let Some(config_dir) = dirs::config_dir() {
             let path = config_dir.join("moviebox-tui").join("tv_config.json");
-            if let Ok(content) = std::fs::read_to_string(path)
+            if let Ok(content) = std::fs::read_to_string(&path)
                 && let Ok(list) = serde_json::from_str::<Vec<String>>(&content)
-                && !list.is_empty()
             {
-                self.state.tv_playlists = list;
+                let mut seen = std::collections::HashSet::new();
+                self.state.tv_playlists = list
+                    .into_iter()
+                    .map(|item| item.trim().to_string())
+                    .filter(|item| !item.is_empty() && seen.insert(item.clone()))
+                    .collect();
+                if self.state.tv_playlists.is_empty() {
+                    let _ = std::fs::remove_file(path);
+                }
+            } else {
+                let _ = std::fs::remove_file(path);
             }
         }
     }

@@ -46,10 +46,26 @@ impl App {
         self.state.selected_details = None;
         self.state.selected_resources = None;
         self.state.active_subject_id = None;
+        self.state.details_pane = crate::tui::state::DetailsPane::default();
+        self.state.selected_season = 1;
+        self.state.selected_episode = 1;
+        self.state.language_chosen = false;
+        self.state.season_list_state.select(None);
+        self.state.episode_list_state.select(None);
+        self.state.language_list_state.select(None);
+        self.state.pending_episode_fetch = None;
         self.state.available_seasons.clear();
         self.state.available_episode_numbers.clear();
         self.state.stream_pool.clear();
         self.state.is_resolving_playback = false;
+        self.state
+            .cancel_download
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.state.download_progress = None;
+        self.state.download_status = None;
+        self.state.download_queue.clear();
+        self.state.download_queue_total = 0;
+        self.state.is_waiting_for_download_stream = false;
         self.state.search_posters.clear();
         self.state.search_poster_protocols.clear();
         self.state.image_cache.clear();

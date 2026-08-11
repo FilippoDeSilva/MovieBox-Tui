@@ -41,7 +41,8 @@ impl M3UParser {
         url: &str,
     ) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
         let trimmed = url.trim();
-        let content = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        let is_remote = trimmed.starts_with("http://") || trimmed.starts_with("https://");
+        let content = if is_remote {
             let file_path = self.cache_dir.join(cache_filename(trimmed));
             let mut needs_download = true;
 
@@ -69,7 +70,19 @@ impl M3UParser {
                 let _ = write_cache_file(&file_path, res.as_bytes()).await;
                 res
             } else {
-                tokio::fs::read_to_string(&file_path).await?
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => content,
+                    Err(_) => {
+                        let _ = tokio::fs::remove_file(&file_path).await;
+                        self.client
+                            .get(trimmed)
+                            .send()
+                            .await?
+                            .error_for_status()?
+                            .text()
+                            .await?
+                    }
+                }
             }
         } else {
             let path = std::path::PathBuf::from(trimmed);
@@ -78,7 +91,26 @@ impl M3UParser {
                 .map_err(|error| format!("failed to read playlist file {}: {error}", trimmed))?
         };
 
-        Ok(self.parse_m3u(&content))
+        let channels = self.parse_m3u(&content);
+        if is_remote && channels.is_empty() {
+            let file_path = self.cache_dir.join(cache_filename(trimmed));
+            let _ = tokio::fs::remove_file(&file_path).await;
+            let fresh = self
+                .client
+                .get(trimmed)
+                .send()
+                .await?
+                .error_for_status()?
+                .text()
+                .await?;
+            let fresh_channels = self.parse_m3u(&fresh);
+            if fresh_channels.is_empty() {
+                return Ok(fresh_channels);
+            }
+            let _ = write_cache_file(&file_path, fresh.as_bytes()).await;
+            return Ok(fresh_channels);
+        }
+        Ok(channels)
     }
 
     fn parse_m3u(&self, content: &str) -> Vec<Channel> {

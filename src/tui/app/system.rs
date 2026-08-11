@@ -196,7 +196,18 @@ impl App {
                 self.state.poster_image = None;
                 self.state.poster_protocol = None;
                 self.state.search_preview = None;
+                self.state.search_error = None;
+                self.state.search_list_state.select(None);
                 self.state.selected_resources = None;
+                self.state.active_subject_id = None;
+                self.state.selected_details = None;
+                self.state.details_pane = crate::tui::state::DetailsPane::default();
+                self.state.selected_season = 1;
+                self.state.selected_episode = 1;
+                self.state.language_chosen = false;
+                self.state.season_list_state.select(None);
+                self.state.episode_list_state.select(None);
+                self.state.language_list_state.select(None);
                 self.state.available_seasons.clear();
                 self.state.available_episode_numbers.clear();
                 if self.state.is_tv_mode {

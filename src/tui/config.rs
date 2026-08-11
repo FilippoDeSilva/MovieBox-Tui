@@ -32,10 +32,11 @@ pub fn load() -> Config {
     let Some(path) = path() else {
         return config;
     };
-    let Ok(content) = std::fs::read_to_string(path) else {
+    let Ok(content) = std::fs::read_to_string(&path) else {
         return config;
     };
     let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) else {
+        let _ = std::fs::remove_file(path);
         return config;
     };
     if let Some(v) = value.get("auto_update").and_then(|v| v.as_bool()) {
