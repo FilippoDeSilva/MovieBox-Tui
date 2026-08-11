@@ -76,7 +76,7 @@ Confirm:
 
 ## 5. Termux / Android checks
 
-Verify on a real Termux device before calling the release production-ready:
+Verify on a real Termux device before calling the desktop release production-ready:
 
 - app starts normally
 - `Play` opens the Android chooser through `termux-open` or `/system/bin/am`
@@ -89,8 +89,7 @@ This remains mandatory because chooser behavior is device/environment dependent.
 
 Verify the published release contains:
 
-- expected archives for macOS, Linux x64, Linux arm64, Windows x64, Windows arm64,
-  and Termux arm64
+- expected archives for macOS, Linux x64, Linux arm64, Windows x64, and Windows arm64
 - `SHA256SUMS`
 - working install scripts / formula references
 

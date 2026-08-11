@@ -41,8 +41,6 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
-    env:
-      CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: aarch64-linux-android21-clang
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -53,10 +51,6 @@ jobs:
         with:
           prefix-key: "release-preflight"
       - run: cargo package --locked
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-      - run: cross build --locked --target aarch64-linux-android
 
   build:
     name: Build ${{ matrix.target }}
@@ -70,8 +64,6 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
           - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: aarch64-linux-android
             os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-latest
@@ -121,8 +113,6 @@ jobs:
             tar -czvf MovieBox_Linux_x64.tar.gz -C dist .
           elif [ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]; then
             tar -czvf MovieBox_Linux_arm64.tar.gz -C dist .
-          elif [ "${{ matrix.target }}" == "aarch64-linux-android" ]; then
-            tar -czvf MovieBox_Termux_arm64.tar.gz -C dist .
           else
             tar -czvf moviebox-tui-${{ matrix.target }}.tar.gz -C dist .
           fi

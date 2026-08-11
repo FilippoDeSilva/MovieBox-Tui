@@ -59,7 +59,8 @@ MovieBox-TUI resolves links from upstream services. Availability can change when
 
 ## Installation
 
-Prebuilt binaries are available for macOS, Linux, Windows, and Termux arm64 releases. The official install scripts verify the release SHA-256 checksum automatically.
+Prebuilt binaries are available for macOS, Linux, and Windows releases. The official install scripts verify the release SHA-256 checksum automatically.
+On Termux, install from TUR or build from source with `cargo install` on-device.
 
 ### macOS or Linux
 
