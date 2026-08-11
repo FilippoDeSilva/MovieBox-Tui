@@ -119,6 +119,7 @@ impl App {
             | Action::CacheCleared(..)
             | Action::ToggleThemePopup
             | Action::SelectTheme(..)
+            | Action::ShowBrowseMenu
             | Action::SetStatus(..)
             | Action::CheckForUpdates
             | Action::UpdateAvailable(..) => {
@@ -152,6 +153,7 @@ impl App {
             | Action::SelectSuggestion { .. }
             | Action::Search { .. }
             | Action::FetchHomepage { .. }
+            | Action::SelectBrowse(..)
             | Action::SearchSuccess { .. }
             | Action::SearchFailure(..)
             | Action::HomepageSuccess { .. }
