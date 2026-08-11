@@ -12,10 +12,12 @@ Run the repository checks first:
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo check --locked
-cargo test --locked
 cargo audit
 cargo package --locked
 ```
+
+This project currently has no unit-test suite by design; keep the static gates above
+green instead of adding a placeholder `cargo test` step.
 
 Confirm the main GitHub Actions workflows are green:
 
