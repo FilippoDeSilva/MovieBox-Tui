@@ -389,10 +389,13 @@ local checks the repository expects plus the CI-only verification steps:
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo check --locked
-cargo test --locked
 cargo audit
 cargo package --locked
 ```
+
+This project currently has no unit-test suite by design, so the release/readme
+checklist stays focused on the static gates above plus the runtime checks in
+[`docs/release-checklist.md`](docs/release-checklist.md).
 
 GitHub Actions also verifies cross-platform builds on Linux, macOS, and Windows,
 plus an Android/Termux cross-build lane.
