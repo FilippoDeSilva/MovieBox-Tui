@@ -19,7 +19,7 @@ default (`bdix_enabled` in config; `/enable-bdix`).
 ## Shared flow
 
 Search, details, and episode-streams are dispatched per provider. Crate-internal seams
-in `providers/mod.rs` give every client one interface and one error type:
+in `providers/mod.rs` give every client a shared async trait shape:
 
 - `Provider::search` / `Provider::details` return the moviebox-JSON payload the UI
   consumes: MovieBox provides it natively; the other providers convert their typed
@@ -65,6 +65,6 @@ Each channel yields `{ id, name, logo, group, stream_url }`; TV mode groups chan
 
 ## Error handling
 
-Each provider defines a `thiserror` enum (`ScraperError`, `FourKHdHubError`,
+Each provider defines its own `thiserror` enum (`ScraperError`, `FourKHdHubError`,
 `CircleFtpError`, `DhakaFlixError`). Errors bubble to `app/requests.rs` handlers, which
 surface them in the UI status bar and log the full detail (see [logging.md](logging.md)).
