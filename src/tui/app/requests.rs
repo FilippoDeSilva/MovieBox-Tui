@@ -980,13 +980,14 @@ impl App {
 
                 let mut default_season = 1;
                 let mut default_episode = 1;
-                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
-                    if res.season > 0 {
-                        default_season = res.season;
-                    }
-                    if res.episode > 0 {
-                        default_episode = res.episode;
-                    }
+                if let Some(history) = self.state.history.recent.iter().rev().find(|item| {
+                    item.provider == context.provider.label()
+                        && item.subject_id == id
+                        && item.season > 0
+                        && item.episode > 0
+                }) {
+                    default_season = history.season;
+                    default_episode = history.episode;
                 }
 
                 let season_idx = self
@@ -1013,14 +1014,35 @@ impl App {
                 self.state.episode_list_state.select(Some(ep_idx));
 
                 if let Some(dubs) = payload.get("dubs").and_then(|d| d.as_array()) {
-                    let mut current_idx = 0;
-                    for (i, dub) in dubs.iter().enumerate() {
-                        let dub_id = dub.get("subjectId").and_then(crate::tui::state::subject_id);
-                        if dub_id == Some(id.clone()) {
-                            current_idx = i;
-                        }
-                    }
-                    self.state.language_list_state.select(Some(current_idx));
+                    let preferred_idx = dubs
+                        .iter()
+                        .enumerate()
+                        .find_map(|(i, dub)| {
+                            let dub_id =
+                                dub.get("subjectId").and_then(crate::tui::state::subject_id);
+                            if dub_id == Some(id.clone()) {
+                                return Some(i);
+                            }
+
+                            let labels = [
+                                dub.get("title").and_then(|v| v.as_str()),
+                                dub.get("name").and_then(|v| v.as_str()),
+                                dub.get("lanName").and_then(|v| v.as_str()),
+                                dub.get("audioName").and_then(|v| v.as_str()),
+                            ];
+                            let label = labels.into_iter().flatten().collect::<Vec<_>>().join(" ");
+                            let lower = label.to_ascii_lowercase();
+                            if lower.contains("original")
+                                || lower.contains("english")
+                                || lower.contains("sub")
+                            {
+                                Some(i)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(0);
+                    self.state.language_list_state.select(Some(preferred_idx));
                 } else {
                     self.state.language_list_state.select(Some(0));
                 }
