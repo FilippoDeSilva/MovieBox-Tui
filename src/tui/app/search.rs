@@ -125,14 +125,7 @@ impl App {
                 Some(0)
             });
         if !self.state.search_results.is_empty() {
-            self.spawn_search_posters(
-                self.state
-                    .search_results
-                    .iter()
-                    .take(15)
-                    .map(|result| (result.id.clone(), result.cover_url.clone()))
-                    .collect(),
-            );
+            self.prefetch_visible_posters();
         }
         self.state.set_status(
             if self.state.search_results.is_empty() {
@@ -729,28 +722,97 @@ impl App {
         });
     }
 
-    pub(super) fn spawn_search_posters(&self, results: Vec<(String, Option<String>)>) {
+    pub(super) fn prefetch_visible_posters(&mut self) {
+        if !self.state.image_supported || self.state.search_results.is_empty() {
+            return;
+        }
+        let total = self.state.search_results.len();
+        let selected = self.state.search_list_state.selected().unwrap_or(0);
+        let offset = self.state.search_list_state.offset();
+        let visible = self.state.visible_items.max(8);
+
+        let base_start = offset.min(selected);
+        let start = base_start.saturating_sub(6);
+        let end = (offset + visible + 14).min(total);
+
+        if start < end {
+            let slice: Vec<(String, Option<String>)> = self.state.search_results[start..end]
+                .iter()
+                .map(|r| (r.id.clone(), r.cover_url.clone()))
+                .collect();
+            self.spawn_search_posters(slice);
+        }
+    }
+
+    pub(super) fn spawn_search_posters(&mut self, results: Vec<(String, Option<String>)>) {
+        if !self.state.image_supported {
+            return;
+        }
+
+        let mut to_fetch = Vec::new();
+        for (id, cover_url) in results {
+            let Some(url) = cover_url else {
+                continue;
+            };
+            if url.is_empty() {
+                continue;
+            }
+            if self.state.search_posters.contains(&id) {
+                continue;
+            }
+            if !self.state.in_flight_posters.insert(id.clone()) {
+                continue;
+            }
+            to_fetch.push((id, url));
+        }
+
+        if to_fetch.is_empty() {
+            return;
+        }
+
         let sender = self.action_sender.clone();
         let req_client = self.client.http_client().clone();
         tokio::spawn(async move {
             let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
-            for (id, cover_url) in results {
-                let Some(url) = cover_url else {
-                    continue;
-                };
-                if url.is_empty() {
-                    continue;
-                }
+            for (id, url) in to_fetch {
                 let permit = sem.clone().acquire_owned().await.ok();
                 let tx = sender.clone();
                 let client = req_client.clone();
                 tokio::spawn(async move {
                     let _permit = permit;
-                    if let Some(bytes) = network::fetch_poster_bytes(&client, &url).await
-                        && let Some(img) = network::decode_poster(bytes).await
+                    let id_clone = id.clone();
+                    if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
+                        let id_c = id_clone.clone();
+                        move || crate::cache::get_namespaced_image_cache("posters", &id_c)
+                    })
+                    .await
                     {
-                        tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
+                        if let Some(img) = network::decode_poster(bytes).await {
+                            tx.send(Action::SearchPosterLoaded(id_clone, Some(img)))
+                                .ok();
+                            return;
+                        }
                     }
+
+                    if let Some(bytes) = network::fetch_poster_bytes(&client, &url).await {
+                        let bytes_clone = bytes.clone();
+                        let id_c = id.clone();
+                        let _ = tokio::task::spawn_blocking(move || {
+                            crate::cache::set_namespaced_image_cache(
+                                "posters",
+                                &id_c,
+                                &bytes_clone,
+                            );
+                        })
+                        .await;
+
+                        if let Some(img) = network::decode_poster(bytes).await {
+                            tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
+                            return;
+                        }
+                    }
+
+                    tx.send(Action::SearchPosterLoaded(id, None)).ok();
                 });
             }
         });

@@ -70,6 +70,7 @@ impl App {
         self.state.is_waiting_for_download_stream = false;
         self.state.search_posters.clear();
         self.state.search_poster_protocols.clear();
+        self.state.in_flight_posters.clear();
         self.state.image_cache.clear();
         self.state.preview_cache.clear();
         self.state.poster_image = None;
@@ -453,6 +454,7 @@ impl App {
                                     .ok();
                             }
                         }
+                        self.prefetch_visible_posters();
                     }
                     Screen::Details => match self.state.details_pane {
                         crate::tui::state::DetailsPane::Streams => {
@@ -529,6 +531,7 @@ impl App {
                                     .send(Action::FetchPreview(res.id.clone()))
                                     .ok();
                             }
+                            self.prefetch_visible_posters();
                         } else if !self.state.is_tv_mode
                             && !self.state.is_loading
                             && !self.state.search_results.is_empty()
@@ -656,6 +659,7 @@ impl App {
                             .send(Action::FetchPreview(res.id.clone()))
                             .ok();
                     }
+                    self.prefetch_visible_posters();
                 }
             }
 
@@ -679,6 +683,7 @@ impl App {
                             .send(Action::FetchPreview(res.id.clone()))
                             .ok();
                     }
+                    self.prefetch_visible_posters();
                 }
             }
 

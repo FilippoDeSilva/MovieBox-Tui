@@ -168,6 +168,7 @@ impl App {
                     self.state.poster_protocol = None;
                     self.state.search_posters.clear();
                     self.state.search_poster_protocols.clear();
+                    self.state.in_flight_posters.clear();
                     self.state.search_list_state.select(None);
                     self.state.search_suggestions.clear();
                     self.state.suggest_index = None;
@@ -204,15 +205,7 @@ impl App {
                         }
 
                         self.state.search_list_state.select(Some(0));
-
-                        self.spawn_search_posters(
-                            self.state
-                                .search_results
-                                .iter()
-                                .take(15)
-                                .map(|r| (r.id.clone(), r.cover_url.clone()))
-                                .collect(),
-                        );
+                        self.prefetch_visible_posters();
                     }
                     return None;
                 }
@@ -406,14 +399,7 @@ impl App {
                 }
 
                 if !self.state.search_results.is_empty() {
-                    self.spawn_search_posters(
-                        self.state
-                            .search_results
-                            .iter()
-                            .take(15)
-                            .map(|r| (r.id.clone(), r.cover_url.clone()))
-                            .collect(),
-                    );
+                    self.prefetch_visible_posters();
                 }
 
                 self.prepare_image_refresh();
@@ -469,6 +455,7 @@ impl App {
                     self.state.poster_protocol = None;
                     self.state.search_posters.clear();
                     self.state.search_poster_protocols.clear();
+                    self.state.in_flight_posters.clear();
                 }
                 self.state.search_error = Some(err.clone());
                 self.state
@@ -502,15 +489,7 @@ impl App {
                 self.sort_browse_results();
 
                 if count > 0 {
-                    self.spawn_search_posters(
-                        self.state
-                            .search_results
-                            .iter()
-                            .skip(if page == 1 { 0 } else { (page - 1) * 20 })
-                            .take(20)
-                            .map(|r| (r.id.clone(), r.cover_url.clone()))
-                            .collect(),
-                    );
+                    self.prefetch_visible_posters();
                 }
 
                 if count > 0 && self.state.current_page <= 1 {
@@ -555,6 +534,7 @@ impl App {
                 self.state.poster_protocol = None;
                 self.state.search_posters.clear();
                 self.state.search_poster_protocols.clear();
+                self.state.in_flight_posters.clear();
                 self.state
                     .set_status(format!("Discover failed: {}", err), 150);
             }
@@ -822,6 +802,7 @@ impl App {
             }
 
             Action::SearchPosterLoaded(id, img_opt) => {
+                self.state.in_flight_posters.remove(&id);
                 if let Some(img) = img_opt {
                     self.state.search_posters.put(id, img);
                 }

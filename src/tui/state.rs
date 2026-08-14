@@ -184,6 +184,7 @@ pub struct AppState {
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
     pub search_poster_protocols:
         lru::LruCache<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
+    pub in_flight_posters: std::collections::HashSet<String>,
     pub search_list_state: TableState,
 
     pub selected_details: Option<serde_json::Value>,
@@ -306,8 +307,9 @@ impl Default for AppState {
             is_homepage_mode: false,
             current_tab_id: String::new(),
             current_page: 1,
-            search_posters: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
-            search_poster_protocols: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
+            search_posters: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
+            search_poster_protocols: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
+            in_flight_posters: std::collections::HashSet::new(),
             search_list_state: TableState::default(),
             basic_terminal: crate::tui::terminal::uses_basic_ui(),
             selected_details: None,
