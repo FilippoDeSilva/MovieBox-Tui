@@ -379,6 +379,14 @@ impl App {
                             });
                         }
                     }
+                    let previous_selected_id = if page > 1 {
+                        self.state.search_list_state.selected().and_then(|idx| {
+                            self.state.search_results.get(idx).map(|r| r.id.clone())
+                        })
+                    } else {
+                        None
+                    };
+
                     let query_lower = query.to_lowercase();
                     self.state.search_results.sort_by(|a, b| {
                         let a_title = a.title.to_lowercase();
@@ -396,6 +404,17 @@ impl App {
                             .then_with(|| b.stype.cmp(&a.stype))
                             .then_with(|| b.release_year.cmp(&a.release_year))
                     });
+
+                    if let Some(prev_id) = previous_selected_id {
+                        if let Some(new_idx) = self
+                            .state
+                            .search_results
+                            .iter()
+                            .position(|r| r.id == prev_id)
+                        {
+                            self.state.search_list_state.select(Some(new_idx));
+                        }
+                    }
                 }
 
                 if !self.state.search_results.is_empty() {
@@ -482,6 +501,15 @@ impl App {
                     self.state.search_error = None;
                 }
 
+                let previous_selected_id = if page > 1 {
+                    self.state
+                        .search_list_state
+                        .selected()
+                        .and_then(|idx| self.state.search_results.get(idx).map(|r| r.id.clone()))
+                } else {
+                    None
+                };
+
                 let extracted_subjects = self
                     .state
                     .active_browse_preset
@@ -490,11 +518,16 @@ impl App {
                 let count = self.append_homepage_subjects(extracted_subjects);
                 self.sort_browse_results();
 
-                if count > 0 {
-                    self.prefetch_visible_posters();
-                }
-
-                if count > 0 && self.state.current_page <= 1 {
+                if let Some(prev_id) = previous_selected_id {
+                    if let Some(new_idx) = self
+                        .state
+                        .search_results
+                        .iter()
+                        .position(|r| r.id == prev_id)
+                    {
+                        self.state.search_list_state.select(Some(new_idx));
+                    }
+                } else if count > 0 && self.state.current_page <= 1 {
                     self.state.search_list_state.select(Some(0));
                     if let Some(first) = self.state.search_results.first() {
                         self.action_sender
@@ -503,6 +536,10 @@ impl App {
                     }
                 } else if count == 0 && self.state.current_page <= 1 {
                     self.state.search_list_state.select(None);
+                }
+
+                if count > 0 {
+                    self.prefetch_visible_posters();
                 }
 
                 if self.state.current_page <= 1 {

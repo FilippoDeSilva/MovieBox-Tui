@@ -150,6 +150,68 @@ impl App {
             .unwrap_or(self.state.active_provider)
     }
 
+    pub(super) fn trigger_next_page_if_needed(&mut self) {
+        if self.state.is_tv_mode || self.state.is_loading || self.state.search_results.is_empty() {
+            return;
+        }
+        let total = self.state.search_results.len();
+        let selected = self.state.search_list_state.selected().unwrap_or(0);
+        let offset = self.state.search_list_state.offset();
+        let visible = self.state.visible_items.max(6);
+
+        if selected + 8 >= total || offset + visible + 4 >= total {
+            let next_page = self.state.current_page + 1;
+            if self.state.is_homepage_mode {
+                self.action_sender
+                    .send(Action::FetchHomepage {
+                        tab_id: self.state.current_tab_id.clone(),
+                        page: next_page,
+                    })
+                    .ok();
+            } else {
+                let query = self.state.search_query.clone();
+                let client = self.client.clone();
+                let fourk_client = self.fourk_client.clone();
+                let circleftp_client = self.circleftp_client.clone();
+                let dhakaflix_client = self.dhakaflix_client.clone();
+                let sender = self.action_sender.clone();
+                let context = self.request_context();
+                let request_id = self.state.active_search_request;
+                self.state.is_loading = true;
+                tokio::spawn(async move {
+                    let result = network::provider_search(
+                        &client,
+                        &fourk_client,
+                        &circleftp_client,
+                        &dhakaflix_client,
+                        context.provider,
+                        &query,
+                        next_page,
+                    )
+                    .await;
+                    match result {
+                        Ok(res) => {
+                            sender
+                                .send(Action::SearchSuccess {
+                                    context,
+                                    request_id,
+                                    query,
+                                    page: next_page,
+                                    payload: res,
+                                })
+                                .ok();
+                        }
+                        Err(e) => {
+                            sender
+                                .send(Action::SearchFailure(context, request_id, next_page, e))
+                                .ok();
+                        }
+                    }
+                });
+            }
+        }
+    }
+
     pub(super) fn cycle_details_pane(&mut self, forward: bool) {
         use crate::tui::state::DetailsPane;
 
@@ -526,64 +588,8 @@ impl App {
                                     .ok();
                             }
                             self.prefetch_visible_posters();
-                        } else if !self.state.is_tv_mode
-                            && !self.state.is_loading
-                            && !self.state.search_results.is_empty()
-                        {
-                            let next_page = self.state.current_page + 1;
-                            if self.state.is_homepage_mode {
-                                self.action_sender
-                                    .send(Action::FetchHomepage {
-                                        tab_id: self.state.current_tab_id.clone(),
-                                        page: next_page,
-                                    })
-                                    .ok();
-                            } else {
-                                let query = self.state.search_query.clone();
-                                let client = self.client.clone();
-                                let fourk_client = self.fourk_client.clone();
-                                let circleftp_client = self.circleftp_client.clone();
-                                let dhakaflix_client = self.dhakaflix_client.clone();
-                                let sender = self.action_sender.clone();
-                                let context = self.request_context();
-                                let request_id = self.state.active_search_request;
-                                self.state.is_loading = true;
-                                self.state
-                                    .set_status(format!("Loading page {}...", next_page), 150);
-                                tokio::spawn(async move {
-                                    let result = network::provider_search(
-                                        &client,
-                                        &fourk_client,
-                                        &circleftp_client,
-                                        &dhakaflix_client,
-                                        context.provider,
-                                        &query,
-                                        next_page,
-                                    )
-                                    .await;
-                                    match result {
-                                        Ok(res) => {
-                                            sender
-                                                .send(Action::SearchSuccess {
-                                                    context,
-                                                    request_id,
-                                                    query,
-                                                    page: next_page,
-                                                    payload: res,
-                                                })
-                                                .ok();
-                                        }
-                                        Err(e) => {
-                                            sender
-                                                .send(Action::SearchFailure(
-                                                    context, request_id, next_page, e,
-                                                ))
-                                                .ok();
-                                        }
-                                    }
-                                });
-                            }
                         }
+                        self.trigger_next_page_if_needed();
                     }
                     Screen::Details => match self.state.details_pane {
                         crate::tui::state::DetailsPane::Streams => {
@@ -676,6 +682,7 @@ impl App {
                             .ok();
                     }
                     self.prefetch_visible_posters();
+                    self.trigger_next_page_if_needed();
                 }
             }
 

@@ -567,7 +567,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             };
             let results_area = results_chunk;
             let selected_idx = state.search_list_state.selected();
-            let offset = state.search_list_state.offset();
 
             let row_height = state.poster_rows.max(3) + 1;
             state.visible_items = (results_area.height as usize) / (row_height as usize);
@@ -579,13 +578,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let table = Table::new(rows, [Constraint::Percentage(100)]).block(list_block);
 
             frame.render_stateful_widget(table, results_area, &mut state.search_list_state);
+            let offset = state.search_list_state.offset();
 
             let inner_area = results_area;
 
             let mut current_y = inner_area.y;
 
             for (i, res) in state.search_results.iter().enumerate().skip(offset) {
-                if current_y >= inner_area.y + inner_area.height {
+                if current_y + state.poster_rows > inner_area.y + inner_area.height {
                     break;
                 }
 
@@ -593,14 +593,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     x: inner_area.x,
                     y: current_y,
                     width: inner_area.width,
-                    height: state
-                        .poster_rows
-                        .min(inner_area.y + inner_area.height.saturating_sub(current_y)),
+                    height: state.poster_rows,
                 };
-
-                if item_area.height == 0 {
-                    break;
-                }
 
                 let is_selected = Some(i) == selected_idx;
                 if is_selected {
@@ -761,12 +755,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
 
                 if is_selected {
-                    if state.preview_loading || state.is_loading {
-                        push_year!();
-                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        info_spans.push(ratatui::text::Span::styled("Loading...", theme.text_dim));
-                    } else if let Some(meta) = &state.search_preview {
+                    if let Some(meta) = &state.search_preview {
                         let rating = meta
                             .get("imdbRating")
                             .or_else(|| meta.get("imdbRatingValue"))
@@ -796,6 +785,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                         }
                         info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                    } else if state.preview_loading {
+                        push_year!();
+                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        info_spans.push(ratatui::text::Span::styled("Loading...", theme.text_dim));
                     } else {
                         push_year!();
                         info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));

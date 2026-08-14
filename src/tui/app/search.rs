@@ -374,29 +374,29 @@ impl App {
 
     pub(super) fn prepare_homepage_request(&mut self, tab_id: &str, page: usize) {
         self.state.active_homepage_request = self.state.active_homepage_request.wrapping_add(1);
-        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
         self.state.is_homepage_mode = true;
         self.state.current_tab_id = tab_id.to_string();
         self.state.current_page = page;
         self.state.active_screen = Screen::Home;
-        self.state.active_subject_id = None;
-        self.state.selected_details = None;
-        self.state.selected_resources = None;
         self.state.is_loading = true;
         self.state.search_error = None;
         if page == 1 {
+            self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
+            self.state.active_subject_id = None;
+            self.state.selected_details = None;
+            self.state.selected_resources = None;
             self.state.search_results.clear();
             self.state.browse_metrics.clear();
             self.state.search_list_state.select(Some(0));
+            self.state.search_suggestions.clear();
+            self.state.suggest_index = None;
+            self.state.search_preview = None;
+            self.state.preview_loading = false;
+            self.state.poster_image = None;
+            self.state.poster_protocol = None;
+            self.state
+                .set_status("Loading discover tab...".to_string(), 150);
         }
-        self.state.search_suggestions.clear();
-        self.state.suggest_index = None;
-        self.state.search_preview = None;
-        self.state.preview_loading = false;
-        self.state.poster_image = None;
-        self.state.poster_protocol = None;
-        self.state
-            .set_status("Loading discover tab...".to_string(), 150);
     }
 
     pub(super) fn prepare_details_request(&mut self, id: &str) -> RequestContext {
