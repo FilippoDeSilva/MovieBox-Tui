@@ -990,6 +990,19 @@ impl App {
                     default_episode = history.episode;
                 }
 
+                let target_season = if self.state.language_chosen && self.state.selected_season > 0
+                {
+                    self.state.selected_season
+                } else {
+                    default_season
+                };
+                let target_episode =
+                    if self.state.language_chosen && self.state.selected_episode > 0 {
+                        self.state.selected_episode
+                    } else {
+                        default_episode
+                    };
+
                 let season_idx = self
                     .state
                     .available_seasons
@@ -997,7 +1010,7 @@ impl App {
                     .position(|s| {
                         s.get("se")
                             .and_then(|v| v.as_i64())
-                            .map(|v| v as usize == default_season)
+                            .map(|v| v as usize == target_season)
                             .unwrap_or(false)
                     })
                     .unwrap_or(0);
@@ -1008,22 +1021,19 @@ impl App {
                     .state
                     .available_episode_numbers
                     .get(season_idx)
-                    .and_then(|eps| eps.iter().position(|&e| e == default_episode))
+                    .and_then(|eps| eps.iter().position(|&e| e == target_episode))
                     .unwrap_or(0);
 
                 self.state.episode_list_state.select(Some(ep_idx));
 
                 if let Some(dubs) = payload.get("dubs").and_then(|d| d.as_array()) {
-                    let preferred_idx = dubs
-                        .iter()
-                        .enumerate()
-                        .find_map(|(i, dub)| {
-                            let dub_id =
-                                dub.get("subjectId").and_then(crate::tui::state::subject_id);
-                            if dub_id == Some(id.clone()) {
-                                return Some(i);
-                            }
+                    let matching_idx = dubs.iter().position(|dub| {
+                        dub.get("subjectId").and_then(crate::tui::state::subject_id)
+                            == Some(id.clone())
+                    });
 
+                    let fallback_idx = || {
+                        dubs.iter().position(|dub| {
                             let labels = [
                                 dub.get("title").and_then(|v| v.as_str()),
                                 dub.get("name").and_then(|v| v.as_str()),
@@ -1032,25 +1042,20 @@ impl App {
                             ];
                             let label = labels.into_iter().flatten().collect::<Vec<_>>().join(" ");
                             let lower = label.to_ascii_lowercase();
-                            if lower.contains("original")
+                            lower.contains("original")
                                 || lower.contains("english")
                                 || lower.contains("sub")
-                            {
-                                Some(i)
-                            } else {
-                                None
-                            }
                         })
-                        .unwrap_or(0);
+                    };
+
+                    let preferred_idx = matching_idx.or_else(fallback_idx).unwrap_or(0);
                     self.state.language_list_state.select(Some(preferred_idx));
                 } else {
                     self.state.language_list_state.select(Some(0));
                 }
 
-                if !self.state.language_chosen {
-                    self.state.selected_season = default_season;
-                    self.state.selected_episode = default_episode;
-                }
+                self.state.selected_season = target_season;
+                self.state.selected_episode = target_episode;
 
                 let has_multiple_dubs = payload
                     .get("dubs")
@@ -1063,10 +1068,12 @@ impl App {
                     self.state
                         .set_status("Please select a language dubbing.".to_string(), 150);
                 } else {
-                    if stype == 2 && !self.state.available_seasons.is_empty() {
-                        self.state.details_pane = crate::tui::state::DetailsPane::Seasons;
-                    } else {
-                        self.state.details_pane = crate::tui::state::DetailsPane::Streams;
+                    if !self.state.language_chosen {
+                        if stype == 2 && !self.state.available_seasons.is_empty() {
+                            self.state.details_pane = crate::tui::state::DetailsPane::Seasons;
+                        } else {
+                            self.state.details_pane = crate::tui::state::DetailsPane::Streams;
+                        }
                     }
 
                     self.state.is_loading = true;

@@ -402,12 +402,13 @@ impl App {
                 if let Some(details) = &self.state.selected_details
                     && let Some(dubs) = details.get("dubs").and_then(|d| d.as_array())
                     && let Some(dub) = dubs.get(idx)
-                    && let Some(id) = dub.get("subjectId").and_then(|i| i.as_str())
+                    && let Some(id) = dub.get("subjectId").and_then(crate::tui::state::subject_id)
                 {
                     let next_id = id.to_string();
                     self.state.selected_resources = None;
                     self.state.resource_list_state.select(None);
                     self.state.language_chosen = true;
+                    self.state.language_list_state.select(Some(idx));
                     self.state
                         .set_status("Switching language...".to_string(), 150);
                     self.action_sender
@@ -479,9 +480,6 @@ impl App {
                             let current = self.state.language_list_state.selected().unwrap_or(0);
                             if current > 0 {
                                 self.state.language_list_state.select(Some(current - 1));
-                                self.action_sender
-                                    .send(Action::SelectLanguage(current - 1))
-                                    .ok();
                             }
                         }
                     },
@@ -633,9 +631,6 @@ impl App {
                                 && current + 1 < dubs.len()
                             {
                                 self.state.language_list_state.select(Some(current + 1));
-                                self.action_sender
-                                    .send(Action::SelectLanguage(current + 1))
-                                    .ok();
                             }
                         }
                     },

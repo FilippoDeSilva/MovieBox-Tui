@@ -525,17 +525,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         if let Some(dubs) = details_json.get("dubs").and_then(|d| d.as_array()) {
             for dub in dubs {
                 if let Some(lang) = dub.get("lanName").and_then(|n| n.as_str()) {
-                    let mut name = if lang.to_lowercase().starts_with("original") {
-                        "Original".to_string()
-                    } else {
-                        lang.replace("dub", "")
-                            .replace("Dub", "")
-                            .trim()
-                            .to_string()
-                    };
-                    if name.to_lowercase() == "ptbr" {
-                        name = "Portuguese (BR)".to_string();
-                    }
+                    let name = clean_language_name(lang);
                     lang_items.push(ListItem::new(name).style(theme.text));
                 }
             }
@@ -1348,10 +1338,24 @@ fn render_workflow(
     let mut steps = Vec::new();
 
     if has_languages {
+        let active_idx = details
+            .get("dubs")
+            .and_then(|dubs| dubs.as_array())
+            .and_then(|dubs| {
+                dubs.iter().position(|dub| {
+                    dub.get("subjectId")
+                        .and_then(crate::tui::state::subject_id)
+                        .as_deref()
+                        == state.active_subject_id.as_deref()
+                })
+            })
+            .or_else(|| state.language_list_state.selected())
+            .unwrap_or(0);
+
         let language = details
             .get("dubs")
             .and_then(|dubs| dubs.as_array())
-            .and_then(|dubs| dubs.get(state.language_list_state.selected().unwrap_or(0)))
+            .and_then(|dubs| dubs.get(active_idx))
             .and_then(|dub| dub.get("lanName"))
             .and_then(|name| name.as_str())
             .map(clean_language_name)
