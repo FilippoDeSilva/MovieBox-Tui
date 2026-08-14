@@ -419,9 +419,6 @@ impl App {
             }
 
             Action::MoveUp => {
-                if self.state.active_screen == Screen::Home {
-                    self.prepare_image_refresh();
-                }
                 if self.state.player_picker_popup {
                     let i = match self.state.player_picker_state.selected() {
                         Some(i) => {
@@ -497,9 +494,6 @@ impl App {
             }
 
             Action::MoveDown => {
-                if self.state.active_screen == Screen::Home {
-                    self.prepare_image_refresh();
-                }
                 if self.state.player_picker_popup {
                     let i = match self.state.player_picker_state.selected() {
                         Some(i) => {
@@ -642,7 +636,6 @@ impl App {
 
             Action::MoveLeft => {
                 if self.state.active_screen == Screen::Home {
-                    self.prepare_image_refresh();
                     let current = self.state.search_list_state.selected().unwrap_or(0);
                     let jump = self.state.visible_items.max(1);
                     if current > jump {
@@ -665,7 +658,6 @@ impl App {
 
             Action::MoveRight => {
                 if self.state.active_screen == Screen::Home {
-                    self.prepare_image_refresh();
                     let current = self.state.search_list_state.selected().unwrap_or(0);
                     let jump = self.state.visible_items.max(1);
                     let total = self.state.search_results.len();

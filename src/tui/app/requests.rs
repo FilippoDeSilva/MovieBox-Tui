@@ -402,7 +402,9 @@ impl App {
                     self.prefetch_visible_posters();
                 }
 
-                self.prepare_image_refresh();
+                if page <= 1 {
+                    self.prepare_image_refresh();
+                }
 
                 self.state.set_status(
                     if self.state.search_results.is_empty() {
@@ -503,7 +505,9 @@ impl App {
                     self.state.search_list_state.select(None);
                 }
 
-                self.prepare_image_refresh();
+                if self.state.current_page <= 1 {
+                    self.prepare_image_refresh();
+                }
 
                 let status = self
                     .state
