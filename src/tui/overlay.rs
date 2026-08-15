@@ -253,7 +253,6 @@ pub fn notifications(
     basic_terminal: bool,
 ) {
     let mut y = area.bottom().saturating_sub(2);
-    let surface = theme.surface0.fg.unwrap_or(theme.base);
 
     for notification in notifications.iter().rev().take(3) {
         let (badge, badge_style) = notification_style(notification.kind, theme, basic_terminal);
@@ -318,7 +317,6 @@ pub fn notifications(
                 BorderType::Rounded
             })
             .border_style(badge_style)
-            .style(Style::default().bg(surface))
             .padding(ratatui::widgets::Padding::horizontal(1));
 
         frame.render_widget(Paragraph::new(lines).block(block), toast_area);
