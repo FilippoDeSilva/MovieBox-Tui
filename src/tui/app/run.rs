@@ -65,8 +65,7 @@ impl App {
 
         loop {
             if self.state.clear_terminal_before_draw {
-                terminal.backend_mut().clear()?;
-                terminal.current_buffer_mut().reset();
+                terminal.clear()?;
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 self.state.clear_terminal_before_draw = false;

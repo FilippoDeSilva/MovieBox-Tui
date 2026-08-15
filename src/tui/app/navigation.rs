@@ -386,7 +386,6 @@ impl App {
     pub(super) async fn handle_navigation(&mut self, action: Action) -> Option<()> {
         match action {
             Action::GoBack => {
-                self.prepare_image_refresh();
                 if self.state.player_picker_popup {
                     self.state.player_picker_popup = false;
                     self.state.player_picker_link = None;
