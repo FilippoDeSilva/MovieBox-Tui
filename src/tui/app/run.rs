@@ -13,8 +13,12 @@ impl App {
         std::io::Error: From<<B as ratatui::backend::Backend>::Error>,
     {
         if self.state.image_picker.is_none() && self.state.image_supported {
-            let picker = ratatui_image::picker::Picker::from_query_stdio()
-                .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks());
+            let picker = if crate::tui::terminal::should_query_images() {
+                ratatui_image::picker::Picker::from_query_stdio()
+                    .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
+            } else {
+                ratatui_image::picker::Picker::halfblocks()
+            };
             let cell_h = picker.font_size().height;
             if cell_h > 0 {
                 self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
@@ -226,7 +230,8 @@ impl App {
         let area = frame.area();
 
         if let Some((_, w, h)) = self.state.last_resize_time {
-            let label = format!("{} × {}", w, h);
+            let sep = if self.state.basic_terminal { "x" } else { "×" };
+            let label = format!("{} {} {}", w, sep, h);
             let label_len = label.chars().count() as u16 + 4;
             let badge_w = label_len.min(area.width);
             let badge_h = 1_u16;

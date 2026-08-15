@@ -46,11 +46,6 @@ pub fn init() {
         std::env::consts::OS,
         display_path()
     );
-    eprintln!(
-        "[moviebox-tui] logging to {} (MOVIEBOX_LOG={})",
-        display_path(),
-        spec
-    );
 }
 
 pub fn log_file_path() -> std::path::PathBuf {

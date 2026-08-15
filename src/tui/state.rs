@@ -275,6 +275,13 @@ pub struct AppState {
     pub history: crate::history::HistoryManager,
 }
 
+const fn non_zero(n: usize) -> std::num::NonZeroUsize {
+    match std::num::NonZeroUsize::new(n) {
+        Some(v) => v,
+        None => panic!("non-zero constant required"),
+    }
+}
+
 impl Default for AppState {
     fn default() -> Self {
         Self {
@@ -292,9 +299,9 @@ impl Default for AppState {
             is_homepage_mode: false,
             current_tab_id: String::new(),
             current_page: 1,
-            search_posters: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
-            failed_posters: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
-            search_poster_protocols: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
+            search_posters: lru::LruCache::new(non_zero(300)),
+            failed_posters: lru::LruCache::new(non_zero(300)),
+            search_poster_protocols: lru::LruCache::new(non_zero(300)),
             in_flight_posters: std::collections::HashSet::new(),
             search_list_state: TableState::default(),
             basic_terminal: crate::tui::terminal::uses_basic_ui(),
@@ -310,7 +317,7 @@ impl Default for AppState {
             is_waiting_for_download_stream: false,
             is_fetching_streams: false,
             stream_error: None,
-            preview_cache: lru::LruCache::new(std::num::NonZeroUsize::new(30).unwrap()),
+            preview_cache: lru::LruCache::new(non_zero(30)),
             resource_list_state: ListState::default(),
 
             details_pane: DetailsPane::default(),
@@ -339,7 +346,7 @@ impl Default for AppState {
             image_supported: crate::tui::terminal::should_query_images(),
             clear_terminal_before_draw: false,
             poster_rows: 3,
-            image_cache: lru::LruCache::new(std::num::NonZeroUsize::new(10).unwrap()),
+            image_cache: lru::LruCache::new(non_zero(10)),
             show_help: false,
             visible_items: 10,
             active_resource_request: 0,

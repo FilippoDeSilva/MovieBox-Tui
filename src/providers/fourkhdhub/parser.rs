@@ -514,14 +514,16 @@ fn detect_language(value: &str) -> Option<String> {
                 let actual_pos = search_idx + pos;
                 let end_pos = actual_pos + pattern.len();
 
-                let prev_ok = actual_pos == 0 || {
-                    let prev_char = lower[..actual_pos].chars().last().unwrap();
-                    !prev_char.is_alphabetic()
-                };
-                let next_ok = end_pos >= lower.len() || {
-                    let next_char = lower[end_pos..].chars().next().unwrap();
-                    !next_char.is_alphabetic()
-                };
+                let prev_ok = actual_pos == 0
+                    || lower
+                        .get(..actual_pos)
+                        .and_then(|s| s.chars().last())
+                        .is_none_or(|c| !c.is_alphabetic());
+                let next_ok = end_pos >= lower.len()
+                    || lower
+                        .get(end_pos..)
+                        .and_then(|s| s.chars().next())
+                        .is_none_or(|c| !c.is_alphabetic());
 
                 if prev_ok && next_ok {
                     if !found_langs.iter().any(|(_, name)| *name == *lang_name) {

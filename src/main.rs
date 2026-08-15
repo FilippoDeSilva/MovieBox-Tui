@@ -29,7 +29,9 @@ fn purge_stale_subtitles() {
         }
 
         for dir in dirs {
-            if let Ok(entries) = std::fs::read_dir(dir) {
+            if dir.exists()
+                && let Ok(entries) = std::fs::read_dir(&dir)
+            {
                 for entry in entries.flatten() {
                     if let Ok(metadata) = entry.metadata()
                         && let Ok(modified) = metadata.modified()
@@ -53,6 +55,23 @@ impl Drop for TerminalGuard {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        println!("moviebox-tui {}", env!("CARGO_PKG_VERSION"));
+        println!("A terminal client for finding and streaming movies, TV shows, and anime.\n");
+        println!("USAGE:");
+        println!("    moviebox-tui [OPTIONS]\n");
+        println!("OPTIONS:");
+        println!("    -h, --help           Print help information");
+        println!("    -v, -V, --version    Print version information\n");
+        println!("ENVIRONMENT VARIABLES:");
+        println!("    MOVIEBOX_LOG         Log level (info, warn, error, debug, trace)");
+        println!("    MOVIEBOX_THEME       Theme name (e.g. catppuccin, dracula, nord, etc.)");
+        println!("    MOVIEBOX_PLAYER      Preferred player (mpv, iina, vlc, android)");
+        println!("    MOVIEBOX_MPV_PATH    Custom mpv binary path");
+        println!("    MOVIEBOX_VLC_PATH    Custom vlc binary path");
+        println!("    MOVIEBOX_IINA_PATH   Custom iina-cli binary path");
+        return Ok(());
+    }
     if args
         .iter()
         .any(|arg| arg == "--version" || arg == "-v" || arg == "-V")

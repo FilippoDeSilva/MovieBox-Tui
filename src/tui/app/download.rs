@@ -5,10 +5,26 @@ use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 impl App {
     pub(super) fn resolve_download_base_dir(&self) -> std::path::PathBuf {
         if let Some(ref custom_dir) = self.state.download_dir {
+            static LAST_PROBE: std::sync::Mutex<Option<(std::path::PathBuf, std::time::Instant)>> =
+                std::sync::Mutex::new(None);
+            let mut cached_ok = false;
+            if let Ok(guard) = LAST_PROBE.lock() {
+                if let Some((ref path, time)) = *guard {
+                    if path == custom_dir && time.elapsed().as_secs() < 60 {
+                        cached_ok = true;
+                    }
+                }
+            }
+            if cached_ok {
+                return custom_dir.clone();
+            }
             if std::fs::create_dir_all(custom_dir).is_ok() {
                 let probe = custom_dir.join(format!(".mb_probe_{}", std::process::id()));
                 if std::fs::write(&probe, b"ok").is_ok() {
                     let _ = std::fs::remove_file(&probe);
+                    if let Ok(mut guard) = LAST_PROBE.lock() {
+                        *guard = Some((custom_dir.clone(), std::time::Instant::now()));
+                    }
                     return custom_dir.clone();
                 }
             }
@@ -66,15 +82,15 @@ impl App {
             .and_then(|details| details.get("title"))
             .and_then(|title| title.as_str())
             .unwrap_or("MovieBox-Tui_Stream");
-        let media_type = self
+        let is_series = self
             .state
             .selected_details
             .as_ref()
-            .and_then(|details| details.get("type"))
-            .and_then(|t| t.as_i64())
-            .unwrap_or(1);
-        let season = self.state.selected_season.saturating_add(1);
-        let episode = self.state.selected_episode.saturating_add(1);
+            .map(crate::tui::state::stype)
+            .is_some_and(|s| s == 2)
+            || !self.state.available_seasons.is_empty();
+        let season = self.state.selected_season;
+        let episode = self.state.selected_episode;
         let safe_title = title
             .chars()
             .map(|c| {
@@ -94,13 +110,13 @@ impl App {
             .and_then(|path| path.rsplit('.').next())
             .filter(|ext| {
                 let lower = ext.to_ascii_lowercase();
-                lower == "mp4" || lower == "mkv" || lower == "webm" || lower == "ts"
+                matches!(lower.as_str(), "mp4" | "mkv" | "webm" | "ts")
             })
             .unwrap_or("mp4")
             .to_ascii_lowercase();
 
         let base_dir = self.resolve_download_base_dir();
-        let (target_dir, base_name) = if media_type == 2 {
+        let (target_dir, base_name) = if is_series {
             (
                 base_dir
                     .join("Series")
@@ -109,7 +125,10 @@ impl App {
                 format!("{safe_title}_S{season:02}E{episode:02}"),
             )
         } else {
-            (base_dir.join("Movies"), safe_title)
+            (
+                base_dir.join("Movies").join(&safe_title),
+                safe_title.clone(),
+            )
         };
         let mut destination = target_dir.join(format!("{base_name}.{extension}"));
         let mut counter = 2;

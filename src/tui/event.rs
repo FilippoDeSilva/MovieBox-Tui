@@ -12,9 +12,17 @@ impl EventHandler {
         let (sender, receiver) = mpsc::channel(128);
         let event_sender = sender.clone();
 
-        let mut tick_interval = tokio::time::interval(tick_rate);
+        tokio::spawn({
+            let signal_sender = sender.clone();
+            async move {
+                if tokio::signal::ctrl_c().await.is_ok() {
+                    let _ = signal_sender.send(Action::Quit).await;
+                }
+            }
+        });
 
         tokio::spawn(async move {
+            let mut tick_interval = tokio::time::interval(tick_rate);
             let mut reader = crossterm::event::EventStream::new();
             use futures::StreamExt;
 
