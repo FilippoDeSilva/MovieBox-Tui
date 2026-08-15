@@ -16,7 +16,7 @@ The active file is `moviebox-tui_rCURRENT.log`; rotated files are
 
 - **Level** is controlled by `MOVIEBOX_LOG` (`off|warn|info|debug|trace`). Default is
   `warn` in release builds, `info` in debug builds.
-- **Rotation**: rotates at 5MB and keeps 3 files, so it stays small automatically.
+- **Rotation**: rotates at 5MB and keeps 3 files.
 - **Terminal output**: normal log lines go only to the file without writing to stdout or stderr, preventing screen bleed before entering alternate screen mode. Setup errors (if any) are reported on `stderr`.
 - **Session header**: version, OS, and the log path are written on startup.
 - **Panics**: the panic hook logs the payload to the file, then restores the terminal.

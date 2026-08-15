@@ -2,127 +2,76 @@
 
 # MovieBox-TUI
 
-Search, browse, play, and download movies, series, anime, and IPTV streams from a keyboard-first terminal interface with full mouse support using external media players.
+Watch and download movies, TV shows, anime, and live TV right in your terminal — without opening a browser.
 
 [![Crates.io](https://img.shields.io/crates/v/moviebox-tui.svg?logo=rust)](https://crates.io/crates/moviebox-tui)
+[![Crates.io Downloads](https://img.shields.io/crates/d/moviebox-tui.svg)](https://crates.io/crates/moviebox-tui)
 [![CI](https://github.com/mesamirh/MovieBox-Tui/actions/workflows/ci.yml/badge.svg)](https://github.com/mesamirh/MovieBox-Tui/actions/workflows/ci.yml)
-[![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android-brightgreen)](#requirements)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![License](https://img.shields.io/crates/l/moviebox-tui.svg)](#license)
 
 <video src="https://github.com/user-attachments/assets/e3dc0c11-524f-4b0e-8902-e0c66d6ca88d" alt="MovieBox-TUI demo" width="85%" autoplay loop muted></video>
 
 </div>
 
-## Documentation
+## Why MovieBox-TUI?
 
-This README is the project landing page (features, install, usage). The full
-documentation set — architecture, providers, players, cache, logging, TV mode,
-configuration, and debugging — lives in [`docs/`](docs/README.md). Contribution
-guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Searching and watching media through web browsers often means dealing with heavy memory usage from multiple open tabs, intrusive popups, tracking scripts, and clunky web players.
 
-## Features
+**MovieBox-TUI replaces the web browser workflow with a lightweight terminal interface.** It extracts stream links directly and launches them in your preferred local media player (`mpv`, `VLC`, or `IINA`), with no ads or popups inside the application.
 
-### Catalogs & Browsing
+### Quick Comparison
 
-- Search and browse movies, TV series, and anime from multiple content catalogs
-- Inspect stream quality groupings, multilingual audio tracks, and subtitle options before playback
+| Feature | Streaming in a Web Browser | MovieBox-TUI in Your Terminal |
+| :--- | :--- | :--- |
+| **Resource Usage** | Heavy browser process overhead | **~5 MB RAM (no web engine required)** |
+| **In-App Experience** | Popups, redirects, and tracking scripts | **No ads or popups inside the application** |
+| **Video Player** | Browser web player | **Direct playback in mpv, VLC, or IINA** |
+| **Account &amp; Login** | Forced account creation &amp; signups | **No account or login required** |
+| **Subtitles** | Manual search and file renaming | **Automatic subtitle downloads in your language** |
+| **Downloads** | Manual single-file downloads | **1-click full season batch downloads** |
+| **File Organization** | Cluttered downloads folder | **Clean, organized Movies and Series folders** |
 
-> **Note on BDIX:** BDIX sources are only accessible from supported Bangladeshi ISP networks. Because of this, they are hidden by default. You can enable them manually if your network supports it.
+## Features at a Glance
 
-### Playback
-
-- Play streams directly in your local media player (mpv, VLC, or IINA)
-- Play protected streams seamlessly without manual configuration
-
-### Downloads
-
-- Contextual downloads: download entire seasons or single episodes with one click/key
-- Automatic subtitle language selection applied across all season episodes
-- Resume interrupted downloads without losing progress
-
-### IPTV
-
-- Watch live TV by loading remote or local `.m3u` playlists organized by category
-
-### User Interface & App
-
-- Full mouse and keyboard controls: click search, suggestions, cards, tabs, and action buttons directly
-- Minimal tree-branch autocomplete suggestions with helpful slash command descriptions
-- View rich graphical posters in supported terminals (Kitty, iTerm2, Sixel) or fallback to text art
-- Let the app automatically manage configuration and clean up expired caches
-
-MovieBox-TUI resolves links from upstream services. Availability can change when those services change, and some mirrors are region- or rate-limit-dependent.
-
-## Requirements
-
-- 64-bit Windows, macOS, Linux, or Android (Termux)
-- Terminal size of at least 50×14 (80×24+ recommended for optimal poster & metadata layout)
-- One supported player: mpv, VLC, IINA, or any native Android video player
-- Internet connection
+- **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, and custom IPTV playlists).
+- **Smooth Video Playback:** Plays directly in **mpv**, **VLC**, or **IINA** using your computer's hardware for smooth video.
+- **Easy Downloads:** Download single episodes or entire seasons with one keypress. Completed episodes are skipped automatically.
+- **Simple Terminal Interface:** Full keyboard and mouse support, beautiful color themes, and movie poster art.
 
 ## Installation
 
-Prebuilt binaries are available for macOS, Linux, and Windows releases. The official install scripts verify the release SHA-256 checksum automatically.
-On Termux, install from TUR or build from source with `cargo install` on-device.
+### Cargo
 
-### macOS or Linux
+```bash
+cargo install moviebox-tui --locked
+```
 
-#### Homebrew
+### Homebrew (macOS & Linux)
 
 ```bash
 brew tap mesamirh/moviebox-tui https://github.com/mesamirh/MovieBox-Tui
 brew install mesamirh/moviebox-tui/moviebox-tui
 ```
 
-The formula selects the correct macOS, Linux x86_64, or Linux ARM64 release.
-
-#### Install script
+### Install Script (macOS & Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
 ```
 
-The script features multi-tier animations, automatic SHA256 checksum verification, media player detection, and non-destructive shell PATH configuration. Supports `--version <tag>`, `--dir <path>`, `--force`, and `--uninstall`.
-
 ### Windows
-
-Works in PowerShell or Command Prompt (cmd):
 
 ```cmd
 powershell -Command "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex"
 ```
 
-The installer selects x86_64 or ARM64, verifies checksums, installs under `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin`, and automatically adds the directory to your user PATH. Supports `-Version <tag>`, `-InstallDir <path>`, `-Force`, and `-Uninstall`.
-
 ### Android (Termux)
-
-MovieBox-Tui runs natively in Termux and opens videos through the Android app chooser on supported devices.
-
-Preferred install via TUR (Termux User Repository):
 
 ```bash
 pkg install tur-repo
 pkg install moviebox-tui
 termux-setup-storage
 ```
-
-TUR packages are distributed separately from crates.io. New MovieBox-Tui GitHub
-releases may take some time to appear in TUR, and users still need to update
-packages normally in Termux (for example via `pkg upgrade`). Termux playback
-should be rechecked on real devices for each release.
-If you previously installed MovieBox-Tui with `cargo install`, see
-[Troubleshooting](#troubleshooting) for the Termux PATH fix.
-
-Alternative source-based install:
-
-```bash
-pkg install rust openssl pkg-config
-cargo install moviebox-tui --locked
-termux-setup-storage
-```
-
-_`termux-setup-storage` is recommended if you want downloads saved to the real
-Android `Download` folder._
 
 <details>
 <summary><b>Build from source</b></summary>
@@ -133,307 +82,67 @@ cd MovieBox-Tui
 cargo build --release --locked
 ```
 
-Binary location: `target/release/moviebox-tui` (`moviebox-tui.exe` on Windows).
-
 </details>
-
-## Supported Players
-
-MovieBox-TUI checks standard application locations, PATH executables, and Linux Flatpak installations.
-
-Detected automatically:
-
-- **macOS:** `/Applications`, `~/Applications`, Homebrew/PATH
-- **Linux:** PATH, Flatpak mpv, Flatpak VLC
-- **Windows:** PATH, common Program Files locations, Microsoft Store aliases
-
-Portable or custom installations can be selected with environment variables:
-
-| Player | Variable             |
-| ------ | -------------------- |
-| mpv    | `MOVIEBOX_MPV_PATH`  |
-| VLC    | `MOVIEBOX_VLC_PATH`  |
-| IINA   | `MOVIEBOX_IINA_PATH` |
-
-You can also force the preferred detected player order with:
-
-```bash
-export MOVIEBOX_PLAYER=mpv
-```
-
-macOS/Linux example:
-
-```bash
-export MOVIEBOX_MPV_PATH="$HOME/Apps/mpv"
-moviebox-tui
-```
-
-Windows PowerShell example:
-
-```powershell
-$env:MOVIEBOX_VLC_PATH = "D:\Apps\VLC\vlc.exe"
-moviebox-tui
-```
-
-IINA is macOS-only. mpv provides the broadest source-header compatibility. Android intent playback depends on device chooser behavior and cannot attach subtitles.
 
 ## Usage
 
-Run:
+Start the app:
 
 ```bash
 moviebox-tui
 ```
 
-### Keyboard shortcuts
+- **Interactive Help:** Press `?` inside the app anytime to view all keyboard shortcuts and mouse actions.
+- **Mouse & Keyboard:** Full mouse navigation and keyboard controls are supported throughout the application.
+- **Full Reference:** See [Controls & Shortcuts](docs/controls.md) for the complete list of keybindings and slash commands.
 
-| Key        | Action                                                |
-| ---------- | ----------------------------------------------------- |
-| Arrow keys | Navigate lists, grids, seasons, episodes, and dialogs |
-| Enter      | Open or confirm selection                             |
-| Esc        | Close dialog or go back                               |
-| `o`        | Choose another player                                 |
-| `d`        | Download selected episode or season                   |
-| `r`        | Refresh current content                               |
-| `Ctrl+P`   | Switch content provider                               |
-| `Ctrl+T`   | Toggle IPTV mode                                      |
-| `?`        | Show help                                             |
-| `Ctrl+C` / `q` | Quit application and restore terminal             |
+## Documentation
 
-### Mouse controls
+All in-depth guides and technical details are available in the [`docs/`](docs/) directory:
 
-| Action | Result |
-| ------ | ------ |
-| Left click search bar | Enter search query input mode |
-| Left click suggestion item | Select and search suggestion immediately |
-| Left click search result row | Select item and preview; click again / double click to open details |
-| Left click audio / season / episode / stream | Switch audio language, change season, select episode, or play stream |
-| Left click footer buttons | Switch provider (`[Ctrl+P]`), toggle TV mode (`[Ctrl+T]`), open help (`[?]`), or quit (`[q]`) |
-| Left click modal items / buttons | Select theme, browse preset, subtitles, players, or confirm download/cancel |
-| Left click outside modal | Dismiss popup |
+- [Controls & Shortcuts](docs/controls.md) — Complete keyboard shortcuts, mouse actions, and slash commands
+- [Architecture & Data Flow](docs/architecture.md) — How the app works under the hood
+- [Media Players](docs/players.md) — Supported players, custom paths, and launch options
+- [Downloads & Organization](docs/downloads.md) — Folder layout, batch downloading, and subtitles
+- [Live TV & Playlists](docs/tv-mode.md) — How to add and manage custom M3U playlists
+- [Configuration Reference](docs/config.md) — Config files and environment variables
+- [Providers](docs/providers.md) — Supported content sources and protocols
+- [Troubleshooting & Debugging](docs/debugging.md) — Fixing common issues and reporting bugs
+- [Contributing Guide](CONTRIBUTING.md) — How to contribute code and submit PRs
 
-### Slash commands
+## Roadmap
 
-| Command              | Action                                    |
-| -------------------- | ----------------------------------------- |
-| `/browse`            | Browse curated, rated, and most-watched views |
-| `/download-dir`      | View, change, or reset download directory |
-| `/history`           | Show watch history                        |
-| `/list`              | Show IPTV channels                        |
-| `/config`            | Configure IPTV playlists                  |
-| `/github`            | Open the project repository               |
-| `/theme`             | Open the theme picker                     |
-| `/update`            | Check for a newer release                 |
-| `/toggle-update`     | Enable or disable automatic update checks |
-| `/clear-cache`       | Remove cached application data            |
-| `/enable-bdix`       | Enable BDIX FTP sources                   |
-| `/disable-bdix`      | Disable BDIX FTP sources                  |
+- [x] **Terminal UI (TUI):** Interactive terminal application with mouse and keyboard navigation, stream playback, and batch downloading.
+- [ ] **Command-Line Interface (CLI):** Direct command-line flags and arguments for headless searching, streaming, and scripted downloading.
+- [ ] **Desktop GUI Client:** Dedicated graphical desktop application powered by the same backend stream engine.
 
-`/update` checks availability and shows the release location; it does not replace the running binary. Re-run the installer or Homebrew upgrade command to update.
+## Feedback & Support
 
-Choosing a player from `Open with` updates the saved default player for later launches,
-unless `MOVIEBOX_PLAYER` is set in the environment.
+MovieBox-TUI is an open-source project built for the community. If you enjoy using it, here are a few simple ways to help:
 
-## Downloads
-
-By default, downloads are stored under the operating system Downloads directory:
-
-```text
-MovieBox-TUI/
-├── Movies/
-│   └── <title>/
-│       ├── <title>.<ext>
-│       └── <title>.<lang>.<sub_ext>
-└── Series/
-    └── <title>/
-        └── Season <number>/
-            ├── <title> - S01E01.<ext>
-            └── <title> - S01E01.<lang>.<sub_ext>
-```
-
-- **Custom download directory:** Use `/download-dir <path>` (e.g. `/download-dir ~/Videos` or `/download-dir /Volumes/Drive`) to change and persist your download folder. Use `/download-dir reset` to return to default.
-- **Contextual triggers:** Pressing `d` or clicking `[Download]` while focused on the **Seasons** pane prompts to download the whole season; while on **Episodes** or **Streams**, it downloads that single episode.
-- **Sequential downloads & Duplication prevention:** Entire seasons are downloaded one by one. Existing completed episodes are automatically skipped to save bandwidth and prevent duplicate files.
-- **Smart subtitle tagging:** Subtitles are saved with ISO 639-1 language codes (e.g. `.en.srt`, `.hi.srt`) so media players (VLC, mpv, IINA) and media servers (Plex, Jellyfin, Kodi) automatically identify track languages. Missing subtitles do not discard completed video files.
-- **Robust resuming:** Interrupted downloads preserve `.part` and metadata files, and can be resumed without losing progress.
-- On Android/Termux, the app prefers shared `storage/downloads` when it exists.
-
-## Configuration & Cache
-
-MovieBox-TUI uses standard OS directories:
-
-| Platform | Configuration                                | Cache                                      |
-| -------- | -------------------------------------------- | ------------------------------------------ |
-| Linux    | `${XDG_CONFIG_HOME:-~/.config}/moviebox-tui` | `${XDG_CACHE_HOME:-~/.cache}/moviebox-tui` |
-| macOS    | `~/Library/Application Support/moviebox-tui` | `~/Library/Caches/moviebox-tui`            |
-| Windows  | `%APPDATA%\moviebox-tui`                     | `%LOCALAPPDATA%\moviebox-tui`              |
-
-Catalog providers use separate cache namespaces. Expired or invalid cache entries are discarded automatically; files older than seven days are cleaned at startup.
-
-The current theme, active provider, default player, BDIX visibility, and update
-preferences are persisted in `config.json`. See [`docs/config.md`](docs/config.md)
-for the full config and environment-variable reference.
-
-## Updates
-
-Automatic update checks only notify you about new releases. They do not update the application automatically.
-
-Homebrew:
-
-```bash
-brew update
-brew upgrade moviebox-tui
-```
-
-Script installation: run the install command again.
-
-Windows PowerShell: run the install command again.
-
-Cargo:
-
-```bash
-cargo install moviebox-tui --locked --force
-```
-
-## Uninstallation
-
-Homebrew:
-
-```bash
-brew uninstall moviebox-tui
-brew untap mesamirh/moviebox-tui
-```
-
-Script installation:
-
-```bash
-sudo rm -f /usr/local/bin/moviebox-tui
-rm -f "$HOME/.local/bin/moviebox-tui"
-```
-
-Windows PowerShell:
-
-```powershell
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\MovieBox-Tui"
-```
-
-Cargo:
-
-```bash
-cargo uninstall moviebox-tui
-```
-
-Configuration and cache directories remain until removed manually.
-
-## Troubleshooting
+- **Star the repository** on GitHub to help more people discover it.
+- **Share your thoughts** or report issues on the [GitHub Issues](https://github.com/mesamirh/MovieBox-Tui/issues) page.
+- **Share the project** with friends or anyone who loves terminal tools.
+- **Contribute** fixes or new features through [pull requests](CONTRIBUTING.md).
 
 <details>
-<summary><b>No media player found</b></summary>
+<summary><b>Optional Support</b></summary>
 
-MovieBox-TUI relies on external players. If it says none are found:
+If you would like to support ongoing development directly:
 
-1. Ensure you have installed **mpv**, **VLC**, or **IINA**.
-2. Verify it is in your system PATH by running `mpv --version` or `vlc --version` in your terminal.
-3. If using a portable or non-standard installation, set the corresponding environment variable before running (e.g., `MOVIEBOX_MPV_PATH=/path/to/mpv`).
-
-</details>
-
-<details>
-<summary><b>Images do not render / Only text is shown</b></summary>
-
-MovieBox-TUI supports inline images via Kitty, Sixel, and iTerm2 protocols.
-
-- If images don't show, ensure you are using a compatible terminal emulator (like Kitty, WezTerm, iTerm2, or Windows Terminal Preview).
-- If your terminal does not support graphics, the UI gracefully falls back to text-based posters and remains fully usable.
-- If you experience crashes when resizing the window (specifically with Sixel), please report it with your OS, terminal name, and version.
+| Network / Asset | Address |
+| :--- | :--- |
+| **USDT (TRC20)** | `TL4yW73qmbKZpBWwbEFgjBpwVkPDFTkJgV` |
+| **Bitcoin (BTC)** | `3MEAtqtRWrQBhnaMi3Zuf5nt2efNUS2LUQ` |
+| **Ethereum / EVM** | `0x7ea20d5fa29d87f33195f5a3b211ff94038d794c` |
+| **Solana (SOL)** | `6ctm5WFv73MNywoCKAz3xK72yizSspHa72rFNygooU6` |
 
 </details>
-
-<details>
-<summary><b>Termux: TUR install works, but `moviebox-tui` still points to `~/.cargo/bin`</b></summary>
-
-This usually means you installed MovieBox-Tui with Cargo earlier and your shell
-is still preferring the old Cargo path over the TUR package in `$PREFIX/bin`.
-
-Check the installed TUR binary directly:
-
-```bash
-$PREFIX/bin/moviebox-tui --version
-```
-
-Then clear the shell command cache:
-
-```bash
-hash -r
-```
-
-If needed, move Termux's bin directory earlier in your shell startup file:
-
-```bash
-export PATH="$PREFIX/bin:$HOME/.cargo/bin:$PATH"
-```
-
-Then reload your shell and try `moviebox-tui` again.
-
-</details>
-
-<details>
-<summary><b>"moviebox-tui: command not found" (Linux / macOS)</b></summary>
-
-If you installed via the script without `sudo`, the binary was placed in `~/.local/bin`. You need to add this to your PATH. Add this line to your `~/.bashrc` or `~/.zshrc`:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Then restart your terminal.
-
-</details>
-
-<details>
-<summary><b>Windows PowerShell script fails (Execution Policy)</b></summary>
-
-If you receive an error about running scripts being disabled on your system when installing via PowerShell, run this command as Administrator first:
-
-```powershell
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-Then try the installation command again.
-
-</details>
-
-## Development
-
-Formatting and linting are enforced automatically by the pre-commit hook on every
-commit (see [CONTRIBUTING.md](CONTRIBUTING.md)). Before opening a PR, run the same
-local checks the repository expects plus the CI-only verification steps:
-
-```bash
-cargo fmt --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo check --locked
-cargo audit
-cargo package --locked
-```
-
-CI currently runs `cargo test --locked`, which passes today but covers no
-meaningful unit tests yet. Keep the static gates above, plus the runtime checks
-in [`docs/release-checklist.md`](docs/release-checklist.md), as the main release
-bar until real regression coverage lands.
-
-GitHub Actions also verifies cross-platform builds on Linux, macOS, and Windows,
-and the release checklist still requires a real-device Termux/Android playback
-verification before calling a release production-ready.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and
-[`docs/release-checklist.md`](docs/release-checklist.md) for the runtime checks still
-required before calling a release production-ready.
 
 ## License
 
 Licensed under either [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
 
-## Legal
+## Disclaimer
 
-MovieBox-TUI does not host media. It is not affiliated with any specific content sources, IPTV providers, player projects, or terminal vendors. Users are responsible for complying with laws and service terms applicable to them.
+MovieBox-TUI does not host or store any media. It is an open-source tool for playing publicly available streams. Users are responsible for complying with the laws of their country.

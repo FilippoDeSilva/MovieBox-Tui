@@ -9,6 +9,7 @@ layout, runtime behavior, and operational workflows in prose tied to the source 
 | Document                                     | What it covers                                                                  | Status  |
 | -------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
 | [architecture.md](architecture.md)           | Crate/module map, event loop, async model, data flow                            | current |
+| [controls.md](controls.md)                   | Keyboard shortcuts, mouse controls, and slash commands                          | current |
 | [modules.md](modules.md)                     | Crate/module tree with responsibilities                                         | current |
 | [providers.md](providers.md)                 | MovieBox, 4KHDHub, BDIX protocols, signing, resolvers, errors                   | current |
 | [players.md](players.md)                     | Player detection, mpv/VLC/IINA/AndroidIntent, headers, subtitles, window sizing | current |

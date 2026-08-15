@@ -1,13 +1,12 @@
 # TV Mode
 
-TV mode streams live channels from **your own** M3U playlists — there is no bundled
-third-party feed. You add playlists by URL or local file path, and the app parses,
-groups, dedupes and lets you search and play them.
+TV mode streams live channels from M3U playlists. You add playlists by URL or local
+file path, and the app parses, groups, dedupes, and lets you search and play them.
 
 ## Entering TV mode
 
 - `Ctrl+T` toggles Streaming / TV mode.
-- On first entry with no playlists, the playlist manager opens automatically.
+- On first entry with no playlists, the playlist manager opens.
 - While in TV mode, type to filter channels by name or group, `Enter` to play,
   `/list` for all channels, `/config` to manage playlists, `[r]` to reload.
 

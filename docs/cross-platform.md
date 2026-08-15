@@ -16,14 +16,14 @@ Supported: macOS, Linux, Windows, and Android (Termux). The codebase uses
 
 The app probes the terminal at startup via `ratatui_image`:
 
-- **Poster rendering**: High-resolution graphics via Sixel, Kitty, and iTerm2 protocols when supported by the terminal. Non-graphics terminals (e.g. standard Apple Terminal.app, basic xterm) gracefully display clean, aligned text placeholders (`Poster unavailable` / `No Art`) with zero block redraw artifacts. Image queries can be disabled via `MOVIEBOX_NO_IMAGE=1`.
+- **Poster rendering**: High-resolution graphics via Sixel, Kitty, and iTerm2 protocols when supported by the terminal. Non-graphics terminals (for example Apple Terminal.app or basic xterm) display text placeholders (`Poster unavailable` / `No Art`). Image queries can be disabled via `MOVIEBOX_NO_IMAGE=1`.
 - **Terminal classification**: `TERM=dumb`/`linux` fall back to a basic UI.
 - Focus events (focus loss/gain) are used to re-render in place without clearing.
 
 ## Network & TLS portability
 
 - **TLS Engine**: Uses pure-Rust `rustls` across all targets (macOS, Linux, Windows, Android/Termux), eliminating external C dependencies on OpenSSL.
-- **DNS Resolution**: Uses standard POSIX/WinSock system DNS (`getaddrinfo`) on all platforms, ensuring reliable domain resolution in both standard OS environments and native Android/Termux CLI sessions without requiring JNI or `ndk-context`.
+- **DNS Resolution**: Uses standard POSIX/WinSock system DNS (`getaddrinfo`) on all platforms, without requiring JNI or `ndk-context`.
 
 ## Things to verify per release
 

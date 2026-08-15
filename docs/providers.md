@@ -48,7 +48,7 @@ which `app/playback.rs::launch_player` feeds to the external player.
   refuse real streaming) are rejected. The 4KHD referer and a browser user-agent are
   attached so referer-gated CDNs stream in the player too.
 - `hubcloud.rs` resolves hubcloud/hubdrive pages into candidate playable links and
-  picks the best mirror by score.
+  selects a mirror by score.
 - **Multilingual audio detection**: `parser.rs::detect_language` parses release titles and
   metadata for 30+ regional and international languages (Hindi, Tamil, Telugu, Kannada,
   Malayalam, Bengali, Marathi, Punjabi, Gujarati, Urdu, Japanese, Korean, Chinese, Spanish,
