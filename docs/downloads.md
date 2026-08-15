@@ -16,12 +16,14 @@ and optional segmentation. Orchestration lives in `app/download.rs`.
 - **Cancel**: an `AtomicBool` cancel flag pauses/resumes cleanly, preserving the
   partial file for a later resume.
 
-## File names
+## File names and directories
 
 `safe_file_stem` sanitizes titles for all platforms: control/whitespace/illegal
 characters are replaced, Windows reserved names (`CON`, `COM1`-`COM9`, …) are avoided,
-and length is capped. Files go to the user's download directory. On Android-family
-environments the code prefers shared `storage/downloads` when present.
+and length is capped.
+
+- **Default path:** Files go to the user's OS download directory (`~/Downloads/MovieBox-TUI`). On Android-family environments the code prefers shared `storage/downloads` when present.
+- **Custom path:** Users can set a custom download directory using `/download-dir <path>` or revert with `/download-dir reset`. Target directories are validated with active write probes before saving, and the engine automatically falls back to default if custom storage becomes unavailable at runtime.
 
 ## Contextual triggers & Seasons
 

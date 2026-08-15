@@ -21,6 +21,10 @@ impl App {
                         commands.push("/browse");
                         commands.push("/history");
                     }
+                    commands.push("/download-dir");
+                    if self.state.download_dir.is_some() {
+                        commands.push("/download-dir reset");
+                    }
                     commands.push("/theme");
                     commands.push("/update");
                     commands.push("/toggle-update");

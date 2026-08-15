@@ -8,6 +8,7 @@ pub struct Config {
     pub active_theme: String,
     pub bdix_enabled: bool,
     pub default_player: Option<String>,
+    pub download_dir: Option<String>,
 }
 
 impl Default for Config {
@@ -19,6 +20,7 @@ impl Default for Config {
             active_theme: String::new(),
             bdix_enabled: false,
             default_player: None,
+            download_dir: None,
         }
     }
 }
@@ -57,6 +59,9 @@ pub fn load() -> Config {
     if let Some(v) = value.get("default_player").and_then(|v| v.as_str()) {
         config.default_player = Some(v.to_string());
     }
+    if let Some(v) = value.get("download_dir").and_then(|v| v.as_str()) {
+        config.download_dir = Some(v.to_string());
+    }
     config
 }
 
@@ -75,7 +80,8 @@ pub fn save(config: &Config) {
         "active_provider": config.active_provider.cache_key(),
         "active_theme": config.active_theme,
         "bdix_enabled": config.bdix_enabled,
-        "default_player": config.default_player
+        "default_player": config.default_player,
+        "download_dir": config.download_dir
     });
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

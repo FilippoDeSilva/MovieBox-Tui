@@ -182,6 +182,101 @@ impl App {
             self.action_sender.send(Action::ShowBrowseMenu).ok();
             return Some(true);
         }
+        if lower_query.starts_with("/download-dir") {
+            let raw_arg = query.strip_prefix("/download-dir").unwrap_or("").trim();
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+
+            if raw_arg.is_empty() {
+                let current = if let Some(ref custom) = self.state.download_dir {
+                    custom.to_string_lossy().to_string()
+                } else {
+                    let default_base = dirs::download_dir()
+                        .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
+                        .unwrap_or_else(|| std::path::PathBuf::from("."));
+                    default_base
+                        .join("MovieBox-TUI")
+                        .to_string_lossy()
+                        .to_string()
+                };
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Download Directory",
+                    format!(
+                        "{}\nSet: /download-dir <path> | Reset: /download-dir reset",
+                        current
+                    ),
+                );
+                return Some(true);
+            }
+
+            if raw_arg.eq_ignore_ascii_case("reset") || raw_arg.eq_ignore_ascii_case("default") {
+                if self.state.download_dir.is_none() {
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Download Directory",
+                        "Already using system default (Downloads/MovieBox-TUI)",
+                    );
+                } else {
+                    self.state.download_dir = None;
+                    self.persist_config();
+                    self.state.notify(
+                        NotificationKind::Success,
+                        "Download Directory",
+                        "Reset to default (Downloads/MovieBox-TUI)",
+                    );
+                }
+                return Some(true);
+            }
+
+            let expanded_path = if let Some(stripped) = raw_arg.strip_prefix("~/") {
+                if let Some(home) = dirs::home_dir() {
+                    home.join(stripped)
+                } else {
+                    std::path::PathBuf::from(raw_arg)
+                }
+            } else if raw_arg == "~" {
+                dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(raw_arg))
+            } else {
+                std::path::PathBuf::from(raw_arg)
+            };
+
+            match std::fs::create_dir_all(&expanded_path) {
+                Ok(_) => {
+                    let test_file = expanded_path.join(format!(".mb_probe_{}", std::process::id()));
+                    match std::fs::write(&test_file, b"ok") {
+                        Ok(_) => {
+                            let _ = std::fs::remove_file(&test_file);
+                            let canonical =
+                                std::fs::canonicalize(&expanded_path).unwrap_or(expanded_path);
+                            self.state.download_dir = Some(canonical.clone());
+                            self.persist_config();
+                            self.state.notify(
+                                NotificationKind::Success,
+                                "Download Directory",
+                                format!("Saved: {}", canonical.display()),
+                            );
+                        }
+                        Err(err) => {
+                            self.state.notify(
+                                NotificationKind::Error,
+                                "Permission Denied",
+                                format!("Cannot write to '{}': {}", expanded_path.display(), err),
+                            );
+                        }
+                    }
+                }
+                Err(err) => {
+                    self.state.notify(
+                        NotificationKind::Error,
+                        "Invalid Directory",
+                        format!("Cannot create '{}': {}", expanded_path.display(), err),
+                    );
+                }
+            }
+
+            return Some(true);
+        }
         if lower_query == "/toggle-update" {
             self.state.auto_update = !self.state.auto_update;
             self.persist_config();

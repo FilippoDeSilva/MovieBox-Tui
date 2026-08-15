@@ -247,6 +247,7 @@ pub struct AppState {
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
     pub cancel_download: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub download_dir: Option<std::path::PathBuf>,
 
     pub download_queue: std::collections::VecDeque<(usize, usize)>,
     pub download_queue_total: usize,
@@ -371,6 +372,7 @@ impl Default for AppState {
             download_progress: None,
             download_status: None,
             cancel_download: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            download_dir: None,
             download_queue: std::collections::VecDeque::new(),
             download_queue_total: 0,
             language_chosen: false,

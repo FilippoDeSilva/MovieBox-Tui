@@ -217,6 +217,7 @@ moviebox-tui
 | Command              | Action                                    |
 | -------------------- | ----------------------------------------- |
 | `/browse`            | Browse curated, rated, and most-watched views |
+| `/download-dir`      | View, change, or reset download directory |
 | `/history`           | Show watch history                        |
 | `/list`              | Show IPTV channels                        |
 | `/config`            | Configure IPTV playlists                  |
@@ -235,7 +236,7 @@ unless `MOVIEBOX_PLAYER` is set in the environment.
 
 ## Downloads
 
-Downloads are stored under the operating system Downloads directory:
+By default, downloads are stored under the operating system Downloads directory:
 
 ```text
 MovieBox-TUI/
@@ -243,6 +244,7 @@ MovieBox-TUI/
 └── Series/<title>/Season <number>/
 ```
 
+- **Custom download directory:** Use `/download-dir <path>` (e.g. `/download-dir ~/Videos` or `/download-dir /Volumes/Drive`) to change and persist your download folder. Use `/download-dir reset` to return to default.
 - **Contextual triggers:** Pressing `d` or clicking `[Download]` while focused on the **Seasons** pane prompts to download the whole season; while on **Episodes** or **Streams**, it downloads that single episode.
 - **Sequential downloads:** Entire seasons are downloaded one by one to limit disk and network pressure.
 - **Smart subtitles:** Your subtitle language choice for the first episode is applied to the remaining episodes. Missing subtitles do not discard completed video files.

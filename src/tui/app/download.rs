@@ -3,6 +3,36 @@ use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 impl App {
+    pub(super) fn resolve_download_base_dir(&self) -> std::path::PathBuf {
+        if let Some(ref custom_dir) = self.state.download_dir {
+            if std::fs::create_dir_all(custom_dir).is_ok() {
+                let probe = custom_dir.join(format!(".mb_probe_{}", std::process::id()));
+                if std::fs::write(&probe, b"ok").is_ok() {
+                    let _ = std::fs::remove_file(&probe);
+                    return custom_dir.clone();
+                }
+            }
+            log::warn!("Custom download directory inaccessible; falling back to default");
+        }
+
+        let base_dir = dirs::download_dir()
+            .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+        let base_dir = if let Some(home) = dirs::home_dir() {
+            let android_storage = home.join("storage/downloads");
+            if android_storage.exists() {
+                android_storage
+            } else {
+                base_dir
+            }
+        } else {
+            base_dir
+        };
+
+        base_dir.join("MovieBox-TUI")
+    }
+
     pub(super) fn start_resilient_download(
         &mut self,
         subtitle_url: Option<String>,
@@ -40,53 +70,36 @@ impl App {
             .state
             .selected_details
             .as_ref()
-            .map(crate::tui::state::stype)
+            .and_then(|details| details.get("type"))
+            .and_then(|t| t.as_i64())
             .unwrap_or(1);
-        let season = self.state.selected_season;
-        let episode = self.state.selected_episode;
-        let clean_title = crate::providers::moviebox::clean_moviebox_title(title);
-        let safe_title = crate::download::safe_file_stem(&clean_title);
-
-        let extension = self
-            .state
-            .selected_resources
-            .as_ref()
-            .and_then(|resources| resources.get("list"))
-            .and_then(|list| list.as_array())
-            .and_then(|list| list.get(self.state.resource_list_state.selected().unwrap_or(0)))
-            .and_then(|resource| {
-                resource
-                    .get("fileName")
-                    .or_else(|| resource.get("title"))
-                    .and_then(|name| name.as_str())
+        let season = self.state.selected_season.saturating_add(1);
+        let episode = self.state.selected_episode.saturating_add(1);
+        let safe_title = title
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                    c
+                } else {
+                    '_'
+                }
             })
-            .and_then(|name| std::path::Path::new(name).extension())
-            .and_then(|extension| extension.to_str())
-            .filter(|extension| {
-                matches!(
-                    extension.to_ascii_lowercase().as_str(),
-                    "mp4" | "mkv" | "webm" | "avi" | "mov" | "m4v"
-                )
+            .collect::<String>()
+            .trim()
+            .to_string();
+
+        let extension = link
+            .split('?')
+            .next()
+            .and_then(|path| path.rsplit('.').next())
+            .filter(|ext| {
+                let lower = ext.to_ascii_lowercase();
+                lower == "mp4" || lower == "mkv" || lower == "webm" || lower == "ts"
             })
             .unwrap_or("mp4")
             .to_ascii_lowercase();
 
-        let base_dir = dirs::download_dir()
-            .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-
-        let base_dir = if let Some(home) = dirs::home_dir() {
-            let android_storage = home.join("storage/downloads");
-            if android_storage.exists() {
-                android_storage
-            } else {
-                base_dir
-            }
-        } else {
-            base_dir
-        };
-
-        let base_dir = base_dir.join("MovieBox-TUI");
+        let base_dir = self.resolve_download_base_dir();
         let (target_dir, base_name) = if media_type == 2 {
             (
                 base_dir

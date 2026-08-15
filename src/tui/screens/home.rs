@@ -55,6 +55,8 @@ pub(crate) fn slash_command_description(cmd: &str) -> Option<&'static str> {
     let name = cmd.strip_prefix('/').unwrap_or(cmd);
     match name {
         "browse" => Some("Curated, rated & most-watched views"),
+        "download-dir" => Some("Change or view download directory"),
+        "download-dir reset" => Some("Reset download directory to default"),
         "history" => Some("Watch history"),
         "theme" => Some("Theme picker"),
         "list" => Some("IPTV channels"),

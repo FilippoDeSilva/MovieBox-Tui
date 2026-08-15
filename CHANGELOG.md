@@ -12,6 +12,11 @@
 - **Contextual Downloads**:
   - Pressing `d` or clicking `[Download]` while on the **Seasons** pane prompts to download the whole season (all episodes).
   - Triggering download while on **Episodes** or **Streams** downloads that single episode.
+- **Custom Download Directory**:
+  - Added `/download-dir <path>` slash command with directory creation and active write-probe validation.
+  - Added `/download-dir reset` (contextually suggested only when custom path is configured) to revert to OS default.
+  - Safe automatic fallback to default OS Downloads folder if custom path becomes inaccessible.
+  - Configuration persistence across sessions in `config.json`.
 - **Tree Branch Suggestions**:
   - Redesigned search and slash command autocomplete into a minimal, transparent tree-branch layout (`├─ ` / `└─ `) anchored directly under the search prompt.
   - Added aligned slash command descriptions (`browse`, `history`, `theme`, `config`, `update`, etc.) without duplicate leading slashes.

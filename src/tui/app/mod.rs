@@ -51,6 +51,7 @@ impl App {
         };
         state.active_theme_kind = config.active_theme;
         state.default_player = config.default_player;
+        state.download_dir = config.download_dir.map(std::path::PathBuf::from);
 
         let mut theme = crate::tui::theme::Theme::new();
         if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
@@ -101,6 +102,11 @@ impl App {
             active_theme: self.state.active_theme_kind.clone(),
             bdix_enabled: self.state.bdix_enabled,
             default_player: self.state.default_player.clone(),
+            download_dir: self
+                .state
+                .download_dir
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string()),
         };
         crate::tui::config::save(&config);
     }
