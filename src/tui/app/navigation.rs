@@ -195,7 +195,7 @@ impl App {
                 tokio::spawn(async move {
                     let result = network::provider_search(
                         &client,
-                        &fourk_client,
+                        fourk_client.as_ref(),
                         &circleftp_client,
                         &dhakaflix_client,
                         context.provider,
