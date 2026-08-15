@@ -68,8 +68,10 @@ powershell -Command "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui
 ### Android (Termux)
 
 ```bash
-pkg install tur-repo
-pkg install moviebox-tui
+pkg install rust
+cargo install moviebox-tui --locked
+echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 termux-setup-storage
 ```
 

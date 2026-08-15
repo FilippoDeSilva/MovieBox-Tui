@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Fixed
+- **Android / Termux TLS Certificate Compatibility**:
+  - Switched `reqwest` to use pure-Rust embedded `webpki-roots` certificate verification, resolving `rustls-platform-verifier` crashes and panics in non-JVM Android CLI environments like Termux.
 - **Transparent Stream & Search Diagnostics**:
   - Replaced misleading generic `"No matches"` and `"Rate Limit"` errors with truthful, contextual diagnostics: `"No stream sources available on {provider}"`, `"Network connection failed to {provider}"`, `"Rate limited by {provider}"`, and `"Episode S{season}E{episode} is not listed on {provider}"`.
   - Added helpful actionable hints (`Press Ctrl+P to try another provider, or r to refresh`).
