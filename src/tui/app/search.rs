@@ -229,16 +229,20 @@ impl App {
                 return Some(true);
             }
 
-            let expanded_path = if let Some(stripped) = raw_arg.strip_prefix("~/") {
+            let clean_arg = raw_arg.trim_matches(|c| c == '\'' || c == '"').trim();
+            let expanded_path = if let Some(stripped) = clean_arg
+                .strip_prefix("~/")
+                .or_else(|| clean_arg.strip_prefix("~\\"))
+            {
                 if let Some(home) = dirs::home_dir() {
                     home.join(stripped)
                 } else {
-                    std::path::PathBuf::from(raw_arg)
+                    std::path::PathBuf::from(clean_arg)
                 }
-            } else if raw_arg == "~" {
-                dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(raw_arg))
+            } else if clean_arg == "~" {
+                dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(clean_arg))
             } else {
-                std::path::PathBuf::from(raw_arg)
+                std::path::PathBuf::from(clean_arg)
             };
 
             match std::fs::create_dir_all(&expanded_path) {
@@ -249,12 +253,20 @@ impl App {
                             let _ = std::fs::remove_file(&test_file);
                             let canonical =
                                 std::fs::canonicalize(&expanded_path).unwrap_or(expanded_path);
-                            self.state.download_dir = Some(canonical.clone());
+                            let clean_path = {
+                                let s = canonical.to_string_lossy();
+                                if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                                    std::path::PathBuf::from(stripped)
+                                } else {
+                                    canonical
+                                }
+                            };
+                            self.state.download_dir = Some(clean_path.clone());
                             self.persist_config();
                             self.state.notify(
                                 NotificationKind::Success,
                                 "Download Directory",
-                                format!("Saved: {}", canonical.display()),
+                                format!("Saved: {}", clean_path.display()),
                             );
                         }
                         Err(err) => {
