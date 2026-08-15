@@ -573,22 +573,15 @@ impl App {
             return Vec::new();
         };
 
-        let matching_items: Vec<_> = items
-            .iter()
-            .filter(|item| {
-                item.get("title")
-                    .and_then(|title| title.as_str())
-                    .is_some_and(|title| browse_group_matches(title, preset))
-            })
-            .collect();
-        let groups = if matching_items.is_empty() {
-            items.iter().collect()
-        } else {
-            matching_items
-        };
-
         let mut subjects = Vec::new();
-        for group in groups {
+        let mut seen_ids = std::collections::HashSet::new();
+
+        // 1. Process matching curated groups first with high priority
+        for group in items.iter().filter(|item| {
+            item.get("title")
+                .and_then(|title| title.as_str())
+                .is_some_and(|title| browse_group_matches(title, preset))
+        }) {
             let Some(group_subjects) = group.get("subjects").and_then(|s| s.as_array()) else {
                 continue;
             };
@@ -598,12 +591,33 @@ impl App {
                 if rank_metric && let Some(subject_object) = subject.as_object_mut() {
                     subject_object.insert(
                         "__browse_rank".to_string(),
-                        serde_json::json!((group_subjects.len() - index) as f64),
+                        serde_json::json!((1000 + group_subjects.len() - index) as f64),
                     );
+                }
+                if let Some(id) = subject.get("subjectId").and_then(|i| i.as_str()) {
+                    seen_ids.insert(id.to_string());
                 }
                 subjects.push(subject);
             }
         }
+
+        // 2. Also include all remaining subjects from the full feed so the user gets all available titles
+        for group in items {
+            let Some(group_subjects) = group.get("subjects").and_then(|s| s.as_array()) else {
+                continue;
+            };
+            for subject in group_subjects {
+                let id_opt = subject.get("subjectId").and_then(|i| i.as_str());
+                if let Some(id) = id_opt {
+                    if seen_ids.contains(id) {
+                        continue;
+                    }
+                    seen_ids.insert(id.to_string());
+                }
+                subjects.push(subject.clone());
+            }
+        }
+
         subjects
     }
 
@@ -877,9 +891,10 @@ mod tests {
         });
 
         let subjects = App::extract_browse_subjects(&payload, BrowsePreset::Trending);
-        assert_eq!(subjects.len(), 1);
+        assert_eq!(subjects.len(), 2);
         assert_eq!(subjects[0]["subjectId"], "trending-1");
-        assert_eq!(subjects[0]["__browse_rank"], 1.0);
+        assert_eq!(subjects[0]["__browse_rank"], 1001.0);
+        assert_eq!(subjects[1]["subjectId"], "top-1");
     }
 
     #[test]
@@ -898,8 +913,9 @@ mod tests {
         });
 
         let subjects = App::extract_browse_subjects(&payload, BrowsePreset::MostWatched);
-        assert_eq!(subjects.len(), 1);
+        assert_eq!(subjects.len(), 2);
         assert_eq!(subjects[0]["subjectId"], "watched-1");
         assert!(subjects[0].get("__browse_rank").is_none());
+        assert_eq!(subjects[1]["subjectId"], "top-1");
     }
 }
