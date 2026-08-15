@@ -267,23 +267,34 @@ pub fn notifications(
         let has_message =
             !notification.message.is_empty() && notification.message != notification.title;
 
-        let max_content_w = (area.width.saturating_sub(8) as usize).clamp(24, 48);
-        let message = middle_truncate(&notification.message, max_content_w);
-        let title_w = crate::tui::text::width(&notification.title).saturating_add(6);
-        let msg_w = if has_message {
-            crate::tui::text::width(&message).saturating_add(6)
+        let max_content_w = (area.width.saturating_sub(8) as usize).clamp(24, 52);
+        let msg_lines: Vec<String> = if has_message {
+            notification
+                .message
+                .lines()
+                .take(3)
+                .map(|line| middle_truncate(line.trim(), max_content_w))
+                .filter(|line| !line.is_empty())
+                .collect()
         } else {
-            0
+            Vec::new()
         };
+
+        let title_w = crate::tui::text::width(&notification.title).saturating_add(6);
+        let msg_w = msg_lines
+            .iter()
+            .map(|line| crate::tui::text::width(line).saturating_add(6))
+            .max()
+            .unwrap_or(0);
         let badge_w = badge.len().saturating_add(4);
 
         let width = title_w
             .max(msg_w)
             .max(badge_w)
-            .clamp(28, 52)
+            .clamp(28, 56)
             .min(area.width.saturating_sub(4) as usize) as u16;
 
-        let height = if has_message { 4 } else { 3 };
+        let height = 2 + 1 + msg_lines.len() as u16;
 
         if width < 10 || y < area.y.saturating_add(height) {
             break;
@@ -306,9 +317,9 @@ pub fn notifications(
             theme.text.add_modifier(Modifier::BOLD),
         )]));
 
-        if has_message {
+        for line in &msg_lines {
             lines.push(Line::from(vec![Span::styled(
-                crate::tui::text::truncate_width(&message, width.saturating_sub(4) as usize),
+                crate::tui::text::truncate_width(line, width.saturating_sub(4) as usize),
                 theme.subtext1,
             )]));
         }
