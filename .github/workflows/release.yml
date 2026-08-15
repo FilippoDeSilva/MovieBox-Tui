@@ -190,9 +190,39 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - uses: actions/checkout@v6
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
+
+      - name: Extract Release Notes from CHANGELOG.md
+        id: changelog
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { flag=1; next }
+            flag && /^## \[/ { flag=0 }
+            flag { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$NOTES" ]; then
+            NOTES=$(awk '
+              /^## \[Unreleased\]/ { flag=1; next }
+              flag && /^## \[/ { flag=0 }
+              flag { print }
+            ' CHANGELOG.md)
+          fi
+
+          if [ -n "$NOTES" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$NOTES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_notes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_notes=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate checksums
         run: |
           find artifacts -type f \( -name 'MovieBox_*.tar.gz' -o -name 'MovieBox_*.zip' \) -print0 |
@@ -201,6 +231,7 @@ jobs:
               hash=$(sha256sum "$file" | awk '{print $1}')
               echo "$hash  $(basename "$file")"
             done > SHA256SUMS
+
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@v4
         with:
@@ -208,12 +239,14 @@ jobs:
             artifacts/**/MovieBox_*.tar.gz
             artifacts/**/MovieBox_*.zip
             SHA256SUMS
-      - name: Generate Release Notes and Publish
+
+      - name: Publish Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: "v${{ needs.check-version.outputs.version }}"
           name: "v${{ needs.check-version.outputs.version }}"
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.notes }}
+          generate_release_notes: ${{ steps.changelog.outputs.has_notes != 'true' }}
           files: |
             artifacts/**/MovieBox_*.tar.gz
             artifacts/**/MovieBox_*.zip
