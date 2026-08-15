@@ -127,7 +127,7 @@ impl App {
                     .join("Series")
                     .join(&safe_title)
                     .join(format!("Season {season}")),
-                format!("{safe_title}_S{season:02}E{episode:02}"),
+                format!("{safe_title} - S{season:02}E{episode:02}"),
             )
         } else {
             (
@@ -135,12 +135,22 @@ impl App {
                 safe_title.clone(),
             )
         };
-        let mut destination = target_dir.join(format!("{base_name}.{extension}"));
-        let mut counter = 2;
-        while destination.exists() {
-            destination = target_dir.join(format!("{base_name}_{counter}.{extension}"));
-            counter += 1;
+        let destination = target_dir.join(format!("{base_name}.{extension}"));
+        if is_media_already_downloaded(&target_dir, &base_name) {
+            self.state.is_waiting_for_download_stream = false;
+            self.state.notify(
+                NotificationKind::Warning,
+                "Already downloaded",
+                format!("{base_name} already exists on disk."),
+            );
+            return;
         }
+
+        let sub_lang = self
+            .state
+            .last_download_subtitle_language
+            .take()
+            .or_else(|| self.state.season_subtitle_preference.clone());
 
         self.state.is_waiting_for_download_stream = false;
         self.state.download_status = Some("Preparing download...".into());
@@ -186,7 +196,19 @@ impl App {
                         matches!(extension.as_str(), "srt" | "vtt" | "ass" | "ssa" | "sub")
                     })
                     .unwrap_or_else(|| "srt".to_string());
-                let subtitle_path = destination.with_extension(subtitle_extension);
+
+                let lang_code = sub_lang
+                    .as_deref()
+                    .and_then(crate::providers::moviebox::title::language_to_code)
+                    .or_else(|| subtitle_language_from_url(&subtitle_url));
+
+                let final_ext = if let Some(code) = lang_code {
+                    format!("{code}.{subtitle_extension}")
+                } else {
+                    subtitle_extension
+                };
+
+                let subtitle_path = destination.with_extension(final_ext);
                 let result = tokio::time::timeout(
                     std::time::Duration::from_secs(30),
                     client.get(subtitle_url).send(),
@@ -445,6 +467,50 @@ impl App {
                     let total = self.state.download_queue_total;
                     let num = total - remaining;
 
+                    let raw_title = self
+                        .state
+                        .selected_details
+                        .as_ref()
+                        .and_then(|details| details.get("title"))
+                        .and_then(|title| title.as_str())
+                        .unwrap_or("MovieBox-Tui_Stream");
+                    let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
+                    let safe_title = clean_title
+                        .chars()
+                        .map(|c| {
+                            if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                                c
+                            } else {
+                                ' '
+                            }
+                        })
+                        .collect::<String>();
+                    let safe_title = safe_title.split_whitespace().collect::<Vec<_>>().join(" ");
+                    let safe_title = if safe_title.is_empty() {
+                        "MovieBox-Tui_Stream".to_string()
+                    } else {
+                        safe_title
+                    };
+
+                    let base_dir = self.resolve_download_base_dir();
+                    let target_dir = base_dir
+                        .join("Series")
+                        .join(&safe_title)
+                        .join(format!("Season {season}"));
+                    let base_name = format!("{safe_title} - S{season:02}E{episode:02}");
+
+                    if is_media_already_downloaded(&target_dir, &base_name) {
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Skipping episode",
+                            format!(
+                                "S{season:02}E{episode:02} already downloaded ({num}/{total})."
+                            ),
+                        );
+                        self.action_sender.send(Action::ProcessDownloadQueue).ok();
+                        return None;
+                    }
+
                     self.state.notify(
                         NotificationKind::Info,
                         "Preparing episode",
@@ -570,4 +636,109 @@ impl App {
         }
         None
     }
+}
+
+fn subtitle_language_from_url(url: &str) -> Option<&'static str> {
+    let lower = url.to_lowercase();
+    if lower.contains(".en.")
+        || lower.contains("_en.")
+        || lower.contains("/en/")
+        || lower.contains("english")
+    {
+        Some("en")
+    } else if lower.contains(".es.")
+        || lower.contains("_es.")
+        || lower.contains("/es/")
+        || lower.contains("spanish")
+    {
+        Some("es")
+    } else if lower.contains(".hi.")
+        || lower.contains("_hi.")
+        || lower.contains("/hi/")
+        || lower.contains("hindi")
+    {
+        Some("hi")
+    } else if lower.contains(".fr.")
+        || lower.contains("_fr.")
+        || lower.contains("/fr/")
+        || lower.contains("french")
+    {
+        Some("fr")
+    } else if lower.contains(".de.")
+        || lower.contains("_de.")
+        || lower.contains("/de/")
+        || lower.contains("german")
+    {
+        Some("de")
+    } else if lower.contains(".ar.")
+        || lower.contains("_ar.")
+        || lower.contains("/ar/")
+        || lower.contains("arabic")
+    {
+        Some("ar")
+    } else if lower.contains(".pt.")
+        || lower.contains("_pt.")
+        || lower.contains("/pt/")
+        || lower.contains("portuguese")
+    {
+        Some("pt")
+    } else if lower.contains(".ru.")
+        || lower.contains("_ru.")
+        || lower.contains("/ru/")
+        || lower.contains("russian")
+    {
+        Some("ru")
+    } else if lower.contains(".ja.")
+        || lower.contains("_ja.")
+        || lower.contains("/ja/")
+        || lower.contains("japanese")
+    {
+        Some("ja")
+    } else if lower.contains(".ko.")
+        || lower.contains("_ko.")
+        || lower.contains("/ko/")
+        || lower.contains("korean")
+    {
+        Some("ko")
+    } else if lower.contains(".zh.")
+        || lower.contains("_zh.")
+        || lower.contains("/zh/")
+        || lower.contains("chinese")
+    {
+        Some("zh")
+    } else if lower.contains(".it.")
+        || lower.contains("_it.")
+        || lower.contains("/it/")
+        || lower.contains("italian")
+    {
+        Some("it")
+    } else if lower.contains(".bn.")
+        || lower.contains("_bn.")
+        || lower.contains("/bn/")
+        || lower.contains("bengali")
+    {
+        Some("bn")
+    } else {
+        None
+    }
+}
+
+fn is_media_already_downloaded(target_dir: &std::path::Path, base_name: &str) -> bool {
+    let extensions = ["mp4", "mkv", "webm", "ts"];
+    for ext in extensions {
+        let final_file = target_dir.join(format!("{base_name}.{ext}"));
+        if final_file.exists() {
+            let part_json = target_dir.join(format!("{base_name}.{ext}.part.json"));
+            let part_file = target_dir.join(format!("{base_name}.{ext}.part"));
+            let part_0 = target_dir.join(format!("{base_name}.{ext}.part.0"));
+            if !part_json.exists() && !part_file.exists() && !part_0.exists() {
+                if let Ok(metadata) = std::fs::metadata(&final_file) {
+                    if metadata.len() > 1024 * 1024 {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
