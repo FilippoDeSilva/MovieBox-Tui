@@ -45,11 +45,6 @@ impl App {
             return None;
         }
 
-        if key.code == KeyCode::F(1) {
-            self.action_sender.send(Action::ToggleHelp).ok();
-            return None;
-        }
-
         if self.state.show_browse_popup {
             match key.code {
                 KeyCode::Esc => {
@@ -137,6 +132,8 @@ impl App {
             InputMode::Editing => match key.code {
                 KeyCode::Esc => {
                     self.state.input_mode = InputMode::Normal;
+                    self.state.suggest_index = None;
+                    self.state.search_suggestions.clear();
                     self.state.set_status(String::new(), 150);
                 }
                 KeyCode::Enter => {
@@ -158,6 +155,12 @@ impl App {
                         };
                         self.action_sender.send(action).ok();
                     }
+                }
+                KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.state.search_query.clear();
+                    self.state.suggest_index = None;
+                    self.state.search_suggestions.clear();
+                    self.state.last_search_edit = std::time::Instant::now();
                 }
                 KeyCode::Backspace => {
                     crate::tui::text::remove_last_grapheme(&mut self.state.search_query);

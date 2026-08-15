@@ -19,6 +19,15 @@ impl App {
                         self.state.status_message.clear();
                     }
                 }
+                if let Some((time, _, _)) = self.state.last_resize_time {
+                    needs_redraw = true;
+                    if time.elapsed() >= std::time::Duration::from_millis(300) {
+                        self.state.last_resize_time = None;
+                        self.state.clear_terminal_before_draw = true;
+                        self.state.poster_protocol = None;
+                        self.state.search_poster_protocols.clear();
+                    }
+                }
                 if needs_redraw {
                     self.state.dirty = true;
                 }
@@ -96,8 +105,8 @@ impl App {
                 self.prepare_image_soft_refresh();
             }
 
-            Action::Resize(_w, _h) => {
-                self.state.last_resize_time = None;
+            Action::Resize(w, h) => {
+                self.state.last_resize_time = Some((std::time::Instant::now(), w, h));
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 self.state.clear_terminal_before_draw = true;

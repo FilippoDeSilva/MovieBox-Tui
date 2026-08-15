@@ -299,10 +299,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 Constraint::Length(1),
                 Constraint::Length(3),
                 Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
                 Constraint::Min(0),
-                Constraint::Length(1),
                 Constraint::Length(1),
             ])
             .split(area);
@@ -399,25 +396,30 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
 
             let mut footer_spans = vec![];
-            let provider_name = if state.is_tv_mode {
-                "Live TV"
-            } else {
-                state.active_provider.label()
-            };
+            if !state.is_tv_mode {
+                footer_spans.push(Span::styled("[", theme.text_dim));
+                footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+                footer_spans.push(Span::styled("] ", theme.text_dim));
+                footer_spans.push(Span::styled(
+                    state.active_provider.label(),
+                    theme.text.add_modifier(Modifier::BOLD),
+                ));
+                footer_spans.push(Span::raw("   "));
+            }
 
             footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+            footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
             footer_spans.push(Span::styled("] ", theme.text_dim));
             footer_spans.push(Span::styled(
-                provider_name,
-                theme.text.add_modifier(Modifier::BOLD),
+                if state.is_tv_mode { "Streaming" } else { "TV" },
+                theme.text_dim,
             ));
-            footer_spans.push(Span::raw("    "));
+            footer_spans.push(Span::raw("   "));
             footer_spans.push(Span::styled("[", theme.text_dim));
             footer_spans.push(Span::styled("?", theme.shortcut));
             footer_spans.push(Span::styled("] ", theme.text_dim));
             footer_spans.push(Span::styled("Help", theme.text_dim));
-            footer_spans.push(Span::raw("    "));
+            footer_spans.push(Span::raw("   "));
             footer_spans.push(Span::styled("[", theme.text_dim));
             footer_spans.push(Span::styled("q", theme.shortcut));
             footer_spans.push(Span::styled("] ", theme.text_dim));
@@ -425,7 +427,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             frame.render_widget(
                 Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center),
-                vertical_chunks[8],
+                vertical_chunks[6],
             );
         }
     } else {

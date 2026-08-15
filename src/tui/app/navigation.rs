@@ -41,6 +41,7 @@ impl App {
         self.state.is_loading = false;
         self.state.is_fetching_streams = false;
         self.state.stream_error = None;
+        self.state.search_error = None;
         self.state.search_results.clear();
         self.state.search_suggestions.clear();
         self.state.search_preview = None;

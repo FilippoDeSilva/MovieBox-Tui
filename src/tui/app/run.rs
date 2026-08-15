@@ -67,6 +67,8 @@ impl App {
             if self.state.clear_terminal_before_draw {
                 terminal.backend_mut().clear()?;
                 terminal.current_buffer_mut().reset();
+                self.state.poster_protocol = None;
+                self.state.search_poster_protocols.clear();
                 self.state.clear_terminal_before_draw = false;
                 self.state.dirty = true;
             }
@@ -101,7 +103,9 @@ impl App {
     }
 
     async fn handle_action(&mut self, action: Action) -> Option<()> {
-        if !matches!(action, Action::Tick | Action::UpdateDownload(..)) {
+        if self.state.last_resize_time.is_some()
+            || !matches!(action, Action::Tick | Action::UpdateDownload(..))
+        {
             self.state.dirty = true;
         }
         match action {
@@ -213,17 +217,42 @@ impl App {
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
 
-        if area.width < 85 || area.height < 24 {
+        if let Some((_, w, h)) = self.state.last_resize_time {
+            let label = format!("{} × {}", w, h);
+            let label_len = label.chars().count() as u16 + 4;
+            let badge_w = label_len.min(area.width);
+            let badge_h = 1_u16;
+            let badge_x = area.x + (area.width.saturating_sub(badge_w)) / 2;
+            let badge_y = area.y + (area.height.saturating_sub(badge_h)) / 2;
+            let badge_area = ratatui::layout::Rect {
+                x: badge_x,
+                y: badge_y,
+                width: badge_w,
+                height: badge_h,
+            };
+            let line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
+                label,
+                self.theme.title,
+            )]);
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(line)
+                    .alignment(ratatui::layout::Alignment::Center),
+                badge_area,
+            );
+            return;
+        }
+
+        if area.width < 50 || area.height < 14 {
             use ratatui::layout::Alignment;
             use ratatui::text::Line;
             use ratatui::widgets::{Block, Borders, Paragraph};
 
             let msg_lines = vec![
                 Line::from(format!(
-                    "Terminal too small ({}x{}).",
+                    "Terminal too small ({}×{}).",
                     area.width, area.height
                 )),
-                Line::from("Minimum required size: 85x24"),
+                Line::from("Minimum required size: 50×14"),
                 Line::from("Please enlarge your terminal window."),
             ];
 

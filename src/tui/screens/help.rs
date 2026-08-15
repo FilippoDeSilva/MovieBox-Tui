@@ -42,7 +42,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![
             Span::styled("    [←] / [→]  ", theme.header),
-            Span::styled("Page Through Results", theme.text),
+            Span::styled("Jump Page of Results", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Enter]    ", theme.header),
@@ -68,12 +68,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Reload Playlists", theme.text),
             ]),
             Line::from(vec![
-                Span::styled("    /list      ", theme.header),
-                Span::styled("Show Available Channels", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /config    ", theme.header),
-                Span::styled("Add / Remove Playlists", theme.text),
+                Span::styled("    Type /config", theme.header),
+                Span::styled("Manage Playlists (in search)", theme.text),
             ]),
         ]);
     } else {
