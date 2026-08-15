@@ -294,25 +294,16 @@ pub fn notifications(
         crate::tui::clear_area(frame, toast_area, theme);
 
         let mut lines = Vec::new();
-        lines.push(Line::from(vec![
-            Span::styled(if basic_terminal { "* " } else { "▌ " }, badge_style),
-            Span::styled(
-                crate::tui::text::truncate_width(
-                    &notification.title,
-                    width.saturating_sub(5) as usize,
-                ),
-                theme.text.add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            crate::tui::text::truncate_width(&notification.title, width.saturating_sub(4) as usize),
+            theme.text.add_modifier(Modifier::BOLD),
+        )]));
 
         if has_message {
-            lines.push(Line::from(vec![
-                Span::styled("  ", theme.subtext1),
-                Span::styled(
-                    crate::tui::text::truncate_width(&message, width.saturating_sub(5) as usize),
-                    theme.subtext1,
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                crate::tui::text::truncate_width(&message, width.saturating_sub(4) as usize),
+                theme.subtext1,
+            )]));
         }
 
         let block = Block::default()
