@@ -7,6 +7,7 @@ use crate::tui::{action::Action, state::AppState, theme::Theme};
 
 mod download;
 mod keyboard;
+mod mouse;
 mod navigation;
 mod network;
 mod playback;

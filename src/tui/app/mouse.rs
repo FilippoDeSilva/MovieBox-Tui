@@ -1,0 +1,811 @@
+use super::App;
+use crate::tui::{
+    action::Action,
+    state::{BrowsePreset, DetailsPane, InputMode, Screen},
+};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+
+impl App {
+    pub(super) fn handle_mouse(&mut self, col: u16, row: u16) -> Option<Action> {
+        let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+        let area = Rect::new(0, 0, cols, rows);
+
+        if self.handle_overlay_mouse(col, row, area) {
+            return None;
+        }
+
+        match self.state.active_screen {
+            Screen::Home => self.handle_home_mouse(col, row, area),
+            Screen::Details => self.handle_details_mouse(col, row, area),
+        }
+    }
+
+    fn handle_overlay_mouse(&mut self, col: u16, row: u16, area: Rect) -> bool {
+        if self.state.show_theme_popup {
+            let items = crate::tui::theme::AVAILABLE_THEMES;
+            let popup = centered_rect(area, 40, items.len() as u16 + 4, 30, 60);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let item_y = popup.y.saturating_add(1);
+                if row >= item_y && (row - item_y) < items.len() as u16 {
+                    let clicked_idx = (row - item_y) as usize;
+                    self.state.theme_list_state.select(Some(clicked_idx));
+                    if let Some(theme_name) = items.get(clicked_idx) {
+                        self.action_sender
+                            .send(Action::SelectTheme(theme_name.to_string()))
+                            .ok();
+                        self.state.show_theme_popup = false;
+                        self.state.theme_list_state.select(None);
+                        self.state
+                            .set_status(format!("{theme_name} theme applied."), 150);
+                    }
+                }
+            } else {
+                self.state.show_theme_popup = false;
+                self.state.theme_list_state.select(None);
+            }
+            return true;
+        }
+
+        if self.state.show_browse_popup {
+            let presets = BrowsePreset::ALL;
+            let popup = centered_rect(area, 40, presets.len() as u16 + 4, 30, 60);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let item_y = popup.y.saturating_add(1);
+                if row >= item_y && (row - item_y) < presets.len() as u16 {
+                    let clicked_idx = (row - item_y) as usize;
+                    self.state.browse_list_state.select(Some(clicked_idx));
+                    if let Some(preset) = presets.get(clicked_idx).copied() {
+                        self.state.show_browse_popup = false;
+                        self.state.browse_list_state.select(None);
+                        self.action_sender.send(Action::SelectBrowse(preset)).ok();
+                    }
+                }
+            } else {
+                self.state.show_browse_popup = false;
+                self.state.browse_list_state.select(None);
+            }
+            return true;
+        }
+
+        if self.state.show_help {
+            self.state.show_help = false;
+            return true;
+        }
+
+        if self.state.update_available.is_some() {
+            let popup = centered_rect(area, 46, 7, 36, 60);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let dismiss_y = popup.y + popup.height.saturating_sub(2);
+                if row == dismiss_y {
+                    if col < popup.x + popup.width / 2 {
+                        if let Some((ver, _)) = &self.state.update_available {
+                            let url = format!(
+                                "https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{ver}"
+                            );
+                            let _ = open::that(&url);
+                        }
+                    }
+                    self.state.update_available = None;
+                }
+            } else {
+                self.state.update_available = None;
+            }
+            return true;
+        }
+
+        if self.state.player_picker_popup {
+            let count = self.state.available_players.len();
+            let popup = centered_rect(area, 40, count as u16 + 4, 24, 60);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let item_y = popup.y.saturating_add(1);
+                if row >= item_y && (row - item_y) < count as u16 {
+                    let clicked_idx = (row - item_y) as usize;
+                    self.state.player_picker_state.select(Some(clicked_idx));
+                    self.action_sender.send(Action::Submit).ok();
+                }
+            } else {
+                self.state.player_picker_popup = false;
+            }
+            return true;
+        }
+
+        if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
+            let count = self.state.subtitle_list.len().min(8);
+            let popup = centered_rect(area, 44, count as u16 + 4, 30, 60);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let item_y = popup.y.saturating_add(1);
+                if row >= item_y && (row - item_y) < count as u16 {
+                    let clicked_idx = (row - item_y) as usize;
+                    self.state.subtitle_list_state.select(Some(clicked_idx));
+                    self.action_sender.send(Action::Submit).ok();
+                }
+            } else {
+                self.state.subtitle_popup = false;
+                self.state.is_download_subtitle_popup = false;
+            }
+            return true;
+        }
+
+        if self.state.show_season_download_confirm {
+            let popup = centered_rect(area, 40, 6, 36, 64);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let action_y = popup.y + 3;
+                if row == action_y {
+                    let mid_x = popup.x + popup.width / 2;
+                    if col < mid_x {
+                        self.action_sender.send(Action::ConfirmDownloadSeason).ok();
+                    } else {
+                        self.state.show_season_download_confirm = false;
+                    }
+                }
+            } else {
+                self.state.show_season_download_confirm = false;
+            }
+            return true;
+        }
+
+        if self.state.show_episode_download_confirm {
+            let popup = centered_rect(area, 40, 6, 36, 64);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                let action_y = popup.y + 3;
+                if row == action_y {
+                    let mid_x = popup.x + popup.width / 2;
+                    if col < mid_x {
+                        self.action_sender.send(Action::ConfirmDownloadEpisode).ok();
+                    } else {
+                        self.state.show_episode_download_confirm = false;
+                    }
+                }
+            } else {
+                self.state.show_episode_download_confirm = false;
+            }
+            return true;
+        }
+
+        if self.state.tv_config_popup {
+            let rows = self.state.tv_manager_rows();
+            let total_rows = rows.len();
+            let content_width = self
+                .state
+                .tv_playlists
+                .iter()
+                .map(|source| crate::tui::text::width(source))
+                .max()
+                .unwrap_or(28)
+                .max(40)
+                .max(crate::tui::text::width(
+                    "[ Add URL ] [ Add file ] [ Reload ] [ Done ]",
+                ));
+            let (popup_width, popup_height) = if self.state.tv_input_active {
+                (content_width.saturating_add(6) as u16, 6)
+            } else {
+                (
+                    content_width.saturating_add(6) as u16,
+                    total_rows.min(10).saturating_add(5) as u16,
+                )
+            };
+            let popup = centered_rect(area, popup_width, popup_height, 36, 70);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                if !self.state.tv_input_active {
+                    let item_start_y = popup.y + 1;
+                    if row >= item_start_y && (row - item_start_y) < total_rows as u16 {
+                        let clicked_idx = (row - item_start_y) as usize;
+                        self.state.tv_manager_selected = clicked_idx;
+                        if let Some(r) = rows.get(clicked_idx) {
+                            match r {
+                                crate::tui::state::TvManagerRow::AddUrl => {
+                                    self.action_sender.send(Action::TvInputToggle(false)).ok();
+                                }
+                                crate::tui::state::TvManagerRow::AddFile => {
+                                    self.action_sender.send(Action::TvInputToggle(true)).ok();
+                                }
+                                crate::tui::state::TvManagerRow::Reload => {
+                                    self.action_sender.send(Action::TvReloadPlaylists).ok();
+                                }
+                                crate::tui::state::TvManagerRow::Done => {
+                                    self.state.tv_config_popup = false;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            } else {
+                self.state.tv_config_popup = false;
+                self.state.tv_input_active = false;
+            }
+            return true;
+        }
+
+        false
+    }
+
+    fn handle_home_mouse(&mut self, col: u16, row: u16, area: Rect) -> Option<Action> {
+        let is_landing = self.state.search_results.is_empty()
+            && (self.state.search_query.trim().is_empty()
+                || (self.state.is_tv_mode && !self.state.is_loading));
+
+        let logo_height = if self.state.basic_terminal { 2 } else { 6 };
+        let (search_bar_area, suggestion_area) = if is_landing {
+            let vertical_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(16),
+                    Constraint::Length(logo_height),
+                    Constraint::Length(1),
+                    Constraint::Length(3),
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                    Constraint::Length(1),
+                ])
+                .split(area);
+
+            let base_width = if self.state.basic_terminal {
+                54
+            } else {
+                (area.width.saturating_sub(4)).clamp(20, 64)
+            };
+            let s_bar = centered_width_rect(vertical_chunks[4], base_width);
+            let s_sugg = Rect {
+                x: s_bar.x,
+                y: s_bar.bottom(),
+                width: s_bar.width,
+                height: area.bottom().saturating_sub(s_bar.bottom()),
+            };
+
+            let footer = vertical_chunks[6];
+            if row == footer.y {
+                self.handle_home_footer_click(col, area.width);
+                return None;
+            }
+
+            (s_bar, s_sugg)
+        } else {
+            let has_results = !self.state.search_results.is_empty();
+            let suggestion_height = if self.state.input_mode == InputMode::Editing
+                && !self.state.search_suggestions.is_empty()
+            {
+                self.state.search_suggestions.len().min(6) as u16 + 3
+            } else {
+                0
+            };
+            let chunks = if has_results {
+                Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(1),
+                        Constraint::Length(1),
+                        Constraint::Min(0),
+                    ])
+                    .split(area)
+            } else {
+                Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(1),
+                        Constraint::Length(1),
+                        Constraint::Length(suggestion_height),
+                        Constraint::Length(0),
+                        Constraint::Min(0),
+                    ])
+                    .split(area)
+            };
+
+            let s_bar = if has_results {
+                Rect {
+                    x: chunks[0].x + 2,
+                    y: chunks[0].y,
+                    width: chunks[0].width.saturating_sub(4),
+                    height: chunks[0].height,
+                }
+            } else {
+                let base_width = if self.state.basic_terminal {
+                    54
+                } else {
+                    (area.width.saturating_sub(4)).clamp(24, 76)
+                };
+                centered_width_rect(chunks[0], base_width)
+            };
+            let s_sugg = chunks[2];
+
+            (s_bar, s_sugg)
+        };
+
+        if self.state.input_mode == InputMode::Editing && !self.state.search_suggestions.is_empty()
+        {
+            let visible_count = self.state.search_suggestions.len().min(6);
+            let dropdown_height = visible_count as u16 + 4;
+            let selected_index = self.state.suggest_index.unwrap_or(0);
+            let suggestion_offset = selected_index
+                .saturating_add(1)
+                .saturating_sub(visible_count)
+                .min(
+                    self.state
+                        .search_suggestions
+                        .len()
+                        .saturating_sub(visible_count),
+                );
+
+            let max_suggestion_len = self
+                .state
+                .search_suggestions
+                .iter()
+                .map(|s| crate::tui::text::width(s))
+                .max()
+                .unwrap_or(0) as u16;
+
+            let content_desired_width = max_suggestion_len
+                .saturating_add(8)
+                .max(search_bar_area.width)
+                .max(54);
+
+            let dropdown_width = content_desired_width
+                .min(area.width.saturating_sub(4))
+                .max(20);
+
+            let dropdown_x = area.x + area.width.saturating_sub(dropdown_width) / 2;
+            let dropdown_y = if suggestion_area.height >= dropdown_height {
+                suggestion_area.y
+            } else {
+                search_bar_area.y + search_bar_area.height
+            };
+
+            let dropdown_rect = Rect {
+                x: dropdown_x,
+                y: dropdown_y,
+                width: dropdown_width,
+                height: dropdown_height,
+            };
+
+            if dropdown_rect.contains(ratatui::layout::Position::new(col, row)) {
+                let item_start_y = dropdown_rect.y + 1;
+                if row >= item_start_y && (row - item_start_y) < visible_count as u16 {
+                    let clicked_idx = suggestion_offset + (row - item_start_y) as usize;
+                    if let Some(query) = self.state.search_suggestions.get(clicked_idx).cloned() {
+                        self.action_sender
+                            .send(Action::SelectSuggestion { query })
+                            .ok();
+                    }
+                }
+                return None;
+            }
+        }
+
+        if row >= search_bar_area.y && row < search_bar_area.y + search_bar_area.height {
+            self.state.input_mode = InputMode::Editing;
+            return None;
+        }
+
+        if !is_landing {
+            let results_y = 2;
+            if row >= results_y && row < area.height.saturating_sub(1) {
+                let row_height = self.state.poster_rows.max(3) + 1;
+                let clicked_relative_row = row.saturating_sub(results_y);
+                let clicked_idx = (clicked_relative_row / row_height) as usize;
+
+                let table_offset = self.state.search_list_state.selected().unwrap_or(0);
+                let visible_items =
+                    ((area.height.saturating_sub(results_y)) / row_height).max(1) as usize;
+                let page_start = if table_offset >= visible_items {
+                    table_offset.saturating_sub(visible_items - 1)
+                } else {
+                    0
+                };
+
+                let target_idx = page_start + clicked_idx;
+                if target_idx < self.state.search_results.len() {
+                    let prev_selected = self.state.search_list_state.selected();
+                    self.state.search_list_state.select(Some(target_idx));
+
+                    if prev_selected == Some(target_idx) {
+                        self.action_sender.send(Action::Submit).ok();
+                    } else if let Some(res) = self.state.search_results.get(target_idx) {
+                        self.action_sender
+                            .send(Action::FetchPreview(res.id.clone()))
+                            .ok();
+                        self.prefetch_visible_posters();
+                    }
+                }
+                return None;
+            }
+        }
+
+        None
+    }
+
+    fn handle_home_footer_click(&mut self, col: u16, width: u16) {
+        let provider_label = self.state.active_provider.label();
+        let tv_label = if self.state.is_tv_mode {
+            "Streaming"
+        } else {
+            "TV"
+        };
+
+        let provider_w = 9 + provider_label.chars().count() as u16;
+        let tv_w = 9 + tv_label.chars().count() as u16;
+        let help_w = 8_u16;
+        let quit_w = 8_u16;
+        let sep = 3_u16;
+
+        let total_w = if !self.state.is_tv_mode {
+            provider_w + sep + tv_w + sep + help_w + sep + quit_w
+        } else {
+            tv_w + sep + help_w + sep + quit_w
+        };
+
+        let start_x = width.saturating_sub(total_w) / 2;
+
+        if !self.state.is_tv_mode {
+            let b1_start = start_x;
+            let b1_end = b1_start + provider_w;
+
+            let b2_start = b1_end + sep;
+            let b2_end = b2_start + tv_w;
+
+            let b3_start = b2_end + sep;
+            let b3_end = b3_start + help_w;
+
+            let b4_start = b3_end + sep;
+            let b4_end = b4_start + quit_w;
+
+            if col >= b1_start && col <= b1_end + 1 {
+                self.cycle_provider();
+            } else if col >= b2_start && col <= b2_end + 1 {
+                self.action_sender.send(Action::ToggleTvMode).ok();
+            } else if col >= b3_start && col <= b3_end + 1 {
+                self.action_sender.send(Action::ToggleHelp).ok();
+            } else if col >= b4_start && col <= b4_end + 2 {
+                self.action_sender.send(Action::Quit).ok();
+            }
+        } else {
+            let b2_start = start_x;
+            let b2_end = b2_start + tv_w;
+
+            let b3_start = b2_end + sep;
+            let b3_end = b3_start + help_w;
+
+            let b4_start = b3_end + sep;
+            let b4_end = b4_start + quit_w;
+
+            if col >= b2_start && col <= b2_end + 1 {
+                self.action_sender.send(Action::ToggleTvMode).ok();
+            } else if col >= b3_start && col <= b3_end + 1 {
+                self.action_sender.send(Action::ToggleHelp).ok();
+            } else if col >= b4_start && col <= b4_end + 2 {
+                self.action_sender.send(Action::Quit).ok();
+            }
+        }
+    }
+
+    fn handle_details_mouse(&mut self, col: u16, row: u16, area: Rect) -> Option<Action> {
+        let details_json = self.state.selected_details.as_ref()?.clone();
+
+        let type_val = crate::tui::state::stype(&details_json);
+        let has_languages = details_json
+            .get("dubs")
+            .and_then(|d| d.as_array())
+            .is_some_and(|d| d.len() > 1);
+        let is_series = type_val == 2 && !self.state.available_seasons.is_empty();
+
+        let mut available_panes = Vec::new();
+        if has_languages {
+            available_panes.push(DetailsPane::Languages);
+        }
+        if is_series {
+            available_panes.push(DetailsPane::Seasons);
+            available_panes.push(DetailsPane::Episodes);
+        }
+
+        let tier = crate::tui::screens::details::DetailsLayoutTier::for_area(area);
+        let header_height = tier.header_height(area, self.state.selected_details.as_ref());
+        let footer_height = tier.footer_height(area.width);
+
+        let chunks = Layout::vertical([
+            Constraint::Length(header_height),
+            Constraint::Length(1),
+            Constraint::Min(5),
+            Constraint::Length(footer_height),
+        ])
+        .split(area);
+
+        let workflow_area = chunks[1];
+        let bottom_area = chunks[2];
+        let footer_area = chunks[3];
+
+        if row == footer_area.y {
+            self.handle_details_footer_click(col, area.width);
+            return None;
+        }
+
+        if row == workflow_area.y {
+            let count = available_panes.len() + 1;
+            let section_w = area.width / count as u16;
+            let pane_idx = (col / section_w.max(1)) as usize;
+            if pane_idx < available_panes.len() {
+                self.state.details_pane = available_panes[pane_idx];
+            } else {
+                self.state.details_pane = DetailsPane::Streams;
+            }
+            return None;
+        }
+
+        let visible_selector_panes = if matches!(
+            tier,
+            crate::tui::screens::details::DetailsLayoutTier::Narrow
+                | crate::tui::screens::details::DetailsLayoutTier::Tiny
+        ) {
+            available_panes
+                .iter()
+                .copied()
+                .filter(|pane| *pane == self.state.details_pane)
+                .collect::<Vec<_>>()
+        } else {
+            available_panes
+        };
+
+        let selector_height = if visible_selector_panes.is_empty() {
+            0
+        } else {
+            let episode_count = self
+                .state
+                .available_episode_numbers
+                .get(self.state.season_list_state.selected().unwrap_or(0))
+                .map_or(0, Vec::len);
+            let language_count = details_json
+                .get("dubs")
+                .and_then(|dubs| dubs.as_array())
+                .map_or(0, Vec::len);
+            language_count
+                .max(self.state.available_seasons.len())
+                .max(episode_count)
+                .min(4) as u16
+                + 2
+        };
+
+        let lower_chunks =
+            Layout::vertical([Constraint::Length(selector_height), Constraint::Min(3)])
+                .split(bottom_area);
+
+        let selector_area = lower_chunks[0];
+        let streams_area = lower_chunks[1];
+
+        if !visible_selector_panes.is_empty()
+            && selector_area.contains(ratatui::layout::Position::new(col, row))
+        {
+            let selector_chunks = Layout::horizontal(vec![
+                Constraint::Ratio(
+                    1,
+                    visible_selector_panes.len() as u32
+                );
+                visible_selector_panes.len()
+            ])
+            .split(selector_area);
+
+            for (pane, pane_rect) in visible_selector_panes
+                .into_iter()
+                .zip(selector_chunks.iter())
+            {
+                if pane_rect.contains(ratatui::layout::Position::new(col, row)) {
+                    let clicked_row = row.saturating_sub(pane_rect.y + 1) as usize;
+                    match pane {
+                        DetailsPane::Languages => {
+                            self.state.details_pane = DetailsPane::Languages;
+                            if let Some(dubs) = details_json.get("dubs").and_then(|d| d.as_array())
+                            {
+                                if clicked_row < dubs.len() {
+                                    self.action_sender
+                                        .send(Action::SelectLanguage(clicked_row))
+                                        .ok();
+                                }
+                            }
+                        }
+                        DetailsPane::Seasons => {
+                            self.state.details_pane = DetailsPane::Seasons;
+                            if clicked_row < self.state.available_seasons.len() {
+                                self.state.season_list_state.select(Some(clicked_row));
+                                self.state.selected_season =
+                                    self.state
+                                        .available_seasons
+                                        .get(clicked_row)
+                                        .and_then(|s| s.get("se"))
+                                        .and_then(|v| v.as_i64())
+                                        .unwrap_or(1) as usize;
+                                self.state.episode_list_state.select(Some(0));
+                                self.trigger_episode_fetch();
+                            }
+                        }
+                        DetailsPane::Episodes => {
+                            self.state.details_pane = DetailsPane::Episodes;
+                            let season_idx = self.state.season_list_state.selected().unwrap_or(0);
+                            if let Some(ep_numbers) =
+                                self.state.available_episode_numbers.get(season_idx)
+                            {
+                                if clicked_row < ep_numbers.len() {
+                                    self.state.episode_list_state.select(Some(clicked_row));
+                                    self.state.selected_episode = ep_numbers[clicked_row];
+                                    self.trigger_episode_fetch();
+                                }
+                            }
+                        }
+                        DetailsPane::Streams => {}
+                    }
+                    return None;
+                }
+            }
+        }
+
+        if streams_area.contains(ratatui::layout::Position::new(col, row)) {
+            self.state.details_pane = DetailsPane::Streams;
+            let streams_count = self
+                .state
+                .selected_resources
+                .as_ref()
+                .and_then(|r| r.get("list"))
+                .and_then(|l| l.as_array())
+                .map_or(0, Vec::len);
+
+            if streams_count > 0 {
+                let list = self
+                    .state
+                    .selected_resources
+                    .as_ref()
+                    .and_then(|r| r.get("list"))
+                    .and_then(|l| l.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+
+                let clicked_stream_row = row.saturating_sub(streams_area.y + 1);
+                let mut line_offset = 0_u16;
+                let mut prev_resolution = None;
+                let mut matched_idx = None;
+
+                for (i, file) in list.iter().enumerate() {
+                    let resolution = file.get("resolution").and_then(|r| r.as_i64()).unwrap_or(0);
+                    if prev_resolution != Some(resolution) {
+                        if i > 0 {
+                            line_offset += 1;
+                        }
+                        line_offset += 1;
+                        prev_resolution = Some(resolution);
+                    }
+                    if clicked_stream_row == line_offset {
+                        matched_idx = Some(i);
+                        break;
+                    }
+                    line_offset += 1;
+                }
+
+                let target_idx = matched_idx.unwrap_or_else(|| {
+                    (clicked_stream_row as usize / 2).min(streams_count.saturating_sub(1))
+                });
+
+                let prev_selected = self.state.resource_list_state.selected();
+                self.state.resource_list_state.select(Some(target_idx));
+
+                if prev_selected == Some(target_idx) {
+                    self.action_sender.send(Action::PlayStream(false)).ok();
+                }
+            }
+            return None;
+        }
+
+        None
+    }
+
+    fn handle_details_footer_click(&mut self, col: u16, width: u16) {
+        let is_streams = self.state.details_pane == DetailsPane::Streams;
+        let is_seasons = self.state.details_pane == DetailsPane::Seasons;
+        let is_languages = self.state.details_pane == DetailsPane::Languages;
+
+        let mut btn_widths = vec![16_u16, 10_u16];
+        let action_label = if is_streams { 11_u16 } else { 13_u16 };
+        btn_widths.push(action_label);
+
+        if is_streams {
+            btn_widths.push(14_u16);
+        }
+        if !is_languages {
+            btn_widths.push(15_u16);
+        }
+        btn_widths.push(14_u16);
+        btn_widths.push(11_u16);
+
+        let sep = 3_u16;
+        let total_w: u16 = btn_widths.iter().sum::<u16>() + (btn_widths.len() as u16 - 1) * sep;
+        let mut curr_x = width.saturating_sub(total_w) / 2;
+
+        let mut hitboxes = Vec::new();
+        for w in &btn_widths {
+            hitboxes.push((curr_x, curr_x + w));
+            curr_x += w + sep;
+        }
+
+        let mut idx = 0;
+        if let Some(&(s, e)) = hitboxes.get(idx) {
+            if col >= s && col < e + 2 {
+                self.action_sender.send(Action::TabPane).ok();
+                return;
+            }
+        }
+        idx += 1;
+
+        if let Some(&(s, e)) = hitboxes.get(idx) {
+            if col >= s && col < e + 2 {
+                self.action_sender.send(Action::MoveDown).ok();
+                return;
+            }
+        }
+        idx += 1;
+
+        if let Some(&(s, e)) = hitboxes.get(idx) {
+            if col >= s && col < e + 2 {
+                if is_streams {
+                    self.action_sender.send(Action::PlayStream(false)).ok();
+                } else {
+                    self.action_sender.send(Action::Submit).ok();
+                }
+                return;
+            }
+        }
+        idx += 1;
+
+        if is_streams {
+            if let Some(&(s, e)) = hitboxes.get(idx) {
+                if col >= s && col < e + 2 {
+                    self.action_sender.send(Action::PlayStream(true)).ok();
+                    return;
+                }
+            }
+            idx += 1;
+        }
+
+        if !is_languages {
+            if let Some(&(s, e)) = hitboxes.get(idx) {
+                if col >= s && col < e + 2 {
+                    if is_seasons {
+                        self.action_sender.send(Action::PromptDownloadSeason).ok();
+                    } else {
+                        self.action_sender.send(Action::PromptDownloadEpisode).ok();
+                    }
+                    return;
+                }
+            }
+            idx += 1;
+        }
+
+        if let Some(&(s, e)) = hitboxes.get(idx) {
+            if col >= s && col < e + 2 {
+                self.action_sender.send(Action::Refresh).ok();
+                return;
+            }
+        }
+        idx += 1;
+
+        if let Some(&(s, e)) = hitboxes.get(idx) {
+            if col >= s && col <= e + 3 {
+                self.action_sender.send(Action::GoBack).ok();
+            }
+        }
+    }
+}
+
+fn centered_rect(area: Rect, width: u16, height: u16, min_w: u16, max_w: u16) -> Rect {
+    let w = width.clamp(min_w, max_w).min(area.width.saturating_sub(2));
+    let h = height.min(area.height.saturating_sub(2));
+    Rect {
+        x: area.x + (area.width.saturating_sub(w)) / 2,
+        y: area.y + (area.height.saturating_sub(h)) / 2,
+        width: w,
+        height: h,
+    }
+}
+
+fn centered_width_rect(area: Rect, width: u16) -> Rect {
+    let w = width.min(area.width);
+    Rect {
+        x: area.x + (area.width.saturating_sub(w)) / 2,
+        y: area.y,
+        width: w,
+        height: area.height,
+    }
+}

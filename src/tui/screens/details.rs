@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DetailsLayoutTier {
+pub(crate) enum DetailsLayoutTier {
     Wide,
     Medium,
     Narrow,
@@ -19,7 +19,7 @@ enum DetailsLayoutTier {
 }
 
 impl DetailsLayoutTier {
-    fn for_area(area: Rect) -> Self {
+    pub(crate) fn for_area(area: Rect) -> Self {
         if area.width < 60 || area.height < 24 {
             Self::Tiny
         } else if area.width < 80 {
@@ -31,7 +31,7 @@ impl DetailsLayoutTier {
         }
     }
 
-    fn header_height(self, area: Rect, details: Option<&serde_json::Value>) -> u16 {
+    pub(crate) fn header_height(self, area: Rect, details: Option<&serde_json::Value>) -> u16 {
         let (minimum, maximum, synopsis_limit, reserved_width) = match self {
             Self::Wide => (9, 12, 3, 30),
             Self::Medium => (8, 11, 2, 24),
@@ -74,7 +74,7 @@ impl DetailsLayoutTier {
         (content_rows as u16 + 2).clamp(minimum, maximum)
     }
 
-    fn footer_height(self, width: u16) -> u16 {
+    pub(crate) fn footer_height(self, width: u16) -> u16 {
         if width >= 70 { 1 } else { 2 }
     }
 }

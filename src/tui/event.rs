@@ -38,6 +38,9 @@ impl EventHandler {
                                     crossterm::event::MouseEventKind::ScrollDown => {
                                         let _ = event_sender.send(Action::Key(crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Down, crossterm::event::KeyModifiers::empty()))).await;
                                     }
+                                    crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                                        let _ = event_sender.send(Action::MouseClick(mouse.column, mouse.row)).await;
+                                    }
                                     _ => {}
                                 }
                             }

@@ -484,11 +484,15 @@ impl App {
                     self.state.resource_list_state.select(None);
                     self.state.language_chosen = true;
                     self.state.language_list_state.select(Some(idx));
-                    self.state
-                        .set_status("Switching language...".to_string(), 150);
-                    self.action_sender
-                        .send(Action::FetchDetails(next_id, false))
-                        .ok();
+                    if self.state.active_subject_id.as_deref() == Some(&next_id) {
+                        self.trigger_episode_fetch();
+                    } else {
+                        self.state
+                            .set_status("Switching language...".to_string(), 150);
+                        self.action_sender
+                            .send(Action::FetchDetails(next_id, false))
+                            .ok();
+                    }
                 }
             }
 

@@ -6,6 +6,7 @@ pub enum Action {
     LaunchPlayer(crate::tui::state::PlayerKind, String, Option<String>),
     Tick,
     Key(crossterm::event::KeyEvent),
+    MouseClick(u16, u16),
     Quit,
     GoBack,
     SelectLanguage(usize),

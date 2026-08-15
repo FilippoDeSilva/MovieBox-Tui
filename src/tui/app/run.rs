@@ -121,6 +121,10 @@ impl App {
                 self.handle_key(key).await;
             }
 
+            Action::MouseClick(col, row) => {
+                self.handle_mouse(col, row);
+            }
+
             Action::Tick
             | Action::FocusChange
             | Action::Resize(..)
