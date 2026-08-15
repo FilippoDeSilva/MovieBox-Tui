@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Transparent Stream & Search Diagnostics**:
+  - Replaced misleading generic `"No matches"` and `"Rate Limit"` errors with truthful, contextual diagnostics: `"No stream sources available on {provider}"`, `"Network connection failed to {provider}"`, `"Rate limited by {provider}"`, and `"Episode S{season}E{episode} is not listed on {provider}"`.
+  - Added helpful actionable hints (`Press Ctrl+P to try another provider, or r to refresh`).
+- **Rate-Limiting & Concurrency Hardening**:
+  - Added HTTP 429 `Retry-After` header parsing with bounded exponential backoff in `MovieBoxClient`.
+  - Added semaphore concurrency limiting (`Semaphore::new(2)`) during parallel episode page resolution to prevent burst requests from tripping provider rate limiters.
+- **Selector Tab Preservation in Standard Displays**:
+  - Maintained visibility of Audio Languages, Seasons, and Episodes selector tabs side-by-side in standard ~80-column terminals when focusing Streams, preventing tabs from disappearing when 0 streams are available.
+
 ## [0.1.12] - 2026-08-15
 
 ### Added
@@ -108,74 +120,5 @@
 
 ### Refactored
 - **Domain Modularization**: Split the application monolith into cohesive domain modules (`network`, `playback`, `download`, `requests`, `navigation`, `tv`, `system`, `keyboard`).
-- **Provider Architecture**: Introduced typed contract models and unified `Provider` / `ReleaseProvider` seams.
-
-### Fixed
-- Added request generation IDs to invalidate stale asynchronous network and preview responses.
-- Hardened MovieBox HMAC-MD5 request signing and runtime token initialization.
-- Preserved upstream subtitle sidecar file extensions (`.srt`, `.vtt`, `.ass`, `.sub`).
-
-## [0.1.10] - 2026-08-06
-
-### Added
-- **BDIX Integration**: Added CircleFTP and DhakaFlix provider scrapers with isolated cache namespaces.
-- **Native Android Support**: Added Android Intent media player dispatch and shared storage download directory detection.
-- **BDIX Commands**: Added `/enable-bdix` and `/disable-bdix` slash commands with search autocomplete.
-
-### Fixed
-- Fixed subtitle loading in IINA player.
-- Fixed help menu text truncation on small terminal viewports.
-
-## [0.1.9] - 2026-08-05
-
-### Added
-- **Watch History**: Added persistent watch history tracking via `/history` with automatic deduplication.
-- **Update Checker**: Added in-app update notification popup with release information.
-- **Subtitle Caching**: Added caching layer for MovieBox stream subtitles.
-
-### Fixed
-- Updated 4kHDHub mirror resolution for new HubCloud domains and anti-bot challenges.
-- Prevented playback resolution request spam on rapid navigation keystrokes.
-
-## [0.1.8] - 2026-08-02
-
-### Added
-- **Theme Switcher**: Added interactive theme picker popup with configuration persistence in `config.json`.
-- **Homebrew Support**: Created official Homebrew tap formula with automated release updates.
-- **Flatpak Support**: Added automatic detection for Flatpak-installed mpv and VLC players on Linux.
-
-### Performance
-- Migrated TUI event loop to bounded asynchronous channels.
-- Added disk caching for provider media details during list preview loading.
-
-## [0.1.7] - 2026-07-31
-
-### Added
-- **4KHDHub Provider**: Added secondary 4K content provider with HubCloud mirror resolver and preflight validation.
-- **Bi-directional Navigation**: Added `Tab` and `Shift+Tab` pane switching on the Details screen.
-- **Stream Caching**: Added in-memory stream caching with atomic disk writes.
-- **Terminal Capabilities**: Added Sixel graphics and adaptive terminal layout detection.
-
-### Fixed
-- Managed temporary subtitle file lifecycle with delayed cleanup after player process initialization.
-- Centered poster images vertically on wide terminal viewports.
-
-## [0.1.6] - 2026-07-26
-
-### Added
-- **Live TV (IPTV) Mode**: Added IPTV live channel streaming with M3U parser and category groupings.
-- **Confirmation Dialogs**: Added confirmation modals for season and episode downloads.
-- **Player Picker**: Added interactive media player picker popup (`o` key).
-- **Linux ARM64**: Added native build and install support for aarch64 Linux systems.
-
-### Fixed
-- Enhanced download engine with HTTP range requests, timeout handling, and chunk validation.
-
-## [0.1.5] - 2026-07-23
-
-### Added
-- Initial tagged release:
-  - Search, browse, stream, and download movies, series, and anime.
-  - External player integration for mpv, VLC, and IINA.
-  - Subtitle track picker and automated downloading.
-  - Basic terminal ASCII fallback mode.
+- **State Decomposition**: Split the monolithic application state into specialized domain state structs.
+- **Strict Verification Gates**: Enforced workspace lint checks, static analysis, and testing.

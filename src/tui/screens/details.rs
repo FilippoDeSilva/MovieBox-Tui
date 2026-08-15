@@ -451,16 +451,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         available_selector_panes.push(crate::tui::state::DetailsPane::Episodes);
     }
 
-    let visible_selector_panes =
-        if matches!(tier, DetailsLayoutTier::Narrow | DetailsLayoutTier::Tiny) {
-            available_selector_panes
-                .iter()
-                .copied()
-                .filter(|pane| *pane == state.details_pane)
-                .collect::<Vec<_>>()
-        } else {
-            available_selector_panes
-        };
+    let visible_selector_panes = if matches!(tier, DetailsLayoutTier::Tiny) {
+        available_selector_panes
+            .iter()
+            .copied()
+            .filter(|pane| *pane == state.details_pane)
+            .collect::<Vec<_>>()
+    } else {
+        available_selector_panes
+    };
 
     let selector_height = if visible_selector_panes.is_empty() {
         0
@@ -979,10 +978,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .and_then(|d| d.get("dubs"))
                     .and_then(|d| d.as_array())
                     .is_some_and(|a| a.len() > 1);
+                let provider_label = state
+                    .active_subject_id
+                    .as_deref()
+                    .map(|id| subject_provider(state, id).label())
+                    .unwrap_or_else(|| state.active_provider.label());
+
                 let msg = if has_multiple_dubs && !state.language_chosen {
-                    "Choose an audio track to load streams."
+                    "Choose an audio track to load streams.".to_string()
                 } else {
-                    "No streams found — press r to retry."
+                    format!(
+                        "No stream sources found on {provider_label} — press Ctrl+P to try another provider, or r to retry."
+                    )
                 };
 
                 let inner = streams_block.inner(streams_area);
@@ -1009,7 +1016,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let msg = if waiting_for_language {
                 "Choose an audio track to load streams.".to_string()
             } else if let Some(error) = &state.stream_error {
-                format!("{error} — press r to retry.")
+                if error.contains("No stream sources") || error.contains("not listed") {
+                    format!("{error}.\nPress Ctrl+P to try another provider, or r to refresh.")
+                } else {
+                    format!("{error} — press r to retry or Ctrl+P to switch provider.")
+                }
             } else {
                 let dots = match (state.tick_count / 4) % 4 {
                     0 => "",

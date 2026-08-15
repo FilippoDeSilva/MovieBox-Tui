@@ -1425,6 +1425,7 @@ impl App {
 
                     let mut all_items: Vec<serde_json::Value> = Vec::new();
                     let mut found_target = false;
+                    let mut any_fetch_failed = false;
 
                     if is_movie {
                         let mut page = 1usize;
@@ -1452,10 +1453,14 @@ impl App {
                                         break;
                                     }
                                 }
-                                _ => break,
+                                _ => {
+                                    any_fetch_failed = true;
+                                    break;
+                                }
                             }
                         }
                     } else {
+                        let concurrency_limit = std::sync::Arc::new(tokio::sync::Semaphore::new(2));
                         let mut page = estimated_page;
                         'outer: loop {
                             if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
@@ -1473,9 +1478,11 @@ impl App {
                                 let c = client.clone();
                                 let id = id_clone.clone();
                                 let ct = cancel_token.clone();
+                                let permit = concurrency_limit.clone();
                                 page_handles.push(tokio::spawn(async move {
+                                    let _permit = permit.acquire_owned().await.ok();
                                     if ct.load(std::sync::atomic::Ordering::Relaxed) {
-                                        return (Vec::new(), serde_json::json!({}));
+                                        return (Vec::new(), serde_json::json!({}), false);
                                     }
                                     match tokio::time::timeout(
                                         std::time::Duration::from_secs(15),
@@ -1483,8 +1490,8 @@ impl App {
                                     )
                                     .await
                                     {
-                                        Ok(Ok((items, pager))) => (items, pager),
-                                        _ => (Vec::new(), serde_json::json!({})),
+                                        Ok(Ok((items, pager))) => (items, pager, true),
+                                        _ => (Vec::new(), serde_json::json!({}), false),
                                     }
                                 }));
                             }
@@ -1492,7 +1499,10 @@ impl App {
                             let mut page_empty = true;
                             let mut has_more = false;
                             for handle in page_handles {
-                                if let Ok((items, pager)) = handle.await {
+                                if let Ok((items, pager, ok)) = handle.await {
+                                    if !ok {
+                                        any_fetch_failed = true;
+                                    }
                                     if !items.is_empty() {
                                         page_empty = false;
                                     }
@@ -1535,12 +1545,16 @@ impl App {
                     };
 
                     if !target_ok || all_items.is_empty() {
-                        let err_msg = if all_items.is_empty() {
-                            "No matches"
+                        let provider_name = context.provider.label();
+                        let err_msg = if any_fetch_failed && all_items.is_empty() {
+                            format!("Network connection failed to {provider_name}")
+                        } else if any_fetch_failed {
+                            format!("Rate limited by {provider_name}")
+                        } else if all_items.is_empty() {
+                            format!("No stream sources available on {provider_name}")
                         } else {
-                            "Rate Limit"
-                        }
-                        .into();
+                            format!("Episode S{season}E{episode} is not listed on {provider_name}")
+                        };
                         sender
                             .send(Action::EpisodeStreamsFailed(
                                 context, request_id, id_clone, season, episode, err_msg,

@@ -179,11 +179,18 @@ fn render_search_state(
         }
         SearchViewState::Error => {
             let symbol = if state.basic_terminal { "!" } else { "×" };
+            let err_text = state.search_error.as_deref().unwrap_or_else(|| {
+                if !state.status_message.is_empty() {
+                    &state.status_message
+                } else {
+                    "Search request failed"
+                }
+            });
             Line::from(vec![
                 Span::styled(format!("{symbol} "), theme.error),
                 Span::styled(
                     crate::tui::text::truncate_width(
-                        &state.status_message,
+                        err_text,
                         card_width.saturating_sub(4) as usize,
                     ),
                     theme.error,
