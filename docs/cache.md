@@ -39,9 +39,10 @@ The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
 
 ## In-memory caches (AppState)
 
-- `image_cache` (10), `search_posters` (30), `search_poster_protocols` (30),
-  `preview_cache` (30): `lru::LruCache` for poster images and terminal image
-  protocols; `stream_pool`: resolved streams per subject.
+- `image_cache` (30), `search_posters` (300), `failed_posters` (300),
+  `search_poster_protocols` (300), `preview_cache` (30): `lru::LruCache` for poster
+  images, negative lookup cache, and terminal image protocols; `stream_pool`:
+  resolved streams per subject.
 
 All disk access in async code is wrapped in `tokio::task::spawn_blocking` so the event
 loop never blocks. Failures are logged (see [logging.md](logging.md)) and treated as

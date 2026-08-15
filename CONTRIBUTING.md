@@ -43,7 +43,7 @@ Short version:
 - `src/cache.rs`: Local disk caching to minimize API calls.
 
 The app is message-driven. User input and background tasks produce `Action` values,
-handled by the dispatcher in `src/tui/app/mod.rs`. When adding behavior, prefer adding a
+handled by the dispatcher in `src/tui/app/run.rs`. When adding behavior, prefer adding a
 new `Action` variant over blocking the UI thread.
 
 ## Workflow

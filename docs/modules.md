@@ -60,7 +60,6 @@ src/
       home.rs        Home/startup + search list rendering (streaming and TV).
       details.rs     Details screen rendering.
       help.rs        Keybinding help (mode-aware).
-      startup.rs     Startup splash.
     terminal.rs      Terminal capability probes (basic UI, image querying).
     theme.rs         Color themes + terminal color detection.
     text.rs          Grapheme-safe width/truncation helpers.

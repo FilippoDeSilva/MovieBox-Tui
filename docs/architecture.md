@@ -46,7 +46,7 @@ src/
     event.rs                    EventHandler: input events + tick → Action channel
     player.rs                   player detection and command construction
     overlay.rs                  popups, pickers, notifications
-    screens/                    render-only modules (home, details, help, startup)
+    screens/                    render-only modules (home, details, help)
     terminal.rs                 terminal capability probes
     theme.rs                    color themes
     text.rs                     grapheme-safe text helpers

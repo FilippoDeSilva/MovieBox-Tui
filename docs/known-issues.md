@@ -24,7 +24,7 @@ Tracked here so future work and issue reports reference the same facts.
 - **Termux playback needs the device confirmed** on each release: `termux-open` /
   `am` availability and the Android chooser behavior.
 
-## Test coverage
-
-- Unit tests cover browse ranking, score extraction, and curated group matching logic (`src/tui/app/search.rs`).
-- Correctness across UI and network flows is enforced by the lint gate (`cargo clippy`), type checking, unit tests (`cargo test`), and manual verification. CI runs `cargo audit` and `cargo package`.
+## Verification
+ 
+- This project currently has no unit-test suite by design.
+- Correctness across UI, providers, and network flows is enforced by strict compiler type checking, the lint gate (`cargo clippy --all-targets -- -D warnings`), formatting (`cargo fmt --check`), and the manual/runtime verification gates in [`release-checklist.md`](release-checklist.md). CI also runs `cargo audit` and `cargo package`.
