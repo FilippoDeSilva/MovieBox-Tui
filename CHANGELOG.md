@@ -12,6 +12,13 @@
 - **Selector Tab Preservation in Standard Displays**:
   - Maintained visibility of Audio Languages, Seasons, and Episodes selector tabs side-by-side in standard ~80-column terminals when focusing Streams, preventing tabs from disappearing when 0 streams are available.
 
+### Documentation
+- **Streamlined README & Controls Guide**:
+  - Transformed `README.md` into a focused landing page with measured `~5 MB RAM` benchmark data, defensible value propositions, and direct links to deep guides in `docs/`.
+  - Created standalone `docs/controls.md` covering all keyboard shortcuts, mouse controls, and slash commands.
+  - Added a 3-phase project roadmap: Terminal UI (TUI) -> Command-Line Interface (CLI) -> Desktop GUI Client.
+  - Added a community-first feedback and support section with optional crypto donation options.
+
 ## [0.1.12] - 2026-08-15
 
 ### Added
@@ -26,7 +33,7 @@
   - Pressing `d` or clicking `[Download]` while on the **Seasons** pane prompts to download the whole season (all episodes).
   - Triggering download while on **Episodes** or **Streams** downloads that single episode.
 - **Organized Downloads & Custom Directory**:
-  - Structured Series downloads under `<base_dir>/Series/<Title>/Season <N>/<Title> - S<N:02>E<E:02>.<ext>` (Plex/Jellyfin standard) and Movies under `<base_dir>/Movies/<Title>/<Title>.<ext>`.
+  - Structured Series downloads under `<base_dir>/Series/<Title>/Season <N>/<Title> - S<N:02>E<E:02>.<ext>` and Movies under `<base_dir>/Movies/<Title>/<Title>.<ext>`.
   - Added ISO 639-1 language code tagging to subtitle sidecars (e.g. `<BaseName>.en.srt`) for automatic track identification in media players and servers.
   - Added smart duplication prevention: completed episodes on disk are automatically skipped during season batch downloads.
   - Added `/download-dir <path>` slash command with directory creation and active write-probe validation.
