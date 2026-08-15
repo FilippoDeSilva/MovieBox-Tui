@@ -306,9 +306,6 @@ impl App {
         }
 
         match self.state.active_screen {
-            Screen::Startup => {
-                crate::tui::screens::startup::draw(frame, main_area, &mut self.state, &self.theme);
-            }
             Screen::Home => {
                 crate::tui::screens::home::draw(frame, main_area, &mut self.state, &self.theme);
             }
@@ -378,60 +375,68 @@ impl App {
         }
 
         if let Some((version, notes)) = &self.state.update_available {
-            use ratatui::layout::{Alignment, Constraint, Direction, Layout};
+            use ratatui::layout::Alignment;
             use ratatui::text::{Line, Span};
-            use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+            use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
-            let popup_width = 70;
-            let popup_height = 20;
+            let note_lines: Vec<&str> = notes
+                .lines()
+                .map(|l| l.trim())
+                .filter(|l| !l.is_empty())
+                .collect();
 
-            let h_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Min(0),
-                    Constraint::Length(popup_width),
-                    Constraint::Min(0),
-                ])
-                .split(area);
+            let min_w: u16 = 46;
+            let max_w: u16 = 72;
+            let desired_w = max_w.min(area.width.saturating_sub(4)).max(min_w);
 
-            let v_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(0),
-                    Constraint::Length(popup_height),
-                    Constraint::Min(0),
-                ])
-                .split(h_chunks[1]);
+            let header_rows: u16 = 5;
+            let footer_rows: u16 = 3;
+            let available_height = area.height.saturating_sub(4);
+            let available_note_rows =
+                (available_height.saturating_sub(header_rows + footer_rows) as usize).clamp(2, 10);
 
-            let popup_area = v_chunks[1];
-            frame.render_widget(Clear, popup_area);
+            let display_count = note_lines.len().min(available_note_rows);
+            let has_more = note_lines.len() > display_count;
+            let total_rows =
+                header_rows + (display_count as u16) + (if has_more { 1 } else { 0 }) + footer_rows;
+            let desired_h = total_rows.clamp(10, available_height.max(10));
+
+            let popup_area =
+                crate::tui::overlay::centered(area, desired_w, desired_h, min_w, max_w);
+            crate::tui::clear_area(frame, area, &self.theme);
 
             let mut text = vec![
-                Line::from(Span::styled("Update Available!", self.theme.accent))
-                    .alignment(Alignment::Center),
-                Line::from(""),
-                Line::from("A new version of MovieBox-Tui is available.")
-                    .alignment(Alignment::Center),
-                Line::from(""),
+                Line::from(vec![Span::styled(
+                    "A new version of MovieBox-Tui is available",
+                    self.theme
+                        .header
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                )])
+                .alignment(Alignment::Center),
                 Line::from(vec![
-                    Span::raw(format!("Current: v{}  ", env!("CARGO_PKG_VERSION"))),
-                    Span::styled("→", self.theme.accent),
-                    Span::raw(format!("  Latest: v{}", version)),
+                    Span::styled("Installed: ", self.theme.text_dim),
+                    Span::styled(format!("v{}", env!("CARGO_PKG_VERSION")), self.theme.text),
+                    Span::styled("   →   ", self.theme.accent),
+                    Span::styled("Latest: ", self.theme.text_dim),
+                    Span::styled(
+                        format!("v{version}"),
+                        self.theme
+                            .accent
+                            .add_modifier(ratatui::style::Modifier::BOLD),
+                    ),
                 ])
                 .alignment(Alignment::Center),
                 Line::from(""),
-                Line::from(Span::styled(
-                    "─ Release Notes ──────────────────────────────────────────────────",
-                    self.theme.border,
-                ))
-                .alignment(Alignment::Center),
-                Line::from(""),
+                Line::from(vec![Span::styled(
+                    "Release Notes:",
+                    self.theme
+                        .subtext1
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                )]),
             ];
 
-            let note_lines: Vec<&str> = notes.lines().filter(|l| !l.trim().is_empty()).collect();
-
-            let take_count = 6;
-            for line in note_lines.iter().take(take_count) {
+            let line_width = popup_area.width.saturating_sub(6) as usize;
+            for line in note_lines.iter().take(display_count) {
                 let trimmed = line.trim();
                 let mut spans = vec![Span::raw("  ")];
 
@@ -440,52 +445,64 @@ impl App {
                     || trimmed.starts_with("# ")
                 {
                     let text_start = trimmed.find(' ').unwrap_or(0);
-                    spans.push(Span::styled("▌", self.theme.accent));
+                    spans.push(Span::styled("▌ ", self.theme.accent));
                     spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&trimmed[text_start..], 60),
+                        crate::tui::text::truncate_width(
+                            &trimmed[text_start..],
+                            line_width.saturating_sub(4),
+                        ),
                         self.theme.highlight,
                     ));
                 } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
                     let text_start = trimmed.find(' ').unwrap_or(0) + 1;
                     spans.push(Span::styled("• ", self.theme.accent));
                     spans.push(Span::raw(crate::tui::text::truncate_width(
-                        &trimmed[text_start..],
-                        60,
+                        trimmed[text_start..].trim_start(),
+                        line_width.saturating_sub(4),
                     )));
                 } else {
-                    spans.push(Span::raw(crate::tui::text::truncate_width(trimmed, 64)));
+                    spans.push(Span::raw(crate::tui::text::truncate_width(
+                        trimmed,
+                        line_width.saturating_sub(2),
+                    )));
                 }
                 text.push(Line::from(spans));
             }
 
-            if note_lines.len() > take_count {
-                text.push(Line::from(""));
+            if has_more {
                 text.push(
                     Line::from(Span::styled(
-                        "... (read more on GitHub)",
+                        "... (read more on GitHub release page)",
                         self.theme.text_dim,
                     ))
                     .alignment(Alignment::Center),
                 );
-            } else {
-                text.push(Line::from(""));
             }
 
             text.push(Line::from(""));
             text.push(
-                Line::from(Span::styled(
-                    "[Enter] Close popup   [o] Open in Browser",
-                    self.theme.accent,
-                ))
+                Line::from(vec![
+                    Span::styled("[o]", self.theme.shortcut),
+                    Span::styled(" Open Release Page    ", self.theme.text),
+                    Span::styled("[Esc / Enter]", self.theme.shortcut),
+                    Span::styled(" Dismiss", self.theme.text),
+                ])
                 .alignment(Alignment::Center),
             );
 
-            let popup = Paragraph::new(text).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(self.theme.border),
-            );
+            let block = Block::default()
+                .title(" Update Available ")
+                .title_alignment(Alignment::Center)
+                .title_style(self.theme.title)
+                .borders(Borders::ALL)
+                .border_type(if self.state.basic_terminal {
+                    BorderType::Plain
+                } else {
+                    BorderType::Rounded
+                })
+                .border_style(self.theme.border_focus);
 
+            let popup = Paragraph::new(text).block(block);
             frame.render_widget(popup, popup_area);
         }
 

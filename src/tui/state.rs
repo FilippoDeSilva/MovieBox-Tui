@@ -41,7 +41,6 @@ impl PlayerKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
-    Startup,
     Home,
     Details,
 }
@@ -279,7 +278,7 @@ impl Default for AppState {
         Self {
             active_provider: ProviderKind::MovieBox,
             provider_generation: 0,
-            active_screen: Screen::Startup,
+            active_screen: Screen::Home,
             input_mode: InputMode::Normal,
             search_query: String::new(),
             last_suggest_query: String::new(),

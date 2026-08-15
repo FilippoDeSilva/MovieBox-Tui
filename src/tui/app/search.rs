@@ -163,9 +163,10 @@ impl App {
         if lower_query == "/update" {
             self.state.search_query.clear();
             self.state.input_mode = InputMode::Normal;
-            self.state.active_screen = Screen::Startup;
             self.state.update_available = None;
             self.state.manual_update_check = true;
+            self.state
+                .set_status("Checking GitHub for updates...".to_string(), 180);
             self.action_sender.send(Action::CheckForUpdates).ok();
             return Some(true);
         }

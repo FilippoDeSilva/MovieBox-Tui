@@ -195,7 +195,6 @@ impl App {
                             .ok();
                     }
                 }
-                _ => {}
             },
 
             Action::ClearCache => {
@@ -324,14 +323,7 @@ impl App {
             Action::CheckForUpdates => {
                 let update_sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    let start = tokio::time::Instant::now();
                     let result = crate::tui::updater::check(env!("CARGO_PKG_VERSION")).await;
-
-                    let elapsed = start.elapsed();
-                    if elapsed.as_millis() < 1500 {
-                        tokio::time::sleep(std::time::Duration::from_millis(1500) - elapsed).await;
-                    }
-
                     match result {
                         Ok(Some((version, notes))) => {
                             update_sender
@@ -356,27 +348,36 @@ impl App {
             }
 
             Action::UpdateAvailable(version, notes) => {
-                if self.state.active_screen == Screen::Startup {
-                    self.state.active_screen = Screen::Home;
-                }
+                self.state.last_update_check = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                self.persist_config();
 
                 if version == "none" {
-                    self.state.last_update_check = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs();
-                    self.persist_config();
                     if self.state.manual_update_check {
+                        self.state.set_status(
+                            format!(
+                                "MovieBox-Tui is up to date (v{}).",
+                                env!("CARGO_PKG_VERSION")
+                            ),
+                            180,
+                        );
                         self.state.notify(
                             NotificationKind::Success,
                             "Up to date",
-                            "You are using the latest version.",
+                            format!(
+                                "MovieBox-Tui v{} is the latest version.",
+                                env!("CARGO_PKG_VERSION")
+                            ),
                         );
                     }
                     self.state.manual_update_check = false;
                 } else if version.starts_with("error:") {
                     let err = version.trim_start_matches("error:");
                     if self.state.manual_update_check {
+                        self.state
+                            .set_status(format!("Update check failed: {err}"), 180);
                         self.state.notify(
                             NotificationKind::Error,
                             "Update check failed",
@@ -385,12 +386,8 @@ impl App {
                     }
                     self.state.manual_update_check = false;
                 } else {
-                    self.state.last_update_check = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs();
-                    self.persist_config();
                     self.state.manual_update_check = false;
+                    self.reset_transient_overlays();
                     self.state.update_available = Some((version, notes));
                 }
             }

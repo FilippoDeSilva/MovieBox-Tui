@@ -420,7 +420,6 @@ impl App {
                     return None;
                 }
                 match self.state.active_screen {
-                    Screen::Startup => {}
                     Screen::Home => {
                         if !self.state.search_results.is_empty()
                             || !self.state.search_query.is_empty()
@@ -514,7 +513,6 @@ impl App {
                     return None;
                 }
                 match self.state.active_screen {
-                    Screen::Startup => {}
                     Screen::Home => {
                         let current = self.state.search_list_state.selected().unwrap_or(0);
                         if current > 0 {
@@ -589,7 +587,6 @@ impl App {
                     return None;
                 }
                 match self.state.active_screen {
-                    Screen::Startup => {}
                     Screen::Home => {
                         let current = self.state.search_list_state.selected().unwrap_or(0);
                         if current + 1 < self.state.search_results.len() {

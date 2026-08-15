@@ -200,7 +200,6 @@ impl App {
                 _ => {}
             },
             InputMode::Normal => match self.state.active_screen {
-                Screen::Startup => {}
                 Screen::Home => {
                     if self.state.tv_config_popup {
                         if self.state.tv_input_active {
