@@ -143,23 +143,30 @@ impl App {
                     self.state.set_status(String::new(), 150);
                 }
                 KeyCode::Enter => {
-                    let query = self.state.search_query.trim().to_string();
+                    let selected_opt = self
+                        .state
+                        .suggest_index
+                        .and_then(|idx| self.state.search_suggestions.get(idx).cloned());
+
+                    let query = if let Some(sug) = selected_opt {
+                        sug
+                    } else {
+                        self.state.search_query.trim().to_string()
+                    };
+
                     if !query.is_empty() {
-                        let selected_suggestion = self.state.suggest_index.is_some();
+                        self.state.search_query = query.clone();
                         self.state.input_mode = InputMode::Normal;
                         self.state.search_suggestions.clear();
                         self.state.suggest_index = None;
                         self.state.search_list_state.select(None);
                         self.state.last_search_edit = std::time::Instant::now();
-                        let action = if selected_suggestion {
-                            Action::SelectSuggestion { query }
-                        } else {
-                            Action::Search {
+                        self.action_sender
+                            .send(Action::Search {
                                 query,
                                 force_refresh: false,
-                            }
-                        };
-                        self.action_sender.send(action).ok();
+                            })
+                            .ok();
                     }
                 }
                 KeyCode::Backspace => {
@@ -179,10 +186,6 @@ impl App {
                         Some(i) => i - 1,
                     };
                     self.state.suggest_index = Some(next_idx);
-                    if let Some(sug) = self.state.search_suggestions.get(next_idx) {
-                        self.state.search_query = sug.clone();
-                        self.state.last_suggest_query = self.state.search_query.trim().to_string();
-                    }
                 }
                 KeyCode::Down if !self.state.search_suggestions.is_empty() => {
                     let max_idx = self.state.search_suggestions.len() - 1;
@@ -192,10 +195,6 @@ impl App {
                         Some(i) => i + 1,
                     };
                     self.state.suggest_index = Some(next_idx);
-                    if let Some(sug) = self.state.search_suggestions.get(next_idx) {
-                        self.state.search_query = sug.clone();
-                        self.state.last_suggest_query = self.state.search_query.trim().to_string();
-                    }
                 }
                 _ => {}
             },

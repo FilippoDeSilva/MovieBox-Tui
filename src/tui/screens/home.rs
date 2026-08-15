@@ -871,7 +871,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let position = state
                 .suggest_index
                 .map(|index| format!("{}/{}", index + 1, state.search_suggestions.len()))
-                .unwrap_or_else(|| state.search_suggestions.len().to_string());
+                .unwrap_or_else(|| format!("{} available", state.search_suggestions.len()));
             let heading = Line::from(vec![
                 Span::styled(" Suggestions", theme.title),
                 Span::styled(" · ", theme.overlay0),

@@ -13,21 +13,25 @@ impl App {
                     self.state.active_suggest_request.wrapping_add(1);
                 let request_id = self.state.active_suggest_request;
                 if query.starts_with('/') {
-                    let mut commands = vec![
-                        "/clear-cache",
-                        "/update",
-                        "/toggle-update",
-                        "/github",
-                        "/theme",
-                        "/enable-bdix",
-                        "/disable-bdix",
-                    ];
+                    let mut commands = Vec::new();
                     if self.state.is_tv_mode {
                         commands.push("/list");
                         commands.push("/config");
                     } else {
-                        commands.extend(vec!["/browse", "/history"]);
+                        commands.push("/browse");
+                        commands.push("/history");
                     }
+                    commands.push("/theme");
+                    commands.push("/update");
+                    commands.push("/toggle-update");
+                    commands.push("/clear-cache");
+                    commands.push("/github");
+                    if self.state.bdix_enabled {
+                        commands.push("/disable-bdix");
+                    } else {
+                        commands.push("/enable-bdix");
+                    }
+
                     let mut suggestions = vec![];
                     for cmd in commands {
                         if cmd.starts_with(&query) {
@@ -71,7 +75,10 @@ impl App {
                 if request_id != self.state.active_suggest_request {
                     return None;
                 }
-                if self.state.is_tv_mode || self.state.active_provider != ProviderKind::MovieBox {
+                if !query.starts_with('/')
+                    && (self.state.is_tv_mode
+                        || self.state.active_provider != ProviderKind::MovieBox)
+                {
                     return None;
                 }
                 if self.state.suggest_index.is_some() {
@@ -93,7 +100,8 @@ impl App {
                     .and_then(|s| s.as_array());
 
                 if let Some(subjects) = subjects_opt {
-                    for item in subjects.iter().take(8) {
+                    let limit = if query.starts_with('/') { 20 } else { 10 };
+                    for item in subjects.iter().take(limit) {
                         let raw_title = item
                             .get("title")
                             .and_then(|t| t.as_str())
@@ -105,6 +113,15 @@ impl App {
                             .unwrap_or(&raw_title)
                             .trim()
                             .to_string();
+
+                        if query.starts_with('/') {
+                            if clean_title.starts_with(&query)
+                                && !self.state.search_suggestions.contains(&clean_title)
+                            {
+                                self.state.search_suggestions.push(clean_title);
+                            }
+                            continue;
+                        }
 
                         let normalized_query = query
                             .to_lowercase()

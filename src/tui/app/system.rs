@@ -39,7 +39,7 @@ impl App {
                 {
                     self.state.last_suggest_query = current_query.clone();
                     if !current_query.is_empty() {
-                        if self.state.is_tv_mode {
+                        if self.state.is_tv_mode && !current_query.starts_with('/') {
                             let q = current_query.to_lowercase();
                             self.state.search_suggestions = self
                                 .state
