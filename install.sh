@@ -436,25 +436,14 @@ install_binary() {
     fi
 
     mkdir -p "$INSTALL_DIR" 2>/dev/null || true
-    if [ -w "$INSTALL_DIR" ] || [ -w "$(dirname "$INSTALL_DIR")" ]; then
-        mkdir -p "$INSTALL_DIR"
-        install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH" 2>/dev/null || {
-            cp "$TMP_DIR/$BIN_NAME" "$APP_PATH"
-            chmod 755 "$APP_PATH"
-        }
-    elif command -v sudo >/dev/null 2>&1; then
-        sudo mkdir -p "$INSTALL_DIR"
-        sudo install -m 755 "$TMP_DIR/$BIN_NAME" "$APP_PATH" 2>/dev/null || {
-            sudo cp "$TMP_DIR/$BIN_NAME" "$APP_PATH"
-            sudo chmod 755 "$APP_PATH"
-        }
-    else
+    if [ ! -w "$INSTALL_DIR" ] && [ ! -w "$(dirname "$INSTALL_DIR")" ]; then
         INSTALL_DIR="$HOME/.local/bin"
         APP_PATH="$INSTALL_DIR/$BIN_NAME"
-        mkdir -p "$INSTALL_DIR"
-        cp "$TMP_DIR/$BIN_NAME" "$APP_PATH"
-        chmod 755 "$APP_PATH"
+        mkdir -p "$INSTALL_DIR" 2>/dev/null || true
     fi
+
+    cp "$TMP_DIR/$BIN_NAME" "$APP_PATH"
+    chmod 755 "$APP_PATH"
 }
 
 run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary
