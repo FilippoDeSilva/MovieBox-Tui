@@ -48,6 +48,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         width: panel.width,
         height: 1,
     };
+    let auto_update_label = if state.auto_update {
+        "   •   AUTOMATIC UPDATES ON"
+    } else {
+        "   •   AUTOMATIC UPDATES OFF"
+    };
+
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled("CURRENT  ", theme.muted),
@@ -55,7 +61,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 format!("v{}", env!("CARGO_PKG_VERSION")),
                 theme.text_dim.add_modifier(Modifier::BOLD),
             ),
-            Span::styled("   •   AUTOMATIC UPDATES ON", theme.muted),
+            Span::styled(auto_update_label, theme.muted),
         ]))
         .alignment(Alignment::Center),
         footer,

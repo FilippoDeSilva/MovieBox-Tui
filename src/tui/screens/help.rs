@@ -64,12 +64,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Play Channel", theme.text),
             ]),
             Line::from(vec![
+                Span::styled("    [o]        ", theme.header),
+                Span::styled("Open Player Picker", theme.text),
+            ]),
+            Line::from(vec![
                 Span::styled("    [r]        ", theme.header),
                 Span::styled("Reload Playlists", theme.text),
             ]),
             Line::from(vec![
-                Span::styled("    Type /config", theme.header),
-                Span::styled("Manage Playlists (in search)", theme.text),
+                Span::styled("    /config    ", theme.header),
+                Span::styled("Configure Playlists", theme.text),
+            ]),
+            Line::from(vec![
+                Span::styled("    /list      ", theme.header),
+                Span::styled("Show Channels", theme.text),
             ]),
         ]);
     } else {
@@ -183,7 +191,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
 
     let popup_chunk = crate::tui::overlay::centered(area, desired_width, desired_height, 46, 120);
 
-    crate::tui::overlay::clear_modal_area(frame, area, popup_chunk, theme);
+    crate::tui::clear_area(frame, area, theme);
 
     let block = Block::default()
         .title(" Keybindings Help ")

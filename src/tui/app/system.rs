@@ -267,6 +267,7 @@ impl App {
                 if open {
                     self.reset_transient_overlays();
                     self.state.tv_config_popup = false;
+                    self.state.original_theme_kind = Some(self.state.active_theme_kind.clone());
                     self.state.show_theme_popup = true;
                     if let Some(idx) = crate::tui::theme::AVAILABLE_THEMES
                         .iter()

@@ -144,6 +144,8 @@ fn render_search_state(
             };
             let msg = if let Some(preset) = state.active_browse_preset {
                 format!("No items found for {}", preset.label())
+            } else if state.search_query.trim().eq_ignore_ascii_case("/history") {
+                "No watch history found".to_string()
             } else if !state.search_query.trim().is_empty() {
                 format!("No matches for “{query}”")
             } else {

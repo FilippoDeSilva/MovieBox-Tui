@@ -82,6 +82,9 @@ impl App {
             match key.code {
                 KeyCode::Esc => {
                     self.state.show_theme_popup = false;
+                    if let Some(orig) = self.state.original_theme_kind.take() {
+                        self.action_sender.send(Action::SelectTheme(orig)).ok();
+                    }
                 }
                 KeyCode::Up => {
                     let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
@@ -121,6 +124,7 @@ impl App {
                 }
                 KeyCode::Enter => {
                     self.state.show_theme_popup = false;
+                    self.state.original_theme_kind = None;
                     self.persist_config();
                 }
                 _ => {}

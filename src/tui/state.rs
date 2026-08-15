@@ -201,6 +201,7 @@ pub struct AppState {
 
     pub show_theme_popup: bool,
     pub active_theme_kind: String,
+    pub original_theme_kind: Option<String>,
     pub theme_list_state: ListState,
     pub show_browse_popup: bool,
     pub browse_list_state: ListState,
@@ -324,6 +325,7 @@ impl Default for AppState {
             tick_count: 0,
             poster_image: None,
             active_theme_kind: String::new(),
+            original_theme_kind: None,
             show_theme_popup: false,
             theme_list_state: ListState::default(),
             show_browse_popup: false,

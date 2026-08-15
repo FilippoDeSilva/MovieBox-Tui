@@ -1039,6 +1039,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if !state.selected_resources.is_some() {
         frame.render_widget(streams_block, streams_area);
     }
+
+    let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);
+    let footer_p = if area.width >= 70 {
+        primary_footer.extend(secondary_footer);
+        Paragraph::new(Line::from(primary_footer))
+    } else {
+        Paragraph::new(vec![
+            Line::from(primary_footer),
+            Line::from(secondary_footer),
+        ])
+    }
+    .alignment(Alignment::Center);
+    frame.render_widget(footer_p, chunks[3]);
+
     if state.subtitle_popup || state.is_download_subtitle_popup {
         let items = state
             .subtitle_list
@@ -1090,19 +1104,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             state.basic_terminal,
         );
     }
-
-    let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);
-    let footer_p = if area.width >= 70 {
-        primary_footer.extend(secondary_footer);
-        Paragraph::new(Line::from(primary_footer))
-    } else {
-        Paragraph::new(vec![
-            Line::from(primary_footer),
-            Line::from(secondary_footer),
-        ])
-    }
-    .alignment(Alignment::Center);
-    frame.render_widget(footer_p, chunks[3]);
 
     if state.show_season_download_confirm {
         let season_idx = state.selected_season;
