@@ -70,6 +70,7 @@ impl App {
         self.state.download_queue_total = 0;
         self.state.is_waiting_for_download_stream = false;
         self.state.search_posters.clear();
+        self.state.failed_posters.clear();
         self.state.search_poster_protocols.clear();
         self.state.in_flight_posters.clear();
         self.state.image_cache.clear();

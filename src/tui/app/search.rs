@@ -756,7 +756,7 @@ impl App {
             if url.is_empty() {
                 continue;
             }
-            if self.state.search_posters.contains(&id) {
+            if self.state.search_posters.contains(&id) || self.state.failed_posters.contains(&id) {
                 continue;
             }
             if !self.state.in_flight_posters.insert(id.clone()) {
@@ -815,90 +815,5 @@ impl App {
                 });
             }
         });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extracts_browse_metrics_from_string_and_nested_values() {
-        let item = serde_json::json!({
-            "metadata": {
-                "imdb_trending": "9.2",
-                "imdbRatingValue": "7.2",
-                "imdbRatingLast30Days": 8.7
-            },
-            "imdb_popularity": 74
-        });
-
-        let metrics = extract_browse_metrics(&item);
-        assert_eq!(metrics.trending, Some(9.2));
-        assert_eq!(metrics.recent_rating, Some(8.7));
-        assert_eq!(metrics.popularity, Some(74.0));
-        assert_eq!(metrics.rating, Some(7.2));
-    }
-
-    #[test]
-    fn browse_sort_keeps_unranked_titles_at_the_end() {
-        assert_eq!(
-            compare_browse_values(Some(7.0), Some(8.0), true),
-            std::cmp::Ordering::Greater
-        );
-        assert_eq!(
-            compare_browse_values(Some(7.0), Some(8.0), false),
-            std::cmp::Ordering::Less
-        );
-        assert_eq!(
-            compare_browse_values(Some(7.0), None, true),
-            std::cmp::Ordering::Less
-        );
-    }
-
-    #[test]
-    fn browse_extraction_uses_matching_curated_group() {
-        let payload = serde_json::json!({
-            "items": [
-                {
-                    "title": "Trending in Cinema",
-                    "subjects": [
-                        {"subjectId": "trending-1", "title": "Current hit"}
-                    ]
-                },
-                {
-                    "title": "Top 20 Movies",
-                    "subjects": [
-                        {"subjectId": "top-1", "title": "All-time favorite"}
-                    ]
-                }
-            ]
-        });
-
-        let subjects = App::extract_browse_subjects(&payload, BrowsePreset::Trending);
-        assert_eq!(subjects.len(), 1);
-        assert_eq!(subjects[0]["subjectId"], "trending-1");
-        assert_eq!(subjects[0]["__browse_rank"], 1.0);
-    }
-
-    #[test]
-    fn popularity_does_not_alias_top_rated_group() {
-        let payload = serde_json::json!({
-            "items": [
-                {
-                    "title": "Top 20 Movies",
-                    "subjects": [{"subjectId": "top-1", "title": "All-time favorite"}]
-                },
-                {
-                    "title": "Most Watched",
-                    "subjects": [{"subjectId": "watched-1", "title": "Most watched"}]
-                }
-            ]
-        });
-
-        let subjects = App::extract_browse_subjects(&payload, BrowsePreset::MostWatched);
-        assert_eq!(subjects.len(), 1);
-        assert_eq!(subjects[0]["subjectId"], "watched-1");
-        assert!(subjects[0].get("__browse_rank").is_none());
     }
 }

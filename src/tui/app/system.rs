@@ -212,6 +212,7 @@ impl App {
                 self.state.stream_pool.clear();
                 self.state.image_cache.clear();
                 self.state.search_posters.clear();
+                self.state.failed_posters.clear();
                 self.state.search_poster_protocols.clear();
                 self.state.in_flight_posters.clear();
                 self.state.browse_metrics.clear();

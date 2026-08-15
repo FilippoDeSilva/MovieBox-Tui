@@ -53,7 +53,11 @@ impl HistoryManager {
     pub fn save(&self) {
         if let Some(path) = Self::history_file_path() {
             if let Ok(content) = serde_json::to_string(self) {
-                let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+                let stamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos();
+                let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
                 if let Err(error) = fs::write(&temporary, content) {
                     log::warn!("failed to save watch history: {error}");
                     return;

@@ -76,7 +76,8 @@ pub fn picker(
         .unwrap_or(0)
         .min(items.len().saturating_sub(1));
     let visible_rows = items.len().clamp(1, MAX_PICKER_ROWS);
-    let footer_width = crate::tui::text::width("[↑↓] Move  [Enter] Download  [Esc] Back");
+    let footer_str = format!("[↑↓] Move  [Enter] {}  [Esc] Back", spec.confirm_label);
+    let footer_width = crate::tui::text::width(&footer_str);
     let content_width = items
         .iter()
         .map(|item| crate::tui::text::width(item))

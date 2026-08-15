@@ -123,7 +123,12 @@ impl App {
             .connect_timeout(std::time::Duration::from_secs(15))
             .tcp_keepalive(std::time::Duration::from_secs(30))
             .build()
-            .unwrap_or_else(|_| self.client.http_client().clone());
+            .unwrap_or_else(|err| {
+                log::warn!(
+                    "failed to build custom download client ({err}), falling back to default"
+                );
+                self.client.http_client().clone()
+            });
 
         tokio::spawn(async move {
             if let Err(error) = tokio::fs::create_dir_all(&target_dir).await {
@@ -463,24 +468,46 @@ impl App {
             Action::DownloadFailed(error) => {
                 self.state.download_progress = None;
                 self.state.download_status = None;
+                if self.state.download_queue_total > 0 {
+                    let total = self.state.download_queue_total;
+                    let remaining = self.state.download_queue.len();
+                    let completed = total.saturating_sub(remaining + 1);
+                    self.state.notify(
+                        NotificationKind::Error,
+                        "Season download halted",
+                        format!("{completed}/{total} files finished before error: {error}"),
+                    );
+                } else {
+                    self.state.notify(
+                        NotificationKind::Error,
+                        "Download failed",
+                        format!("Partial file preserved. {error}"),
+                    );
+                }
                 self.state.download_queue.clear();
                 self.state.download_queue_total = 0;
-                self.state.notify(
-                    NotificationKind::Error,
-                    "Download failed",
-                    format!("Partial file preserved. {error}"),
-                );
             }
             Action::DownloadPaused(path) => {
                 self.state.download_progress = None;
                 self.state.download_status = None;
+                if self.state.download_queue_total > 0 {
+                    let total = self.state.download_queue_total;
+                    let remaining = self.state.download_queue.len();
+                    let completed = total.saturating_sub(remaining + 1);
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Season download paused",
+                        format!("{completed}/{total} files finished. Resume with {path}.part"),
+                    );
+                } else {
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Download paused",
+                        format!("Start again to resume {path}.part"),
+                    );
+                }
                 self.state.download_queue.clear();
                 self.state.download_queue_total = 0;
-                self.state.notify(
-                    NotificationKind::Warning,
-                    "Download paused",
-                    format!("Start again to resume {path}.part"),
-                );
             }
             Action::ClearDownload => {
                 self.state.download_progress = None;

@@ -174,6 +174,7 @@ impl App {
                     self.state.poster_image = None;
                     self.state.poster_protocol = None;
                     self.state.search_posters.clear();
+                    self.state.failed_posters.clear();
                     self.state.search_poster_protocols.clear();
                     self.state.in_flight_posters.clear();
                     self.state.search_list_state.select(None);
@@ -482,6 +483,7 @@ impl App {
                     self.state.poster_image = None;
                     self.state.poster_protocol = None;
                     self.state.search_posters.clear();
+                    self.state.failed_posters.clear();
                     self.state.search_poster_protocols.clear();
                     self.state.in_flight_posters.clear();
                 }
@@ -582,6 +584,7 @@ impl App {
                 self.state.poster_image = None;
                 self.state.poster_protocol = None;
                 self.state.search_posters.clear();
+                self.state.failed_posters.clear();
                 self.state.search_poster_protocols.clear();
                 self.state.in_flight_posters.clear();
                 self.state
@@ -854,6 +857,8 @@ impl App {
                 self.state.in_flight_posters.remove(&id);
                 if let Some(img) = img_opt {
                     self.state.search_posters.put(id, img);
+                } else {
+                    self.state.failed_posters.put(id, ());
                 }
             }
 
@@ -1126,6 +1131,8 @@ impl App {
                     context.provider.cache_key()
                 );
                 self.state.is_loading = false;
+                self.state.is_resolving_playback = false;
+                self.state.is_waiting_for_download_stream = false;
                 self.state.selected_details = None;
                 self.state.selected_resources = None;
                 self.state.active_subject_id = None;
@@ -1196,19 +1203,8 @@ impl App {
                         (0usize, 0usize)
                     }
                 } else {
-                    let se = if self.state.selected_season > 0 {
-                        self.state.selected_season
-                    } else {
-                        1
-                    };
-                    let ep = if self.state.selected_episode > 0 {
-                        self.state.selected_episode
-                    } else {
-                        1
-                    };
-                    (se, ep)
+                    (0usize, 0usize)
                 };
-                let _ = (se, ep);
 
                 self.state.selected_season = se;
                 self.state.selected_episode = ep;

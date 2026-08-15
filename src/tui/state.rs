@@ -163,6 +163,7 @@ pub struct AppState {
     pub current_tab_id: String,
     pub current_page: usize,
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
+    pub failed_posters: lru::LruCache<String, ()>,
     pub search_poster_protocols:
         lru::LruCache<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
     pub in_flight_posters: std::collections::HashSet<String>,
@@ -291,6 +292,7 @@ impl Default for AppState {
             current_tab_id: String::new(),
             current_page: 1,
             search_posters: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
+            failed_posters: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
             search_poster_protocols: lru::LruCache::new(std::num::NonZeroUsize::new(300).unwrap()),
             in_flight_posters: std::collections::HashSet::new(),
             search_list_state: TableState::default(),

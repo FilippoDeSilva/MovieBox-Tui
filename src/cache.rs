@@ -9,13 +9,16 @@ const HOMEPAGE_CACHE_EXPIRY_SECS: u64 = 60 * 60;
 fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value> {
     if path.exists() {
         if let Ok(metadata) = fs::metadata(path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(elapsed) = modified.elapsed() {
-                    if elapsed.as_secs() > expiry_secs {
-                        let _ = fs::remove_file(path);
-                        return None;
-                    }
+            match metadata.modified().ok().and_then(|m| m.elapsed().ok()) {
+                Some(elapsed) if elapsed.as_secs() > expiry_secs => {
+                    let _ = fs::remove_file(path);
+                    return None;
                 }
+                None => {
+                    let _ = fs::remove_file(path);
+                    return None;
+                }
+                _ => {}
             }
         }
         if let Ok(content) = fs::read_to_string(path) {
@@ -303,13 +306,16 @@ pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> 
     let path = get_namespaced_image_path(namespace, id);
     if path.exists() {
         if let Ok(metadata) = std::fs::metadata(&path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(elapsed) = modified.elapsed() {
-                    if elapsed.as_secs() > CACHE_EXPIRY_SECS {
-                        let _ = std::fs::remove_file(&path);
-                        return None;
-                    }
+            match metadata.modified().ok().and_then(|m| m.elapsed().ok()) {
+                Some(elapsed) if elapsed.as_secs() > CACHE_EXPIRY_SECS => {
+                    let _ = std::fs::remove_file(&path);
+                    return None;
                 }
+                None => {
+                    let _ = std::fs::remove_file(&path);
+                    return None;
+                }
+                _ => {}
             }
         }
         return std::fs::read(&path).ok();

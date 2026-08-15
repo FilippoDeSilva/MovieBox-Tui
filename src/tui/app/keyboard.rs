@@ -307,12 +307,6 @@ impl App {
                         KeyCode::Enter => {
                             if self.state.search_results.is_empty()
                                 && !self.state.search_query.trim().is_empty()
-                                && (self.state.search_error.is_some()
-                                    || self
-                                        .state
-                                        .status_message
-                                        .to_ascii_lowercase()
-                                        .starts_with("no matches"))
                             {
                                 self.action_sender
                                     .send(Action::Search {
