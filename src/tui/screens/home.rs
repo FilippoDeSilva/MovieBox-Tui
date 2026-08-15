@@ -41,47 +41,6 @@ fn search_view_state(state: &AppState) -> SearchViewState {
     }
 }
 
-fn search_hint(view: SearchViewState, width: u16, theme: &Theme) -> Line<'static> {
-    let text = match view {
-        SearchViewState::Editing if width >= 82 => "[↑↓] Suggestions  [Enter] Search  [Esc] Cancel",
-        SearchViewState::Editing if width >= 54 => "[↑↓] Suggest  [Enter] Search  [Esc] Cancel",
-        SearchViewState::Editing => "[Enter] Search  [Esc] Cancel",
-        SearchViewState::Error if width >= 62 => "[Enter] Retry  [Type] Edit  [Esc] Clear",
-        SearchViewState::Error => "[Enter] Retry  [Esc] Clear",
-        SearchViewState::Results if width >= 62 => "[Type] Edit  [↑↓] Browse  [Enter] Open",
-        SearchViewState::Results => "[↑↓] Browse  [Enter] Open",
-        SearchViewState::NoResults if width >= 62 => "[Type] Edit  [Enter] Retry  [Esc] Clear",
-        SearchViewState::NoResults => "[Type] Edit  [Esc] Clear",
-        SearchViewState::Loading => "",
-        SearchViewState::Empty => "",
-    };
-
-    let mut spans = Vec::new();
-    let mut remaining = text;
-    while let Some(open) = remaining.find('[') {
-        if open > 0 {
-            spans.push(Span::styled(remaining[..open].to_string(), theme.text_dim));
-        }
-        let Some(close) = remaining[open..].find(']') else {
-            spans.push(Span::styled(remaining[open..].to_string(), theme.text_dim));
-            remaining = "";
-            break;
-        };
-        let close = open + close;
-        spans.push(Span::styled("[", theme.text_dim));
-        spans.push(Span::styled(
-            remaining[open + 1..close].to_string(),
-            theme.shortcut,
-        ));
-        spans.push(Span::styled("]", theme.text_dim));
-        remaining = &remaining[close + 1..];
-    }
-    if !remaining.is_empty() {
-        spans.push(Span::styled(remaining.to_string(), theme.text_dim));
-    }
-    Line::from(spans).centered()
-}
-
 fn centered_width(area: Rect, maximum: u16) -> Rect {
     let width = area.width.min(maximum).max(1);
     Rect {
@@ -238,17 +197,6 @@ fn render_search_bar(
     show_cursor: bool,
     centered: bool,
 ) {
-    let rule_style = if view == SearchViewState::Editing {
-        theme.border_focus
-    } else if view == SearchViewState::Error {
-        theme.error
-    } else {
-        theme.border
-    };
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Length(1)])
-        .split(area);
     let result_status = if view == SearchViewState::Results {
         Some(if state.search_results.len() == 1 {
             "1 result".to_string()
@@ -268,7 +216,7 @@ fn render_search_bar(
             Constraint::Min(1),
             Constraint::Length(status_width.saturating_add(u16::from(status_width > 0) * 2)),
         ])
-        .split(rows[0]);
+        .split(area);
     let mut paragraph = Paragraph::new(search_content(
         state,
         view,
@@ -294,13 +242,6 @@ fn render_search_bar(
             content_row[1],
         );
     }
-
-    let rule = if state.basic_terminal { "-" } else { "─" };
-    let rule_text = rule.repeat(area.width as usize);
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(rule_text, rule_style))),
-        rows[1],
-    );
 }
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
@@ -350,16 +291,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         } else {
             73
         };
-        let suggestions_open =
-            state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Percentage(18),
+                Constraint::Percentage(16),
                 Constraint::Length(logo_height),
                 Constraint::Length(1),
-                Constraint::Length(2),
-                Constraint::Length(2),
+                Constraint::Length(3),
+                Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Min(0),
@@ -459,14 +398,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 );
             }
 
-            if !suggestions_open && view != SearchViewState::Empty {
-                frame.render_widget(
-                    Paragraph::new(search_hint(view, search_bar_area.width, theme))
-                        .alignment(Alignment::Center),
-                    vertical_chunks[5],
-                );
-            }
-
             let mut footer_spans = vec![];
             let provider_name = if state.is_tv_mode {
                 "Live TV"
@@ -508,13 +439,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let chunks = if has_results {
             Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(2), Constraint::Min(0)])
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                ])
                 .split(area)
         } else {
             Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(2),
+                    Constraint::Length(1),
                     Constraint::Length(1),
                     Constraint::Length(suggestion_height),
                     Constraint::Length(0),
@@ -525,8 +460,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let search_width = search_deck_width(area, state, false);
         search_bar_area = centered_width(chunks[0], search_width);
-        let results_chunk = if has_results { chunks[1] } else { chunks[4] };
-        suggestion_area = if has_results { chunks[1] } else { chunks[2] };
+        let results_chunk = if has_results { chunks[2] } else { chunks[4] };
+        suggestion_area = chunks[2];
         render_search_bar(
             frame,
             search_bar_area,
@@ -536,15 +471,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             show_cursor,
             false,
         );
-        let suggestions_open =
-            state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
-        if !suggestions_open && !has_results {
-            frame.render_widget(
-                Paragraph::new(search_hint(view, search_bar_area.width, theme))
-                    .alignment(Alignment::Center),
-                if has_results { chunks[0] } else { chunks[1] },
-            );
-        }
 
         let list_block = Block::default();
         if state.is_loading && state.search_results.is_empty() {
