@@ -194,7 +194,6 @@ moviebox-tui
 | `r`        | Refresh current content                               |
 | `Ctrl+P`   | Switch content provider                               |
 | `Ctrl+T`   | Toggle IPTV mode                                      |
-| `Ctrl+U`   | Clear active search query                             |
 | `?`        | Show help                                             |
 | `q`        | Quit                                                  |
 

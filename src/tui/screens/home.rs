@@ -460,9 +460,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .split(area)
         };
 
-        let search_width = search_deck_width(area, state, false);
-        search_bar_area = centered_width(chunks[0], search_width);
         let results_chunk = if has_results { chunks[2] } else { chunks[4] };
+        search_bar_area = if has_results {
+            Rect {
+                x: chunks[0].x + 2,
+                width: chunks[0].width.saturating_sub(4),
+                ..chunks[0]
+            }
+        } else {
+            let search_width = search_deck_width(area, state, false);
+            centered_width(chunks[0], search_width)
+        };
         suggestion_area = chunks[2];
         render_search_bar(
             frame,

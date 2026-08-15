@@ -156,12 +156,6 @@ impl App {
                         self.action_sender.send(action).ok();
                     }
                 }
-                KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.state.search_query.clear();
-                    self.state.suggest_index = None;
-                    self.state.search_suggestions.clear();
-                    self.state.last_search_edit = std::time::Instant::now();
-                }
                 KeyCode::Backspace => {
                     crate::tui::text::remove_last_grapheme(&mut self.state.search_query);
                     self.state.suggest_index = None;
