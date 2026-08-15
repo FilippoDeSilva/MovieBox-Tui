@@ -568,6 +568,7 @@ impl App {
                 }
                 log::error!("discover failed: {err}");
                 self.state.is_loading = false;
+                self.state.search_error = Some(format!("Discover failed: {err}"));
                 self.state.search_results.clear();
                 self.state.search_list_state.select(None);
                 self.state.search_preview = None;

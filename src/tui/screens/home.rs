@@ -29,11 +29,12 @@ fn search_view_state(state: &AppState) -> SearchViewState {
         SearchViewState::Error
     } else if !state.search_results.is_empty() {
         SearchViewState::Results
-    } else if !state.search_query.trim().is_empty()
-        && state
-            .status_message
-            .to_ascii_lowercase()
-            .starts_with("no matches")
+    } else if state.active_browse_preset.is_some()
+        || (!state.search_query.trim().is_empty()
+            && state
+                .status_message
+                .to_ascii_lowercase()
+                .starts_with("no matches"))
     {
         SearchViewState::NoResults
     } else {
@@ -123,10 +124,16 @@ fn render_search_state(
     let line = match view {
         SearchViewState::Loading => {
             let dots = state.loading_dots();
-            Line::from(vec![Span::styled(
-                format!("Searching for “{query}”{dots}"),
-                theme.lavender,
-            )])
+            let msg = if let Some(preset) = state.active_browse_preset {
+                format!("Loading {}{dots}", preset.label())
+            } else if state.is_homepage_mode {
+                format!("Loading discover{dots}")
+            } else if !state.search_query.trim().is_empty() {
+                format!("Searching for “{query}”{dots}")
+            } else {
+                format!("Loading{dots}")
+            };
+            Line::from(vec![Span::styled(msg, theme.lavender)])
         }
         SearchViewState::NoResults => {
             let symbol = if state.basic_terminal { "-" } else { pulse };
@@ -135,9 +142,16 @@ fn render_search_state(
             } else {
                 theme.subtext1
             };
+            let msg = if let Some(preset) = state.active_browse_preset {
+                format!("No items found for {}", preset.label())
+            } else if !state.search_query.trim().is_empty() {
+                format!("No matches for “{query}”")
+            } else {
+                "No results found".to_string()
+            };
             Line::from(vec![
                 Span::styled(format!("{symbol} "), style),
-                Span::styled(format!("No matches for “{query}”"), theme.text),
+                Span::styled(msg, theme.text),
             ])
         }
         SearchViewState::Error => {
