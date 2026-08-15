@@ -489,7 +489,7 @@ printf "%b│%b  • Binary:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$
 if [ -n "$PLAYER_DETECTED" ]; then
     printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED (ready)" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
 else
-    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_YELLOW" "None found (mpv / VLC / IINA required)" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
+    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_CYAN" "None detected (mpv, VLC, or IINA recommended)" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then
@@ -502,7 +502,7 @@ printf "%b│%b    %b$ moviebox-tui%b                                         %b
 printf "%b└────────────────────────────────────────────────────────────┘%b\n\n" "$C_BOLD_CYAN" "$C_RESET"
 
 if [ -z "$PLAYER_DETECTED" ]; then
-    log_warn "No media player detected. Please install mpv, VLC, or IINA for video playback."
+    printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_BOLD_CYAN" "$C_RESET"
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then

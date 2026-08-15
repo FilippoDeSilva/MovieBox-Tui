@@ -233,7 +233,7 @@ Write-Host "│  • Binary:   $ExePath" -ForegroundColor Cyan
 if ($PlayerDetected) {
     Write-Host "│  • Player:   $PlayerDetected (ready)" -ForegroundColor Cyan
 } else {
-    Write-Host "│  • Player:   None found (mpv / VLC required)               │" -ForegroundColor Cyan
+    Write-Host "│  • Player:   None detected (mpv or VLC recommended)       │" -ForegroundColor Cyan
 }
 
 if ($PathModified) {
@@ -247,7 +247,7 @@ Write-Host "└─────────────────────�
 Write-Host ""
 
 if (-not $PlayerDetected) {
-    Write-Warn "No media player detected. Please install mpv, VLC, or IINA for video playback."
+    Write-Host "  ℹ Note: A media player (mpv, VLC, or IINA) is recommended for video playback.`n" -ForegroundColor Cyan
 }
 
 if ($PathModified) {
