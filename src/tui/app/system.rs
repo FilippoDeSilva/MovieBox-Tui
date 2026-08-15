@@ -142,11 +142,13 @@ impl App {
                         self.state.is_loading = true;
                         self.state
                             .set_status(format!("Reloading {}...", preset.label()), 150);
+                        let tab_id = if self.state.current_tab_id.is_empty() {
+                            "2".to_string()
+                        } else {
+                            self.state.current_tab_id.clone()
+                        };
                         self.action_sender
-                            .send(Action::FetchHomepage {
-                                tab_id: "2".to_string(),
-                                page: 1,
-                            })
+                            .send(Action::FetchHomepage { tab_id, page: 1 })
                             .ok();
                     } else if !query.is_empty() {
                         self.action_sender
@@ -325,71 +327,52 @@ impl App {
                 let update_sender = self.action_sender.clone();
                 tokio::spawn(async move {
                     let result = crate::tui::updater::check(env!("CARGO_PKG_VERSION")).await;
-                    match result {
-                        Ok(Some((version, notes))) => {
-                            update_sender
-                                .send(Action::UpdateAvailable(version, notes))
-                                .ok();
-                        }
-                        Ok(None) => {
-                            update_sender
-                                .send(Action::UpdateAvailable("none".into(), "".into()))
-                                .ok();
-                        }
-                        Err(error) => {
-                            update_sender
-                                .send(Action::UpdateAvailable(
-                                    format!("error:{}", error),
-                                    "".into(),
-                                ))
-                                .ok();
-                        }
-                    }
+                    update_sender.send(Action::UpdateAvailable(result)).ok();
                 });
             }
 
-            Action::UpdateAvailable(version, notes) => {
+            Action::UpdateAvailable(result) => {
                 self.state.last_update_check = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs();
                 self.persist_config();
 
-                if version == "none" {
-                    if self.state.manual_update_check {
-                        self.state.set_status(
-                            format!(
-                                "MovieBox-Tui is up to date (v{}).",
-                                env!("CARGO_PKG_VERSION")
-                            ),
-                            180,
-                        );
-                        self.state.notify(
-                            NotificationKind::Success,
-                            "Up to date",
-                            format!(
-                                "MovieBox-Tui v{} is the latest version.",
-                                env!("CARGO_PKG_VERSION")
-                            ),
-                        );
+                match result {
+                    Ok(None) => {
+                        if self.state.manual_update_check {
+                            self.state.set_status(
+                                format!(
+                                    "MovieBox-Tui is up to date (v{}).",
+                                    env!("CARGO_PKG_VERSION")
+                                ),
+                                180,
+                            );
+                            self.state.notify(
+                                NotificationKind::Success,
+                                "Up to date",
+                                format!(
+                                    "MovieBox-Tui v{} is the latest version.",
+                                    env!("CARGO_PKG_VERSION")
+                                ),
+                            );
+                        }
+                        self.state.manual_update_check = false;
                     }
-                    self.state.manual_update_check = false;
-                } else if version.starts_with("error:") {
-                    let err = version.trim_start_matches("error:");
-                    if self.state.manual_update_check {
-                        self.state
-                            .set_status(format!("Update check failed: {err}"), 180);
-                        self.state.notify(
-                            NotificationKind::Error,
-                            "Update check failed",
-                            err.to_string(),
-                        );
+                    Err(err) => {
+                        if self.state.manual_update_check {
+                            self.state
+                                .set_status(format!("Update check failed: {err}"), 180);
+                            self.state
+                                .notify(NotificationKind::Error, "Update check failed", err);
+                        }
+                        self.state.manual_update_check = false;
                     }
-                    self.state.manual_update_check = false;
-                } else {
-                    self.state.manual_update_check = false;
-                    self.reset_transient_overlays();
-                    self.state.update_available = Some((version, notes));
+                    Ok(Some((version, notes))) => {
+                        self.state.manual_update_check = false;
+                        self.reset_transient_overlays();
+                        self.state.update_available = Some((version, notes));
+                    }
                 }
             }
             _ => return None,

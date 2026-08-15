@@ -8,6 +8,8 @@ pub(super) async fn fetch_poster_bytes(client: &reqwest::Client, url: &str) -> O
         .header("User-Agent", "MovieBox-Tui/1.0")
         .send()
         .await
+        .ok()?
+        .error_for_status()
         .ok()?;
     Some(response.bytes().await.ok()?.to_vec())
 }

@@ -398,11 +398,6 @@ impl App {
 
             Action::ProcessDownloadQueue => {
                 if self.state.download_progress.is_some() {
-                    let sender = self.action_sender.clone();
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                        sender.send(Action::ProcessDownloadQueue).ok();
-                    });
                     return None;
                 }
 

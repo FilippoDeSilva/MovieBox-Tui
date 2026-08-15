@@ -112,7 +112,7 @@ pub enum Action {
     ),
     PosterSuccess(String, std::sync::Arc<image::DynamicImage>),
     SearchPosterLoaded(String, Option<std::sync::Arc<image::DynamicImage>>),
-    UpdateAvailable(String, String),
+    UpdateAvailable(Result<Option<(String, String)>, String>),
     CheckForUpdates,
     SetStatus(String),
     Refresh,

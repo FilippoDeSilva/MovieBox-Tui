@@ -77,11 +77,20 @@ pub fn save(config: &Config) {
         "bdix_enabled": config.bdix_enabled,
         "default_player": config.default_player
     });
-    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
-    if std::fs::write(&temporary, json.to_string()).is_ok()
-        && std::fs::rename(&temporary, &path).is_err()
-    {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
+    if let Err(error) = std::fs::write(&temporary, json.to_string()) {
+        log::warn!("failed to write config: {error}");
+        return;
+    }
+    if std::fs::rename(&temporary, &path).is_err() {
         let _ = std::fs::remove_file(&path);
-        let _ = std::fs::rename(&temporary, &path);
+        if let Err(error) = std::fs::rename(&temporary, &path) {
+            let _ = std::fs::remove_file(&temporary);
+            log::warn!("failed to commit config: {error}");
+        }
     }
 }

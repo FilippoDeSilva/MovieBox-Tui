@@ -307,6 +307,8 @@ impl App {
                                 }
                             }
                         });
+                    } else {
+                        self.state.is_resolving_playback = false;
                     }
                     return None;
                 }
