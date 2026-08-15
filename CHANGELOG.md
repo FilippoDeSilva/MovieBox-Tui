@@ -14,6 +14,10 @@
 - **Selector Tab Preservation in Standard Displays**:
   - Maintained visibility of Audio Languages, Seasons, and Episodes selector tabs side-by-side in standard ~80-column terminals when focusing Streams, preventing tabs from disappearing when 0 streams are available.
 
+### Changed
+- **Multi-System Core Module Decoupling**:
+  - Promoted `player.rs` (process management & detection), `config.rs` (shared configuration), and `updater.rs` (release checks) to core modules in `src/`, preparing the architecture for upcoming CLI and GUI frontends with full backward compatibility.
+
 ### Documentation
 - **Streamlined README & Controls Guide**:
   - Transformed `README.md` into a focused landing page with measured `~5 MB RAM` benchmark data, defensible value propositions, and direct links to deep guides in `docs/`.

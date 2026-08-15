@@ -1,43 +1,7 @@
 use crate::providers::models::ProviderKind;
 use ratatui::widgets::{ListState, TableState};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlayerKind {
-    Mpv,
-    Iina,
-    Vlc,
-    AndroidIntent,
-}
-
-impl PlayerKind {
-    pub fn label(&self) -> &'static str {
-        match self {
-            PlayerKind::Mpv => "mpv",
-            PlayerKind::Iina => "IINA",
-            PlayerKind::Vlc => "VLC",
-            PlayerKind::AndroidIntent => "Android Player",
-        }
-    }
-
-    pub fn config_key(&self) -> &'static str {
-        match self {
-            PlayerKind::Mpv => "mpv",
-            PlayerKind::Iina => "iina",
-            PlayerKind::Vlc => "vlc",
-            PlayerKind::AndroidIntent => "android",
-        }
-    }
-
-    pub fn parse(value: &str) -> Option<PlayerKind> {
-        match value.to_ascii_lowercase().as_str() {
-            "mpv" => Some(PlayerKind::Mpv),
-            "iina" => Some(PlayerKind::Iina),
-            "vlc" => Some(PlayerKind::Vlc),
-            "android" | "androidintent" | "android-intent" => Some(PlayerKind::AndroidIntent),
-            _ => None,
-        }
-    }
-}
+pub use crate::player::PlayerKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {

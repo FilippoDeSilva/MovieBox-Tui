@@ -1,6 +1,6 @@
 # Players
 
-Playback is handed to an external player. `tui/player.rs` detects available players and
+Playback is handed to an external player. `player.rs` detects available players and
 builds the exact command; `tui/app/playback.rs` spawns it.
 
 ## Detection
