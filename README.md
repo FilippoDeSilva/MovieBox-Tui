@@ -201,12 +201,8 @@ moviebox-tui
 
 | Command              | Action                                    |
 | -------------------- | ----------------------------------------- |
-| `/discover`, `/home` | Open discovery view                       |
 | `/browse`            | Browse curated, rated, and most-watched views |
 | `/history`           | Show watch history                        |
-| `/movies`            | Browse movies                             |
-| `/shows`, `/tvshows` | Browse series                             |
-| `/anime`             | Browse anime                              |
 | `/list`              | Show IPTV channels                        |
 | `/config`            | Configure IPTV playlists                  |
 | `/github`            | Open the project repository               |

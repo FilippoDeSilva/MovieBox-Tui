@@ -27,16 +27,7 @@ impl App {
                         commands.push("/list");
                         commands.push("/config");
                     } else {
-                        commands.extend(vec![
-                            "/discover",
-                            "/home",
-                            "/browse",
-                            "/history",
-                            "/movies",
-                            "/shows",
-                            "/tvshows",
-                            "/anime",
-                        ]);
+                        commands.extend(vec!["/browse", "/history"]);
                     }
                     let mut suggestions = vec![];
                     for cmd in commands {

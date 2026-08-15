@@ -259,30 +259,6 @@ impl App {
             return Some(true);
         }
 
-        if let Some(tid) = match lower_query {
-            "/home" | "/discover" => Some("0"),
-            "/movies" => Some("2"),
-            "/shows" | "/tvshows" => Some("5"),
-            "/anime" => Some("8"),
-            _ => None,
-        } {
-            if self.state.active_provider != ProviderKind::MovieBox {
-                self.state.set_status(
-                    "This provider has no shared discover feed; enter a title to search.",
-                    180,
-                );
-                return Some(true);
-            }
-            self.state.active_browse_preset = None;
-            self.action_sender
-                .send(Action::FetchHomepage {
-                    tab_id: tid.to_string(),
-                    page: 1,
-                })
-                .ok();
-            return Some(true);
-        }
-
         None
     }
 
