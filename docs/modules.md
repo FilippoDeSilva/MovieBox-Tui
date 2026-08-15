@@ -80,6 +80,8 @@ src/
     download.rs      handle_download: download orchestration + start_resilient_download.
     navigation.rs    handle_navigation + provider/nav helpers.
     keyboard.rs      handle_key: raw key-event handling.
+    mouse.rs         handle_mouse: mouse click routing and hitboxes across screens,
+                     popups, tabs, buttons, and dialogs.
     system.rs        handle_system: tick/quit/focus/resize/help/refresh/cache/
                      theme/status/updates.
     tv.rs            handle_tv: playlist manager + TV actions.

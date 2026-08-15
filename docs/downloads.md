@@ -23,9 +23,10 @@ characters are replaced, Windows reserved names (`CON`, `COM1`-`COM9`, …) are 
 and length is capped. Files go to the user's download directory. On Android-family
 environments the code prefers shared `storage/downloads` when present.
 
-## Seasons
+## Contextual triggers & Seasons
 
-A season download enqueues every episode (`download_queue`) and processes them one at a
+- **Contextual trigger**: Pressing `d` (or clicking `[Download]`) while focused on the **Seasons** pane prompts to download all episodes of the selected season. Triggering download while on the **Episodes** or **Streams** pane prompts to download only that single episode.
+- A season download enqueues every episode (`download_queue`) and processes them one at a
 time, each resolving its stream and subtitle. Progress is reported through
 `Action::UpdateDownload` and the status bar; failures pause and preserve partial data.
 

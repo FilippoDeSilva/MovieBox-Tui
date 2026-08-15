@@ -49,6 +49,10 @@ which `app/playback.rs::launch_player` feeds to the external player.
   attached so referer-gated CDNs stream in the player too.
 - `hubcloud.rs` resolves hubcloud/hubdrive pages into candidate playable links and
   picks the best mirror by score.
+- **Multilingual audio detection**: `parser.rs::detect_language` parses release titles and
+  metadata for 30+ regional and international languages (Hindi, Tamil, Telugu, Kannada,
+  Malayalam, Bengali, Marathi, Punjabi, Gujarati, Urdu, Japanese, Korean, Chinese, Spanish,
+  French, German, Italian, etc.) and formats all available audio tracks for stream display.
 - Errors are surfaced as `FourKHdHubError`; mirror rejections and the final failure
   reason are logged with the mirror label and a sanitized URL.
 

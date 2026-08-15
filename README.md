@@ -2,7 +2,7 @@
 
 # MovieBox-TUI
 
-Search, browse, play, and download movies, series, anime, and IPTV streams from a keyboard-first terminal interface using external media players.
+Search, browse, play, and download movies, series, anime, and IPTV streams from a keyboard-first terminal interface with full mouse support using external media players.
 
 [![Crates.io](https://img.shields.io/crates/v/moviebox-tui.svg?logo=rust)](https://crates.io/crates/moviebox-tui)
 [![CI](https://github.com/mesamirh/MovieBox-Tui/actions/workflows/ci.yml/badge.svg)](https://github.com/mesamirh/MovieBox-Tui/actions/workflows/ci.yml)
@@ -25,7 +25,7 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ### Catalogs & Browsing
 
 - Search and browse movies, TV series, and anime from multiple content catalogs
-- Inspect stream quality groupings and subtitle options before playback
+- Inspect stream quality groupings, multilingual audio tracks, and subtitle options before playback
 
 > **Note on BDIX:** BDIX sources are only accessible from supported Bangladeshi ISP networks. Because of this, they are hidden by default. You can enable them manually if your network supports it.
 
@@ -36,7 +36,8 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### Downloads
 
-- Download full seasons or episodes with automatic subtitle language selection
+- Contextual downloads: download entire seasons or single episodes with one click/key
+- Automatic subtitle language selection applied across all season episodes
 - Resume interrupted downloads without losing progress
 
 ### IPTV
@@ -45,6 +46,7 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### User Interface & App
 
+- Full mouse and keyboard controls: click search, suggestions, cards, tabs, and action buttons directly
 - View rich graphical posters in supported terminals (Kitty, iTerm2, Sixel) or fallback to text art
 - Let the app automatically manage configuration and clean up expired caches
 
@@ -197,6 +199,18 @@ moviebox-tui
 | `?`        | Show help                                             |
 | `q`        | Quit                                                  |
 
+### Mouse controls
+
+| Action | Result |
+| ------ | ------ |
+| Left click search bar | Enter search query input mode |
+| Left click suggestion item | Select and search suggestion immediately |
+| Left click search result row | Select item and preview; click again / double click to open details |
+| Left click audio / season / episode / stream | Switch audio language, change season, select episode, or play stream |
+| Left click footer buttons | Switch provider (`[Ctrl+P]`), toggle TV mode (`[Ctrl+T]`), open help (`[?]`), or quit (`[q]`) |
+| Left click modal items / buttons | Select theme, browse preset, subtitles, players, or confirm download/cancel |
+| Left click outside modal | Dismiss popup |
+
 ### Slash commands
 
 | Command              | Action                                    |
@@ -228,6 +242,7 @@ MovieBox-TUI/
 └── Series/<title>/Season <number>/
 ```
 
+- **Contextual triggers:** Pressing `d` or clicking `[Download]` while focused on the **Seasons** pane prompts to download the whole season; while on **Episodes** or **Streams**, it downloads that single episode.
 - **Sequential downloads:** Entire seasons are downloaded one by one to limit disk and network pressure.
 - **Smart subtitles:** Your subtitle language choice for the first episode is applied to the remaining episodes. Missing subtitles do not discard completed video files.
 - **Robust resuming:** Interrupted downloads preserve `.part` and metadata files, and can be resumed without losing progress.

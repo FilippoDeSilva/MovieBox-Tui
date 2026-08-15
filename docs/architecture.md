@@ -39,6 +39,7 @@ src/
       navigation.rs             list navigation, submit actions, provider helpers
       tv.rs                     TV mode: playlist manager + playback
       keyboard.rs               raw key-event handling
+      mouse.rs                  mouse click handling and hitbox routing
       system.rs                 help, refresh, cache, theme, updates, focus, resize
     state.rs                    AppState: all UI state + in-memory LRU caches
     action.rs                   the Action enum (event/message model)
