@@ -1374,193 +1374,192 @@ impl App {
                     return None;
                 }
 
-                if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
-                    if !force_refresh {
-                        if let Some(cached) = pool.episode_index.get(&(season, episode)) {
-                            let sender = self.action_sender.clone();
-                            let cached = cached.clone();
-                            let cached_subject_id = subject_id.clone();
-                            tokio::spawn(async move {
-                                tokio::time::sleep(std::time::Duration::from_millis(120)).await;
-                                sender
-                                    .send(Action::EpisodeStreamsReady(
-                                        context,
-                                        request_id,
-                                        cached_subject_id,
-                                        season,
-                                        episode,
-                                        serde_json::Value::Array(cached),
-                                    ))
-                                    .ok();
-                            });
-                            return None;
-                        }
-                    }
-
-                    let mut absolute_episode = 0;
-                    for s_val in &self.state.available_seasons {
-                        let se = s_val.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-                        if se < season {
-                            absolute_episode +=
-                                s_val.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
-                        }
-                    }
-                    absolute_episode += episode.saturating_sub(1);
-                    let estimated_page = (absolute_episode / 20) + 1;
-
-                    let client = self.client.clone();
-                    let sender = self.action_sender.clone();
-                    let cancel_token = self.state.fetch_cancel.clone();
-                    let id_clone = subject_id.clone();
-                    let resolutions = pool.available_resolutions.clone();
-                    let is_movie = season == 0 && episode == 0;
-
-                    tokio::spawn(async move {
-                        sender
-                            .send(Action::SetStatus("Fetching streams...".to_string()))
-                            .ok();
-
-                        let mut all_items: Vec<serde_json::Value> = Vec::new();
-                        let mut found_target = false;
-
-                        if is_movie {
-                            let mut page = 1usize;
-                            loop {
-                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
-                                    break;
-                                }
-                                match tokio::time::timeout(
-                                    std::time::Duration::from_secs(15),
-                                    client.fetch_resource_page(&id_clone, 0, page),
-                                )
-                                .await
-                                {
-                                    Ok(Ok((items, pager))) => {
-                                        let has_more = pager
-                                            .get("hasMore")
-                                            .and_then(|v| v.as_bool())
-                                            .unwrap_or(false);
-                                        all_items.extend(items);
-                                        if !has_more {
-                                            break;
-                                        }
-                                        page += 1;
-                                        if page > 10 {
-                                            break;
-                                        }
-                                    }
-                                    _ => break,
-                                }
-                            }
-                        } else {
-                            let mut page = estimated_page;
-                            'outer: loop {
-                                if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
-                                    break 'outer;
-                                }
-                                let mut page_handles = Vec::new();
-
-                                let res_to_fetch = if resolutions.is_empty() {
-                                    vec![0]
-                                } else {
-                                    resolutions.clone()
-                                };
-
-                                for &res in &res_to_fetch {
-                                    let c = client.clone();
-                                    let id = id_clone.clone();
-                                    let ct = cancel_token.clone();
-                                    page_handles.push(tokio::spawn(async move {
-                                        if ct.load(std::sync::atomic::Ordering::Relaxed) {
-                                            return (Vec::new(), serde_json::json!({}));
-                                        }
-                                        match tokio::time::timeout(
-                                            std::time::Duration::from_secs(15),
-                                            c.fetch_resource_page(&id, res, page),
-                                        )
-                                        .await
-                                        {
-                                            Ok(Ok((items, pager))) => (items, pager),
-                                            _ => (Vec::new(), serde_json::json!({})),
-                                        }
-                                    }));
-                                }
-
-                                let mut page_empty = true;
-                                let mut has_more = false;
-                                for handle in page_handles {
-                                    if let Ok((items, pager)) = handle.await {
-                                        if !items.is_empty() {
-                                            page_empty = false;
-                                        }
-                                        if pager
-                                            .get("hasMore")
-                                            .and_then(|v| v.as_bool())
-                                            .unwrap_or(false)
-                                        {
-                                            has_more = true;
-                                        }
-                                        for item in &items {
-                                            let se = item
-                                                .get("se")
-                                                .and_then(|v| v.as_i64())
-                                                .unwrap_or(0)
-                                                as usize;
-                                            let ep = item
-                                                .get("ep")
-                                                .and_then(|v| v.as_i64())
-                                                .unwrap_or(0)
-                                                as usize;
-                                            if se == season && ep == episode {
-                                                found_target = true;
-                                            }
-                                        }
-                                        all_items.extend(items);
-                                    }
-                                }
-
-                                if found_target || page_empty || !has_more {
-                                    break 'outer;
-                                }
-                                page += 1;
-                                if page > 60 {
-                                    break;
-                                }
-                            }
-                        }
-
-                        let target_ok = if is_movie {
-                            !all_items.is_empty()
-                        } else {
-                            found_target
-                        };
-
-                        if !target_ok || all_items.is_empty() {
-                            let err_msg = if all_items.is_empty() {
-                                "No matches"
-                            } else {
-                                "Rate Limit"
-                            }
-                            .into();
-                            sender
-                                .send(Action::EpisodeStreamsFailed(
-                                    context, request_id, id_clone, season, episode, err_msg,
-                                ))
-                                .ok();
-                        } else {
+                let pool = self
+                    .state
+                    .stream_pool
+                    .entry(subject_id.clone())
+                    .or_default();
+                if !force_refresh {
+                    if let Some(cached) = pool.episode_index.get(&(season, episode)) {
+                        let sender = self.action_sender.clone();
+                        let cached = cached.clone();
+                        let cached_subject_id = subject_id.clone();
+                        tokio::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_millis(120)).await;
                             sender
                                 .send(Action::EpisodeStreamsReady(
                                     context,
                                     request_id,
-                                    id_clone,
+                                    cached_subject_id,
                                     season,
                                     episode,
-                                    serde_json::Value::Array(all_items),
+                                    serde_json::Value::Array(cached),
                                 ))
                                 .ok();
-                        }
-                    });
+                        });
+                        return None;
+                    }
                 }
+
+                let mut absolute_episode = 0;
+                for s_val in &self.state.available_seasons {
+                    let se = s_val.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
+                    if se < season {
+                        absolute_episode +=
+                            s_val.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
+                    }
+                }
+                absolute_episode += episode.saturating_sub(1);
+                let estimated_page = (absolute_episode / 20) + 1;
+
+                let client = self.client.clone();
+                let sender = self.action_sender.clone();
+                let cancel_token = self.state.fetch_cancel.clone();
+                let id_clone = subject_id.clone();
+                let resolutions = pool.available_resolutions.clone();
+                let is_movie = season == 0 && episode == 0;
+
+                tokio::spawn(async move {
+                    sender
+                        .send(Action::SetStatus("Fetching streams...".to_string()))
+                        .ok();
+
+                    let mut all_items: Vec<serde_json::Value> = Vec::new();
+                    let mut found_target = false;
+
+                    if is_movie {
+                        let mut page = 1usize;
+                        loop {
+                            if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
+                                break;
+                            }
+                            match tokio::time::timeout(
+                                std::time::Duration::from_secs(15),
+                                client.fetch_resource_page(&id_clone, 0, page),
+                            )
+                            .await
+                            {
+                                Ok(Ok((items, pager))) => {
+                                    let has_more = pager
+                                        .get("hasMore")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
+                                    all_items.extend(items);
+                                    if !has_more {
+                                        break;
+                                    }
+                                    page += 1;
+                                    if page > 10 {
+                                        break;
+                                    }
+                                }
+                                _ => break,
+                            }
+                        }
+                    } else {
+                        let mut page = estimated_page;
+                        'outer: loop {
+                            if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
+                                break 'outer;
+                            }
+                            let mut page_handles = Vec::new();
+
+                            let res_to_fetch = if resolutions.is_empty() {
+                                vec![0]
+                            } else {
+                                resolutions.clone()
+                            };
+
+                            for &res in &res_to_fetch {
+                                let c = client.clone();
+                                let id = id_clone.clone();
+                                let ct = cancel_token.clone();
+                                page_handles.push(tokio::spawn(async move {
+                                    if ct.load(std::sync::atomic::Ordering::Relaxed) {
+                                        return (Vec::new(), serde_json::json!({}));
+                                    }
+                                    match tokio::time::timeout(
+                                        std::time::Duration::from_secs(15),
+                                        c.fetch_resource_page(&id, res, page),
+                                    )
+                                    .await
+                                    {
+                                        Ok(Ok((items, pager))) => (items, pager),
+                                        _ => (Vec::new(), serde_json::json!({})),
+                                    }
+                                }));
+                            }
+
+                            let mut page_empty = true;
+                            let mut has_more = false;
+                            for handle in page_handles {
+                                if let Ok((items, pager)) = handle.await {
+                                    if !items.is_empty() {
+                                        page_empty = false;
+                                    }
+                                    if pager
+                                        .get("hasMore")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false)
+                                    {
+                                        has_more = true;
+                                    }
+                                    for item in &items {
+                                        let se =
+                                            item.get("se").and_then(|v| v.as_i64()).unwrap_or(0)
+                                                as usize;
+                                        let ep =
+                                            item.get("ep").and_then(|v| v.as_i64()).unwrap_or(0)
+                                                as usize;
+                                        if se == season && ep == episode {
+                                            found_target = true;
+                                        }
+                                    }
+                                    all_items.extend(items);
+                                }
+                            }
+
+                            if found_target || page_empty || !has_more {
+                                break 'outer;
+                            }
+                            page += 1;
+                            if page > 60 {
+                                break;
+                            }
+                        }
+                    }
+
+                    let target_ok = if is_movie {
+                        !all_items.is_empty()
+                    } else {
+                        found_target
+                    };
+
+                    if !target_ok || all_items.is_empty() {
+                        let err_msg = if all_items.is_empty() {
+                            "No matches"
+                        } else {
+                            "Rate Limit"
+                        }
+                        .into();
+                        sender
+                            .send(Action::EpisodeStreamsFailed(
+                                context, request_id, id_clone, season, episode, err_msg,
+                            ))
+                            .ok();
+                    } else {
+                        sender
+                            .send(Action::EpisodeStreamsReady(
+                                context,
+                                request_id,
+                                id_clone,
+                                season,
+                                episode,
+                                serde_json::Value::Array(all_items),
+                            ))
+                            .ok();
+                    }
+                });
             }
 
             Action::EpisodeStreamsReady(
