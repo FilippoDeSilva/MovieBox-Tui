@@ -198,8 +198,9 @@ jobs:
 
       - name: Extract Release Notes from CHANGELOG.md
         id: changelog
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
         run: |
-          VERSION="${{ needs.check-version.outputs.version }}"
           NOTES=$(awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" { flag=1; next }
             flag && /^## \[/ { flag=0 }
