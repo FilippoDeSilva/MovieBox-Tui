@@ -51,7 +51,7 @@ function Print-Header {
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝
 "@
     Write-Host $Header -ForegroundColor Magenta
-    Write-Host "              Terminal Cinema & IPTV • Official Installer`n" -ForegroundColor Cyan
+    Write-Host "                           Official Installer`n" -ForegroundColor Cyan
 }
 
 function Do-Uninstall {

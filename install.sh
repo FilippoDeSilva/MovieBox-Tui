@@ -166,7 +166,7 @@ print_header() {
             printf "%s\n" "$line"
             sleep 0.02
         done
-        printf "%b%b              Terminal Cinema & IPTV • Official Installer%b%b\n\n" "$C_SAPPHIRE" "$C_BOLD" "$C_RESET" "$CURSOR_SHOW"
+        printf "%b%b                           Official Installer%b%b\n\n" "$C_SAPPHIRE" "$C_BOLD" "$C_RESET" "$CURSOR_SHOW"
     else
         cat << 'EOF'
 ███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
@@ -175,7 +175,7 @@ print_header() {
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝
-              Terminal Cinema & IPTV • Official Installer
+                           Official Installer
 
 EOF
     fi
