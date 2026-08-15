@@ -93,9 +93,11 @@ impl App {
                 let _ = client.init().await;
             });
         }
-        if !self.state.search_query.trim().is_empty() {
-            let query = self.state.search_query.clone();
-            self.prepare_search_request(&query);
+        let trimmed = self.state.search_query.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('/') {
+            let query = trimmed.to_string();
+            let context = self.prepare_search_request(&query);
+            self.run_search_request(query, false, context);
         }
     }
 
@@ -157,7 +159,12 @@ impl App {
     }
 
     pub(super) fn trigger_next_page_if_needed(&mut self) {
-        if self.state.is_tv_mode || self.state.is_loading || self.state.search_results.is_empty() {
+        if self.state.is_tv_mode
+            || self.state.is_loading
+            || self.state.search_results.is_empty()
+            || self.state.active_browse_preset.is_some()
+            || self.state.search_query.trim().starts_with('/')
+        {
             return;
         }
         let total = self.state.search_results.len();

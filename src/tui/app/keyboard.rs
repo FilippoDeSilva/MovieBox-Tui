@@ -22,6 +22,8 @@ impl App {
 
         if let KeyCode::Char('x') | KeyCode::Char('X') = key.code
             && self.state.download_progress.is_some()
+            && self.state.input_mode != InputMode::Editing
+            && !self.state.tv_input_active
         {
             self.action_sender.send(Action::CancelDownload).ok();
             return None;
