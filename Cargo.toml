@@ -45,6 +45,7 @@ open = "5.4.0"
 percent-encoding = "2.3.2"
 log = "0.4.33"
 flexi_logger = "0.31.10"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 
 [lib]
 name = "moviebox_tui"
@@ -62,10 +63,5 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
-
 [target.'cfg(not(target_os = "android"))'.dependencies]
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 mimalloc = "0.1.52"
-
-[target.'cfg(target_os = "android")'.dependencies]
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "hickory-dns"] }
