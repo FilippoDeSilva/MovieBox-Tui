@@ -52,7 +52,8 @@ Verify poster rendering on the terminal families the docs claim to support:
 
 - Kitty protocol terminal
 - Sixel-capable terminal
-- basic half-block fallback terminal
+- iTerm2 protocol terminal
+- Non-graphics basic terminal (clean text placeholder)
 
 Confirm:
 
