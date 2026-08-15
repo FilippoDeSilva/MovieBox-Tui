@@ -16,8 +16,9 @@ cargo audit
 cargo package --locked
 ```
 
-This project currently has no unit-test suite by design; keep the static gates above
-green instead of adding a placeholder `cargo test` step.
+CI currently runs `cargo test --locked`, but the suite still contains no meaningful
+tests. Keep the static gates above green and treat runtime verification as the main
+release gate until regression coverage is added.
 
 Confirm the main GitHub Actions workflows are green:
 

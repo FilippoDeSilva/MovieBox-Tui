@@ -66,7 +66,7 @@
 
 ### Added
 - **User-Owned M3U Playlists**: Full custom playlist management in TV mode with remote URL and local file support.
-- **Prebuilt Android Releases**: Automated native Android aarch64 binary builds via GitHub Actions.
+- **Android Runtime Support**: Termux playback and shared-storage handling continue to be exercised on real devices, but release artifacts remain desktop-focused.
 
 ### Refactored
 - **Domain Modularization**: Split the application monolith into cohesive domain modules (`network`, `playback`, `download`, `requests`, `navigation`, `tv`, `system`, `keyboard`).

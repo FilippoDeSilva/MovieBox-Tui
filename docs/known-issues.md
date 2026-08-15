@@ -26,5 +26,5 @@ Tracked here so future work and issue reports reference the same facts.
 
 ## Verification
  
-- This project currently has no unit-test suite by design.
+- CI runs `cargo test --locked`, but the suite still has no meaningful coverage.
 - Correctness across UI, providers, and network flows is enforced by strict compiler type checking, the lint gate (`cargo clippy --all-targets -- -D warnings`), formatting (`cargo fmt --check`), and the manual/runtime verification gates in [`release-checklist.md`](release-checklist.md). CI also runs `cargo audit` and `cargo package`.

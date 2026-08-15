@@ -417,12 +417,14 @@ cargo audit
 cargo package --locked
 ```
 
-This project currently has no unit-test suite by design, so the release/readme
-checklist stays focused on the static gates above plus the runtime checks in
-[`docs/release-checklist.md`](docs/release-checklist.md).
+CI currently runs `cargo test --locked`, which passes today but covers no
+meaningful unit tests yet. Keep the static gates above, plus the runtime checks
+in [`docs/release-checklist.md`](docs/release-checklist.md), as the main release
+bar until real regression coverage lands.
 
 GitHub Actions also verifies cross-platform builds on Linux, macOS, and Windows,
-plus an Android/Termux cross-build lane.
+and the release checklist still requires a real-device Termux/Android playback
+verification before calling a release production-ready.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and
 [`docs/release-checklist.md`](docs/release-checklist.md) for the runtime checks still
