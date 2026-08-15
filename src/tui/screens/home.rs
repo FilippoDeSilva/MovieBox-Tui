@@ -55,7 +55,8 @@ pub(crate) fn slash_command_description(cmd: &str) -> Option<&'static str> {
     let name = cmd.strip_prefix('/').unwrap_or(cmd);
     match name {
         "browse" => Some("Curated, rated & most-watched views"),
-        "download-dir" => Some("Change or view download directory"),
+        "download-dir" => Some("View current download folder"),
+        "download-dir <path>" => Some("Set custom folder (e.g. ~/Movies)"),
         "download-dir reset" => Some("Reset download directory to default"),
         "history" => Some("Watch history"),
         "theme" => Some("Theme picker"),
@@ -834,7 +835,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             if let Some(description) = desc {
                 let name_len = crate::tui::text::width(display_name);
-                let pad = 16usize.saturating_sub(name_len).max(2);
+                let pad = 22usize.saturating_sub(name_len).max(2);
                 spans.push(Span::raw(" ".repeat(pad)));
                 spans.push(Span::styled(description, desc_style));
             }

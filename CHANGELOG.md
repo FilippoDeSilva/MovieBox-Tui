@@ -42,6 +42,9 @@
   - Eliminated ANSI block characters, yellow/white selection redraw bars, and unnecessary background image downloads on basic terminals.
   - Preserved full native high-resolution graphical rendering on Sixel, Kitty, and iTerm2 supported terminals.
   - Added `MOVIEBOX_NO_IMAGE=1` environment override to disable image probing on slow or headless sessions.
+- **Explicit Download Directory Autocomplete Hints**:
+  - Added `/download-dir <path>` slash command suggestion with clear action descriptions (`Set custom folder (e.g. ~/Movies)` vs. `View current download folder`).
+  - Added friendly guidance notification if a user inputs literal `<path>` placeholders.
 
 ### Fixed
 - **Default Audio Track Prioritization (Original / English)**:

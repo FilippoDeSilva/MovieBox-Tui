@@ -22,6 +22,7 @@ impl App {
                         commands.push("/history");
                     }
                     commands.push("/download-dir");
+                    commands.push("/download-dir <path>");
                     if self.state.download_dir.is_some() {
                         commands.push("/download-dir reset");
                     }

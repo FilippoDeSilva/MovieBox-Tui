@@ -230,6 +230,18 @@ impl App {
             }
 
             let clean_arg = raw_arg.trim_matches(|c| c == '\'' || c == '"').trim();
+            if clean_arg == "<path>"
+                || clean_arg == "path"
+                || clean_arg == "<dir>"
+                || clean_arg == "dir"
+            {
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Download Directory",
+                    "Usage: /download-dir <folder_path>\nExample: /download-dir ~/Movies",
+                );
+                return Some(true);
+            }
             let expanded_path = if let Some(stripped) = clean_arg
                 .strip_prefix("~/")
                 .or_else(|| clean_arg.strip_prefix("~\\"))
