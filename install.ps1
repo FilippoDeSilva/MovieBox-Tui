@@ -36,10 +36,10 @@ OPTIONS:
     exit 0
 }
 
-function Write-Step { param([string]$Message) Write-Host "  → $Message" -ForegroundColor Cyan }
-function Write-Success { param([string]$Message) Write-Host "  ✔ $Message" -ForegroundColor Green }
-function Write-Warn { param([string]$Message) Write-Host "  ⚠ $Message" -ForegroundColor Yellow }
-function Write-Err { param([string]$Message) Write-Host "  ✖ $Message" -ForegroundColor Red; exit 1 }
+function Write-Step { param([string]$Message) Write-Host "  → " -ForegroundColor Cyan -NoNewline; Write-Host $Message }
+function Write-Success { param([string]$Message) Write-Host "  ✔ " -ForegroundColor Green -NoNewline; Write-Host $Message }
+function Write-Warn { param([string]$Message) Write-Host "  ⚠ " -ForegroundColor Yellow -NoNewline; Write-Host $Message }
+function Write-Err { param([string]$Message) Write-Host "  ✖ " -ForegroundColor Red -NoNewline; Write-Host $Message; exit 1 }
 
 function Print-Header {
     $Header = @"
@@ -49,10 +49,9 @@ function Print-Header {
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝
-                     MovieBox-Tui Installer
 "@
-    Write-Host $Header -ForegroundColor Cyan
-    Write-Host ""
+    Write-Host $Header -ForegroundColor Magenta
+    Write-Host "              Terminal Cinema & IPTV • Official Installer`n" -ForegroundColor Cyan
 }
 
 function Do-Uninstall {
@@ -225,25 +224,34 @@ if (Get-Command "mpv" -ErrorAction SilentlyContinue) {
 }
 
 Write-Host ""
-Write-Host "┌────────────────────────────────────────────────────────────┐" -ForegroundColor Cyan
-Write-Host "│  ✔ MovieBox-Tui $TargetVersion successfully installed!             │" -ForegroundColor Cyan
-Write-Host "│                                                            │" -ForegroundColor Cyan
-Write-Host "│  • Binary:   $ExePath" -ForegroundColor Cyan
+Write-Host "┌────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
+Write-Host "│  " -ForegroundColor DarkGray -NoNewline
+Write-Host "✔ MovieBox-Tui $TargetVersion successfully installed!" -ForegroundColor Green -NoNewline
+$PadLen = 58 - 36 - $TargetVersion.Length
+if ($PadLen -gt 0) { Write-Host (" " * $PadLen) -NoNewline }
+Write-Host "│" -ForegroundColor DarkGray
+Write-Host "│                                                            │" -ForegroundColor DarkGray
+Write-Host "│  • Binary:   " -ForegroundColor DarkGray -NoNewline
+Write-Host $ExePath -ForegroundColor White
 
 if ($PlayerDetected) {
-    Write-Host "│  • Player:   $PlayerDetected (ready)" -ForegroundColor Cyan
+    Write-Host "│  • Player:   " -ForegroundColor DarkGray -NoNewline
+    Write-Host "$PlayerDetected (ready)" -ForegroundColor Green
 } else {
-    Write-Host "│  • Player:   None detected (mpv or VLC recommended)       │" -ForegroundColor Cyan
+    Write-Host "│  • Player:   " -ForegroundColor DarkGray -NoNewline
+    Write-Host "None detected (mpv or VLC recommended)" -ForegroundColor Cyan
 }
 
 if ($PathModified) {
-    Write-Host "│  • Shell:    PATH updated in User Environment              │" -ForegroundColor Cyan
+    Write-Host "│  • Shell:    " -ForegroundColor DarkGray -NoNewline
+    Write-Host "PATH updated in User Environment" -ForegroundColor Magenta
 }
 
-Write-Host "│                                                            │" -ForegroundColor Cyan
-Write-Host "│  To start streaming:                                       │" -ForegroundColor Cyan
-Write-Host "│    $ moviebox-tui                                          │" -ForegroundColor Cyan
-Write-Host "└────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+Write-Host "│                                                            │" -ForegroundColor DarkGray
+Write-Host "│  To start streaming:                                       │" -ForegroundColor DarkGray
+Write-Host "│    " -ForegroundColor DarkGray -NoNewline
+Write-Host "$ moviebox-tui" -ForegroundColor Green
+Write-Host "└────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
 Write-Host ""
 
 if (-not $PlayerDetected) {

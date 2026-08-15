@@ -77,32 +77,51 @@ if [ "$IS_COLOR" -eq 1 ]; then
     C_RESET="\033[0m"
     C_BOLD="\033[1m"
     C_DIM="\033[2m"
-    C_CYAN="\033[36m"
-    C_BOLD_CYAN="\033[1;36m"
-    C_GREEN="\033[32m"
-    C_BOLD_GREEN="\033[1;32m"
-    C_YELLOW="\033[33m"
-    C_BOLD_YELLOW="\033[1;33m"
-    C_RED="\033[31m"
-    C_BOLD_RED="\033[1;31m"
-    C_MAGENTA="\033[35m"
-    C_BLUE="\033[34m"
+    
+    # Catppuccin Mocha Palette (24-bit TrueColor with ANSI fallback)
+    if [ "${COLORTERM:-}" = "truecolor" ] || [ "${COLORTERM:-}" = "24bit" ] || [ -n "${WT_SESSION:-}" ] || [ "${TERM_PROGRAM:-}" = "Apple_Terminal" ] || [ "${TERM_PROGRAM:-}" = "iTerm.app" ] || [ "${TERM_PROGRAM:-}" = "ghostty" ] || [ "${TERM_PROGRAM:-}" = "WezTerm" ] || [ "${TERM_PROGRAM:-}" = "warp" ]; then
+        C_MAUVE="\033[38;2;203;166;247m"
+        C_BLUE="\033[38;2;137;180;250m"
+        C_SAPPHIRE="\033[38;2;116;199;236m"
+        C_LAVENDER="\033[38;2;180;190;254m"
+        C_TEAL="\033[38;2;148;226;213m"
+        C_GREEN="\033[38;2;166;227;161m"
+        C_YELLOW="\033[38;2;249;226;175m"
+        C_RED="\033[38;2;243;139;168m"
+        C_TEXT="\033[38;2;205;214;244m"
+        C_SUBTEXT="\033[38;2;166;173;200m"
+        C_MUTED="\033[38;2;108;112;134m"
+    else
+        C_MAUVE="\033[35m"
+        C_BLUE="\033[34m"
+        C_SAPPHIRE="\033[36m"
+        C_LAVENDER="\033[35m"
+        C_TEAL="\033[36m"
+        C_GREEN="\033[32m"
+        C_YELLOW="\033[33m"
+        C_RED="\033[31m"
+        C_TEXT="\033[37m"
+        C_SUBTEXT="\033[37m"
+        C_MUTED="\033[90m"
+    fi
+
     CURSOR_HIDE="\033[?25l"
     CURSOR_SHOW="\033[?25h"
 else
     C_RESET=""
     C_BOLD=""
     C_DIM=""
-    C_CYAN=""
-    C_BOLD_CYAN=""
-    C_GREEN=""
-    C_BOLD_GREEN=""
-    C_YELLOW=""
-    C_BOLD_YELLOW=""
-    C_RED=""
-    C_BOLD_RED=""
-    C_MAGENTA=""
+    C_MAUVE=""
     C_BLUE=""
+    C_SAPPHIRE=""
+    C_LAVENDER=""
+    C_TEAL=""
+    C_GREEN=""
+    C_YELLOW=""
+    C_RED=""
+    C_TEXT=""
+    C_SUBTEXT=""
+    C_MUTED=""
     CURSOR_HIDE=""
     CURSOR_SHOW=""
 fi
@@ -116,25 +135,25 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 log_step() {
-    printf "  %b%s%b %s\n" "$C_BOLD_CYAN" "→" "$C_RESET" "$1"
+    printf "  %b%s%b %b%s%b\n" "$C_BLUE" "→" "$C_RESET" "$C_TEXT" "$1" "$C_RESET"
 }
 
 log_success() {
-    printf "  %b%s%b %s\n" "$C_BOLD_GREEN" "✔" "$C_RESET" "$1"
+    printf "  %b%s%b %b%s%b\n" "$C_GREEN" "✔" "$C_RESET" "$C_TEXT" "$1" "$C_RESET"
 }
 
 log_warn() {
-    printf "  %b%s%b %s\n" "$C_BOLD_YELLOW" "⚠" "$C_RESET" "$1"
+    printf "  %b%s%b %b%s%b\n" "$C_YELLOW" "⚠" "$C_RESET" "$C_TEXT" "$1" "$C_RESET"
 }
 
 log_error() {
-    printf "  %b%s%b %s\n" "$C_BOLD_RED" "✖" "$C_RESET" "$1" >&2
+    printf "  %b%s%b %b%s%b\n" "$C_RED" "✖" "$C_RESET" "$C_TEXT" "$1" "$C_RESET" >&2
 }
 
 print_header() {
     if [ "$IS_COLOR" -eq 1 ] && [ "$IS_TTY" -eq 1 ]; then
         printf "%b\n" "$CURSOR_HIDE"
-        printf "%b" "$C_BOLD_CYAN"
+        printf "%b%b" "$C_BOLD" "$C_MAUVE"
         local lines=(
             "███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗"
             "████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝"
@@ -147,7 +166,7 @@ print_header() {
             printf "%s\n" "$line"
             sleep 0.02
         done
-        printf "%b%b%s%b\n\n" "$C_DIM" "                     MovieBox-Tui Installer" "$C_RESET" "$CURSOR_SHOW"
+        printf "%b%b              Terminal Cinema & IPTV • Official Installer%b%b\n\n" "$C_SAPPHIRE" "$C_BOLD" "$C_RESET" "$CURSOR_SHOW"
     else
         cat << 'EOF'
 ███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
@@ -156,7 +175,7 @@ print_header() {
 ██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
 ██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
 ╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝
-                     MovieBox-Tui Installer
+              Terminal Cinema & IPTV • Official Installer
 
 EOF
     fi
@@ -189,7 +208,7 @@ run_spinner() {
 
     while kill -0 "$pid" 2>/dev/null; do
         local frame="${spin_chars[$spin_idx]}"
-        printf "\r\033[K  %b%s%b %s..." "$C_CYAN" "$frame" "$C_RESET" "$message"
+        printf "\r\033[K  %b%s%b %b%s...%b" "$C_SAPPHIRE" "$frame" "$C_RESET" "$C_TEXT" "$message" "$C_RESET"
         spin_idx=$(( (spin_idx + 1) % spin_count ))
         sleep 0.08
     done
@@ -294,9 +313,11 @@ else
     exit 1
 fi
 
+TMP_VER_FILE=$(mktemp)
+
 resolve_version() {
     if [ -n "$VERSION" ]; then
-        TARGET_VERSION="$VERSION"
+        printf "%s" "$VERSION" > "$TMP_VER_FILE"
         return 0
     fi
 
@@ -305,15 +326,24 @@ resolve_version() {
         log_error "Failed to contact GitHub for latest release."
         return 1
     }
-    TARGET_VERSION=$(printf "%s" "$release_header" | grep -i '^location:' | awk -F '/' '{print $NF}' | tr -d '\r\n')
-    if [ -z "$TARGET_VERSION" ]; then
+    local tag
+    tag=$(printf "%s" "$release_header" | grep -i '^location:' | awk -F '/' '{print $NF}' | tr -d '\r\n')
+    if [ -z "$tag" ]; then
         log_error "Could not resolve latest release version from GitHub."
         return 1
     fi
+    printf "%s" "$tag" > "$TMP_VER_FILE"
 }
 
-TARGET_VERSION=""
 run_spinner "[1/4] Checking environment & resolving version" resolve_version
+TARGET_VERSION=$(cat "$TMP_VER_FILE" 2>/dev/null || true)
+rm -f "$TMP_VER_FILE"
+
+if [ -z "$TARGET_VERSION" ]; then
+    log_error "Could not resolve release version."
+    exit 1
+fi
+
 log_success "[1/4] Environment ready ($PLATFORM_NAME • $TARGET_VERSION)"
 
 if [ -n "$CUSTOM_DIR" ]; then
@@ -333,7 +363,7 @@ if [ -n "$EXISTING_BIN" ] && [ -x "$EXISTING_BIN" ]; then
 
     if [ "v$CURRENT_VERSION" = "$TARGET_VERSION" ] && [ "$FORCE" -eq 0 ]; then
         if [ "$IS_TTY" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; then
-            printf "\n  %b%s%b %s\n" "$C_BOLD_YELLOW" "ℹ" "$C_RESET" "MovieBox-TUI $TARGET_VERSION is already installed at $EXISTING_BIN."
+            printf "\n  %b%s%b %b%s%b\n" "$C_YELLOW" "ℹ" "$C_RESET" "$C_TEXT" "MovieBox-TUI $TARGET_VERSION is already installed at $EXISTING_BIN." "$C_RESET"
             printf "  Choose an action: [1] Reinstall  [2] Uninstall  [3] Exit: "
             read -r user_choice || user_choice="3"
             case "$user_choice" in
@@ -479,32 +509,32 @@ elif command -v vlc >/dev/null 2>&1; then
 fi
 
 printf "\n"
-printf "%b┌────────────────────────────────────────────────────────────┐%b\n" "$C_BOLD_CYAN" "$C_RESET"
+printf "%b┌────────────────────────────────────────────────────────────┐%b\n" "$C_MUTED" "$C_RESET"
 printf "%b│%b  %b✔ MovieBox-Tui %s successfully installed!%b%*s%b│%b\n" \
-    "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD_GREEN" "$TARGET_VERSION" "$C_RESET" \
-    $(( 28 - ${#TARGET_VERSION} )) "" "$C_BOLD_CYAN" "$C_RESET"
-printf "%b│%b                                                            %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
-printf "%b│%b  • Binary:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD" "$APP_PATH" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
+    "$C_MUTED" "$C_RESET" "$C_GREEN" "$TARGET_VERSION" "$C_RESET" \
+    $(( 28 - ${#TARGET_VERSION} )) "" "$C_MUTED" "$C_RESET"
+printf "%b│%b                                                            %b│%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET"
+printf "%b│%b  • Binary:   %b%-45s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_TEXT" "$APP_PATH" "$C_RESET" "$C_MUTED" "$C_RESET"
 
 if [ -n "$PLAYER_DETECTED" ]; then
-    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED (ready)" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
+    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED (ready)" "$C_RESET" "$C_MUTED" "$C_RESET"
 else
-    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_CYAN" "None detected (mpv, VLC, or IINA recommended)" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
+    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "None detected (mpv, VLC, or IINA recommended)" "$C_RESET" "$C_MUTED" "$C_RESET"
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then
-    printf "%b│%b  • Shell:    %bPATH added to %-31s%b %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_CYAN" "$SHELL_MODIFIED" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
+    printf "%b│%b  • Shell:    %bPATH added to %-31s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_LAVENDER" "$SHELL_MODIFIED" "$C_RESET" "$C_MUTED" "$C_RESET"
 fi
 
-printf "%b│%b                                                            %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
-printf "%b│%b  To start streaming:                                       %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
-printf "%b│%b    %b$ moviebox-tui%b                                         %b│%b\n" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD_CYAN" "$C_RESET"
-printf "%b└────────────────────────────────────────────────────────────┘%b\n\n" "$C_BOLD_CYAN" "$C_RESET"
+printf "%b│%b                                                            %b│%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET"
+printf "%b│%b  To start streaming:                                       %b│%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET"
+printf "%b│%b    %b$ moviebox-tui%b                                         %b│%b\n" "$C_MUTED" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_MUTED" "$C_RESET"
+printf "%b└────────────────────────────────────────────────────────────┘%b\n\n" "$C_MUTED" "$C_RESET"
 
 if [ -z "$PLAYER_DETECTED" ]; then
-    printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_BOLD_CYAN" "$C_RESET"
+    printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_SAPPHIRE" "$C_RESET"
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then
-    printf "  %bℹ%b Run %b'source %s'%b or restart your terminal to reload PATH.\n\n" "$C_BOLD_CYAN" "$C_RESET" "$C_BOLD" "$SHELL_MODIFIED" "$C_RESET"
+    printf "  %bℹ%b Run %b'source %s'%b or restart your terminal to reload PATH.\n\n" "$C_SAPPHIRE" "$C_RESET" "$C_BOLD" "$SHELL_MODIFIED" "$C_RESET"
 fi
