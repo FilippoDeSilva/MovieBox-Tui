@@ -876,7 +876,7 @@ mod tests {
             ]
         });
 
-        let subjects = App::extract_browse_subjects(&payload, BrowsePreset::TrendingDesc);
+        let subjects = App::extract_browse_subjects(&payload, BrowsePreset::Trending);
         assert_eq!(subjects.len(), 1);
         assert_eq!(subjects[0]["subjectId"], "trending-1");
         assert_eq!(subjects[0]["__browse_rank"], 1.0);
@@ -897,7 +897,7 @@ mod tests {
             ]
         });
 
-        let subjects = App::extract_browse_subjects(&payload, BrowsePreset::PopularDesc);
+        let subjects = App::extract_browse_subjects(&payload, BrowsePreset::MostWatched);
         assert_eq!(subjects.len(), 1);
         assert_eq!(subjects[0]["subjectId"], "watched-1");
         assert!(subjects[0].get("__browse_rank").is_none());

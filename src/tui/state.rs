@@ -83,58 +83,40 @@ pub enum BrowseMetric {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BrowsePreset {
-    TrendingDesc,
-    TrendingAsc,
-    TopRatedAllTimeDesc,
-    TopRatedAllTimeAsc,
-    TopRatedRecentDesc,
-    TopRatedRecentAsc,
-    PopularDesc,
-    PopularAsc,
+    Trending,
+    TopRatedAllTime,
+    TopRatedRecent,
+    MostWatched,
 }
 
 impl BrowsePreset {
-    pub const ALL: [Self; 8] = [
-        Self::TrendingDesc,
-        Self::TrendingAsc,
-        Self::TopRatedAllTimeDesc,
-        Self::TopRatedAllTimeAsc,
-        Self::TopRatedRecentDesc,
-        Self::TopRatedRecentAsc,
-        Self::PopularDesc,
-        Self::PopularAsc,
+    pub const ALL: [Self; 4] = [
+        Self::Trending,
+        Self::TopRatedAllTime,
+        Self::TopRatedRecent,
+        Self::MostWatched,
     ];
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::TrendingDesc => "Trending · High to low",
-            Self::TrendingAsc => "Trending · Low to high",
-            Self::TopRatedAllTimeDesc => "Top Rated · All-time · High to low",
-            Self::TopRatedAllTimeAsc => "Top Rated · All-time · Low to high",
-            Self::TopRatedRecentDesc => "Top Rated · Recent releases · High to low",
-            Self::TopRatedRecentAsc => "Top Rated · Recent releases · Low to high",
-            Self::PopularDesc => "Most Watched · High to low",
-            Self::PopularAsc => "Most Watched · Low to high",
+            Self::Trending => "Trending Now",
+            Self::TopRatedAllTime => "Top Rated (All-Time)",
+            Self::TopRatedRecent => "Top Rated (Recent Releases)",
+            Self::MostWatched => "Most Watched",
         }
     }
 
     pub fn metric(self) -> BrowseMetric {
         match self {
-            Self::TrendingDesc | Self::TrendingAsc => BrowseMetric::Trending,
-            Self::TopRatedAllTimeDesc | Self::TopRatedAllTimeAsc => BrowseMetric::Rating,
-            Self::TopRatedRecentDesc | Self::TopRatedRecentAsc => BrowseMetric::RecentRating,
-            Self::PopularDesc | Self::PopularAsc => BrowseMetric::Popularity,
+            Self::Trending => BrowseMetric::Trending,
+            Self::TopRatedAllTime => BrowseMetric::Rating,
+            Self::TopRatedRecent => BrowseMetric::RecentRating,
+            Self::MostWatched => BrowseMetric::Popularity,
         }
     }
 
     pub fn descending(self) -> bool {
-        matches!(
-            self,
-            Self::TrendingDesc
-                | Self::TopRatedAllTimeDesc
-                | Self::TopRatedRecentDesc
-                | Self::PopularDesc
-        )
+        true
     }
 }
 

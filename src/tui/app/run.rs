@@ -361,6 +361,7 @@ impl App {
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
+            crate::tui::clear_area(frame, area, &self.theme);
             crate::tui::overlay::picker(
                 frame,
                 area,

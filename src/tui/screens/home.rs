@@ -1064,15 +1064,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .iter()
             .map(|preset| preset.label().to_string())
             .collect();
+        crate::tui::clear_area(frame, area, theme);
         crate::tui::overlay::picker(
             frame,
             area,
             &items,
             &mut state.browse_list_state,
             crate::tui::overlay::PickerSpec {
-                title: "Browse Movies",
+                title: "Browse",
                 confirm_label: "Open",
-                minimum_width: 42,
+                minimum_width: 36,
             },
             theme,
             state.basic_terminal,
