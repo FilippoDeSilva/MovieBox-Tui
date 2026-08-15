@@ -65,14 +65,19 @@ impl App {
 
         loop {
             if self.state.clear_terminal_before_draw {
-                terminal.clear()?;
+                if let Err(err) = terminal.clear() {
+                    log::debug!("terminal clear warning: {err}");
+                    let _ = terminal.backend_mut().clear();
+                }
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
                 self.state.clear_terminal_before_draw = false;
                 self.state.dirty = true;
             }
             if self.state.dirty {
-                terminal.draw(|frame| self.draw(frame))?;
+                if let Err(err) = terminal.draw(|frame| self.draw(frame)) {
+                    log::warn!("transient draw warning: {err}");
+                }
                 self.state.dirty = false;
             }
 
@@ -245,6 +250,18 @@ impl App {
             use ratatui::layout::Alignment;
             use ratatui::text::Line;
             use ratatui::widgets::{Block, Borders, Paragraph};
+
+            if area.width < 4 || area.height < 2 {
+                return;
+            }
+
+            if area.width < 25 || area.height < 5 {
+                let p = Paragraph::new(format!("{}×{} (min 50×14)", area.width, area.height))
+                    .style(self.theme.lavender)
+                    .alignment(Alignment::Center);
+                frame.render_widget(p, area);
+                return;
+            }
 
             let msg_lines = vec![
                 Line::from(format!(
