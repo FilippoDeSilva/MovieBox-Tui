@@ -65,7 +65,8 @@ impl App {
 
         loop {
             if self.state.clear_terminal_before_draw {
-                terminal.clear()?;
+                terminal.backend_mut().clear()?;
+                terminal.current_buffer_mut().reset();
                 self.state.clear_terminal_before_draw = false;
                 self.state.dirty = true;
             }
