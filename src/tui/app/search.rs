@@ -842,34 +842,32 @@ impl App {
         let end = (offset + visible + 14).min(total);
 
         if start < end {
-            let slice: Vec<(String, Option<String>)> = self.state.search_results[start..end]
+            let slice: Vec<(String, Option<String>, ProviderKind)> = self.state.search_results
+                [start..end]
                 .iter()
-                .map(|r| (r.id.clone(), r.cover_url.clone()))
+                .map(|r| (r.id.clone(), r.cover_url.clone(), r.provider))
                 .collect();
             self.spawn_search_posters(slice);
         }
     }
 
-    pub(super) fn spawn_search_posters(&mut self, results: Vec<(String, Option<String>)>) {
+    pub(super) fn spawn_search_posters(
+        &mut self,
+        results: Vec<(String, Option<String>, ProviderKind)>,
+    ) {
         if !self.state.image_supported {
             return;
         }
 
         let mut to_fetch = Vec::new();
-        for (id, cover_url) in results {
-            let Some(url) = cover_url else {
-                continue;
-            };
-            if url.is_empty() {
-                continue;
-            }
+        for (id, cover_url, provider) in results {
             if self.state.search_posters.contains(&id) || self.state.failed_posters.contains(&id) {
                 continue;
             }
             if !self.state.in_flight_posters.insert(id.clone()) {
                 continue;
             }
-            to_fetch.push((id, url));
+            to_fetch.push((id, cover_url, provider));
         }
 
         if to_fetch.is_empty() {
@@ -878,12 +876,22 @@ impl App {
 
         let sender = self.action_sender.clone();
         let req_client = self.client.http_client().clone();
+        let mb_client = self.client.clone();
+        let fourk_client = self.fourk_client.clone();
+        let circleftp_client = self.circleftp_client.clone();
+        let dhakaflix_client = self.dhakaflix_client.clone();
+
         tokio::spawn(async move {
             let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
-            for (id, url) in to_fetch {
+            for (id, cover_url, provider) in to_fetch {
                 let permit = sem.clone().acquire_owned().await.ok();
                 let tx = sender.clone();
                 let client = req_client.clone();
+                let mb_client = mb_client.clone();
+                let fourk_client = fourk_client.clone();
+                let circleftp_client = circleftp_client.clone();
+                let dhakaflix_client = dhakaflix_client.clone();
+
                 tokio::spawn(async move {
                     let _permit = permit;
                     let id_clone = id.clone();
@@ -900,21 +908,41 @@ impl App {
                         }
                     }
 
-                    if let Some(bytes) = network::fetch_poster_bytes(&client, &url).await {
-                        let bytes_clone = bytes.clone();
-                        let id_c = id.clone();
-                        let _ = tokio::task::spawn_blocking(move || {
-                            crate::cache::set_namespaced_image_cache(
-                                "posters",
-                                &id_c,
-                                &bytes_clone,
-                            );
-                        })
-                        .await;
+                    let mut resolved_url = cover_url;
+                    if resolved_url.is_none() {
+                        if let Ok(details) = network::provider_details(
+                            &mb_client,
+                            fourk_client.as_ref(),
+                            &circleftp_client,
+                            &dhakaflix_client,
+                            provider,
+                            &id,
+                        )
+                        .await
+                        {
+                            resolved_url = crate::tui::app::playback::extract_cover_url(&details);
+                        }
+                    }
 
-                        if let Some(img) = network::decode_poster(bytes).await {
-                            tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
-                            return;
+                    if let Some(url) = resolved_url {
+                        if !url.is_empty() {
+                            if let Some(bytes) = network::fetch_poster_bytes(&client, &url).await {
+                                let bytes_clone = bytes.clone();
+                                let id_c = id.clone();
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    crate::cache::set_namespaced_image_cache(
+                                        "posters",
+                                        &id_c,
+                                        &bytes_clone,
+                                    );
+                                })
+                                .await;
+
+                                if let Some(img) = network::decode_poster(bytes).await {
+                                    tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();
+                                    return;
+                                }
+                            }
                         }
                     }
 

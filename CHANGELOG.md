@@ -32,10 +32,17 @@
   - Added floating terminal dimension HUD and event coalescing for smooth window resizing without blank screens.
 - **Elevated Notification Badges**:
   - Redesigned notification popups into elevated, rounded bottom-right badge cards with clean typography.
+- **Persistent Long-Term Poster Caching**:
+  - Increased image cache retention to 30 days (`IMAGE_CACHE_EXPIRY_SECS`), serving previously fetched posters instantly from disk across sessions with zero redundant network requests.
+  - Unified image caching under a shared namespace with automatic cross-namespace lookup across MovieBox, 4KHDHub, IPTV, CircleFTP, and DhakaFlix.
 - **Streamlined Browse Views**:
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
 
 ### Fixed
+- **History Poster Auto-Hydration & In-Memory Cache Retention**:
+  - Fixed "Poster unavailable" placeholders in `/history` by automatically resolving missing cover URLs and decoding posters in the background.
+  - Preserved in-memory decoded image caches when opening `/history` to eliminate unnecessary UI redraw latency.
+  - Added multi-source fallback extraction for cover URLs across playback, preview, and search results.
 - **Stream Pool Initialization on Audio Selection**: Fixed stream fetching hanging on "Loading streams..." when selecting non-default audio dubs by ensuring stream pool entries are initialized before episode fetch.
 - **Title Sanitization & Preservation**: Enhanced `clean_moviebox_title` to sanitize international audio dubs, video quality tags, and format markers across downloads, folder organization, and watch history while preserving 4-digit release years.
 - **Terminal Restoration & Signal Handling**: Added `Ctrl+C` keyboard handling and asynchronous `SIGINT` signal listener to guarantee raw mode and alternate screen are always cleanly restored.

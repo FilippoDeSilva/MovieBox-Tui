@@ -177,9 +177,7 @@ impl App {
                     self.state.preview_loading = false;
                     self.state.poster_image = None;
                     self.state.poster_protocol = None;
-                    self.state.search_posters.clear();
                     self.state.failed_posters.clear();
-                    self.state.search_poster_protocols.clear();
                     self.state.in_flight_posters.clear();
                     self.state.search_list_state.select(None);
                     self.state.search_suggestions.clear();
@@ -790,22 +788,15 @@ impl App {
                 self.state.poster_protocol = None;
                 if let Some(cached_img) = self.state.image_cache.get(&id) {
                     self.state.poster_image = Some((**cached_img).clone());
-                } else if let Some(cover_val) = json.get("cover")
-                    && let Some(url) = cover_val.get("url").and_then(|u| u.as_str())
-                {
+                } else if let Some(url) = crate::tui::app::playback::extract_cover_url(&json) {
+                    self.state.history.update_cover_url(&id, &url);
                     let url_clone = url.to_string();
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
-                    let provider = self.provider_for_subject(&id);
                     tokio::spawn(async move {
                         if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                             let id_clone = id_clone.clone();
-                            move || {
-                                crate::cache::get_namespaced_image_cache(
-                                    provider.cache_key(),
-                                    &id_clone,
-                                )
-                            }
+                            move || crate::cache::get_namespaced_image_cache("posters", &id_clone)
                         })
                         .await
                         {
@@ -824,7 +815,7 @@ impl App {
                             let id_clone2 = id_clone.clone();
                             let _ = tokio::task::spawn_blocking(move || {
                                 crate::cache::set_namespaced_image_cache(
-                                    provider.cache_key(),
+                                    "posters",
                                     &id_clone2,
                                     &bytes_clone,
                                 )
@@ -840,6 +831,7 @@ impl App {
 
             Action::PosterSuccess(id, img) => {
                 self.state.image_cache.put(id.clone(), img.clone());
+                self.state.search_posters.put(id.clone(), img.clone());
 
                 let current_id = if self.state.active_screen == Screen::Details {
                     self.state.active_subject_id.clone()
@@ -860,6 +852,7 @@ impl App {
             Action::SearchPosterLoaded(id, img_opt) => {
                 self.state.in_flight_posters.remove(&id);
                 if let Some(img) = img_opt {
+                    self.state.image_cache.put(id.clone(), img.clone());
                     self.state.search_posters.put(id, img);
                 } else {
                     self.state.failed_posters.put(id, ());
@@ -925,22 +918,18 @@ impl App {
                         .or_else(|| self.state.search_posters.get(&id))
                     {
                         self.state.poster_image = Some((**cached_img).clone());
-                    } else if let Some(cover_val) = payload.get("cover")
-                        && let Some(url) = cover_val.get("url").and_then(|u| u.as_str())
+                    } else if let Some(url) = crate::tui::app::playback::extract_cover_url(&payload)
                     {
+                        self.state.history.update_cover_url(&id, &url);
                         let url_clone = url.to_string();
                         let action_tx = self.action_sender.clone();
                         let id_clone = id.clone();
-                        let provider = context.provider;
                         let http_client = self.client.http_client().clone();
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id_clone.clone();
                                 move || {
-                                    crate::cache::get_namespaced_image_cache(
-                                        provider.cache_key(),
-                                        &id_clone,
-                                    )
+                                    crate::cache::get_namespaced_image_cache("posters", &id_clone)
                                 }
                             })
                             .await
@@ -961,10 +950,10 @@ impl App {
                                 let id_clone2 = id_clone.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
                                     crate::cache::set_namespaced_image_cache(
-                                        provider.cache_key(),
+                                        "posters",
                                         &id_clone2,
                                         &bytes_clone,
-                                    )
+                                    );
                                 })
                                 .await;
                                 if let Some(img) = network::decode_poster(bytes).await {

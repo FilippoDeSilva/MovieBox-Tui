@@ -116,6 +116,19 @@ impl HistoryManager {
         }
     }
 
+    pub fn update_cover_url(&mut self, subject_id: &str, cover_url: &str) {
+        let mut modified = false;
+        for item in &mut self.recent {
+            if item.subject_id == subject_id && item.cover_url.is_none() {
+                item.cover_url = Some(cover_url.to_string());
+                modified = true;
+            }
+        }
+        if modified {
+            self.save();
+        }
+    }
+
     pub fn is_watched(
         &self,
         provider: &str,

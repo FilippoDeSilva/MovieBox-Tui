@@ -2,6 +2,37 @@ use super::App;
 use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
+pub(crate) fn extract_cover_url(val: &serde_json::Value) -> Option<String> {
+    let keys = [
+        "cover",
+        "poster",
+        "pic",
+        "coverUrl",
+        "cover_url",
+        "posterUrl",
+        "poster_url",
+        "thumbnail",
+        "image",
+        "logo",
+        "imgUrl",
+        "img_url",
+    ];
+    for key in keys {
+        if let Some(v) = val.get(key) {
+            if let Some(s) = v.as_str() {
+                if !s.is_empty() {
+                    return Some(s.to_string());
+                }
+            } else if let Some(url) = v.get("url").and_then(|u| u.as_str()) {
+                if !url.is_empty() {
+                    return Some(url.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 impl App {
     fn preferred_playback_player(
         &self,
@@ -28,12 +59,7 @@ impl App {
             if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
                 title = crate::providers::moviebox::clean_moviebox_title(t);
             }
-            cover_url = details
-                .get("poster")
-                .or_else(|| details.get("cover"))
-                .or_else(|| details.get("pic"))
-                .and_then(|c| c.as_str().or_else(|| c.get("url").and_then(|u| u.as_str())))
-                .map(|s| s.to_string());
+            cover_url = extract_cover_url(details);
             stype = crate::tui::state::stype(details);
             if let Some(y) = details
                 .get("year")
@@ -43,6 +69,36 @@ impl App {
                 release_year = y.to_string();
             } else if let Some(y) = details.get("year").and_then(|y| y.as_i64()) {
                 release_year = y.to_string();
+            }
+        }
+
+        if cover_url.is_none() {
+            cover_url = self
+                .state
+                .search_results
+                .iter()
+                .find(|r| r.id == *subject_id)
+                .and_then(|r| r.cover_url.clone());
+        }
+
+        if cover_url.is_none() {
+            if let Some(preview) = &self.state.search_preview {
+                cover_url = extract_cover_url(preview);
+            }
+        }
+
+        if title == "Unknown" {
+            if let Some(res) = self
+                .state
+                .search_results
+                .iter()
+                .find(|r| r.id == *subject_id)
+            {
+                title = res.title.clone();
+                stype = res.stype;
+                if release_year == "Unknown" {
+                    release_year = res.release_year.clone();
+                }
             }
         }
 

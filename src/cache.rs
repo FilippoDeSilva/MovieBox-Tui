@@ -302,23 +302,48 @@ fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
     path
 }
 
-pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> {
-    let path = get_namespaced_image_path(namespace, id);
+const IMAGE_CACHE_EXPIRY_SECS: u64 = 30 * 24 * 60 * 60;
+
+fn check_image_file(path: &PathBuf) -> Option<Vec<u8>> {
     if path.exists() {
-        if let Ok(metadata) = std::fs::metadata(&path) {
+        if let Ok(metadata) = std::fs::metadata(path) {
             match metadata.modified().ok().and_then(|m| m.elapsed().ok()) {
-                Some(elapsed) if elapsed.as_secs() > CACHE_EXPIRY_SECS => {
-                    let _ = std::fs::remove_file(&path);
+                Some(elapsed) if elapsed.as_secs() > IMAGE_CACHE_EXPIRY_SECS => {
+                    let _ = std::fs::remove_file(path);
                     return None;
                 }
                 None => {
-                    let _ = std::fs::remove_file(&path);
+                    let _ = std::fs::remove_file(path);
                     return None;
                 }
                 _ => {}
             }
         }
-        return std::fs::read(&path).ok();
+        return std::fs::read(path).ok();
+    }
+    None
+}
+
+pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> {
+    let path = get_namespaced_image_path(namespace, id);
+    if let Some(bytes) = check_image_file(&path) {
+        return Some(bytes);
+    }
+    let fallback_namespaces = [
+        "posters",
+        "moviebox",
+        "fourkhdhub",
+        "iptv",
+        "circleftp",
+        "dhakaflix",
+    ];
+    for fb in fallback_namespaces {
+        if fb != namespace {
+            let fb_path = get_namespaced_image_path(fb, id);
+            if let Some(bytes) = check_image_file(&fb_path) {
+                return Some(bytes);
+            }
+        }
     }
     None
 }
