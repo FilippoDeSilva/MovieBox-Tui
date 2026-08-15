@@ -881,17 +881,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             Span::styled(format!("{codec:<8}"), secondary_style),
                         ];
                         if is_fourk && stream_width >= 58 {
-                            stream_spans
-                                .push(Span::styled(format!("{language:<16}"), secondary_style));
+                            let mirror_str = format!(
+                                "{source_count} mirror{}",
+                                if source_count == 1 { "" } else { "s" }
+                            );
+                            let mirror_width = mirror_str.len() + 2;
+                            let max_lang_width = stream_width.saturating_sub(9 + 8 + mirror_width);
+                            let display_lang =
+                                crate::tui::text::truncate_width(language, max_lang_width);
                             stream_spans.push(Span::styled(
-                                format!(
-                                    "{source_count} mirror{}",
-                                    if source_count == 1 { "" } else { "s" }
-                                ),
+                                format!("{display_lang:<16}  "),
                                 secondary_style,
                             ));
+                            stream_spans.push(Span::styled(mirror_str, secondary_style));
                         } else if is_fourk && stream_width >= 38 {
-                            stream_spans.push(Span::styled(language.to_string(), secondary_style));
+                            let max_lang_width = stream_width.saturating_sub(9 + 8 + 2);
+                            let display_lang =
+                                crate::tui::text::truncate_width(language, max_lang_width);
+                            stream_spans
+                                .push(Span::styled(display_lang.to_string(), secondary_style));
                         } else if !is_fourk && stream_width >= 64 {
                             let fixed_width = 9 + 8 + 12;
                             let uploader = crate::tui::text::truncate_width(
