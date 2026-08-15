@@ -37,8 +37,11 @@
   - Unified image caching under a shared namespace with automatic cross-namespace lookup across MovieBox, 4KHDHub, IPTV, CircleFTP, and DhakaFlix.
 - **Streamlined Browse Views**:
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
-- **Terminal Graphics Fallback Overrides**:
-  - Added `MOVIEBOX_NO_IMAGE=1` and `MOVIEBOX_HALFBLOCKS=1` environment overrides to disable terminal image querying or force Unicode halfblock graphics for SSH, tmux, and slow remote connections.
+- **Native Graphics & Clean Text Placeholders**:
+  - Replaced noisy halfblock mosaic fallback with clean, organized text cards (`Poster unavailable` in search results, `No Art` in details) on non-graphics terminals.
+  - Eliminated ANSI block characters, yellow/white selection redraw bars, and unnecessary background image downloads on basic terminals.
+  - Preserved full native high-resolution graphical rendering on Sixel, Kitty, and iTerm2 supported terminals.
+  - Added `MOVIEBOX_NO_IMAGE=1` environment override to disable image probing on slow or headless sessions.
 
 ### Fixed
 - **Default Audio Track Prioritization (Original / English)**:

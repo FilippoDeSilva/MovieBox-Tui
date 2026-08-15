@@ -33,7 +33,6 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `MOVIEBOX_FOURKHDHUB_URL` | Override the 4KHDHub base URL.                                                    |
 | `MOVIEBOX_THEME`          | Force a theme (e.g. `Mocha`, `Latte`).                                            |
 | `MOVIEBOX_NO_IMAGE`       | Disable poster image queries (set to `1` or `true`).                              |
-| `MOVIEBOX_HALFBLOCKS`     | Force halfblock Unicode character graphics for posters (set to `1` or `true`).    |
 
 ## CLI
 

@@ -121,12 +121,7 @@ impl App {
     }
 
     pub(super) fn prepare_image_refresh(&mut self) {
-        if self.state.image_picker.as_ref().is_some_and(|picker| {
-            !matches!(
-                picker.protocol_type(),
-                ratatui_image::picker::ProtocolType::Halfblocks
-            )
-        }) {
+        if self.state.image_picker.is_some() {
             self.state.clear_terminal_before_draw = true;
         }
     }

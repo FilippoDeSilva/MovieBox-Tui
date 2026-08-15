@@ -72,7 +72,6 @@ async fn main() -> std::io::Result<()> {
         println!("    MOVIEBOX_IINA_PATH      Custom iina-cli binary path");
         println!("    MOVIEBOX_FOURKHDHUB_URL Custom 4KHDHub base URL");
         println!("    MOVIEBOX_NO_IMAGE       Disable poster image queries (1/true)");
-        println!("    MOVIEBOX_HALFBLOCKS     Force halfblock terminal graphics (1/true)");
         return Ok(());
     }
     if args

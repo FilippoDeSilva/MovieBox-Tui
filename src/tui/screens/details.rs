@@ -301,11 +301,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .border_style(theme.muted);
 
         let inner = placeholder_block.inner(poster_area);
-        let lines = if inner.height >= 5 {
-            let pad_top = "\n".repeat((inner.height.saturating_sub(5) / 2) as usize);
-            format!("{pad_top}Poster preview\nunsupported\n\nUse a graphics-\ncapable terminal")
+        let lines = if inner.height >= 4 {
+            let pad_top = "\n".repeat((inner.height.saturating_sub(2) / 2) as usize);
+            format!("{pad_top}No\nPoster")
         } else {
-            "Poster\nunsupported".to_string()
+            "No Art".to_string()
         };
 
         let placeholder = Paragraph::new(lines)

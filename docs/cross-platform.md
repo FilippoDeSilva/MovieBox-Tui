@@ -16,9 +16,7 @@ Supported: macOS, Linux, Windows, and Android (Termux). The codebase uses
 
 The app probes the terminal at startup via `ratatui_image`:
 
-- **Poster rendering**: Sixel / Kitty / iTerm2 / HalfBlocks per terminal support; the
-  image protocol is re-queried on resize and scroll, and focus changes use a soft
-  refresh so launching a player does not flash the screen. Users can explicitly disable image querying via `MOVIEBOX_NO_IMAGE=1` or force Unicode halfblock rendering via `MOVIEBOX_HALFBLOCKS=1`.
+- **Poster rendering**: High-resolution graphics via Sixel, Kitty, and iTerm2 protocols when supported by the terminal. Non-graphics terminals (e.g. standard Apple Terminal.app, basic xterm) gracefully display clean, aligned text placeholders (`Poster unavailable` / `No Art`) with zero block redraw artifacts. Image queries can be disabled via `MOVIEBOX_NO_IMAGE=1`.
 - **Terminal classification**: `TERM=dumb`/`linux` fall back to a basic UI.
 - Focus events (focus loss/gain) are used to re-render in place without clearing.
 

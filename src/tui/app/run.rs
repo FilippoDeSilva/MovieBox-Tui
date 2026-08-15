@@ -14,22 +14,26 @@ impl App {
     {
         if self.state.image_picker.is_none() && self.state.image_supported {
             let picker = if crate::tui::terminal::should_query_images() {
-                if std::env::var("MOVIEBOX_HALFBLOCKS")
-                    .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                {
-                    ratatui_image::picker::Picker::halfblocks()
-                } else {
-                    ratatui_image::picker::Picker::from_query_stdio()
-                        .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
-                }
+                ratatui_image::picker::Picker::from_query_stdio().ok()
             } else {
-                ratatui_image::picker::Picker::halfblocks()
+                None
             };
-            let cell_h = picker.font_size().height;
-            if cell_h > 0 {
-                self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
+            if let Some(picker) = picker
+                && !matches!(
+                    picker.protocol_type(),
+                    ratatui_image::picker::ProtocolType::Halfblocks
+                )
+            {
+                let cell_h = picker.font_size().height;
+                if cell_h > 0 {
+                    self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
+                }
+                self.state.image_picker = Some(picker);
+                self.state.image_supported = true;
+            } else {
+                self.state.image_supported = false;
+                self.state.image_picker = None;
             }
-            self.state.image_picker = Some(picker);
         }
 
         let mut events = EventHandler::new(Duration::from_millis(100));

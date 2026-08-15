@@ -592,7 +592,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         width: 12,
                         height: placeholder_height,
                     };
-                    let placeholder = Paragraph::new("Poster\nunsupported")
+                    let placeholder = Paragraph::new("Poster\nunavailable")
                         .style(theme.text_dim)
                         .alignment(Alignment::Center);
                     frame.render_widget(placeholder, p_area);
