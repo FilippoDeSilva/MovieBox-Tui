@@ -358,7 +358,18 @@ impl App {
                                 .ok();
                             return None;
                         } else {
-                            self.fourk_client.clone()
+                            match self.fourk_client.clone() {
+                                Some(client) => client,
+                                None => {
+                                    self.state.is_resolving_playback = false;
+                                    self.action_sender
+                                        .send(Action::SetStatus(
+                                            "Error: 4KHDHub provider is unavailable".to_string(),
+                                        ))
+                                        .ok();
+                                    return None;
+                                }
+                            }
                         };
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {

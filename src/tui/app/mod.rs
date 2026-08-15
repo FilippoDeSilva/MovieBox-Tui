@@ -21,7 +21,7 @@ pub struct App {
     state: AppState,
     theme: Theme,
     client: MovieBoxClient,
-    fourk_client: FourKHdHubClient,
+    fourk_client: Option<FourKHdHubClient>,
     circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient,
     dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
     action_sender: mpsc::UnboundedSender<Action>,
@@ -70,12 +70,15 @@ impl App {
             theme,
             state,
             client: MovieBoxClient::new(),
-            fourk_client: FourKHdHubClient::new(),
+            fourk_client: FourKHdHubClient::new().ok(),
             circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient::new(),
             dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient::new(),
             action_sender,
             action_receiver,
         };
+        if app.fourk_client.is_none() {
+            log::warn!("4KHDHub client unavailable; provider will be disabled");
+        }
         if provider_was_sanitized {
             app.persist_config();
         }

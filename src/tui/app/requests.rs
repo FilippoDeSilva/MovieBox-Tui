@@ -1305,13 +1305,14 @@ impl App {
                     tokio::spawn(async move {
                         let result = match context.provider {
                             ProviderKind::FourKHdHub => {
-                                crate::providers::ReleaseProvider::episode_streams(
-                                    &fourk_client,
-                                    &id,
-                                    season,
-                                    episode,
-                                )
-                                .await
+                                if let Some(client) = fourk_client.as_ref() {
+                                    crate::providers::ReleaseProvider::episode_streams(
+                                        client, &id, season, episode,
+                                    )
+                                    .await
+                                } else {
+                                    Err("4KHDHub provider is unavailable".to_string())
+                                }
                             }
                             ProviderKind::BdixCircleFtp => {
                                 crate::providers::ReleaseProvider::episode_streams(

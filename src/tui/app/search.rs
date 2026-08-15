@@ -432,7 +432,7 @@ impl App {
 
             let result = network::provider_search(
                 &client,
-                &fourk_client,
+                fourk_client.as_ref(),
                 &circleftp_client,
                 &dhakaflix_client,
                 context.provider,
@@ -545,7 +545,7 @@ impl App {
 
             let result = network::provider_details(
                 &client,
-                &fourk_client,
+                fourk_client.as_ref(),
                 &circleftp_client,
                 &dhakaflix_client,
                 context.provider,

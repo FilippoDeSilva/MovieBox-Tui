@@ -24,7 +24,7 @@ pub(super) async fn decode_poster(bytes: Vec<u8>) -> Option<std::sync::Arc<image
 
 pub(super) async fn provider_search(
     moviebox: &MovieBoxClient,
-    fourk: &FourKHdHubClient,
+    fourk: Option<&FourKHdHubClient>,
     circleftp: &crate::providers::bdix::circleftp::CircleFtpClient,
     dhakaflix: &crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
     provider: ProviderKind,
@@ -33,7 +33,10 @@ pub(super) async fn provider_search(
 ) -> Result<serde_json::Value, String> {
     match provider {
         ProviderKind::MovieBox => Provider::search(moviebox, query, page).await,
-        ProviderKind::FourKHdHub => Provider::search(fourk, query, page).await,
+        ProviderKind::FourKHdHub => {
+            let fourk = fourk.ok_or_else(|| "4KHDHub provider is unavailable".to_string())?;
+            Provider::search(fourk, query, page).await
+        }
         ProviderKind::BdixCircleFtp => Provider::search(circleftp, query, page).await,
         ProviderKind::BdixDhakaFlix => Provider::search(dhakaflix, query, page).await,
     }
@@ -41,7 +44,7 @@ pub(super) async fn provider_search(
 
 pub(super) async fn provider_details(
     moviebox: &MovieBoxClient,
-    fourk: &FourKHdHubClient,
+    fourk: Option<&FourKHdHubClient>,
     circleftp: &crate::providers::bdix::circleftp::CircleFtpClient,
     dhakaflix: &crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
     provider: ProviderKind,
@@ -49,7 +52,10 @@ pub(super) async fn provider_details(
 ) -> Result<serde_json::Value, String> {
     match provider {
         ProviderKind::MovieBox => Provider::details(moviebox, subject_id).await,
-        ProviderKind::FourKHdHub => Provider::details(fourk, subject_id).await,
+        ProviderKind::FourKHdHub => {
+            let fourk = fourk.ok_or_else(|| "4KHDHub provider is unavailable".to_string())?;
+            Provider::details(fourk, subject_id).await
+        }
         ProviderKind::BdixCircleFtp => Provider::details(circleftp, subject_id).await,
         ProviderKind::BdixDhakaFlix => Provider::details(dhakaflix, subject_id).await,
     }

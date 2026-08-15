@@ -23,20 +23,11 @@ pub struct FourKHdHubClient {
     base_url: Url,
 }
 
-impl Default for FourKHdHubClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FourKHdHubClient {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, FourKHdHubError> {
         let base = std::env::var("MOVIEBOX_FOURKHDHUB_URL")
             .unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
-        Self::with_base_url(&base).unwrap_or_else(|_| Self {
-            client: build_client(),
-            base_url: Url::parse(DEFAULT_BASE_URL).expect("valid default 4KHDHub URL"),
-        })
+        Self::with_base_url(&base)
     }
 
     pub fn with_base_url(base: &str) -> Result<Self, FourKHdHubError> {
