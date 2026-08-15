@@ -25,7 +25,7 @@ and length is capped.
 - **Series downloads:** Saved under `<base_dir>/Series/<Title>/Season <N>/<Title> - S<N:02>E<E:02>.<ext>` (and subtitle `<Title> - S<N:02>E<E:02>.<lang>.<sub_ext>`).
 - **Movie downloads:** Saved under `<base_dir>/Movies/<Title>/<Title>.<ext>` (and subtitle `<Title>.<lang>.<sub_ext>`).
 - **Default path:** Files go to the user's OS download directory (`~/Downloads/MovieBox-TUI`). On Android-family environments the code prefers shared `storage/downloads` when present.
-- **Custom path:** Users can set a custom download directory using `/download-dir <path>` or revert with `/download-dir reset`. Target directories are validated with active write probes before saving, and the engine automatically falls back to default if custom storage becomes unavailable at runtime.
+- **Custom path:** Users can set a custom download directory using `/download-dir <path>` or revert with `/download-dir reset`. Target directories are validated with active write probes before saving, consistently creating the organized `MovieBox-TUI` subfolder hierarchy (`Movies/` and `Series/`), and the engine automatically falls back to default if custom storage becomes unavailable at runtime.
 
 ## Contextual triggers & Seasons
 

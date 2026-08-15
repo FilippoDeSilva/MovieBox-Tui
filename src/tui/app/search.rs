@@ -188,14 +188,7 @@ impl App {
             self.state.input_mode = InputMode::Normal;
 
             if raw_arg.is_empty() {
-                let current = if let Some(ref custom) = self.state.download_dir {
-                    crate::logging::sanitize_path(custom)
-                } else {
-                    let default_base = dirs::download_dir()
-                        .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
-                        .unwrap_or_else(|| std::path::PathBuf::from("."));
-                    crate::logging::sanitize_path(default_base.join("MovieBox-TUI"))
-                };
+                let current = crate::logging::sanitize_path(self.resolve_download_base_dir());
                 self.state
                     .notify(NotificationKind::Info, "Download Directory", current);
                 return Some(true);
@@ -266,10 +259,12 @@ impl App {
                             };
                             self.state.download_dir = Some(clean_path.clone());
                             self.persist_config();
+                            let effective =
+                                crate::logging::sanitize_path(self.resolve_download_base_dir());
                             self.state.notify(
                                 NotificationKind::Success,
                                 "Download Directory",
-                                format!("Saved: {}", clean_path.display()),
+                                format!("Saved: {effective}"),
                             );
                         }
                         Err(err) => {

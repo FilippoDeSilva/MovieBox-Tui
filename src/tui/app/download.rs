@@ -2,6 +2,22 @@ use super::App;
 use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
+fn ensure_moviebox_subdir(path: &std::path::Path) -> std::path::PathBuf {
+    let is_already_mb = path
+        .file_name()
+        .map(|name| {
+            let s = name.to_string_lossy();
+            s.eq_ignore_ascii_case("MovieBox-TUI") || s.eq_ignore_ascii_case("MovieBox")
+        })
+        .unwrap_or(false);
+
+    if is_already_mb {
+        path.to_path_buf()
+    } else {
+        path.join("MovieBox-TUI")
+    }
+}
+
 impl App {
     pub(super) fn resolve_download_base_dir(&self) -> std::path::PathBuf {
         if let Some(ref custom_dir) = self.state.download_dir {
@@ -16,7 +32,7 @@ impl App {
                 }
             }
             if cached_ok {
-                return custom_dir.clone();
+                return ensure_moviebox_subdir(custom_dir);
             }
             if std::fs::create_dir_all(custom_dir).is_ok() {
                 let probe = custom_dir.join(format!(".mb_probe_{}", std::process::id()));
@@ -25,7 +41,7 @@ impl App {
                     if let Ok(mut guard) = LAST_PROBE.lock() {
                         *guard = Some((custom_dir.clone(), std::time::Instant::now()));
                     }
-                    return custom_dir.clone();
+                    return ensure_moviebox_subdir(custom_dir);
                 }
             }
             log::warn!("Custom download directory inaccessible; falling back to default");
@@ -46,7 +62,7 @@ impl App {
             base_dir
         };
 
-        base_dir.join("MovieBox-TUI")
+        ensure_moviebox_subdir(&base_dir)
     }
 
     pub(super) fn start_resilient_download(
