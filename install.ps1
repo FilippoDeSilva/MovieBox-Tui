@@ -25,7 +25,7 @@ USAGE:
     .\install.ps1 [OPTIONS]
 
 OPTIONS:
-    -Version <tag>       Install a specific version (e.g. v0.1.11)
+    -Version <tag>       Install a specific version (e.g. v0.1.12)
     -InstallDir <path>   Install binary to a custom directory
     -Force               Reinstall even if already at the latest version
     -DryRun              Perform preflight checks without writing files

@@ -50,7 +50,7 @@ USAGE:
     ./install.sh [OPTIONS]
 
 OPTIONS:
-    -v, --version <tag>    Install a specific version (e.g. v0.1.11)
+    -v, --version <tag>    Install a specific version (e.g. v0.1.12)
         --dir <path>       Install binary to a custom directory
     -f, --force            Reinstall even if already at the latest version
         --dry-run          Perform preflight checks without writing files
