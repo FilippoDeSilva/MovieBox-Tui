@@ -19,7 +19,6 @@ impl App {
                         "/toggle-update",
                         "/github",
                         "/theme",
-                        "/themes",
                         "/enable-bdix",
                         "/disable-bdix",
                     ];

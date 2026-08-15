@@ -157,7 +157,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
                 Span::styled("Disable BDIX FTP", theme.text),
             ]),
             Line::from(vec![
-                Span::styled("    /theme,/themes ", theme.header),
+                Span::styled("    /theme         ", theme.header),
                 Span::styled("Change UI Theme", theme.text),
             ]),
         ]);

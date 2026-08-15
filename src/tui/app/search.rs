@@ -169,7 +169,7 @@ impl App {
             self.action_sender.send(Action::CheckForUpdates).ok();
             return Some(true);
         }
-        if lower_query == "/theme" || lower_query == "/themes" {
+        if lower_query == "/theme" {
             self.state.search_query.clear();
             self.state.input_mode = InputMode::Normal;
             self.action_sender.send(Action::ToggleThemePopup).ok();

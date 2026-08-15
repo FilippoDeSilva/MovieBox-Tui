@@ -206,7 +206,7 @@ moviebox-tui
 | `/list`              | Show IPTV channels                        |
 | `/config`            | Configure IPTV playlists                  |
 | `/github`            | Open the project repository               |
-| `/theme`, `/themes`  | Open the theme picker                     |
+| `/theme`             | Open the theme picker                     |
 | `/update`            | Check for a newer release                 |
 | `/toggle-update`     | Enable or disable automatic update checks |
 | `/clear-cache`       | Remove cached application data            |
