@@ -14,8 +14,14 @@ impl App {
     {
         if self.state.image_picker.is_none() && self.state.image_supported {
             let picker = if crate::tui::terminal::should_query_images() {
-                ratatui_image::picker::Picker::from_query_stdio()
-                    .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
+                if std::env::var("MOVIEBOX_HALFBLOCKS")
+                    .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                {
+                    ratatui_image::picker::Picker::halfblocks()
+                } else {
+                    ratatui_image::picker::Picker::from_query_stdio()
+                        .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
+                }
             } else {
                 ratatui_image::picker::Picker::halfblocks()
             };

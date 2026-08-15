@@ -37,6 +37,8 @@
   - Unified image caching under a shared namespace with automatic cross-namespace lookup across MovieBox, 4KHDHub, IPTV, CircleFTP, and DhakaFlix.
 - **Streamlined Browse Views**:
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
+- **Terminal Graphics Fallback Overrides**:
+  - Added `MOVIEBOX_NO_IMAGE=1` and `MOVIEBOX_HALFBLOCKS=1` environment overrides to disable terminal image querying or force Unicode halfblock graphics for SSH, tmux, and slow remote connections.
 
 ### Fixed
 - **Default Audio Track Prioritization (Original / English)**:

@@ -64,12 +64,15 @@ async fn main() -> std::io::Result<()> {
         println!("    -h, --help           Print help information");
         println!("    -v, -V, --version    Print version information\n");
         println!("ENVIRONMENT VARIABLES:");
-        println!("    MOVIEBOX_LOG         Log level (info, warn, error, debug, trace)");
-        println!("    MOVIEBOX_THEME       Theme name (e.g. catppuccin, dracula, nord, etc.)");
-        println!("    MOVIEBOX_PLAYER      Preferred player (mpv, iina, vlc, android)");
-        println!("    MOVIEBOX_MPV_PATH    Custom mpv binary path");
-        println!("    MOVIEBOX_VLC_PATH    Custom vlc binary path");
-        println!("    MOVIEBOX_IINA_PATH   Custom iina-cli binary path");
+        println!("    MOVIEBOX_LOG            Log level (info, warn, error, debug, trace)");
+        println!("    MOVIEBOX_THEME          Theme name (e.g. catppuccin, dracula, nord, etc.)");
+        println!("    MOVIEBOX_PLAYER         Preferred player (mpv, iina, vlc, android)");
+        println!("    MOVIEBOX_MPV_PATH       Custom mpv binary path");
+        println!("    MOVIEBOX_VLC_PATH       Custom vlc binary path");
+        println!("    MOVIEBOX_IINA_PATH      Custom iina-cli binary path");
+        println!("    MOVIEBOX_FOURKHDHUB_URL Custom 4KHDHub base URL");
+        println!("    MOVIEBOX_NO_IMAGE       Disable poster image queries (1/true)");
+        println!("    MOVIEBOX_HALFBLOCKS     Force halfblock terminal graphics (1/true)");
         return Ok(());
     }
     if args
