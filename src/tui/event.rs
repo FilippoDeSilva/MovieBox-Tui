@@ -66,4 +66,8 @@ impl EventHandler {
     pub async fn next(&mut self) -> Option<Action> {
         self.receiver.recv().await
     }
+
+    pub fn try_recv(&mut self) -> Result<Action, mpsc::error::TryRecvError> {
+        self.receiver.try_recv()
+    }
 }

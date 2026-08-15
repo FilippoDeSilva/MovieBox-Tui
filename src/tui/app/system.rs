@@ -96,10 +96,10 @@ impl App {
                 self.prepare_image_soft_refresh();
             }
 
-            Action::Resize(_w, _h) => {
-                self.prepare_image_refresh();
+            Action::Resize(w, h) => {
+                self.state.last_resize_time = Some((std::time::Instant::now(), w, h));
                 self.state.poster_protocol = None;
-                self.state.search_poster_protocols.clear();
+                self.state.dirty = true;
             }
 
             Action::SwitchProvider(provider) => self.switch_provider(provider),
