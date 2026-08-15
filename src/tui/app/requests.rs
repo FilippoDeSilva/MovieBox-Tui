@@ -1058,12 +1058,7 @@ impl App {
                 self.state.episode_list_state.select(Some(ep_idx));
 
                 if let Some(dubs) = payload.get("dubs").and_then(|d| d.as_array()) {
-                    let matching_idx = dubs.iter().position(|dub| {
-                        dub.get("subjectId").and_then(crate::tui::state::subject_id)
-                            == Some(id.clone())
-                    });
-
-                    let fallback_idx = || {
+                    let find_by_pattern = |patterns: &[&str]| {
                         dubs.iter().position(|dub| {
                             let labels = [
                                 dub.get("title").and_then(|v| v.as_str()),
@@ -1073,13 +1068,23 @@ impl App {
                             ];
                             let label = labels.into_iter().flatten().collect::<Vec<_>>().join(" ");
                             let lower = label.to_ascii_lowercase();
-                            lower.contains("original")
-                                || lower.contains("english")
-                                || lower.contains("sub")
+                            patterns.iter().any(|pat| lower.contains(pat))
                         })
                     };
 
-                    let preferred_idx = matching_idx.or_else(fallback_idx).unwrap_or(0);
+                    let preferred_idx = if self.state.language_chosen {
+                        dubs.iter()
+                            .position(|dub| {
+                                dub.get("subjectId").and_then(crate::tui::state::subject_id)
+                                    == Some(id.clone())
+                            })
+                            .unwrap_or(0)
+                    } else {
+                        find_by_pattern(&["original", "orig"])
+                            .or_else(|| find_by_pattern(&["english", "eng"]))
+                            .unwrap_or(0)
+                    };
+
                     self.state.language_list_state.select(Some(preferred_idx));
                 } else {
                     self.state.language_list_state.select(Some(0));

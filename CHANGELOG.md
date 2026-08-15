@@ -39,6 +39,9 @@
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
 
 ### Fixed
+- **Default Audio Track Prioritization (Original / English)**:
+  - Fixed movie and series details defaulting to regional Hindi dubs on MovieBox by prioritizing `Original` and `English` audio tracks over localized search result subject IDs.
+  - Preserved explicit user language selections when intentionally switching between dubs.
 - **Home Landing Header & Footer Persistence**:
   - Fixed ASCII logo header and shortcut footer disappearing into a blank screen when clearing history or viewing empty search states by removing fragile tick-based animation gates.
   - Ensured the landing screen renders the logo, version, centered search bar, and footer shortcuts immediately on every frame.
