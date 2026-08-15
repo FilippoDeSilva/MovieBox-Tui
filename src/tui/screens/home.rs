@@ -761,8 +761,24 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .saturating_add(1)
             .saturating_sub(visible_count)
             .min(state.search_suggestions.len().saturating_sub(visible_count));
-        let dropdown_width = search_area.width;
-        let dropdown_x = search_area.x;
+
+        let max_suggestion_len = state
+            .search_suggestions
+            .iter()
+            .map(|s| crate::tui::text::width(s))
+            .max()
+            .unwrap_or(0) as u16;
+
+        let content_desired_width = max_suggestion_len
+            .saturating_add(8)
+            .max(search_area.width)
+            .max(54);
+
+        let dropdown_width = content_desired_width
+            .min(area.width.saturating_sub(4))
+            .max(20);
+
+        let dropdown_x = area.x + area.width.saturating_sub(dropdown_width) / 2;
         let dropdown_area = if suggestion_area.height >= dropdown_height {
             Rect {
                 x: dropdown_x,
@@ -849,25 +865,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .style(Style::default().bg(surface));
             frame.render_widget(list, dropdown_rows[1]);
 
-            let footer = if dropdown_area.width >= 50 {
+            let footer = if dropdown_area.width >= 46 {
                 Line::from(vec![
-                    Span::styled(" [", theme.text_dim),
+                    Span::styled("[", theme.text_dim),
                     Span::styled("↑↓", theme.shortcut),
                     Span::styled("] Move   [", theme.text_dim),
                     Span::styled("Enter", theme.shortcut),
-                    Span::styled("] Use   [", theme.text_dim),
+                    Span::styled("] Select   [", theme.text_dim),
                     Span::styled("Esc", theme.shortcut),
                     Span::styled("] Close", theme.text_dim),
                 ])
             } else {
                 Line::from(vec![
-                    Span::styled(" [", theme.text_dim),
+                    Span::styled("[", theme.text_dim),
                     Span::styled("↑↓", theme.shortcut),
                     Span::styled("] Move  [", theme.text_dim),
                     Span::styled("Enter", theme.shortcut),
-                    Span::styled("] Use  [", theme.text_dim),
-                    Span::styled("Esc", theme.shortcut),
-                    Span::styled("]", theme.text_dim),
+                    Span::styled("] Select", theme.text_dim),
                 ])
             }
             .centered();

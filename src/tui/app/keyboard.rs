@@ -10,10 +10,6 @@ impl App {
         use crossterm::event::{KeyCode, KeyModifiers};
 
         if key.modifiers.contains(KeyModifiers::CONTROL) {
-            if let KeyCode::Char('c') = key.code {
-                self.action_sender.send(Action::Quit).ok();
-                return Some(());
-            }
             if let KeyCode::Char('t') = key.code {
                 self.action_sender.send(Action::ToggleTvMode).ok();
                 return None;
