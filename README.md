@@ -47,6 +47,7 @@ guidance is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ### User Interface & App
 
 - Full mouse and keyboard controls: click search, suggestions, cards, tabs, and action buttons directly
+- Minimal tree-branch autocomplete suggestions with helpful slash command descriptions
 - View rich graphical posters in supported terminals (Kitty, iTerm2, Sixel) or fallback to text art
 - Let the app automatically manage configuration and clean up expired caches
 
