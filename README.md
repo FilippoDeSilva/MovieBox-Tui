@@ -53,7 +53,7 @@ MovieBox-TUI resolves links from upstream services. Availability can change when
 ## Requirements
 
 - 64-bit Windows, macOS, Linux, or Android (Termux)
-- Terminal size of at least 85×24
+- Terminal size of at least 50×14 (80×24+ recommended for optimal poster & metadata layout)
 - One supported player: mpv, VLC, IINA, or any native Android video player
 - Internet connection
 
@@ -194,6 +194,7 @@ moviebox-tui
 | `r`        | Refresh current content                               |
 | `Ctrl+P`   | Switch content provider                               |
 | `Ctrl+T`   | Toggle IPTV mode                                      |
+| `Ctrl+U`   | Clear active search query                             |
 | `?`        | Show help                                             |
 | `q`        | Quit                                                  |
 

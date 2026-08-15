@@ -22,6 +22,11 @@ The app probes the terminal at startup via `ratatui_image`:
 - **Terminal classification**: `TERM=dumb`/`linux` fall back to a basic UI.
 - Focus events (focus loss/gain) are used to re-render in place without clearing.
 
+## Network & TLS portability
+
+- **TLS Engine**: Uses pure-Rust `rustls` across all targets (macOS, Linux, Windows, Android/Termux), eliminating external C dependencies on OpenSSL.
+- **DNS Resolution**: Uses standard POSIX/WinSock system DNS (`getaddrinfo`) on all platforms, ensuring reliable domain resolution in both standard OS environments and native Android/Termux CLI sessions without requiring JNI or `ndk-context`.
+
 ## Things to verify per release
 
 - Player launch on each OS (mpv/VLC/IINA/Android intent) — window sizing, subtitles,

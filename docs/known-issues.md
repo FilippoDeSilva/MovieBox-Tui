@@ -26,6 +26,5 @@ Tracked here so future work and issue reports reference the same facts.
 
 ## Test coverage
 
-- There are no unit tests currently (per project decision); correctness is enforced by
-  the lint gate, type checking, and manual verification. CI runs `cargo audit` and
-  `cargo package`.
+- Unit tests cover browse ranking, score extraction, and curated group matching logic (`src/tui/app/search.rs`).
+- Correctness across UI and network flows is enforced by the lint gate (`cargo clippy`), type checking, unit tests (`cargo test`), and manual verification. CI runs `cargo audit` and `cargo package`.
