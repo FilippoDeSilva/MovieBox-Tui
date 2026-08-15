@@ -7,7 +7,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{
         Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, Wrap,
+        ScrollbarOrientation, ScrollbarState,
     },
 };
 
@@ -252,51 +252,87 @@ pub fn notifications(
     theme: &Theme,
     basic_terminal: bool,
 ) {
-    let mut y = area.bottom().saturating_sub(6);
+    let mut y = area.bottom().saturating_sub(2);
+    let surface = theme.surface0.fg.unwrap_or(theme.base);
+
     for notification in notifications.iter().rev().take(3) {
-        let message = middle_truncate(&notification.message, 48);
-        let title_width = crate::tui::text::width(&notification.title).saturating_add(6);
-        let message_width = crate::tui::text::width(&message);
-        let width = title_width
-            .max(message_width.saturating_add(4))
-            .clamp(24, 52)
+        let (badge, badge_style) = notification_style(notification.kind, theme, basic_terminal);
+        let has_message =
+            !notification.message.is_empty() && notification.message != notification.title;
+
+        let max_content_w = (area.width.saturating_sub(8) as usize).clamp(24, 48);
+        let message = middle_truncate(&notification.message, max_content_w);
+        let title_w = crate::tui::text::width(&notification.title).saturating_add(6);
+        let msg_w = if has_message {
+            crate::tui::text::width(&message).saturating_add(6)
+        } else {
+            0
+        };
+        let badge_w = badge.len().saturating_add(4);
+
+        let width = title_w
+            .max(msg_w)
+            .max(badge_w)
+            .clamp(28, 52)
             .min(area.width.saturating_sub(4) as usize) as u16;
-        if width < 4 || y < area.y {
+
+        let height = if has_message { 4 } else { 3 };
+
+        if width < 10 || y < area.y.saturating_add(height) {
             break;
         }
+
+        y = y.saturating_sub(height);
+
         let toast_area = Rect::new(
             area.right().saturating_sub(width).saturating_sub(2),
             y,
             width,
-            3,
+            height,
         );
+
         crate::tui::clear_area(frame, toast_area, theme);
-        let (symbol, style) = notification_style(notification.kind, theme, basic_terminal);
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled(format!(" {symbol} "), style),
-                Span::styled(
-                    notification.title.clone(),
-                    style.add_modifier(Modifier::BOLD),
+
+        let mut lines = Vec::new();
+        lines.push(Line::from(vec![
+            Span::styled(if basic_terminal { "* " } else { "▌ " }, badge_style),
+            Span::styled(
+                crate::tui::text::truncate_width(
+                    &notification.title,
+                    width.saturating_sub(5) as usize,
                 ),
-                Span::raw(" "),
-            ]))
+                theme.text.add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        if has_message {
+            lines.push(Line::from(vec![
+                Span::styled("  ", theme.subtext1),
+                Span::styled(
+                    crate::tui::text::truncate_width(&message, width.saturating_sub(5) as usize),
+                    theme.subtext1,
+                ),
+            ]));
+        }
+
+        let block = Block::default()
+            .title(Line::from(vec![Span::styled(
+                format!(" {badge} "),
+                badge_style.add_modifier(Modifier::BOLD),
+            )]))
             .borders(Borders::ALL)
             .border_type(if basic_terminal {
                 BorderType::Plain
             } else {
                 BorderType::Rounded
             })
-            .border_style(style)
+            .border_style(badge_style)
+            .style(Style::default().bg(surface))
             .padding(ratatui::widgets::Padding::horizontal(1));
-        frame.render_widget(
-            Paragraph::new(message)
-                .style(theme.text)
-                .wrap(Wrap { trim: true })
-                .block(block),
-            toast_area,
-        );
-        y = y.saturating_sub(4);
+
+        frame.render_widget(Paragraph::new(lines).block(block), toast_area);
+
+        y = y.saturating_sub(1);
     }
 }
 
@@ -359,13 +395,13 @@ pub(crate) fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
 fn notification_style(
     kind: NotificationKind,
     theme: &Theme,
-    basic_terminal: bool,
+    _basic_terminal: bool,
 ) -> (&'static str, Style) {
     match kind {
-        NotificationKind::Info => ("i", theme.sapphire),
-        NotificationKind::Success => (if basic_terminal { "+" } else { "✓" }, theme.success),
-        NotificationKind::Warning => ("!", theme.rating),
-        NotificationKind::Error => (if basic_terminal { "x" } else { "×" }, theme.error),
+        NotificationKind::Info => ("INFO", theme.sapphire),
+        NotificationKind::Success => ("SUCCESS", theme.success),
+        NotificationKind::Warning => ("WARNING", theme.rating),
+        NotificationKind::Error => ("ERROR", theme.error),
     }
 }
 
