@@ -459,51 +459,41 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 );
             }
 
-            let context = if state.is_tv_mode {
-                Line::from(vec![
-                    Span::styled("Live TV", theme.accent),
-                    Span::styled(" • ", theme.muted),
-                    Span::styled("Local playlists", theme.text_dim),
-                ])
-            } else {
-                Line::from(vec![
-                    Span::styled(state.active_provider.label().to_string(), theme.accent),
-                    Span::styled(" • ", theme.muted),
-                    Span::styled("Streaming", theme.text_dim),
-                ])
-            };
-            let context_area = if suggestions_open {
-                Rect::default()
-            } else if view == SearchViewState::Empty {
-                vertical_chunks[5]
-            } else {
+            if !suggestions_open && view != SearchViewState::Empty {
                 frame.render_widget(
                     Paragraph::new(search_hint(view, search_bar_area.width, theme))
                         .alignment(Alignment::Center),
                     vertical_chunks[5],
                 );
-                vertical_chunks[6]
-            };
-            if context_area.width > 0 {
-                frame.render_widget(
-                    Paragraph::new(context).alignment(Alignment::Center),
-                    context_area,
-                );
             }
 
-            let footer = Line::from(vec![
-                Span::styled("[", theme.text_dim),
-                Span::styled("?", theme.shortcut),
-                Span::styled("] ", theme.text_dim),
-                Span::styled("Help", theme.text_dim),
-                Span::raw("    "),
-                Span::styled("[", theme.text_dim),
-                Span::styled("q", theme.shortcut),
-                Span::styled("] ", theme.text_dim),
-                Span::styled("Quit", theme.text_dim),
-            ]);
+            let mut footer_spans = vec![];
+            let provider_name = if state.is_tv_mode {
+                "Live TV"
+            } else {
+                state.active_provider.label()
+            };
+
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled(
+                provider_name,
+                theme.text.add_modifier(Modifier::BOLD),
+            ));
+            footer_spans.push(Span::raw("    "));
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("?", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled("Help", theme.text_dim));
+            footer_spans.push(Span::raw("    "));
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("q", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled("Quit", theme.text_dim));
+
             frame.render_widget(
-                Paragraph::new(footer).alignment(Alignment::Center),
+                Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center),
                 vertical_chunks[8],
             );
         }

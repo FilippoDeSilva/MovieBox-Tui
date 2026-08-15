@@ -48,10 +48,11 @@ impl EventHandler {
                                 let _ = event_sender.send(Action::Resize(w, h)).await;
                             }
                             Err(error) => {
-                                let _ = event_sender.send(Action::SetStatus(format!(
-                                    "Error: terminal input failed: {error}"
-                                ))).await;
-                                break;
+                                if error.kind() == std::io::ErrorKind::Interrupted {
+                                    continue;
+                                }
+                                log::warn!("terminal input error: {error}");
+                                tokio::time::sleep(Duration::from_millis(50)).await;
                             }
                             _ => {}
                         }

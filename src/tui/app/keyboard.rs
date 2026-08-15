@@ -168,9 +168,6 @@ impl App {
                     self.state.suggest_index = None;
                     self.state.last_search_edit = std::time::Instant::now();
                 }
-                KeyCode::Char('q') if self.state.search_query.is_empty() => {
-                    self.action_sender.send(Action::Quit).ok();
-                }
                 KeyCode::Char(c) => {
                     self.state.search_query.push(c);
                     self.state.suggest_index = None;

@@ -25,7 +25,7 @@ impl App {
             return;
         }
         self.reset_transient_overlays();
-        self.prepare_image_refresh();
+        self.prepare_image_soft_refresh();
         self.state
             .fetch_cancel
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -77,6 +77,7 @@ impl App {
         self.state.poster_protocol = None;
         self.state.search_list_state.select(None);
         self.state.resource_list_state.select(None);
+        self.state.dirty = true;
         self.state.set_status(
             format!(
                 "{} selected. Search uses only this provider.",
@@ -90,6 +91,10 @@ impl App {
             tokio::spawn(async move {
                 let _ = client.init().await;
             });
+        }
+        if !self.state.search_query.trim().is_empty() {
+            let query = self.state.search_query.clone();
+            self.prepare_search_request(&query);
         }
     }
 

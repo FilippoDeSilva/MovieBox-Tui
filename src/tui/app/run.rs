@@ -13,18 +13,13 @@ impl App {
         std::io::Error: From<<B as ratatui::backend::Backend>::Error>,
     {
         if self.state.image_picker.is_none() && self.state.image_supported {
-            match ratatui_image::picker::Picker::from_query_stdio() {
-                Ok(picker) => {
-                    let cell_h = picker.font_size().height;
-                    if cell_h > 0 {
-                        self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
-                    }
-                    self.state.image_picker = Some(picker);
-                }
-                Err(_) => {
-                    self.state.image_supported = false;
-                }
+            let picker = ratatui_image::picker::Picker::from_query_stdio()
+                .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks());
+            let cell_h = picker.font_size().height;
+            if cell_h > 0 {
+                self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
             }
+            self.state.image_picker = Some(picker);
         }
 
         let mut events = EventHandler::new(Duration::from_millis(100));
