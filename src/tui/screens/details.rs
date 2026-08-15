@@ -1061,7 +1061,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 if name == "None" {
                     "No subtitles".to_string()
                 } else {
-                    name.clone()
+                    crate::tui::text::sanitize_language_label(name)
                 }
             })
             .collect::<Vec<_>>();

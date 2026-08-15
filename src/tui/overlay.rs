@@ -113,9 +113,16 @@ pub fn picker(
     frame.render_widget(block, popup);
 
     let sections = Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).split(inner);
+    let max_item_w = sections[0]
+        .width
+        .saturating_sub(if items.len() > visible_rows { 3 } else { 1 })
+        as usize;
     let list_items = items
         .iter()
-        .map(|item| ListItem::new(item.clone()).style(theme.text))
+        .map(|item| {
+            let truncated = crate::tui::text::truncate_width(item, max_item_w);
+            ListItem::new(truncated).style(theme.text)
+        })
         .collect::<Vec<_>>();
     let list = List::new(list_items)
         .highlight_style(selection_style(theme, basic_terminal))
