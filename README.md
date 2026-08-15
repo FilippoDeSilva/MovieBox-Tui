@@ -198,7 +198,7 @@ moviebox-tui
 | `Ctrl+P`   | Switch content provider                               |
 | `Ctrl+T`   | Toggle IPTV mode                                      |
 | `?`        | Show help                                             |
-| `q`        | Quit                                                  |
+| `Ctrl+C` / `q` | Quit application and restore terminal             |
 
 ### Mouse controls
 
@@ -241,7 +241,14 @@ By default, downloads are stored under the operating system Downloads directory:
 ```text
 MovieBox-TUI/
 ├── Movies/
-└── Series/<title>/Season <number>/
+│   └── <title>/
+│       ├── <title>.<ext>
+│       └── <title>.<sub_ext>
+└── Series/
+    └── <title>/
+        └── Season <number>/
+            ├── <title>_S01E01.<ext>
+            └── <title>_S01E01.<sub_ext>
 ```
 
 - **Custom download directory:** Use `/download-dir <path>` (e.g. `/download-dir ~/Videos` or `/download-dir /Volumes/Drive`) to change and persist your download folder. Use `/download-dir reset` to return to default.

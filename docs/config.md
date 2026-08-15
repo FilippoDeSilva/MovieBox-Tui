@@ -13,6 +13,7 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `active_theme`      | string         | Theme name.                                                                                                 |
 | `bdix_enabled`      | bool           | Show BDIX providers (Bangladesh-only).                                                                      |
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
+| `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
 
 ## Other persisted files
 
@@ -34,5 +35,5 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 
 ## CLI
 
+- `moviebox-tui --help` and `moviebox-tui -h` print the help manual and exit.
 - `moviebox-tui --version`, `moviebox-tui -v`, and `moviebox-tui -V` print the version and exit.
-- No other flags.

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **CLI Help Flag**: Added `-h` / `--help` CLI flags printing formatted usage, available options, and environment variables.
 - **Full Mouse Support**: Complete mouse navigation throughout the application:
   - Click search bar to edit; click suggestion items to search immediately.
   - Click search results to select/preview; click again or double click to enter Details.
@@ -12,7 +13,8 @@
 - **Contextual Downloads**:
   - Pressing `d` or clicking `[Download]` while on the **Seasons** pane prompts to download the whole season (all episodes).
   - Triggering download while on **Episodes** or **Streams** downloads that single episode.
-- **Custom Download Directory**:
+- **Organized Downloads & Custom Directory**:
+  - Structured Series downloads under `<base_dir>/Series/<Title>/Season <N>/<Title>_S<N:02>E<E:02>.<ext>` and Movies under `<base_dir>/Movies/<Title>/<Title>.<ext>`.
   - Added `/download-dir <path>` slash command with directory creation and active write-probe validation.
   - Added `/download-dir reset` (contextually suggested only when custom path is configured) to revert to OS default.
   - Safe automatic fallback to default OS Downloads folder if custom path becomes inaccessible.
@@ -32,6 +34,10 @@
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
 
 ### Fixed
+- **Terminal Restoration & Signal Handling**: Added `Ctrl+C` keyboard handling and asynchronous `SIGINT` signal listener to guarantee raw mode and alternate screen are always cleanly restored.
+- **Download Hierarchy & Numbering**: Fixed series media type detection and removed season/episode off-by-one addition.
+- **Parser UTF-8 Safety**: Hardened language detection boundary checks for multibyte titles against panics.
+- **Startup Screen Artifacts**: Removed early startup `eprintln!` to eliminate terminal screen artifacts before entering alternate screen mode.
 - **Android / Termux Stability**: Removed `hickory-dns` from network dependencies to resolve NDK context panics and crashes on Android.
 - **Screen Flickering & Blanking**:
   - Eliminated full terminal clear on list navigation and infinite scroll pagination.
