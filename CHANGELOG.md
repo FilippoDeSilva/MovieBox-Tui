@@ -39,6 +39,9 @@
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
 
 ### Fixed
+- **Home Landing Header & Footer Persistence**:
+  - Fixed ASCII logo header and shortcut footer disappearing into a blank screen when clearing history or viewing empty search states by removing fragile tick-based animation gates.
+  - Ensured the landing screen renders the logo, version, centered search bar, and footer shortcuts immediately on every frame.
 - **Watch History Consolidation & Latest Progress Representation**:
   - Consolidated watched episodes of the same series into a single entry per show in `/history` displaying the latest watched season and episode.
   - Automatically deduplicated and migrated legacy history rows on startup while maintaining complete per-episode checkmark indexes in `self.watched`.

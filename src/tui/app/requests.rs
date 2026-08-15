@@ -185,6 +185,7 @@ impl App {
 
                     let mut recent = self.state.history.recent.clone();
                     if recent.is_empty() {
+                        self.state.search_query.clear();
                         self.state.notify(
                             crate::tui::overlay::NotificationKind::Info,
                             "History",

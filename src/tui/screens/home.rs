@@ -283,15 +283,11 @@ fn render_search_bar(
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
     let show_cursor = (state.tick_count % 16) < 8;
     let view = search_view_state(state);
-    let mut search_bar_area = Rect::default();
+    let search_bar_area;
 
     if view == SearchViewState::Empty
         || (view == SearchViewState::Editing && state.search_results.is_empty())
     {
-        if state.tick_count < 1 {
-            return;
-        }
-
         let basic_terminal = state.basic_terminal;
         let logo_height = if basic_terminal { 2 } else { 6 };
 
@@ -358,107 +354,65 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(vertical_chunks[2]);
 
-        let logo_style = if state.basic_terminal || state.tick_count >= 8 {
-            theme.title
-        } else {
-            let t = state.tick_count as f32 / 8.0;
-            let (start, end) = logo_fade_colors(theme);
-            let r = (start.0 + (end.0 - start.0) * t) as u8;
-            let g = (start.1 + (end.1 - start.1) * t) as u8;
-            let b = (start.2 + (end.2 - start.2) * t) as u8;
-            ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(r, g, b))
-        };
+        let title_art = Paragraph::new(logo_text)
+            .alignment(Alignment::Left)
+            .style(theme.title);
+        frame.render_widget(title_art, horizontal_chunks[1]);
 
-        if !state.basic_terminal && state.tick_count < 15 {
-            let rows: Vec<&str> = logo_text.split('\n').collect();
-            for (i, row) in rows.iter().enumerate() {
-                let row_tick_start = 1 + i as u64;
-                if state.tick_count >= row_tick_start {
-                    let row_t = ((state.tick_count - row_tick_start) as f32 / 7.0).clamp(0.0, 1.0);
-                    let (start, end) = logo_fade_colors(theme);
-                    let r = (start.0 + (end.0 - start.0) * row_t) as u8;
-                    let g = (start.1 + (end.1 - start.1) * row_t) as u8;
-                    let b = (start.2 + (end.2 - start.2) * row_t) as u8;
-                    let row_style =
-                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(r, g, b));
-
-                    let row_area = Rect {
-                        x: horizontal_chunks[1].x,
-                        y: horizontal_chunks[1].y + i as u16,
-                        width: horizontal_chunks[1].width,
-                        height: 1,
-                    };
-                    frame.render_widget(Paragraph::new(*row).style(row_style), row_area);
-                }
-            }
-        } else {
-            let title_art = Paragraph::new(logo_text)
-                .alignment(Alignment::Left)
-                .style(logo_style);
-            frame.render_widget(title_art, horizontal_chunks[1]);
-        }
-
-        let version_style = if state.tick_count < 6 {
-            theme.surface1
-        } else {
-            theme.text_dim
-        };
         let version = Paragraph::new(format!("v{}", env!("CARGO_PKG_VERSION")))
             .alignment(Alignment::Right)
-            .style(version_style);
+            .style(theme.text_dim);
         frame.render_widget(version, version_chunks[1]);
 
-        if state.tick_count >= 3 {
-            let search_width = search_deck_width(area, state, true);
-            search_bar_area = centered_width(vertical_chunks[4], search_width);
+        let search_width = search_deck_width(area, state, true);
+        search_bar_area = centered_width(vertical_chunks[4], search_width);
 
-            if !state.tv_config_popup {
-                render_search_bar(
-                    frame,
-                    search_bar_area,
-                    state,
-                    theme,
-                    view,
-                    show_cursor,
-                    true,
-                );
-            }
-
-            let mut footer_spans = vec![];
-            if !state.is_tv_mode {
-                footer_spans.push(Span::styled("[", theme.text_dim));
-                footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
-                footer_spans.push(Span::styled("] ", theme.text_dim));
-                footer_spans.push(Span::styled(
-                    state.active_provider.label(),
-                    theme.text.add_modifier(Modifier::BOLD),
-                ));
-                footer_spans.push(Span::raw("   "));
-            }
-
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled(
-                if state.is_tv_mode { "Streaming" } else { "TV" },
-                theme.text_dim,
-            ));
-            footer_spans.push(Span::raw("   "));
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("?", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled("Help", theme.text_dim));
-            footer_spans.push(Span::raw("   "));
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("q", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled("Quit", theme.text_dim));
-
-            frame.render_widget(
-                Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center),
-                vertical_chunks[6],
+        if !state.tv_config_popup {
+            render_search_bar(
+                frame,
+                search_bar_area,
+                state,
+                theme,
+                view,
+                show_cursor,
+                true,
             );
         }
+
+        let mut footer_spans = vec![];
+        if !state.is_tv_mode {
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled(
+                state.active_provider.label(),
+                theme.text.add_modifier(Modifier::BOLD),
+            ));
+            footer_spans.push(Span::raw("   "));
+        }
+
+        footer_spans.push(Span::styled("[", theme.text_dim));
+        footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
+        footer_spans.push(Span::styled("] ", theme.text_dim));
+        footer_spans.push(Span::styled(
+            if state.is_tv_mode { "Streaming" } else { "TV" },
+            theme.text_dim,
+        ));
+        footer_spans.push(Span::raw("   "));
+        footer_spans.push(Span::styled("[", theme.text_dim));
+        footer_spans.push(Span::styled("?", theme.shortcut));
+        footer_spans.push(Span::styled("] ", theme.text_dim));
+        footer_spans.push(Span::styled("Help", theme.text_dim));
+        footer_spans.push(Span::raw("   "));
+        footer_spans.push(Span::styled("[", theme.text_dim));
+        footer_spans.push(Span::styled("q", theme.shortcut));
+        footer_spans.push(Span::styled("] ", theme.text_dim));
+        footer_spans.push(Span::styled("Quit", theme.text_dim));
+
+        frame.render_widget(
+            Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center),
+            vertical_chunks[6],
+        );
     } else {
         let has_results = !state.search_results.is_empty();
         let suggestion_height =
@@ -1068,18 +1022,4 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             state.basic_terminal,
         );
     }
-}
-
-fn logo_fade_colors(theme: &Theme) -> ((f32, f32, f32), (f32, f32, f32)) {
-    let get_rgb = |style: ratatui::style::Style, default: (f32, f32, f32)| {
-        if let Some(ratatui::style::Color::Rgb(r, g, b)) = style.fg {
-            (r as f32, g as f32, b as f32)
-        } else {
-            default
-        }
-    };
-
-    let start = get_rgb(theme.surface1, (73.0, 76.0, 94.0));
-    let end = get_rgb(theme.title, (203.0, 166.0, 247.0));
-    (start, end)
 }
