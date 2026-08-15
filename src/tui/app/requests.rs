@@ -1009,7 +1009,9 @@ impl App {
                 let mut default_season = 1;
                 let mut default_episode = 1;
                 if let Some(history) = self.state.history.recent.iter().rev().find(|item| {
-                    item.provider == context.provider.label()
+                    (ProviderKind::parse(&item.provider) == Some(context.provider)
+                        || item.provider == context.provider.label()
+                        || item.provider == context.provider.cache_key())
                         && item.subject_id == id
                         && item.season > 0
                         && item.episode > 0

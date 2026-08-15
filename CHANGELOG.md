@@ -39,6 +39,9 @@
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
 
 ### Fixed
+- **Watch History Consolidation & Latest Progress Representation**:
+  - Consolidated watched episodes of the same series into a single entry per show in `/history` displaying the latest watched season and episode.
+  - Automatically deduplicated and migrated legacy history rows on startup while maintaining complete per-episode checkmark indexes in `self.watched`.
 - **History Poster Auto-Hydration & In-Memory Cache Retention**:
   - Fixed "Poster unavailable" placeholders in `/history` by automatically resolving missing cover URLs and decoding posters in the background.
   - Preserved in-memory decoded image caches when opening `/history` to eliminate unnecessary UI redraw latency.

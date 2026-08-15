@@ -77,6 +77,27 @@ impl HistoryManager {
         format!("{provider}::{subject_id}::{season}::{episode}")
     }
 
+    pub fn is_same_show(a: &WatchHistoryItem, b: &WatchHistoryItem) -> bool {
+        let prov_a = crate::providers::models::ProviderKind::parse(&a.provider);
+        let prov_b = crate::providers::models::ProviderKind::parse(&b.provider);
+        let same_provider = match (prov_a, prov_b) {
+            (Some(pa), Some(pb)) => pa == pb,
+            _ => a.provider.trim().eq_ignore_ascii_case(b.provider.trim()),
+        };
+        if !same_provider {
+            return false;
+        }
+        if !a.subject_id.is_empty() && a.subject_id == b.subject_id {
+            return true;
+        }
+        let clean_a = crate::providers::moviebox::clean_moviebox_title(&a.title);
+        let clean_b = crate::providers::moviebox::clean_moviebox_title(&b.title);
+        if !clean_a.is_empty() && clean_a.eq_ignore_ascii_case(&clean_b) {
+            return true;
+        }
+        false
+    }
+
     fn hydrate_watched_index(&mut self) {
         if self.watched.is_empty() {
             self.watched = self
@@ -84,30 +105,68 @@ impl HistoryManager {
                 .iter()
                 .map(|item| Self::key(&item.provider, &item.subject_id, item.season, item.episode))
                 .collect();
-            return;
+        } else {
+            for item in &self.recent {
+                self.watched.insert(Self::key(
+                    &item.provider,
+                    &item.subject_id,
+                    item.season,
+                    item.episode,
+                ));
+            }
+        }
+        self.consolidate_recent();
+    }
+
+    fn consolidate_recent(&mut self) {
+        let original_len = self.recent.len();
+        let mut consolidated: Vec<WatchHistoryItem> = Vec::new();
+
+        let mut sorted = self.recent.clone();
+        sorted.sort_by_key(|item| item.timestamp);
+
+        for item in sorted {
+            if let Some(existing) = consolidated
+                .iter_mut()
+                .find(|e| Self::is_same_show(e, &item))
+            {
+                if item.timestamp >= existing.timestamp {
+                    let cover = item
+                        .cover_url
+                        .clone()
+                        .or_else(|| existing.cover_url.clone());
+                    *existing = item;
+                    existing.cover_url = cover;
+                } else if existing.cover_url.is_none() && item.cover_url.is_some() {
+                    existing.cover_url = item.cover_url.clone();
+                }
+            } else {
+                consolidated.push(item);
+            }
         }
 
-        for item in &self.recent {
-            self.watched.insert(Self::key(
-                &item.provider,
-                &item.subject_id,
-                item.season,
-                item.episode,
-            ));
+        self.recent = consolidated;
+        if self.recent.len() != original_len {
+            self.save();
         }
     }
 
-    pub fn mark_watched(&mut self, item: WatchHistoryItem) {
+    pub fn mark_watched(&mut self, mut item: WatchHistoryItem) {
         let key = Self::key(&item.provider, &item.subject_id, item.season, item.episode);
         self.watched.insert(key);
 
-        self.recent.retain(|i| {
-            !(i.provider == item.provider
-                && i.subject_id == item.subject_id
-                && i.season == item.season
-                && i.episode == item.episode)
-        });
+        if item.cover_url.is_none() {
+            if let Some(existing) = self
+                .recent
+                .iter()
+                .find(|i| Self::is_same_show(i, &item))
+                .and_then(|i| i.cover_url.clone())
+            {
+                item.cover_url = Some(existing);
+            }
+        }
 
+        self.recent.retain(|i| !Self::is_same_show(i, &item));
         self.recent.push(item);
 
         if self.recent.len() > 100 {
