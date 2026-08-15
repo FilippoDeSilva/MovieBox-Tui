@@ -62,16 +62,27 @@ fn extract_browse_metrics(item: &serde_json::Value) -> BrowseMetrics {
 
 fn browse_group_matches(title: &str, preset: BrowsePreset) -> bool {
     let title = title.to_lowercase();
-    match preset.metric() {
-        crate::tui::state::BrowseMetric::Trending => {
-            title.contains("trending") || title.contains("hot")
+    match preset {
+        BrowsePreset::Trending => title.contains("trending") || title.contains("hot"),
+        BrowsePreset::TopRatedAllTime => {
+            title.contains("top") || title.contains("rated") || title.contains("favorite")
         }
-        crate::tui::state::BrowseMetric::Rating => title.contains("top") || title.contains("rated"),
-        crate::tui::state::BrowseMetric::RecentRating => {
-            title.contains("new") || title.contains("release") || title.contains("recent")
+        BrowsePreset::TopRatedRecent => {
+            title.contains("new")
+                || title.contains("release")
+                || title.contains("recent")
+                || title.contains("latest")
         }
-        crate::tui::state::BrowseMetric::Popularity => {
-            title.contains("popular") || title.contains("most") || title.contains("watched")
+        BrowsePreset::MostWatched => {
+            title.contains("popular")
+                || title.contains("popluar")
+                || title.contains("most")
+                || title.contains("watched")
+                || title.contains("box office")
+                || title.contains("action")
+                || title.contains("adventure")
+                || title.contains("super hero")
+                || title.contains("stars")
         }
     }
 }
@@ -573,40 +584,31 @@ impl App {
             return Vec::new();
         };
 
+        let matching_items: Vec<_> = items
+            .iter()
+            .filter(|item| {
+                item.get("title")
+                    .and_then(|title| title.as_str())
+                    .is_some_and(|title| browse_group_matches(title, preset))
+            })
+            .collect();
+
+        let groups = if matching_items.is_empty() {
+            items.iter().collect()
+        } else {
+            matching_items
+        };
+
         let mut subjects = Vec::new();
         let mut seen_ids = std::collections::HashSet::new();
+        let rank_metric = preset.metric() == crate::tui::state::BrowseMetric::Trending;
 
-        // 1. Process matching curated groups first with high priority
-        for group in items.iter().filter(|item| {
-            item.get("title")
-                .and_then(|title| title.as_str())
-                .is_some_and(|title| browse_group_matches(title, preset))
-        }) {
+        for group in groups {
             let Some(group_subjects) = group.get("subjects").and_then(|s| s.as_array()) else {
                 continue;
             };
-            let rank_metric = preset.metric() == crate::tui::state::BrowseMetric::Trending;
             for (index, subject) in group_subjects.iter().enumerate() {
                 let mut subject = subject.clone();
-                if rank_metric && let Some(subject_object) = subject.as_object_mut() {
-                    subject_object.insert(
-                        "__browse_rank".to_string(),
-                        serde_json::json!((1000 + group_subjects.len() - index) as f64),
-                    );
-                }
-                if let Some(id) = subject.get("subjectId").and_then(|i| i.as_str()) {
-                    seen_ids.insert(id.to_string());
-                }
-                subjects.push(subject);
-            }
-        }
-
-        // 2. Also include all remaining subjects from the full feed so the user gets all available titles
-        for group in items {
-            let Some(group_subjects) = group.get("subjects").and_then(|s| s.as_array()) else {
-                continue;
-            };
-            for subject in group_subjects {
                 let id_opt = subject.get("subjectId").and_then(|i| i.as_str());
                 if let Some(id) = id_opt {
                     if seen_ids.contains(id) {
@@ -614,7 +616,13 @@ impl App {
                     }
                     seen_ids.insert(id.to_string());
                 }
-                subjects.push(subject.clone());
+                if rank_metric && let Some(subject_object) = subject.as_object_mut() {
+                    subject_object.insert(
+                        "__browse_rank".to_string(),
+                        serde_json::json!((group_subjects.len() - index) as f64),
+                    );
+                }
+                subjects.push(subject);
             }
         }
 
@@ -891,10 +899,9 @@ mod tests {
         });
 
         let subjects = App::extract_browse_subjects(&payload, BrowsePreset::Trending);
-        assert_eq!(subjects.len(), 2);
+        assert_eq!(subjects.len(), 1);
         assert_eq!(subjects[0]["subjectId"], "trending-1");
-        assert_eq!(subjects[0]["__browse_rank"], 1001.0);
-        assert_eq!(subjects[1]["subjectId"], "top-1");
+        assert_eq!(subjects[0]["__browse_rank"], 1.0);
     }
 
     #[test]
@@ -913,9 +920,8 @@ mod tests {
         });
 
         let subjects = App::extract_browse_subjects(&payload, BrowsePreset::MostWatched);
-        assert_eq!(subjects.len(), 2);
+        assert_eq!(subjects.len(), 1);
         assert_eq!(subjects[0]["subjectId"], "watched-1");
         assert!(subjects[0].get("__browse_rank").is_none());
-        assert_eq!(subjects[1]["subjectId"], "top-1");
     }
 }
