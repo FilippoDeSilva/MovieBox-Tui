@@ -96,9 +96,11 @@ impl App {
                 self.prepare_image_soft_refresh();
             }
 
-            Action::Resize(w, h) => {
-                self.state.last_resize_time = Some((std::time::Instant::now(), w, h));
+            Action::Resize(_w, _h) => {
+                self.state.last_resize_time = None;
                 self.state.poster_protocol = None;
+                self.state.search_poster_protocols.clear();
+                self.state.clear_terminal_before_draw = true;
                 self.state.dirty = true;
             }
 

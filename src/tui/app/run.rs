@@ -101,9 +101,7 @@ impl App {
     }
 
     async fn handle_action(&mut self, action: Action) -> Option<()> {
-        if self.state.last_resize_time.is_some()
-            || !matches!(action, Action::Tick | Action::UpdateDownload(..))
-        {
+        if !matches!(action, Action::Tick | Action::UpdateDownload(..)) {
             self.state.dirty = true;
         }
         match action {
@@ -246,43 +244,6 @@ impl App {
 
             frame.render_widget(p, area);
             return;
-        }
-
-        if let Some((time, w, h)) = self.state.last_resize_time {
-            if time.elapsed() < std::time::Duration::from_millis(150) {
-                let pill_w = 42_u16.min(area.width.saturating_sub(4));
-                let pill_h = 3_u16;
-                let pill_x = area.x + (area.width.saturating_sub(pill_w)) / 2;
-                let pill_y = area.y + (area.height.saturating_sub(pill_h)) / 2;
-                let pill_area = ratatui::layout::Rect {
-                    x: pill_x,
-                    y: pill_y,
-                    width: pill_w,
-                    height: pill_h,
-                };
-
-                let line = ratatui::text::Line::from(vec![
-                    ratatui::text::Span::styled("● ", self.theme.accent),
-                    ratatui::text::Span::styled("Resizing Window", self.theme.title),
-                    ratatui::text::Span::styled(" · ", self.theme.text_dim),
-                    ratatui::text::Span::styled(format!("{} × {} cols", w, h), self.theme.text),
-                ]);
-
-                let block = ratatui::widgets::Block::default()
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .border_type(ratatui::widgets::BorderType::Rounded)
-                    .border_style(self.theme.accent);
-
-                let p = ratatui::widgets::Paragraph::new(line)
-                    .block(block)
-                    .alignment(ratatui::layout::Alignment::Center);
-
-                frame.render_widget(p, pill_area);
-                return;
-            } else {
-                self.state.last_resize_time = None;
-                self.state.clear_terminal_before_draw = true;
-            }
         }
 
         let mut main_area = frame.area();
