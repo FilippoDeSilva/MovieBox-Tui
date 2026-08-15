@@ -74,8 +74,8 @@ impl DetailsLayoutTier {
         (content_rows as u16 + 2).clamp(minimum, maximum)
     }
 
-    fn footer_height(self) -> u16 {
-        if matches!(self, Self::Wide) { 1 } else { 2 }
+    fn footer_height(self, width: u16) -> u16 {
+        if width >= 70 { 1 } else { 2 }
     }
 }
 
@@ -91,7 +91,7 @@ fn subject_provider(state: &AppState, subject_id: &str) -> crate::providers::mod
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
     let tier = DetailsLayoutTier::for_area(area);
     let header_height = tier.header_height(area, state.selected_details.as_ref());
-    let footer_height = tier.footer_height();
+    let footer_height = tier.footer_height(area.width);
     let chunks = Layout::vertical([
         Constraint::Length(header_height),
         Constraint::Length(1),
@@ -1092,7 +1092,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);
-    let footer_p = if matches!(tier, DetailsLayoutTier::Wide) {
+    let footer_p = if area.width >= 70 {
         primary_footer.extend(secondary_footer);
         Paragraph::new(Line::from(primary_footer))
     } else {
