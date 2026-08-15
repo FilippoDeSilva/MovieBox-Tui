@@ -37,16 +37,26 @@
   - Unified image caching under a shared namespace with automatic cross-namespace lookup across MovieBox, 4KHDHub, IPTV, CircleFTP, and DhakaFlix.
 - **Streamlined Browse Views**:
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
-- **Native Graphics & Clean Text Placeholders**:
-  - Replaced noisy halfblock mosaic fallback with clean, organized text cards (`Poster unavailable` in search results, `No Art` in details) on non-graphics terminals.
+- **Native Graphics & Single Standardized 'No Poster' Placeholder**:
+  - Replaced redundant dual labels (`Poster unavailable` / `No Art`) and noisy halfblock mosaic fallback with a single clean, centered `No Poster` label across search results, details, and history on non-graphics terminals.
   - Eliminated ANSI block characters, yellow/white selection redraw bars, and unnecessary background image downloads on basic terminals.
   - Preserved full native high-resolution graphical rendering on Sixel, Kitty, and iTerm2 supported terminals.
   - Added `MOVIEBOX_NO_IMAGE=1` environment override to disable image probing on slow or headless sessions.
+- **Next-Gen Multi-Tiered Animated Installers (`install.sh` & `install.ps1`)**:
+  - Multi-tier progressive rendering with official MovieBox branding and Catppuccin Mocha aesthetic.
+  - Live smooth Braille spinners (`⠋ ⠙ ⠹ ...`), SHA256 cryptographic verification against `SHA256SUMS`, and media player ecosystem detection.
+  - 100% sudo-less user-level installation into `~/.local/bin` (or `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin` on Windows) with automatic non-destructive shell PATH integration and zero password prompts.
+  - Added full CLI flags: `--version <tag>`, `--dir <path>`, `--force`, `--dry-run`, and `--uninstall`.
 - **Explicit Download Directory Autocomplete Hints**:
   - Added `/download-dir <path>` slash command suggestion with clear action descriptions (`Set custom folder (e.g. ~/Movies)` vs. `View current download folder`).
   - Added friendly guidance notification if a user inputs literal `<path>` placeholders.
 
 ### Fixed
+- **Custom Download Directory Container Hierarchy**:
+  - Ensured custom download directories always maintain the standardized `MovieBox-TUI` root container (`MovieBox-TUI/Movies/...` and `MovieBox-TUI/Series/...`) without duplicating if already named `MovieBox-TUI`.
+- **Multiline Notification Toast Rendering**:
+  - Upgraded notification toast layout to compute dynamic height and wrap multiline messages per line cleanly without horizontal middle-truncation across newlines.
+  - Sanitized notification folder paths by substituting home directory with `~`.
 - **Default Audio Track Prioritization (Original / English)**:
   - Fixed movie and series details defaulting to regional Hindi dubs on MovieBox by prioritizing `Original` and `English` audio tracks over localized search result subject IDs.
   - Preserved explicit user language selections when intentionally switching between dubs.
@@ -57,7 +67,7 @@
   - Consolidated watched episodes of the same series into a single entry per show in `/history` displaying the latest watched season and episode.
   - Automatically deduplicated and migrated legacy history rows on startup while maintaining complete per-episode checkmark indexes in `self.watched`.
 - **History Poster Auto-Hydration & In-Memory Cache Retention**:
-  - Fixed "Poster unavailable" placeholders in `/history` by automatically resolving missing cover URLs and decoding posters in the background.
+  - Fixed "No Poster" placeholders in `/history` by automatically resolving missing cover URLs and decoding posters in the background.
   - Preserved in-memory decoded image caches when opening `/history` to eliminate unnecessary UI redraw latency.
   - Added multi-source fallback extraction for cover URLs across playback, preview, and search results.
 - **Stream Pool Initialization on Audio Selection**: Fixed stream fetching hanging on "Loading streams..." when selecting non-default audio dubs by ensuring stream pool entries are initialized before episode fetch.
