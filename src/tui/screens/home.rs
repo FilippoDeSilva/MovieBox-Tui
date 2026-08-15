@@ -578,7 +578,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             frame.render_widget(ratatui_image::Image::new(proto), p_area);
                         }
                     } else {
-                        let placeholder = Paragraph::new("Poster\nunavailable")
+                        let placeholder = Paragraph::new("No\nPoster")
                             .style(theme.text_dim)
                             .alignment(Alignment::Center);
                         frame.render_widget(placeholder, poster_area);
@@ -592,7 +592,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         width: 12,
                         height: placeholder_height,
                     };
-                    let placeholder = Paragraph::new("Poster\nunavailable")
+                    let placeholder = Paragraph::new("No\nPoster")
                         .style(theme.text_dim)
                         .alignment(Alignment::Center);
                     frame.render_widget(placeholder, p_area);

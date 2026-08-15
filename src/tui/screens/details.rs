@@ -282,7 +282,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let (pad, msg) = if state.is_loading {
                 let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
-                (p, format!("Loading Art{dots}"))
+                (p, format!("Loading{dots}"))
             } else {
                 let p = "\n".repeat((inner.height.saturating_sub(1) / 2) as usize);
                 (p, title.to_string())
@@ -301,12 +301,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .border_style(theme.muted);
 
         let inner = placeholder_block.inner(poster_area);
-        let lines = if inner.height >= 4 {
-            let pad_top = "\n".repeat((inner.height.saturating_sub(2) / 2) as usize);
-            format!("{pad_top}No\nPoster")
-        } else {
-            "No Art".to_string()
-        };
+        let pad_top = "\n".repeat((inner.height.saturating_sub(2) / 2) as usize);
+        let lines = format!("{pad_top}No\nPoster");
 
         let placeholder = Paragraph::new(lines)
             .style(theme.text_dim)
