@@ -14,7 +14,9 @@
   - Pressing `d` or clicking `[Download]` while on the **Seasons** pane prompts to download the whole season (all episodes).
   - Triggering download while on **Episodes** or **Streams** downloads that single episode.
 - **Organized Downloads & Custom Directory**:
-  - Structured Series downloads under `<base_dir>/Series/<Title>/Season <N>/<Title>_S<N:02>E<E:02>.<ext>` and Movies under `<base_dir>/Movies/<Title>/<Title>.<ext>`.
+  - Structured Series downloads under `<base_dir>/Series/<Title>/Season <N>/<Title> - S<N:02>E<E:02>.<ext>` (Plex/Jellyfin standard) and Movies under `<base_dir>/Movies/<Title>/<Title>.<ext>`.
+  - Added ISO 639-1 language code tagging to subtitle sidecars (e.g. `<BaseName>.en.srt`) for automatic track identification in media players and servers.
+  - Added smart duplication prevention: completed episodes on disk are automatically skipped during season batch downloads.
   - Added `/download-dir <path>` slash command with directory creation and active write-probe validation.
   - Added `/download-dir reset` (contextually suggested only when custom path is configured) to revert to OS default.
   - Safe automatic fallback to default OS Downloads folder if custom path becomes inaccessible.
@@ -34,6 +36,8 @@
   - Curated `/browse` views into 4 categorized shelves (Popular, Top Rated, Trending, Most Watched) with proper filtering.
 
 ### Fixed
+- **Stream Pool Initialization on Audio Selection**: Fixed stream fetching hanging on "Loading streams..." when selecting non-default audio dubs by ensuring stream pool entries are initialized before episode fetch.
+- **Title Sanitization & Preservation**: Enhanced `clean_moviebox_title` to sanitize international audio dubs, video quality tags, and format markers across downloads, folder organization, and watch history while preserving 4-digit release years.
 - **Terminal Restoration & Signal Handling**: Added `Ctrl+C` keyboard handling and asynchronous `SIGINT` signal listener to guarantee raw mode and alternate screen are always cleanly restored.
 - **Download Hierarchy & Numbering**: Fixed series media type detection and removed season/episode off-by-one addition.
 - **Parser UTF-8 Safety**: Hardened language detection boundary checks for multibyte titles against panics.

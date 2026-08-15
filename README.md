@@ -243,18 +243,18 @@ MovieBox-TUI/
 ├── Movies/
 │   └── <title>/
 │       ├── <title>.<ext>
-│       └── <title>.<sub_ext>
+│       └── <title>.<lang>.<sub_ext>
 └── Series/
     └── <title>/
         └── Season <number>/
-            ├── <title>_S01E01.<ext>
-            └── <title>_S01E01.<sub_ext>
+            ├── <title> - S01E01.<ext>
+            └── <title> - S01E01.<lang>.<sub_ext>
 ```
 
 - **Custom download directory:** Use `/download-dir <path>` (e.g. `/download-dir ~/Videos` or `/download-dir /Volumes/Drive`) to change and persist your download folder. Use `/download-dir reset` to return to default.
 - **Contextual triggers:** Pressing `d` or clicking `[Download]` while focused on the **Seasons** pane prompts to download the whole season; while on **Episodes** or **Streams**, it downloads that single episode.
-- **Sequential downloads:** Entire seasons are downloaded one by one to limit disk and network pressure.
-- **Smart subtitles:** Your subtitle language choice for the first episode is applied to the remaining episodes. Missing subtitles do not discard completed video files.
+- **Sequential downloads & Duplication prevention:** Entire seasons are downloaded one by one. Existing completed episodes are automatically skipped to save bandwidth and prevent duplicate files.
+- **Smart subtitle tagging:** Subtitles are saved with ISO 639-1 language codes (e.g. `.en.srt`, `.hi.srt`) so media players (VLC, mpv, IINA) and media servers (Plex, Jellyfin, Kodi) automatically identify track languages. Missing subtitles do not discard completed video files.
 - **Robust resuming:** Interrupted downloads preserve `.part` and metadata files, and can be resumed without losing progress.
 - On Android/Termux, the app prefers shared `storage/downloads` when it exists.
 
