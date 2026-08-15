@@ -26,7 +26,7 @@ impl App {
 
         if let Some(details) = &self.state.selected_details {
             if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
-                title = t.to_string();
+                title = crate::providers::moviebox::clean_moviebox_title(t);
             }
             cover_url = details
                 .get("poster")

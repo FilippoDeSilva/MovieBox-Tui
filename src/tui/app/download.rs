@@ -75,13 +75,14 @@ impl App {
             return;
         };
 
-        let title = self
+        let raw_title = self
             .state
             .selected_details
             .as_ref()
             .and_then(|details| details.get("title"))
             .and_then(|title| title.as_str())
             .unwrap_or("MovieBox-Tui_Stream");
+        let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
         let is_series = self
             .state
             .selected_details
@@ -91,18 +92,22 @@ impl App {
             || !self.state.available_seasons.is_empty();
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
-        let safe_title = title
+        let safe_title = clean_title
             .chars()
             .map(|c| {
                 if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
                     c
                 } else {
-                    '_'
+                    ' '
                 }
             })
-            .collect::<String>()
-            .trim()
-            .to_string();
+            .collect::<String>();
+        let safe_title = safe_title.split_whitespace().collect::<Vec<_>>().join(" ");
+        let safe_title = if safe_title.is_empty() {
+            "MovieBox-Tui_Stream".to_string()
+        } else {
+            safe_title
+        };
 
         let extension = link
             .split('?')
