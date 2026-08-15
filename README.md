@@ -82,7 +82,7 @@ The formula selects the correct macOS, Linux x86_64, or Linux ARM64 release.
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
 ```
 
-The script detects OS and CPU architecture, then installs to `/usr/local/bin`. Without write access or `sudo`, it uses `~/.local/bin`.
+The script features multi-tier animations, automatic SHA256 checksum verification, media player detection, and non-destructive shell PATH configuration. Supports `--version <tag>`, `--dir <path>`, `--force`, and `--uninstall`.
 
 ### Windows
 
@@ -92,7 +92,7 @@ Works in PowerShell or Command Prompt (cmd):
 powershell -Command "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex"
 ```
 
-The installer selects x86_64 or ARM64, installs under `%LOCALAPPDATA%\MovieBox-Tui`, and adds that directory to the user PATH. Open a new terminal after first installation.
+The installer selects x86_64 or ARM64, verifies checksums, installs under `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin`, and automatically adds the directory to your user PATH. Supports `-Version <tag>`, `-InstallDir <path>`, `-Force`, and `-Uninstall`.
 
 ### Android (Termux)
 
