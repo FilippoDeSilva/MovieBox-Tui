@@ -118,12 +118,12 @@ All in-depth guides and technical details are available in the [`docs/`](docs/) 
 
 ## Feedback & Support
 
-MovieBox-TUI is an open-source project built for the community. If you enjoy using it, here are a few simple ways to help:
+If you find the project useful, here are a few simple ways to support it:
 
-- **Star the repository** on GitHub to help more people discover it.
-- **Share your thoughts** or report issues on the [GitHub Issues](https://github.com/mesamirh/MovieBox-Tui/issues) page.
-- **Share the project** with friends or anyone who loves terminal tools.
-- **Contribute** fixes or new features through [pull requests](CONTRIBUTING.md).
+- **Star the repository** on GitHub to help others discover it.
+- **Report bugs or request features** by opening an [issue](https://github.com/mesamirh/MovieBox-Tui/issues).
+- **Share the project** with friends, colleagues, or terminal enthusiasts.
+- **Contribute improvements** to scrapers, performance, or docs via [pull requests](CONTRIBUTING.md).
 
 <details>
 <summary><b>Optional Support</b></summary>
@@ -145,4 +145,4 @@ Licensed under either [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at you
 
 ## Disclaimer
 
-MovieBox-TUI does not host or store any media. It is an open-source tool for playing publicly available streams. Users are responsible for complying with the laws of their country.
+This project does not host or store any media. It is an independent client for playing publicly available streams. Users are responsible for complying with the laws of their country.
