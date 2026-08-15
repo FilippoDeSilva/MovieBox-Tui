@@ -226,7 +226,7 @@ impl App {
                 || (self.state.is_tv_mode && !self.state.is_loading));
 
         let logo_height = if self.state.basic_terminal { 2 } else { 6 };
-        let (search_bar_area, suggestion_area) = if is_landing {
+        let search_bar_area = if is_landing {
             let vertical_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -240,18 +240,12 @@ impl App {
                 ])
                 .split(area);
 
-            let base_width = if self.state.basic_terminal {
+            let s_width = if self.state.basic_terminal {
                 54
             } else {
-                (area.width.saturating_sub(4)).clamp(20, 64)
+                (area.width.saturating_sub(4)).clamp(24, 76)
             };
-            let s_bar = centered_width_rect(vertical_chunks[4], base_width);
-            let s_sugg = Rect {
-                x: s_bar.x,
-                y: s_bar.bottom(),
-                width: s_bar.width,
-                height: area.bottom().saturating_sub(s_bar.bottom()),
-            };
+            let s_bar = centered_width_rect(vertical_chunks[4], s_width);
 
             let footer = vertical_chunks[6];
             if row == footer.y {
@@ -259,7 +253,7 @@ impl App {
                 return None;
             }
 
-            (s_bar, s_sugg)
+            s_bar
         } else {
             let has_results = !self.state.search_results.is_empty();
             let suggestion_height = if self.state.input_mode == InputMode::Editing
@@ -291,7 +285,7 @@ impl App {
                     .split(area)
             };
 
-            let s_bar = if has_results {
+            if has_results {
                 Rect {
                     x: chunks[0].x + 2,
                     y: chunks[0].y,
@@ -305,16 +299,12 @@ impl App {
                     (area.width.saturating_sub(4)).clamp(24, 76)
                 };
                 centered_width_rect(chunks[0], base_width)
-            };
-            let s_sugg = chunks[2];
-
-            (s_bar, s_sugg)
+            }
         };
 
         if self.state.input_mode == InputMode::Editing && !self.state.search_suggestions.is_empty()
         {
             let visible_count = self.state.search_suggestions.len().min(6);
-            let dropdown_height = visible_count as u16 + 4;
             let selected_index = self.state.suggest_index.unwrap_or(0);
             let suggestion_offset = selected_index
                 .saturating_add(1)
@@ -326,46 +316,13 @@ impl App {
                         .saturating_sub(visible_count),
                 );
 
-            let max_suggestion_len = self
-                .state
-                .search_suggestions
-                .iter()
-                .map(|s| crate::tui::text::width(s))
-                .max()
-                .unwrap_or(0) as u16;
-
-            let content_desired_width = max_suggestion_len
-                .saturating_add(8)
-                .max(search_bar_area.width)
-                .max(54);
-
-            let dropdown_width = content_desired_width
-                .min(area.width.saturating_sub(4))
-                .max(20);
-
-            let dropdown_x = area.x + area.width.saturating_sub(dropdown_width) / 2;
-            let dropdown_y = if suggestion_area.height >= dropdown_height {
-                suggestion_area.y
-            } else {
-                search_bar_area.y + search_bar_area.height
-            };
-
-            let dropdown_rect = Rect {
-                x: dropdown_x,
-                y: dropdown_y,
-                width: dropdown_width,
-                height: dropdown_height,
-            };
-
-            if dropdown_rect.contains(ratatui::layout::Position::new(col, row)) {
-                let item_start_y = dropdown_rect.y + 1;
-                if row >= item_start_y && (row - item_start_y) < visible_count as u16 {
-                    let clicked_idx = suggestion_offset + (row - item_start_y) as usize;
-                    if let Some(query) = self.state.search_suggestions.get(clicked_idx).cloned() {
-                        self.action_sender
-                            .send(Action::SelectSuggestion { query })
-                            .ok();
-                    }
+            let start_y = search_bar_area.bottom();
+            if row >= start_y && (row - start_y) < visible_count as u16 {
+                let clicked_idx = suggestion_offset + (row - start_y) as usize;
+                if let Some(query) = self.state.search_suggestions.get(clicked_idx).cloned() {
+                    self.action_sender
+                        .send(Action::SelectSuggestion { query })
+                        .ok();
                 }
                 return None;
             }
