@@ -87,7 +87,7 @@ Examples:
 
 - `feat: add support for custom mpv arguments`
 - `fix: prevent panic when clipboard is unavailable`
-- `docs: document /anime discover command`
+- `docs: document /browse categories`
 - `refactor: extract stream resolution into helper`
 
 Common types: `feat`, `fix`, `refactor`, `docs`, `style`, `perf`, `chore`.

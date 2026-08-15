@@ -68,6 +68,13 @@ impl App {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
+                    self.state.set_status(
+                        format!(
+                            "Streaming mode active ({}).",
+                            self.state.active_provider.label()
+                        ),
+                        150,
+                    );
                 }
             }
 
