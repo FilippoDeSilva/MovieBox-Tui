@@ -12,9 +12,12 @@ src/
                                 alternate screen, App::new + App::run
   lib.rs                        crate root, module declarations
   cache.rs                      disk cache: provider-namespaced, TTL'd, atomic writes
+  config.rs                     Config load/save (config.json)
   download.rs                   download engine (resume, ranges, segments, retry)
   history.rs                    watch history persistence
   logging.rs                    file logging (rotation, sanitization)
+  models.rs                     shared domain models (SearchResult, BrowseMetrics, StreamPool, Notification)
+  player.rs                     player detection (OnceLock) and command construction (mpv/VLC/IINA/Android)
   providers/
     mod.rs                      provider module tree
     models.rs                   shared typed models (ProviderKind, CatalogItem,
@@ -24,6 +27,8 @@ src/
     bdix/circleftp/             BDIX CircleFTP provider
     bdix/dhakaflix/             BDIX DhakaFlix provider
     m3u.rs                      M3U playlist parser (URL and local file)
+  service.rs                    MovieBoxService headless engine (search, details, streams, captions)
+  updater.rs                    GitHub release update check
   tui/
     app/                        the application object and all behavior
       mod.rs                    App struct, App::new, helpers
@@ -43,15 +48,12 @@ src/
       system.rs                 help, refresh, cache, theme, updates, focus, resize
     state.rs                    AppState: all UI state + in-memory LRU caches
     action.rs                   the Action enum (event/message model)
-    config.rs                   Config load/save (config.json)
     event.rs                    EventHandler: input events + tick → Action channel
-    player.rs                   player detection and command construction
     overlay.rs                  popups, pickers, notifications
     screens/                    render-only modules (home, details, help)
     terminal.rs                 terminal capability probes
     theme.rs                    color themes
     text.rs                     grapheme-safe text helpers
-    updater.rs                  GitHub release update check
 ```
 
 ## The event loop

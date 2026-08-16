@@ -8,11 +8,14 @@ responsibility.
 src/
   main.rs            Entry point. Logging init, panic hook, raw mode, alternate
                      screen, TerminalGuard, App::new + App::run.
-  lib.rs             Crate root: declares pub mod cache/download/history/logging/
-                     providers/tui.
+  lib.rs             Crate root: declares pub mod cache/config/download/history/
+                     logging/models/player/providers/service/tui/updater.
 
   cache.rs           Disk cache: provider-namespaced directories, TTL expiry,
                      atomic temp-file writes, payload validation, background purge.
+
+  config.rs          Config struct: load/save config.json (provider, theme,
+                     auto-update, default player, bdix flag).
 
   download.rs        Download engine (pure, async): resume via .part files,
                      HTTP ranges, optional multi-segment download, retries, cancel
@@ -23,6 +26,13 @@ src/
 
   logging.rs         File logging: flexi_logger, rotation (5MB, keep 3),
                      MOVIEBOX_LOG level, URL/path sanitization for sharing.
+
+  models.rs          Pure domain data models: SearchResult, BrowseMetric,
+                     BrowsePreset, BrowseMetrics, SubjectStreamPool, Notification.
+
+  player.rs          Player detection (OnceLock) and command construction for
+                     mpv / VLC / IINA / Android intent, subtitle args, headers,
+                     terminal-sized window.
 
   providers/
     mod.rs           Module declarations.
@@ -43,18 +53,19 @@ src/
       dhakaflix/     BDIX DhakaFlix provider (client + parser).
     m3u.rs           M3U playlist parser (http(s) URL or local file).
 
+  service.rs         MovieBoxService: unified multi-provider headless client &
+                     engine (suggest, search, details, homepage, resolutions,
+                     captions, subtitle download, path resolution).
+
+  updater.rs         GitHub release update check.
+
   tui/
     action.rs        The Action enum: every UI event/message (input, network
                      results, downloads, playback, tv, system).
-    config.rs        Config struct: load/save config.json (provider, theme,
-                     auto-update, default player, bdix flag).
     state.rs         AppState: all UI state, LRU image/preview caches, and the
                      PlayerKind enum + label()/parse(), tv manager row model.
     event.rs         EventHandler: crossterm event stream + tick interval,
                      forwards to the action channel.
-    player.rs        Player detection (OnceLock) and command construction for
-                     mpv / VLC / IINA / Android intent, subtitle args, headers,
-                     terminal-sized window.
     overlay.rs       Popups: notifications, pickers, confirmation, modal centering.
     screens/
       home.rs        Home/startup + search list rendering (streaming and TV).
@@ -63,7 +74,6 @@ src/
     terminal.rs      Terminal capability probes (basic UI, image querying).
     theme.rs         Color themes + terminal color detection.
     text.rs          Grapheme-safe width/truncation helpers.
-    updater.rs       GitHub release update check.
 
   tui/app/           The application object (App) and all behavior.
     mod.rs           App struct, App::new, and small helpers.
