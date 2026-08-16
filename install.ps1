@@ -9,6 +9,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+} catch {
+    # Non-fatal if runtime does not support Tls13 enum
+}
 Set-StrictMode -Version Latest
 
 $AppName = "MovieBox-Tui"
@@ -117,10 +123,17 @@ if (-not $TargetVersion) {
         $Request.AllowAutoRedirect = $false
         $Response = $Request.GetResponse()
         $Location = $Response.Headers["Location"]
-        $TargetVersion = $Location.Split('/')[-1].Trim()
+        if ($Location) {
+            $TargetVersion = $Location.Split('/')[-1].Trim()
+        }
         $Response.Close()
     } catch {
-        Write-Err "Failed to contact GitHub for latest release. Please check your internet connection."
+        try {
+            $ReleaseJson = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ "User-Agent" = "MovieBox-Installer" } -UseBasicParsing
+            $TargetVersion = $ReleaseJson.tag_name.Trim()
+        } catch {
+            Write-Err "Failed to contact GitHub for latest release. Please check your internet connection."
+        }
     }
 }
 
