@@ -64,11 +64,11 @@ impl App {
                     return None;
                 }
 
-                let client = self.client.clone();
+                let service = self.service.clone();
                 let sender = self.action_sender.clone();
                 let query_clone = query.clone();
                 tokio::spawn(async move {
-                    if let Ok(res) = client.suggest(&query_clone).await {
+                    if let Ok(res) = service.suggest(&query_clone).await {
                         sender
                             .send(Action::SuggestSuccess(request_id, query_clone, res))
                             .ok();
@@ -1164,10 +1164,10 @@ impl App {
                     self.trigger_episode_fetch();
                     return None;
                 }
-                let client = self.client.clone();
+                let service = self.service.clone();
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    let resolutions = client
+                    let resolutions = service
                         .fetch_collection_resolutions(&subject_id)
                         .await
                         .unwrap_or_default();
@@ -1737,13 +1737,13 @@ impl App {
                     if is_season_queue {
                         let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
                         if let Some(rid) = self.get_selected_resource_id() {
-                            let client = self.client.clone();
+                            let service = self.service.clone();
                             let sender = self.action_sender.clone();
                             let pref = self.state.season_subtitle_preference.clone();
                             let no_pref = pref.is_none();
 
                             tokio::spawn(async move {
-                                if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
+                                if let Ok(res) = service.get_ext_captions(&subject_id, &rid).await {
                                     if no_pref {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                                     } else if let Some(pref_lang) = pref {

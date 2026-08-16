@@ -24,91 +24,11 @@ pub enum InputMode {
     Editing,
 }
 
-#[derive(Debug, Clone)]
-pub struct SearchResult {
-    pub id: String,
-    pub title: String,
-    pub stype: i64,
-    pub release_year: String,
-    pub cover_url: Option<String>,
-    pub season: usize,
-    pub episode: usize,
-    pub provider: crate::providers::models::ProviderKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BrowseMetric {
-    Trending,
-    Rating,
-    RecentRating,
-    Popularity,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BrowsePreset {
-    Trending,
-    TopRatedAllTime,
-    TopRatedRecent,
-    MostWatched,
-}
-
-impl BrowsePreset {
-    pub const ALL: [Self; 4] = [
-        Self::Trending,
-        Self::TopRatedAllTime,
-        Self::TopRatedRecent,
-        Self::MostWatched,
-    ];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Trending => "Trending Now",
-            Self::TopRatedAllTime => "Top Rated (All-Time)",
-            Self::TopRatedRecent => "Top Rated (Recent Releases)",
-            Self::MostWatched => "Most Watched",
-        }
-    }
-
-    pub fn metric(self) -> BrowseMetric {
-        match self {
-            Self::Trending => BrowseMetric::Trending,
-            Self::TopRatedAllTime => BrowseMetric::Rating,
-            Self::TopRatedRecent => BrowseMetric::RecentRating,
-            Self::MostWatched => BrowseMetric::Popularity,
-        }
-    }
-
-    pub fn descending(self) -> bool {
-        true
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct BrowseMetrics {
-    pub trending: Option<f64>,
-    pub rating: Option<f64>,
-    pub recent_rating: Option<f64>,
-    pub popularity: Option<f64>,
-}
-
-impl BrowseMetrics {
-    pub fn value(self, metric: BrowseMetric) -> Option<f64> {
-        match metric {
-            BrowseMetric::Trending => self.trending,
-            BrowseMetric::Rating => self.rating,
-            BrowseMetric::RecentRating => self.recent_rating,
-            BrowseMetric::Popularity => self.popularity,
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct SubjectStreamPool {
-    pub episode_index: std::collections::HashMap<(usize, usize), Vec<serde_json::Value>>,
-    pub fetched_pages: std::collections::HashMap<u32, std::collections::HashSet<usize>>,
-    pub total_pages: std::collections::HashMap<u32, usize>,
-    pub available_resolutions: Vec<u32>,
-}
+pub use crate::models::{
+    BrowseMetric, BrowseMetrics, BrowsePreset, Notification, NotificationKind, SearchResult,
+    SubjectStreamPool,
+};
+pub use crate::service::{caption_options, caption_url_for, stype, subject_id};
 
 pub struct AppState {
     pub active_provider: ProviderKind,
@@ -447,36 +367,4 @@ impl AppState {
         rows.push(TvManagerRow::Done);
         rows
     }
-}
-
-pub fn subject_id(value: &serde_json::Value) -> Option<String> {
-    value
-        .as_i64()
-        .map(|n| n.to_string())
-        .or_else(|| value.as_str().map(|s| s.to_string()))
-}
-
-pub fn stype(value: &serde_json::Value) -> i64 {
-    value
-        .get("subjectType")
-        .and_then(|s| s.as_i64())
-        .or_else(|| value.get("stype").and_then(|s| s.as_i64()))
-        .unwrap_or(1)
-}
-
-pub fn caption_options(payload: &serde_json::Value) -> Vec<(String, String)> {
-    let mut options = vec![("None".to_string(), "".to_string())];
-    options.extend(
-        crate::providers::moviebox::adapt::captions_json_to_options(payload)
-            .into_iter()
-            .map(|subtitle| (subtitle.name, subtitle.url)),
-    );
-    options
-}
-
-pub fn caption_url_for(payload: &serde_json::Value, language: &str) -> Option<String> {
-    crate::providers::moviebox::adapt::captions_json_to_options(payload)
-        .into_iter()
-        .find(|subtitle| subtitle.name == language)
-        .map(|subtitle| subtitle.url)
 }

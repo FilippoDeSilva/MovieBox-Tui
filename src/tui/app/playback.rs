@@ -2,36 +2,7 @@ use super::App;
 use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
-pub(crate) fn extract_cover_url(val: &serde_json::Value) -> Option<String> {
-    let keys = [
-        "cover",
-        "poster",
-        "pic",
-        "coverUrl",
-        "cover_url",
-        "posterUrl",
-        "poster_url",
-        "thumbnail",
-        "image",
-        "logo",
-        "imgUrl",
-        "img_url",
-    ];
-    for key in keys {
-        if let Some(v) = val.get(key) {
-            if let Some(s) = v.as_str() {
-                if !s.is_empty() {
-                    return Some(s.to_string());
-                }
-            } else if let Some(url) = v.get("url").and_then(|u| u.as_str()) {
-                if !url.is_empty() {
-                    return Some(url.to_string());
-                }
-            }
-        }
-    }
-    None
-}
+pub(crate) use crate::service::extract_cover_url;
 
 impl App {
     fn preferred_playback_player(
@@ -129,7 +100,6 @@ impl App {
     ) {
         let history_item = self.build_watch_history_item();
 
-        let client = self.client.http_client().clone();
         let sender = self.action_sender.clone();
         let cell_size = self
             .state
@@ -154,58 +124,24 @@ impl App {
                 crate::tui::state::PlayerKind::Vlc | crate::tui::state::PlayerKind::Iina
             ) && let Some(url) = subtitle
             {
-                let mut request = client.get(&url);
-                for (name, value) in &headers {
-                    request = request.header(name.as_str(), value.as_str());
-                }
-                let mut downloaded = false;
-                if let Ok(Ok(response)) =
-                    tokio::time::timeout(std::time::Duration::from_secs(30), request.send()).await
-                    && let Ok(response) = response.error_for_status()
-                    && let Ok(bytes) = response.bytes().await
-                {
-                    let extension = url
-                        .rsplit('.')
-                        .next()
-                        .map(|e| e.to_ascii_lowercase())
-                        .filter(|e| matches!(e.as_str(), "srt" | "vtt" | "ass" | "ssa" | "sub"))
-                        .unwrap_or_else(|| "srt".to_string());
-                    let base_dir = if let Some(home) = dirs::home_dir() {
-                        let storage = home.join("storage/downloads/moviebox_subs");
-                        if home.join("storage/downloads").exists() {
-                            let _ = std::fs::create_dir_all(&storage);
-                            storage
-                        } else {
-                            std::env::temp_dir().join("moviebox-tui/subs")
-                        }
-                    } else {
-                        std::env::temp_dir().join("moviebox-tui/subs")
-                    };
-                    let _ = std::fs::create_dir_all(&base_dir);
-                    let path = base_dir.join(format!(
-                        "{}_{}.{}",
-                        std::process::id(),
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_nanos(),
-                        extension
-                    ));
-                    if tokio::fs::write(&path, bytes).await.is_ok() {
+                let download_res = crate::service::MovieBoxService::new()
+                    .download_subtitle_file(&url, &headers)
+                    .await;
+                match download_res {
+                    Ok(path) => {
                         local_subtitle = Some(path.to_string_lossy().into_owned());
                         temporary_subtitle = Some(path);
-                        downloaded = true;
                     }
-                }
-                if !downloaded {
-                    log::warn!(
-                        "subtitle download failed for {:?} player, playing without subtitles (url was {})",
-                        kind,
-                        crate::logging::sanitize_url(&url)
-                    );
-                    let _ = sender.send(Action::SetStatus(
-                        "Subtitles unavailable; playing without subtitles.".to_string(),
-                    ));
+                    Err(_) => {
+                        log::warn!(
+                            "subtitle download failed for {:?} player, playing without subtitles (url was {})",
+                            kind,
+                            crate::logging::sanitize_url(&url)
+                        );
+                        let _ = sender.send(Action::SetStatus(
+                            "Subtitles unavailable; playing without subtitles.".to_string(),
+                        ));
+                    }
                 }
             }
 

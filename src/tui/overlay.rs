@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Rect},
@@ -15,46 +13,7 @@ use crate::tui::theme::Theme;
 
 const MAX_PICKER_ROWS: usize = 8;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NotificationKind {
-    Info,
-    Success,
-    Warning,
-    Error,
-}
-
-#[derive(Debug, Clone)]
-pub struct Notification {
-    pub kind: NotificationKind,
-    pub title: String,
-    pub message: String,
-    expires_at: Instant,
-}
-
-impl Notification {
-    pub fn new(
-        kind: NotificationKind,
-        title: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
-        let duration = match kind {
-            NotificationKind::Info => Duration::from_secs(4),
-            NotificationKind::Success => Duration::from_secs(5),
-            NotificationKind::Warning => Duration::from_secs(7),
-            NotificationKind::Error => Duration::from_secs(10),
-        };
-        Self {
-            kind,
-            title: title.into(),
-            message: message.into(),
-            expires_at: Instant::now() + duration,
-        }
-    }
-
-    pub fn expired(&self) -> bool {
-        Instant::now() >= self.expires_at
-    }
-}
+pub use crate::models::{Notification, NotificationKind};
 
 pub struct PickerSpec<'a> {
     pub title: &'a str,

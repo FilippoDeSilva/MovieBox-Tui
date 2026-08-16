@@ -1,64 +1,11 @@
 use super::{App, network};
 use crate::providers::models::{ProviderKind, RequestContext};
+use crate::service::extract_browse_metrics;
 use crate::tui::{
     action::Action,
     overlay::NotificationKind,
-    state::{BrowseMetrics, BrowsePreset, InputMode, Screen, SearchResult},
+    state::{BrowsePreset, InputMode, Screen, SearchResult},
 };
-
-fn metric_value(item: &serde_json::Value, keys: &[&str]) -> Option<f64> {
-    let mut containers = vec![item];
-    if let Some(metadata) = item.get("metadata") {
-        containers.push(metadata);
-    }
-    if let Some(meta) = item.get("meta") {
-        containers.push(meta);
-    }
-
-    containers.into_iter().find_map(|container| {
-        keys.iter().find_map(|key| {
-            let value = container.get(*key)?;
-            value
-                .as_f64()
-                .or_else(|| value.as_i64().map(|number| number as f64))
-                .or_else(|| value.as_str().and_then(|text| text.parse::<f64>().ok()))
-        })
-    })
-}
-
-fn extract_browse_metrics(item: &serde_json::Value) -> BrowseMetrics {
-    BrowseMetrics {
-        trending: metric_value(
-            item,
-            &["__browse_rank", "imdb_trending", "imdbTrending", "trending"],
-        ),
-        rating: metric_value(
-            item,
-            &["imdbRatingValue", "imdbRate", "imdb_rating", "imdbRating"],
-        ),
-        recent_rating: metric_value(
-            item,
-            &[
-                "imdb_rating_30d",
-                "imdbRating30Days",
-                "imdbRatingLast30Days",
-                "imdb_rating_recent",
-                "imdbRatingValue",
-                "imdbRate",
-            ],
-        ),
-        popularity: metric_value(
-            item,
-            &[
-                "__browse_rank",
-                "imdb_popularity",
-                "imdbPopularity",
-                "popularity",
-                "viewers",
-            ],
-        ),
-    }
-}
 
 fn browse_group_matches(title: &str, preset: BrowsePreset) -> bool {
     let title = title.to_lowercase();
@@ -402,10 +349,7 @@ impl App {
         let request_id = self.state.active_search_request;
         let page = 1;
         let sender = self.action_sender.clone();
-        let client = self.client.clone();
-        let fourk_client = self.fourk_client.clone();
-        let circleftp_client = self.circleftp_client.clone();
-        let dhakaflix_client = self.dhakaflix_client.clone();
+        let service = self.service.clone();
         tokio::spawn(async move {
             if !force_refresh {
                 let q = query.clone();
@@ -428,16 +372,7 @@ impl App {
                 }
             }
 
-            let result = network::provider_search(
-                &client,
-                fourk_client.as_ref(),
-                &circleftp_client,
-                &dhakaflix_client,
-                context.provider,
-                &query,
-                page,
-            )
-            .await;
+            let result = service.search(context.provider, &query, page).await;
             match result {
                 Ok(res) => {
                     let q = query.clone();
@@ -516,10 +451,7 @@ impl App {
         context: RequestContext,
     ) {
         let request_id = self.state.active_details_request;
-        let client = self.client.clone();
-        let fourk_client = self.fourk_client.clone();
-        let circleftp_client = self.circleftp_client.clone();
-        let dhakaflix_client = self.dhakaflix_client.clone();
+        let service = self.service.clone();
         let sender = self.action_sender.clone();
         tokio::spawn(async move {
             if !force_refresh {
@@ -541,15 +473,7 @@ impl App {
                 }
             }
 
-            let result = network::provider_details(
-                &client,
-                fourk_client.as_ref(),
-                &circleftp_client,
-                &dhakaflix_client,
-                context.provider,
-                &id,
-            )
-            .await;
+            let result = service.details(context.provider, &id).await;
             match result {
                 Ok(details) => {
                     let id_for_cache = id.clone();
@@ -577,7 +501,7 @@ impl App {
 
     pub(super) fn run_homepage_request(&self, tab_id: String, page: usize) {
         let request_id = self.state.active_homepage_request;
-        let client = self.client.clone();
+        let service = self.service.clone();
         let sender = self.action_sender.clone();
         tokio::spawn(async move {
             let t_clone = tab_id.clone();
@@ -597,7 +521,7 @@ impl App {
                 return;
             }
 
-            match client.get_homepage(&tab_id, page).await {
+            match service.homepage(&tab_id, page).await {
                 Ok(res) => {
                     let r_clone = res.clone();
                     let t_clone = tab_id.clone();

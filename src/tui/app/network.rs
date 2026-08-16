@@ -1,6 +1,8 @@
 use crate::providers::{
-    Provider, fourkhdhub::FourKHdHubClient, models::ProviderKind, moviebox::client::MovieBoxClient,
+    fourkhdhub::FourKHdHubClient, models::ProviderKind, moviebox::client::MovieBoxClient,
 };
+
+pub(super) use crate::service::decode_poster;
 
 pub(super) async fn fetch_poster_bytes(client: &reqwest::Client, url: &str) -> Option<Vec<u8>> {
     let response = client
@@ -14,14 +16,6 @@ pub(super) async fn fetch_poster_bytes(client: &reqwest::Client, url: &str) -> O
     Some(response.bytes().await.ok()?.to_vec())
 }
 
-pub(super) async fn decode_poster(bytes: Vec<u8>) -> Option<std::sync::Arc<image::DynamicImage>> {
-    tokio::task::spawn_blocking(move || image::load_from_memory(&bytes))
-        .await
-        .ok()?
-        .ok()
-        .map(std::sync::Arc::new)
-}
-
 pub(super) async fn provider_search(
     moviebox: &MovieBoxClient,
     fourk: Option<&FourKHdHubClient>,
@@ -31,15 +25,14 @@ pub(super) async fn provider_search(
     query: &str,
     page: usize,
 ) -> Result<serde_json::Value, String> {
-    match provider {
-        ProviderKind::MovieBox => Provider::search(moviebox, query, page).await,
-        ProviderKind::FourKHdHub => {
-            let fourk = fourk.ok_or_else(|| "4KHDHub provider is unavailable".to_string())?;
-            Provider::search(fourk, query, page).await
-        }
-        ProviderKind::BdixCircleFtp => Provider::search(circleftp, query, page).await,
-        ProviderKind::BdixDhakaFlix => Provider::search(dhakaflix, query, page).await,
-    }
+    let service = crate::service::MovieBoxService {
+        client: moviebox.clone(),
+        fourk_client: fourk.cloned(),
+        circleftp_client: circleftp.clone(),
+        dhakaflix_client: dhakaflix.clone(),
+        http_client: moviebox.http_client().clone(),
+    };
+    service.search(provider, query, page).await
 }
 
 pub(super) async fn provider_details(
@@ -50,13 +43,12 @@ pub(super) async fn provider_details(
     provider: ProviderKind,
     subject_id: &str,
 ) -> Result<serde_json::Value, String> {
-    match provider {
-        ProviderKind::MovieBox => Provider::details(moviebox, subject_id).await,
-        ProviderKind::FourKHdHub => {
-            let fourk = fourk.ok_or_else(|| "4KHDHub provider is unavailable".to_string())?;
-            Provider::details(fourk, subject_id).await
-        }
-        ProviderKind::BdixCircleFtp => Provider::details(circleftp, subject_id).await,
-        ProviderKind::BdixDhakaFlix => Provider::details(dhakaflix, subject_id).await,
-    }
+    let service = crate::service::MovieBoxService {
+        client: moviebox.clone(),
+        fourk_client: fourk.cloned(),
+        circleftp_client: circleftp.clone(),
+        dhakaflix_client: dhakaflix.clone(),
+        http_client: moviebox.http_client().clone(),
+    };
+    service.details(provider, subject_id).await
 }

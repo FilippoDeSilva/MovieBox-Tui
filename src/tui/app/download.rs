@@ -2,67 +2,9 @@ use super::App;
 use crate::providers::models::ProviderKind;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
-fn ensure_moviebox_subdir(path: &std::path::Path) -> std::path::PathBuf {
-    let is_already_mb = path
-        .file_name()
-        .map(|name| {
-            let s = name.to_string_lossy();
-            s.eq_ignore_ascii_case("MovieBox-TUI") || s.eq_ignore_ascii_case("MovieBox")
-        })
-        .unwrap_or(false);
-
-    if is_already_mb {
-        path.to_path_buf()
-    } else {
-        path.join("MovieBox-TUI")
-    }
-}
-
 impl App {
     pub(super) fn resolve_download_base_dir(&self) -> std::path::PathBuf {
-        if let Some(ref custom_dir) = self.state.download_dir {
-            static LAST_PROBE: std::sync::Mutex<Option<(std::path::PathBuf, std::time::Instant)>> =
-                std::sync::Mutex::new(None);
-            let mut cached_ok = false;
-            if let Ok(guard) = LAST_PROBE.lock() {
-                if let Some((ref path, time)) = *guard {
-                    if path == custom_dir && time.elapsed().as_secs() < 60 {
-                        cached_ok = true;
-                    }
-                }
-            }
-            if cached_ok {
-                return ensure_moviebox_subdir(custom_dir);
-            }
-            if std::fs::create_dir_all(custom_dir).is_ok() {
-                let probe = custom_dir.join(format!(".mb_probe_{}", std::process::id()));
-                if std::fs::write(&probe, b"ok").is_ok() {
-                    let _ = std::fs::remove_file(&probe);
-                    if let Ok(mut guard) = LAST_PROBE.lock() {
-                        *guard = Some((custom_dir.clone(), std::time::Instant::now()));
-                    }
-                    return ensure_moviebox_subdir(custom_dir);
-                }
-            }
-            log::warn!("Custom download directory inaccessible; falling back to default");
-        }
-
-        let base_dir = dirs::download_dir()
-            .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-
-        let base_dir = if let Some(home) = dirs::home_dir() {
-            let android_storage = home.join("storage/downloads");
-            if android_storage.exists() {
-                android_storage
-            } else {
-                base_dir
-            }
-        } else {
-            base_dir
-        };
-
-        ensure_moviebox_subdir(&base_dir)
+        crate::service::resolve_download_dir(self.state.download_dir.as_deref())
     }
 
     pub(super) fn start_resilient_download(

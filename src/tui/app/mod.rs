@@ -20,6 +20,7 @@ mod tv;
 pub struct App {
     state: AppState,
     theme: Theme,
+    service: std::sync::Arc<crate::service::MovieBoxService>,
     client: MovieBoxClient,
     fourk_client: Option<FourKHdHubClient>,
     circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient,
@@ -66,13 +67,16 @@ impl App {
             state.active_theme_kind = "Mocha".to_string();
         }
 
+        let service = std::sync::Arc::new(crate::service::MovieBoxService::new());
+
         let app = Self {
             theme,
             state,
-            client: MovieBoxClient::new(),
-            fourk_client: FourKHdHubClient::new().ok(),
-            circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient::new(),
-            dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient::new(),
+            client: service.client.clone(),
+            fourk_client: service.fourk_client.clone(),
+            circleftp_client: service.circleftp_client.clone(),
+            dhakaflix_client: service.dhakaflix_client.clone(),
+            service,
             action_sender,
             action_receiver,
         };
