@@ -42,6 +42,7 @@ function Write-Warn { param([string]$Message) Write-Host "  ⚠ " -ForegroundCol
 function Write-Err { param([string]$Message) Write-Host "  ✖ " -ForegroundColor Red -NoNewline; Write-Host $Message; exit 1 }
 
 function Print-Header {
+    try { [Console]::Clear() } catch { Clear-Host }
     $Header = @"
 ███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝

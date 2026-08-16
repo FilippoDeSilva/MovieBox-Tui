@@ -150,7 +150,14 @@ log_error() {
     printf "  %b%s%b %b%s%b\n" "$C_RED" "✖" "$C_RESET" "$C_TEXT" "$1" "$C_RESET" >&2
 }
 
+clear_screen() {
+    if [ "$IS_TTY" -eq 1 ] && [ "${TERM:-}" != "dumb" ]; then
+        clear 2>/dev/null || printf "\033[2J\033[3J\033[H"
+    fi
+}
+
 print_header() {
+    clear_screen
     if [ "$IS_COLOR" -eq 1 ] && [ "$IS_TTY" -eq 1 ]; then
         printf "%b\n" "$CURSOR_HIDE"
         printf "%b%b" "$C_BOLD" "$C_MAUVE"
