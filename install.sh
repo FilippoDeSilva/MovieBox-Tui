@@ -64,7 +64,7 @@ EOF
 done
 
 IS_TTY=0
-if [ -t 1 ] && [ -t 0 ]; then
+if [ -t 1 ]; then
     IS_TTY=1
 fi
 
@@ -372,7 +372,11 @@ if [ -n "$EXISTING_BIN" ] && [ -x "$EXISTING_BIN" ]; then
         if [ "$IS_TTY" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; then
             printf "\n  %b%s%b %b%s%b\n" "$C_YELLOW" "ℹ" "$C_RESET" "$C_TEXT" "MovieBox-TUI $TARGET_VERSION is already installed at $EXISTING_BIN." "$C_RESET"
             printf "  Choose an action: [1] Reinstall  [2] Uninstall  [3] Exit: "
-            read -r user_choice || user_choice="3"
+            if [ -e /dev/tty ]; then
+                read -r user_choice </dev/tty || user_choice="3"
+            else
+                read -r user_choice || user_choice="3"
+            fi
             case "$user_choice" in
                 1)
                     log_step "Proceeding with reinstall..."
@@ -405,7 +409,7 @@ URL="https://github.com/$REPO/releases/download/$TARGET_VERSION/$FILE"
 CHECKSUM_URL="https://github.com/$REPO/releases/download/$TARGET_VERSION/SHA256SUMS"
 
 download_files() {
-    curl -fSL "$URL" -o "$TMP_DIR/$FILE" && \
+    curl -fsSL "$URL" -o "$TMP_DIR/$FILE" && \
     curl -fsSL "$CHECKSUM_URL" -o "$TMP_DIR/SHA256SUMS"
 }
 
