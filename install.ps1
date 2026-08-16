@@ -12,9 +12,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-} catch {
-    # Non-fatal if runtime does not support Tls13 enum
-}
+} catch {}
 Set-StrictMode -Version Latest
 
 $AppName = "MovieBox-Tui"
@@ -156,9 +154,7 @@ if (Test-Path $ExePath) {
                 exit 0
             }
         }
-    } catch {
-        # Proceed with installation if version check fails
-    }
+    } catch {}
 }
 
 if ($DryRun) {

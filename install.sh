@@ -78,7 +78,6 @@ if [ "$IS_COLOR" -eq 1 ]; then
     C_BOLD="\033[1m"
     C_DIM="\033[2m"
     
-    # Catppuccin Mocha Palette (24-bit TrueColor with ANSI fallback)
     if [ "${COLORTERM:-}" = "truecolor" ] || [ "${COLORTERM:-}" = "24bit" ] || [ -n "${WT_SESSION:-}" ] || [ "${TERM_PROGRAM:-}" = "Apple_Terminal" ] || [ "${TERM_PROGRAM:-}" = "iTerm.app" ] || [ "${TERM_PROGRAM:-}" = "ghostty" ] || [ "${TERM_PROGRAM:-}" = "WezTerm" ] || [ "${TERM_PROGRAM:-}" = "warp" ]; then
         C_MAUVE="\033[38;2;203;166;247m"
         C_BLUE="\033[38;2;137;180;250m"
