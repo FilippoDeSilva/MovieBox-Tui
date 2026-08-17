@@ -30,6 +30,11 @@
   - Added complete mouse click support for Addon Manager modal and browse popups.
 
 ### Fixed
+- **Terminal Race Condition & Blank Screen on `/clear-cache`**:
+  - Replaced physical terminal clear with a soft image refresh when executing `/clear-cache`, resolving a race condition with terminal emulators that swallowed the full Home screen render and caused the screen to go completely blank after a few seconds.
+  - Added comprehensive state isolation preventing search queries, results, and details states from lingering after cache clears.
+  - Sanitized slash command input handling to prevent visual query glitches.
+  - Replaced standard status messages with elevated toast notifications for cache actions.
 - **Atomic Mode Highlight & Single Active Selection**:
   - Added canonical `AppMode` enum (`Streaming`, `Tv`, `Addon`) and atomic state transitions guaranteeing that only one active mode is highlighted in the bottom dock at any time.
   - Hardened state isolation with automatic cleanup across mode switches.
