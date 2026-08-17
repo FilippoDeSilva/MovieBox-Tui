@@ -15,23 +15,37 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         "Streaming Mode"
     };
 
-    let mut help_text: Vec<Line> = vec![
-        Line::from(vec![Span::styled(
-            "  Mode Switching & Navigation",
-            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-        )]),
-        Line::from(vec![
-            Span::styled("    [Ctrl+S]       ", theme.header),
+    let mut help_text: Vec<Line> = vec![Line::from(vec![Span::styled(
+        "  Mode Switching & Navigation",
+        theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+    )])];
+
+    if state.streaming_enabled {
+        let key = format!("    [{}]", crate::tui::text::ctrl_key("S"));
+        let padded = format!("{:<19}", key);
+        help_text.push(Line::from(vec![
+            Span::styled(padded, theme.header),
             Span::styled("Switch to Streaming Mode", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [Ctrl+T]       ", theme.header),
+        ]));
+    }
+    if state.tv_enabled {
+        let key = format!("    [{}]", crate::tui::text::ctrl_key("T"));
+        let padded = format!("{:<19}", key);
+        help_text.push(Line::from(vec![
+            Span::styled(padded, theme.header),
             Span::styled("Switch to TV Mode", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [Ctrl+A]       ", theme.header),
+        ]));
+    }
+    if state.addons_enabled {
+        let key = format!("    [{}]", crate::tui::text::ctrl_key("A"));
+        let padded = format!("{:<19}", key);
+        help_text.push(Line::from(vec![
+            Span::styled(padded, theme.header),
             Span::styled("Switch to Addon Mode", theme.text),
-        ]),
+        ]));
+    }
+
+    help_text.extend(vec![
         Line::from(vec![
             Span::styled("    [↑] / [↓]      ", theme.header),
             Span::styled("Scroll Lists / Navigate", theme.text),
@@ -53,7 +67,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Quit Application", theme.text),
         ]),
         Line::from(vec![]),
-    ];
+    ]);
 
     if state.is_tv_mode {
         help_text.push(Line::from(vec![Span::styled(

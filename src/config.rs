@@ -8,6 +8,8 @@ pub struct Config {
     pub active_provider: ProviderKind,
     pub active_theme: String,
     pub bdix_enabled: bool,
+    pub streaming_enabled: bool,
+    pub tv_enabled: bool,
     pub addons_enabled: bool,
     pub default_player: Option<String>,
     pub download_dir: Option<String>,
@@ -21,6 +23,8 @@ impl Default for Config {
             active_provider: ProviderKind::MovieBox,
             active_theme: String::new(),
             bdix_enabled: false,
+            streaming_enabled: true,
+            tv_enabled: true,
             addons_enabled: false,
             default_player: None,
             download_dir: None,
@@ -63,6 +67,12 @@ pub fn load() -> Config {
     if let Some(v) = value.get("bdix_enabled").and_then(|v| v.as_bool()) {
         config.bdix_enabled = v;
     }
+    if let Some(v) = value.get("streaming_enabled").and_then(|v| v.as_bool()) {
+        config.streaming_enabled = v;
+    }
+    if let Some(v) = value.get("tv_enabled").and_then(|v| v.as_bool()) {
+        config.tv_enabled = v;
+    }
     if let Some(v) = value.get("addons_enabled").and_then(|v| v.as_bool()) {
         config.addons_enabled = v;
     }
@@ -90,6 +100,8 @@ pub fn save(config: &Config) {
         "active_provider": config.active_provider.cache_key(),
         "active_theme": config.active_theme,
         "bdix_enabled": config.bdix_enabled,
+        "streaming_enabled": config.streaming_enabled,
+        "tv_enabled": config.tv_enabled,
         "addons_enabled": config.addons_enabled,
         "default_player": config.default_player,
         "download_dir": config.download_dir

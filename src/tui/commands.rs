@@ -16,6 +16,10 @@ pub enum SlashCommand {
     Github,
     EnableBdix,
     DisableBdix,
+    EnableStreaming,
+    DisableStreaming,
+    EnableTv,
+    DisableTv,
     EnableAddons,
     DisableAddons,
 }
@@ -36,12 +40,16 @@ pub enum ParsedCommand<'a> {
     Github,
     EnableBdix,
     DisableBdix,
+    EnableStreaming,
+    DisableStreaming,
+    EnableTv,
+    DisableTv,
     EnableAddons,
     DisableAddons,
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 20] = [
         Self::Browse,
         Self::History,
         Self::List,
@@ -56,6 +64,10 @@ impl SlashCommand {
         Self::Github,
         Self::EnableBdix,
         Self::DisableBdix,
+        Self::EnableStreaming,
+        Self::DisableStreaming,
+        Self::EnableTv,
+        Self::DisableTv,
         Self::EnableAddons,
         Self::DisableAddons,
     ];
@@ -76,6 +88,10 @@ impl SlashCommand {
             Self::Github => "/github",
             Self::EnableBdix => "/enable-bdix",
             Self::DisableBdix => "/disable-bdix",
+            Self::EnableStreaming => "/enable-streaming",
+            Self::DisableStreaming => "/disable-streaming",
+            Self::EnableTv => "/enable-tv",
+            Self::DisableTv => "/disable-tv",
             Self::EnableAddons => "/enable-addons",
             Self::DisableAddons => "/disable-addons",
         }
@@ -103,6 +119,10 @@ impl SlashCommand {
             Self::Github => "Open project repository",
             Self::EnableBdix => "Enable BDIX FTP sources",
             Self::DisableBdix => "Disable BDIX FTP sources",
+            Self::EnableStreaming => "Enable Streaming mode navigation",
+            Self::DisableStreaming => "Disable Streaming mode navigation",
+            Self::EnableTv => "Enable TV mode navigation",
+            Self::DisableTv => "Disable TV mode navigation",
             Self::EnableAddons => "Enable Addon mode navigation",
             Self::DisableAddons => "Disable Addon mode navigation",
         }
@@ -110,14 +130,30 @@ impl SlashCommand {
 
     pub fn is_available(self, state: &AppState) -> bool {
         match self {
-            Self::Browse | Self::History => !state.is_tv_mode && !state.is_addon_mode,
-            Self::List | Self::Config => state.is_tv_mode,
+            Self::Browse | Self::History => {
+                state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode
+            }
+            Self::List | Self::Config => state.tv_enabled && state.is_tv_mode,
             Self::Reload => state.is_tv_mode,
-            Self::Addons => state.is_addon_mode || (!state.is_tv_mode && state.addons_enabled),
-            Self::EnableBdix => !state.is_tv_mode && !state.is_addon_mode && !state.bdix_enabled,
-            Self::DisableBdix => !state.is_tv_mode && !state.is_addon_mode && state.bdix_enabled,
-            Self::EnableAddons => !state.is_tv_mode && !state.addons_enabled,
-            Self::DisableAddons => !state.is_tv_mode && state.addons_enabled,
+            Self::Addons => state.addons_enabled && (state.is_addon_mode || !state.is_tv_mode),
+            Self::EnableBdix => {
+                state.streaming_enabled
+                    && !state.is_tv_mode
+                    && !state.is_addon_mode
+                    && !state.bdix_enabled
+            }
+            Self::DisableBdix => {
+                state.streaming_enabled
+                    && !state.is_tv_mode
+                    && !state.is_addon_mode
+                    && state.bdix_enabled
+            }
+            Self::EnableStreaming => !state.streaming_enabled,
+            Self::DisableStreaming => state.streaming_enabled,
+            Self::EnableTv => !state.tv_enabled,
+            Self::DisableTv => state.tv_enabled,
+            Self::EnableAddons => !state.addons_enabled,
+            Self::DisableAddons => state.addons_enabled,
             Self::DownloadDir
             | Self::Theme
             | Self::Update
@@ -176,6 +212,10 @@ impl SlashCommand {
             "/github" => Some(ParsedCommand::Github),
             "/enable-bdix" => Some(ParsedCommand::EnableBdix),
             "/disable-bdix" => Some(ParsedCommand::DisableBdix),
+            "/enable-streaming" => Some(ParsedCommand::EnableStreaming),
+            "/disable-streaming" => Some(ParsedCommand::DisableStreaming),
+            "/enable-tv" => Some(ParsedCommand::EnableTv),
+            "/disable-tv" => Some(ParsedCommand::DisableTv),
             "/enable-addons" => Some(ParsedCommand::EnableAddons),
             "/disable-addons" => Some(ParsedCommand::DisableAddons),
             _ => None,

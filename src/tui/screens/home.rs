@@ -376,53 +376,69 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let ctrl_a = crate::tui::text::ctrl_key("A");
         let ctrl_p = crate::tui::text::ctrl_key("P");
 
-        let mut mode_spans = vec![];
-        if !state.is_tv_mode && !state.is_addon_mode {
-            mode_spans.push(Span::styled("[", theme.text_dim));
-            mode_spans.push(Span::styled(&ctrl_p, theme.shortcut));
-            mode_spans.push(Span::styled("] ", theme.text_dim));
-            mode_spans.push(Span::styled(
-                state.active_provider.label(),
-                theme.highlight.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            mode_spans.push(Span::styled("[", theme.text_dim));
-            mode_spans.push(Span::styled(&ctrl_s, theme.shortcut));
-            mode_spans.push(Span::styled("] ", theme.text_dim));
-            mode_spans.push(Span::styled("Streaming", theme.text_dim));
+        let mut mode_tabs: Vec<Vec<Span>> = Vec::new();
+
+        if state.streaming_enabled {
+            let mut spans = vec![];
+            if !state.is_tv_mode && !state.is_addon_mode {
+                spans.push(Span::styled("[", theme.text_dim));
+                spans.push(Span::styled(&ctrl_p, theme.shortcut));
+                spans.push(Span::styled("] ", theme.text_dim));
+                spans.push(Span::styled(
+                    state.active_provider.label(),
+                    theme.highlight.add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                spans.push(Span::styled("[", theme.text_dim));
+                spans.push(Span::styled(&ctrl_s, theme.shortcut));
+                spans.push(Span::styled("] ", theme.text_dim));
+                spans.push(Span::styled("Streaming", theme.text_dim));
+            }
+            mode_tabs.push(spans);
         }
 
-        mode_spans.push(Span::raw("     "));
-
-        if state.is_tv_mode {
-            mode_spans.push(Span::styled("[ ", theme.text_dim));
-            mode_spans.push(Span::styled(
-                "TV",
-                theme.highlight.add_modifier(Modifier::BOLD),
-            ));
-            mode_spans.push(Span::styled(" ]", theme.text_dim));
-        } else {
-            mode_spans.push(Span::styled("[", theme.text_dim));
-            mode_spans.push(Span::styled(&ctrl_t, theme.shortcut));
-            mode_spans.push(Span::styled("] ", theme.text_dim));
-            mode_spans.push(Span::styled("TV", theme.text_dim));
+        if state.tv_enabled {
+            let mut spans = vec![];
+            if state.is_tv_mode {
+                spans.push(Span::styled("[ ", theme.text_dim));
+                spans.push(Span::styled(
+                    "TV",
+                    theme.highlight.add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::styled(" ]", theme.text_dim));
+            } else {
+                spans.push(Span::styled("[", theme.text_dim));
+                spans.push(Span::styled(&ctrl_t, theme.shortcut));
+                spans.push(Span::styled("] ", theme.text_dim));
+                spans.push(Span::styled("TV", theme.text_dim));
+            }
+            mode_tabs.push(spans);
         }
 
         if state.addons_enabled {
-            mode_spans.push(Span::raw("     "));
+            let mut spans = vec![];
             if state.is_addon_mode {
-                mode_spans.push(Span::styled("[ ", theme.text_dim));
-                mode_spans.push(Span::styled(
+                spans.push(Span::styled("[ ", theme.text_dim));
+                spans.push(Span::styled(
                     "Addons",
                     theme.highlight.add_modifier(Modifier::BOLD),
                 ));
-                mode_spans.push(Span::styled(" ]", theme.text_dim));
+                spans.push(Span::styled(" ]", theme.text_dim));
             } else {
-                mode_spans.push(Span::styled("[", theme.text_dim));
-                mode_spans.push(Span::styled(&ctrl_a, theme.shortcut));
-                mode_spans.push(Span::styled("] ", theme.text_dim));
-                mode_spans.push(Span::styled("Addons", theme.text_dim));
+                spans.push(Span::styled("[", theme.text_dim));
+                spans.push(Span::styled(&ctrl_a, theme.shortcut));
+                spans.push(Span::styled("] ", theme.text_dim));
+                spans.push(Span::styled("Addons", theme.text_dim));
             }
+            mode_tabs.push(spans);
+        }
+
+        let mut mode_spans = vec![];
+        for (i, tab) in mode_tabs.into_iter().enumerate() {
+            if i > 0 {
+                mode_spans.push(Span::raw("     "));
+            }
+            mode_spans.extend(tab);
         }
 
         frame.render_widget(

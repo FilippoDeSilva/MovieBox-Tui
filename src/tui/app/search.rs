@@ -360,6 +360,109 @@ impl App {
                 }
                 Some(true)
             }
+            crate::tui::commands::ParsedCommand::EnableStreaming
+            | crate::tui::commands::ParsedCommand::DisableStreaming => {
+                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableStreaming;
+                if self.state.streaming_enabled == enable_req {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Streaming Mode",
+                        if enable_req {
+                            "Already Enabled"
+                        } else {
+                            "Already Disabled"
+                        },
+                    );
+                    return Some(true);
+                }
+                if !enable_req && !self.state.tv_enabled && !self.state.addons_enabled {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Streaming Mode",
+                        "Cannot disable: at least one mode must remain active.",
+                    );
+                    return Some(true);
+                }
+
+                self.state.streaming_enabled = enable_req;
+                self.persist_config();
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Streaming Mode",
+                    if self.state.streaming_enabled {
+                        "Enabled"
+                    } else {
+                        "Disabled"
+                    },
+                );
+                if !self.state.streaming_enabled
+                    && !self.state.is_tv_mode
+                    && !self.state.is_addon_mode
+                {
+                    if self.state.tv_enabled {
+                        self.action_sender.send(Action::ToggleTvMode).ok();
+                    } else if self.state.addons_enabled {
+                        self.action_sender.send(Action::ToggleAddonMode).ok();
+                    }
+                }
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::EnableTv
+            | crate::tui::commands::ParsedCommand::DisableTv => {
+                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableTv;
+                if self.state.tv_enabled == enable_req {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "TV Mode",
+                        if enable_req {
+                            "Already Enabled"
+                        } else {
+                            "Already Disabled"
+                        },
+                    );
+                    return Some(true);
+                }
+                if !enable_req && !self.state.streaming_enabled && !self.state.addons_enabled {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "TV Mode",
+                        "Cannot disable: at least one mode must remain active.",
+                    );
+                    return Some(true);
+                }
+
+                self.state.tv_enabled = enable_req;
+                self.persist_config();
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.notify(
+                    NotificationKind::Info,
+                    "TV Mode",
+                    if self.state.tv_enabled {
+                        "Enabled"
+                    } else {
+                        "Disabled"
+                    },
+                );
+                if !self.state.tv_enabled && self.state.is_tv_mode {
+                    if self.state.streaming_enabled {
+                        self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                    } else if self.state.addons_enabled {
+                        self.action_sender.send(Action::ToggleAddonMode).ok();
+                    }
+                }
+                Some(true)
+            }
             crate::tui::commands::ParsedCommand::EnableAddons
             | crate::tui::commands::ParsedCommand::DisableAddons => {
                 let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableAddons;
@@ -377,6 +480,16 @@ impl App {
                     );
                     return Some(true);
                 }
+                if !enable_req && !self.state.streaming_enabled && !self.state.tv_enabled {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Addon Mode",
+                        "Cannot disable: at least one mode must remain active.",
+                    );
+                    return Some(true);
+                }
 
                 self.state.addons_enabled = enable_req;
                 self.persist_config();
@@ -386,13 +499,17 @@ impl App {
                     NotificationKind::Info,
                     "Addon Mode",
                     if self.state.addons_enabled {
-                        "Enabled (Press Ctrl+A to switch to Addon Mode)"
+                        "Enabled"
                     } else {
                         "Disabled"
                     },
                 );
                 if !self.state.addons_enabled && self.state.is_addon_mode {
-                    self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                    if self.state.streaming_enabled {
+                        self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                    } else if self.state.tv_enabled {
+                        self.action_sender.send(Action::ToggleTvMode).ok();
+                    }
                 }
                 Some(true)
             }

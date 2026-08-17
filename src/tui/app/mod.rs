@@ -45,7 +45,19 @@ impl App {
         state.auto_update = config.auto_update;
         state.last_update_check = config.last_update_check;
         state.bdix_enabled = config.bdix_enabled;
+        state.streaming_enabled = config.streaming_enabled;
+        state.tv_enabled = config.tv_enabled;
         state.addons_enabled = config.addons_enabled;
+        if !state.streaming_enabled && !state.tv_enabled && !state.addons_enabled {
+            state.streaming_enabled = true;
+        }
+        if !state.streaming_enabled {
+            if state.tv_enabled {
+                state.is_tv_mode = true;
+            } else if state.addons_enabled {
+                state.is_addon_mode = true;
+            }
+        }
         let provider_was_sanitized = !state.bdix_enabled && config.active_provider.is_bdix();
         state.active_provider = if provider_was_sanitized {
             crate::providers::models::ProviderKind::MovieBox
@@ -111,6 +123,8 @@ impl App {
             active_provider: self.state.active_provider,
             active_theme: self.state.active_theme_kind.clone(),
             bdix_enabled: self.state.bdix_enabled,
+            streaming_enabled: self.state.streaming_enabled,
+            tv_enabled: self.state.tv_enabled,
             addons_enabled: self.state.addons_enabled,
             default_player: self.state.default_player.clone(),
             download_dir: self

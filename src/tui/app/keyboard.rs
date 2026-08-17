@@ -15,19 +15,34 @@ impl App {
                 return None;
             }
             if let KeyCode::Char('t') = key.code {
-                self.action_sender.send(Action::ToggleTvMode).ok();
+                if self.state.tv_enabled {
+                    self.action_sender.send(Action::ToggleTvMode).ok();
+                } else {
+                    self.state.set_status(
+                        "TV Mode is disabled. Use /enable-tv to enable.".to_string(),
+                        120,
+                    );
+                }
                 return None;
             }
             if let KeyCode::Char('a') = key.code {
-                if !self.state.addons_enabled {
-                    self.state.addons_enabled = true;
-                    self.persist_config();
+                if self.state.addons_enabled {
+                    self.action_sender.send(Action::ToggleAddonMode).ok();
+                } else {
+                    self.state.set_status(
+                        "Addon Mode is disabled. Use /enable-addons to enable.".to_string(),
+                        120,
+                    );
                 }
-                self.action_sender.send(Action::ToggleAddonMode).ok();
                 return None;
             }
             if let KeyCode::Char('s') = key.code {
-                if !self.state.is_tv_mode && !self.state.is_addon_mode {
+                if !self.state.streaming_enabled {
+                    self.state.set_status(
+                        "Streaming Mode is disabled. Use /enable-streaming to enable.".to_string(),
+                        120,
+                    );
+                } else if !self.state.is_tv_mode && !self.state.is_addon_mode {
                     self.state
                         .set_status("Already in Streaming Mode.".to_string(), 120);
                 } else {
