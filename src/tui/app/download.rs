@@ -39,7 +39,7 @@ impl App {
             .as_ref()
             .and_then(|details| details.get("title"))
             .and_then(|title| title.as_str())
-            .unwrap_or("MovieBox-Tui_Stream");
+            .unwrap_or(crate::download::DEFAULT_STREAM_NAME);
         let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
         let is_series = self
             .state
@@ -62,7 +62,7 @@ impl App {
             .collect::<String>();
         let safe_title = safe_title.split_whitespace().collect::<Vec<_>>().join(" ");
         let safe_title = if safe_title.is_empty() {
-            "MovieBox-Tui_Stream".to_string()
+            crate::download::DEFAULT_STREAM_NAME.to_string()
         } else {
             safe_title
         };
@@ -442,7 +442,7 @@ impl App {
                         .as_ref()
                         .and_then(|details| details.get("title"))
                         .and_then(|title| title.as_str())
-                        .unwrap_or("MovieBox-Tui_Stream");
+                        .unwrap_or(crate::download::DEFAULT_STREAM_NAME);
                     let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
                     let safe_title = clean_title
                         .chars()
@@ -456,7 +456,7 @@ impl App {
                         .collect::<String>();
                     let safe_title = safe_title.split_whitespace().collect::<Vec<_>>().join(" ");
                     let safe_title = if safe_title.is_empty() {
-                        "MovieBox-Tui_Stream".to_string()
+                        crate::download::DEFAULT_STREAM_NAME.to_string()
                     } else {
                         safe_title
                     };

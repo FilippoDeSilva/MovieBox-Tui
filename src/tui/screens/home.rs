@@ -943,11 +943,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .title(title)
             .title_style(theme.title)
             .borders(ratatui::widgets::Borders::ALL)
-            .border_type(if state.basic_terminal {
-                ratatui::widgets::BorderType::Plain
-            } else {
-                ratatui::widgets::BorderType::Rounded
-            })
+            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
             .border_style(theme.lavender);
 
         let inner_area = popup_block.inner(popup_area);
@@ -1098,11 +1094,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .title(title)
             .title_style(theme.title)
             .borders(ratatui::widgets::Borders::ALL)
-            .border_type(if state.basic_terminal {
-                ratatui::widgets::BorderType::Plain
-            } else {
-                ratatui::widgets::BorderType::Rounded
-            })
+            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
             .border_style(theme.lavender);
 
         let inner_area = popup_block.inner(popup_area);

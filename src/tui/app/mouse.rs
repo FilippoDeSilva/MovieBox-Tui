@@ -88,7 +88,7 @@ impl App {
         }
 
         if self.state.update_available.is_some() {
-            let popup = centered_rect(area, 46, 7, 36, 60);
+            let popup = crate::tui::overlay::centered(area, 46, 7, 36, 60);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 let dismiss_y = popup.y + popup.height.saturating_sub(2);
                 if row == dismiss_y {
@@ -140,7 +140,7 @@ impl App {
         }
 
         if self.state.show_season_download_confirm {
-            let popup = centered_rect(area, 40, 6, 36, 64);
+            let popup = crate::tui::overlay::centered(area, 40, 6, 36, 64);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 let action_y = popup.y + 3;
                 if row == action_y {
@@ -158,7 +158,7 @@ impl App {
         }
 
         if self.state.show_episode_download_confirm {
-            let popup = centered_rect(area, 40, 6, 36, 64);
+            let popup = crate::tui::overlay::centered(area, 40, 6, 36, 64);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 let action_y = popup.y + 3;
                 if row == action_y {
@@ -197,7 +197,7 @@ impl App {
                     total_rows.min(10).saturating_add(5) as u16,
                 )
             };
-            let popup = centered_rect(area, popup_width, popup_height, 36, 70);
+            let popup = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 70);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 if !self.state.tv_input_active {
                     let item_start_y = popup.y + 1;
@@ -241,7 +241,7 @@ impl App {
                     .min(area.height.saturating_sub(4))
                     .max(7)
             };
-            let popup = centered_rect(area, popup_width, popup_height, 36, 80);
+            let popup = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 80);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 if !self.state.addon_input_active {
                     let list_start_y = popup.y + 1;
@@ -815,17 +815,6 @@ impl App {
     }
 }
 
-fn centered_rect(area: Rect, width: u16, height: u16, min_w: u16, max_w: u16) -> Rect {
-    let w = width.clamp(min_w, max_w).min(area.width.saturating_sub(2));
-    let h = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + (area.width.saturating_sub(w)) / 2,
-        y: area.y + (area.height.saturating_sub(h)) / 2,
-        width: w,
-        height: h,
-    }
-}
-
 fn centered_width_rect(area: Rect, width: u16) -> Rect {
     let w = width.min(area.width);
     Rect {
@@ -845,7 +834,8 @@ fn hit_test_centered_picker(
     min_w: u16,
     max_w: u16,
 ) -> Option<Option<usize>> {
-    let popup = centered_rect(area, width_pct, total_items as u16 + 4, min_w, max_w);
+    let popup =
+        crate::tui::overlay::centered(area, width_pct, total_items as u16 + 4, min_w, max_w);
     if popup.contains(ratatui::layout::Position::new(col, row)) {
         let item_y = popup.y.saturating_add(1);
         if row >= item_y && (row - item_y) < total_items as u16 {

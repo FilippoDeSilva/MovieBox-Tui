@@ -42,6 +42,27 @@ impl App {
         self.state.clear_details_state();
     }
 
+    pub(super) fn announce_mode(&mut self) {
+        match self.state.mode() {
+            crate::tui::state::AppMode::Streaming => {
+                self.state.set_status(
+                    format!(
+                        "Streaming mode active ({}).",
+                        self.state.active_provider.label()
+                    ),
+                    150,
+                );
+            }
+            crate::tui::state::AppMode::Tv => {
+                self.state
+                    .set_status("Loading TV playlists...".to_string(), 200);
+            }
+            crate::tui::state::AppMode::Addon => {
+                self.state.set_status("Addon mode active.".to_string(), 150);
+            }
+        }
+    }
+
     pub(super) async fn handle_tv(&mut self, action: Action) -> Option<()> {
         match action {
             Action::ToggleTvMode => {
@@ -57,8 +78,7 @@ impl App {
                 if self.state.is_tv_mode {
                     self.state.tv_config_popup = false;
                     self.state.tv_channels.clear();
-                    self.state
-                        .set_status("Loading TV playlists...".to_string(), 200);
+                    self.announce_mode();
                     self.load_tv_playlists_from_config();
                     self.reload_tv_playlists();
                     if self.state.tv_playlists.is_empty() {
@@ -72,7 +92,7 @@ impl App {
                     if self.state.installed_addons.is_empty() {
                         self.action_sender.send(Action::ShowAddonManager).ok();
                     } else {
-                        self.state.set_status("Addon mode active.".to_string(), 150);
+                        self.announce_mode();
                     }
                 } else {
                     self.state.tv_config_popup = false;
@@ -83,13 +103,7 @@ impl App {
                         self.state.active_provider =
                             crate::providers::models::ProviderKind::MovieBox;
                     }
-                    self.state.set_status(
-                        format!(
-                            "Streaming mode active ({}).",
-                            self.state.active_provider.label()
-                        ),
-                        150,
-                    );
+                    self.announce_mode();
                 }
                 self.persist_config();
             }

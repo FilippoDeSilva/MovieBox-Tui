@@ -17,6 +17,7 @@ use tokio::io::AsyncWriteExt;
 const MAX_ATTEMPTS: usize = 4;
 const SEGMENT_THRESHOLD: u64 = 32 * 1024 * 1024;
 const MAX_SEGMENTS: usize = 8;
+pub const DEFAULT_STREAM_NAME: &str = "MovieBox-Tui_Stream";
 
 pub fn safe_file_stem(value: &str) -> String {
     let mut stem = value
@@ -24,7 +25,6 @@ pub fn safe_file_stem(value: &str) -> String {
         .take(120)
         .map(|character| {
             if character.is_control()
-                || character.is_whitespace()
                 || matches!(
                     character,
                     '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
@@ -38,7 +38,7 @@ pub fn safe_file_stem(value: &str) -> String {
         .collect::<String>();
     stem = stem.trim_matches(['.', ' ', '_']).to_string();
     if stem.is_empty() {
-        return "MovieBox-Tui_Stream".into();
+        return DEFAULT_STREAM_NAME.into();
     }
     let upper = stem.to_ascii_uppercase();
     let reserved = matches!(upper.as_str(), "CON" | "PRN" | "AUX" | "NUL")

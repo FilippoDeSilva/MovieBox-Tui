@@ -42,7 +42,7 @@ impl HistoryManager {
 
     fn history_file_path() -> Option<PathBuf> {
         let mut path = dirs::data_dir()?;
-        path.push("moviebox-tui");
+        path.push(crate::config::APP_NAME);
         if !path.exists() {
             let _ = fs::create_dir_all(&path);
         }

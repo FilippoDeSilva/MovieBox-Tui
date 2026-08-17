@@ -34,12 +34,18 @@ impl Default for Config {
     }
 }
 
+pub const APP_NAME: &str = "moviebox-tui";
+
 fn path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("moviebox-tui").join("config.json"))
+    dirs::config_dir().map(|dir| dir.join(APP_NAME).join("config.json"))
 }
 
 pub fn addons_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("moviebox-tui").join("addons_config.json"))
+    dirs::config_dir().map(|dir| dir.join(APP_NAME).join("addons_config.json"))
+}
+
+pub fn tv_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|dir| dir.join(APP_NAME).join("tv_config.json"))
 }
 
 pub fn load() -> Config {

@@ -237,11 +237,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let details_block = Block::default()
         .borders(Borders::ALL)
-        .border_type(if state.basic_terminal {
-            ratatui::widgets::BorderType::Plain
-        } else {
-            ratatui::widgets::BorderType::Rounded
-        })
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
         .border_style(theme.surface1)
         .padding(ratatui::widgets::Padding::new(
             if matches!(tier, DetailsLayoutTier::Wide) {
@@ -550,11 +546,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
+                    .border_type(crate::tui::overlay::border_type(state.basic_terminal))
                     .title(pane_title(
                         "Audio",
                         language_count,
@@ -610,11 +602,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
+                    .border_type(crate::tui::overlay::border_type(state.basic_terminal))
                     .title(pane_title(
                         "Seasons",
                         state.available_seasons.len(),
@@ -687,11 +675,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(if state.basic_terminal {
-                        ratatui::widgets::BorderType::Plain
-                    } else {
-                        ratatui::widgets::BorderType::Rounded
-                    })
+                    .border_type(crate::tui::overlay::border_type(state.basic_terminal))
                     .title(pane_title(
                         "Episodes",
                         episode_count,
@@ -762,11 +746,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let streams_block = Block::default()
         .borders(Borders::ALL)
-        .border_type(if state.basic_terminal {
-            ratatui::widgets::BorderType::Plain
-        } else {
-            ratatui::widgets::BorderType::Rounded
-        })
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
         .title(ratatui::text::Line::from(streams_title).alignment(Alignment::Left))
         .title_style(if streams_focused {
             focused_title_style(theme)

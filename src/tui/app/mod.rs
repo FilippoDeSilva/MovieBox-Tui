@@ -51,13 +51,6 @@ impl App {
         if !state.streaming_enabled && !state.tv_enabled && !state.addons_enabled {
             state.streaming_enabled = true;
         }
-        if !state.streaming_enabled {
-            if state.tv_enabled {
-                state.is_tv_mode = true;
-            } else if state.addons_enabled {
-                state.is_addon_mode = true;
-            }
-        }
         let provider_was_sanitized = !state.bdix_enabled && config.active_provider.is_bdix();
         state.active_provider = if provider_was_sanitized {
             crate::providers::models::ProviderKind::MovieBox
@@ -179,46 +172,41 @@ impl App {
     }
 
     fn save_tv_playlists(&self) {
-        if let Some(config_dir) = dirs::config_dir() {
-            let app_dir = config_dir.join("moviebox-tui");
-            let _ = std::fs::create_dir_all(&app_dir);
-            let path = app_dir.join("tv_config.json");
-            if let Ok(json) = serde_json::to_string(&self.state.tv_playlists) {
-                let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
-                if let Err(error) = std::fs::write(&temporary, json) {
-                    log::warn!("failed to save tv playlists: {error}");
-                    return;
-                }
-                if std::fs::rename(&temporary, &path).is_err() {
-                    let _ = std::fs::remove_file(&path);
-                    if let Err(error) = std::fs::rename(&temporary, &path) {
-                        let _ = std::fs::remove_file(&temporary);
-                        log::warn!("failed to commit tv playlists: {error}");
-                    }
-                }
-            }
+        let Some(path) = crate::config::tv_path() else {
+            return;
+        };
+        if let Some(app_dir) = path.parent()
+            && std::fs::create_dir_all(app_dir).is_err()
+        {
+            return;
+        }
+        let Ok(json) = serde_json::to_string_pretty(&self.state.tv_playlists) else {
+            return;
+        };
+        if let Err(error) = crate::cache::atomic_write_file(&path, json.as_bytes()) {
+            log::warn!("failed to save tv playlists: {error}");
         }
     }
 
     fn load_tv_playlists_from_config(&mut self) {
         self.state.tv_playlists.clear();
-        if let Some(config_dir) = dirs::config_dir() {
-            let path = config_dir.join("moviebox-tui").join("tv_config.json");
-            if let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(list) = serde_json::from_str::<Vec<String>>(&content)
-            {
-                let mut seen = std::collections::HashSet::new();
-                self.state.tv_playlists = list
-                    .into_iter()
-                    .map(|item| item.trim().to_string())
-                    .filter(|item| !item.is_empty() && seen.insert(item.clone()))
-                    .collect();
-                if self.state.tv_playlists.is_empty() {
-                    let _ = std::fs::remove_file(path);
-                }
-            } else {
+        let Some(path) = crate::config::tv_path() else {
+            return;
+        };
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(list) = serde_json::from_str::<Vec<String>>(&content)
+        {
+            let mut seen = std::collections::HashSet::new();
+            self.state.tv_playlists = list
+                .into_iter()
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty() && seen.insert(item.clone()))
+                .collect();
+            if self.state.tv_playlists.is_empty() {
                 let _ = std::fs::remove_file(path);
             }
+        } else if path.exists() {
+            let _ = std::fs::remove_file(path);
         }
     }
 

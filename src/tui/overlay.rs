@@ -63,11 +63,7 @@ pub fn picker(
         .title(title)
         .title_style(theme.title)
         .borders(Borders::ALL)
-        .border_type(if basic_terminal {
-            BorderType::Plain
-        } else {
-            BorderType::Rounded
-        })
+        .border_type(border_type(basic_terminal))
         .border_style(theme.lavender);
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -146,11 +142,7 @@ pub fn confirmation(
         .title(format!(" {title} "))
         .title_style(theme.title)
         .borders(Borders::ALL)
-        .border_type(if basic_terminal {
-            BorderType::Plain
-        } else {
-            BorderType::Rounded
-        })
+        .border_type(border_type(basic_terminal))
         .border_style(theme.lavender);
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -289,11 +281,7 @@ pub fn notifications(
                 badge_style.add_modifier(Modifier::BOLD),
             )]))
             .borders(Borders::ALL)
-            .border_type(if basic_terminal {
-                BorderType::Plain
-            } else {
-                BorderType::Rounded
-            })
+            .border_type(border_type(basic_terminal))
             .border_style(badge_style)
             .padding(ratatui::widgets::Padding::horizontal(1));
 
@@ -344,6 +332,14 @@ pub fn clear_modal_area(frame: &mut Frame, bounds: Rect, popup: Rect, theme: &Th
         Rect::new(x, y, right.saturating_sub(x), bottom.saturating_sub(y)),
         theme,
     );
+}
+
+pub fn border_type(basic_terminal: bool) -> BorderType {
+    if basic_terminal {
+        BorderType::Plain
+    } else {
+        BorderType::Rounded
+    }
 }
 
 pub(crate) fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> {

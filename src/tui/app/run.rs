@@ -407,7 +407,7 @@ impl App {
         if let Some((version, notes)) = &self.state.update_available {
             use ratatui::layout::Alignment;
             use ratatui::text::{Line, Span};
-            use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
+            use ratatui::widgets::{Block, Borders, Paragraph};
 
             let note_lines: Vec<&str> = notes
                 .lines()
@@ -525,11 +525,7 @@ impl App {
                 .title_alignment(Alignment::Center)
                 .title_style(self.theme.title)
                 .borders(Borders::ALL)
-                .border_type(if self.state.basic_terminal {
-                    BorderType::Plain
-                } else {
-                    BorderType::Rounded
-                })
+                .border_type(crate::tui::overlay::border_type(self.state.basic_terminal))
                 .border_style(self.theme.border_focus);
 
             let popup = Paragraph::new(text).block(block);

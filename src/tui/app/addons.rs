@@ -22,12 +22,11 @@ impl App {
                     if self.state.installed_addons.is_empty() {
                         self.action_sender.send(Action::ShowAddonManager).ok();
                     } else {
-                        self.state.set_status("Addon mode active.".to_string(), 150);
+                        self.announce_mode();
                     }
                 } else if self.state.is_tv_mode {
                     self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
-                    self.state
-                        .set_status("Loading TV playlists...".to_string(), 200);
+                    self.announce_mode();
                     self.load_tv_playlists_from_config();
                     self.reload_tv_playlists();
                     if self.state.tv_playlists.is_empty() {
@@ -35,13 +34,7 @@ impl App {
                     }
                 } else {
                     self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
-                    self.state.set_status(
-                        format!(
-                            "Streaming mode active ({}).",
-                            self.state.active_provider.label()
-                        ),
-                        150,
-                    );
+                    self.announce_mode();
                 }
                 self.persist_config();
             }
@@ -52,13 +45,7 @@ impl App {
                 if self.state.active_provider == crate::providers::models::ProviderKind::Addons {
                     self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
                 }
-                self.state.set_status(
-                    format!(
-                        "Streaming mode active ({}).",
-                        self.state.active_provider.label()
-                    ),
-                    150,
-                );
+                self.announce_mode();
                 self.persist_config();
             }
 

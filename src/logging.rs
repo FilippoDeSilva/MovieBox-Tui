@@ -12,7 +12,7 @@ pub fn init() {
         .unwrap_or_else(|| default_level.to_string());
 
     let log_dir = dirs::data_dir()
-        .map(|dir| dir.join("moviebox-tui").join("logs"))
+        .map(|dir| dir.join(crate::config::APP_NAME).join("logs"))
         .unwrap_or_else(std::env::temp_dir);
 
     match Logger::try_with_str(&spec) {
@@ -21,7 +21,7 @@ pub fn init() {
                 .log_to_file(
                     FileSpec::default()
                         .directory(&log_dir)
-                        .basename("moviebox-tui"),
+                        .basename(crate::config::APP_NAME),
                 )
                 .rotate(
                     Criterion::Size(5 * 1024 * 1024),
@@ -32,16 +32,20 @@ pub fn init() {
                 .format(flexi_logger::opt_format)
                 .start()
             {
-                eprintln!("[moviebox-tui] logging unavailable: {error}");
+                eprintln!("[{}] logging unavailable: {error}", crate::config::APP_NAME);
             }
         }
         Err(error) => {
-            eprintln!("[moviebox-tui] invalid MOVIEBOX_LOG level: {error}");
+            eprintln!(
+                "[{}] invalid MOVIEBOX_LOG level: {error}",
+                crate::config::APP_NAME
+            );
         }
     }
 
     log::info!(
-        "session started | moviebox-tui {} | {} | log file: {}",
+        "session started | {} {} | {} | log file: {}",
+        crate::config::APP_NAME,
         env!("CARGO_PKG_VERSION"),
         std::env::consts::OS,
         display_path()
@@ -51,9 +55,9 @@ pub fn init() {
 pub fn log_file_path() -> std::path::PathBuf {
     dirs::data_dir()
         .map(|dir| {
-            dir.join("moviebox-tui")
+            dir.join(crate::config::APP_NAME)
                 .join("logs")
-                .join("moviebox-tui_rCURRENT.log")
+                .join(format!("{}_rCURRENT.log", crate::config::APP_NAME))
         })
         .unwrap_or_else(std::env::temp_dir)
 }

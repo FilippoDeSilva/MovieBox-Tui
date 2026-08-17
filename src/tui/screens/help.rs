@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph},
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
@@ -242,11 +242,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         .title_alignment(Alignment::Center)
         .title_style(theme.title)
         .borders(Borders::ALL)
-        .border_type(if state.basic_terminal {
-            BorderType::Plain
-        } else {
-            BorderType::Rounded
-        })
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
         .border_style(theme.border_focus);
 
     if two_columns {
