@@ -538,8 +538,8 @@ impl App {
         let bottom_area = chunks[2];
         let footer_area = chunks[3];
 
-        if row == footer_area.y {
-            self.handle_details_footer_click(col, area.width);
+        if row >= footer_area.y && row < footer_area.bottom() {
+            self.handle_details_footer_click(col, row - footer_area.y, area.width);
             return None;
         }
 
@@ -718,99 +718,109 @@ impl App {
         None
     }
 
-    fn handle_details_footer_click(&mut self, col: u16, width: u16) {
+    fn handle_details_footer_click(&mut self, col: u16, line_idx: u16, width: u16) {
         let is_streams = self.state.details_pane == DetailsPane::Streams;
         let is_seasons = self.state.details_pane == DetailsPane::Seasons;
         let is_languages = self.state.details_pane == DetailsPane::Languages;
+        let compact = width < 80;
+        let very_compact = width < 45;
 
-        let mut btn_widths = vec![16_u16, 10_u16];
-        let action_label = if is_streams { 11_u16 } else { 13_u16 };
-        btn_widths.push(action_label);
+        enum FooterAction {
+            Tab,
+            Move,
+            PlaySelect,
+            OpenWith,
+            Download,
+            Refresh,
+            Back,
+        }
 
-        if is_streams {
-            btn_widths.push(14_u16);
+        let mut primary: Vec<(FooterAction, u16)> = Vec::new();
+        let tab_label_len = if compact { 4 } else { 9 };
+        primary.push((FooterAction::Tab, 5 + 1 + tab_label_len));
+        primary.push((FooterAction::Move, 4 + 1 + 4));
+
+        if !very_compact {
+            let enter_label_len = if is_streams { 4 } else { 6 };
+            primary.push((FooterAction::PlaySelect, 7 + 1 + enter_label_len));
         }
-        if !is_languages {
-            btn_widths.push(15_u16);
+
+        let mut secondary: Vec<(FooterAction, u16)> = Vec::new();
+        if very_compact {
+            let enter_label_len = if is_streams { 4 } else { 6 };
+            secondary.push((FooterAction::PlaySelect, 7 + 1 + enter_label_len));
+        } else {
+            if is_streams {
+                let o_label_len = if compact { 4 } else { 9 };
+                secondary.push((FooterAction::OpenWith, 3 + 1 + o_label_len));
+            }
+            if !is_languages {
+                let d_label_len = if compact { 4 } else { 8 };
+                secondary.push((FooterAction::Download, 3 + 1 + d_label_len));
+            }
+            if !very_compact {
+                let r_label_len = if compact { 5 } else { 7 };
+                secondary.push((FooterAction::Refresh, 3 + 1 + r_label_len));
+            }
         }
-        btn_widths.push(14_u16);
-        btn_widths.push(11_u16);
+        secondary.push((FooterAction::Back, 5 + 1 + 4));
+
+        let active_buttons = if width >= 70 {
+            if line_idx > 0 {
+                return;
+            }
+            let mut combined = primary;
+            combined.extend(secondary);
+            combined
+        } else if line_idx == 0 {
+            primary
+        } else {
+            secondary
+        };
 
         let sep = 3_u16;
-        let total_w: u16 = btn_widths.iter().sum::<u16>() + (btn_widths.len() as u16 - 1) * sep;
+        let total_w: u16 = active_buttons.iter().map(|(_, w)| *w).sum::<u16>()
+            + (active_buttons.len().saturating_sub(1) as u16) * sep;
         let mut curr_x = width.saturating_sub(total_w) / 2;
 
-        let mut hitboxes = Vec::new();
-        for w in &btn_widths {
-            hitboxes.push((curr_x, curr_x + w));
-            curr_x += w + sep;
-        }
-
-        let mut idx = 0;
-        if let Some(&(s, e)) = hitboxes.get(idx) {
-            if col >= s && col < e + 2 {
-                self.action_sender.send(Action::TabPane).ok();
-                return;
-            }
-        }
-        idx += 1;
-
-        if let Some(&(s, e)) = hitboxes.get(idx) {
-            if col >= s && col < e + 2 {
-                self.action_sender.send(Action::MoveDown).ok();
-                return;
-            }
-        }
-        idx += 1;
-
-        if let Some(&(s, e)) = hitboxes.get(idx) {
-            if col >= s && col < e + 2 {
-                if is_streams {
-                    self.action_sender.send(Action::PlayStream(false)).ok();
-                } else {
-                    self.action_sender.send(Action::Submit).ok();
-                }
-                return;
-            }
-        }
-        idx += 1;
-
-        if is_streams {
-            if let Some(&(s, e)) = hitboxes.get(idx) {
-                if col >= s && col < e + 2 {
-                    self.action_sender.send(Action::PlayStream(true)).ok();
-                    return;
-                }
-            }
-            idx += 1;
-        }
-
-        if !is_languages {
-            if let Some(&(s, e)) = hitboxes.get(idx) {
-                if col >= s && col < e + 2 {
-                    if is_seasons {
-                        self.action_sender.send(Action::PromptDownloadSeason).ok();
-                    } else {
-                        self.action_sender.send(Action::PromptDownloadEpisode).ok();
+        for (action, w) in active_buttons {
+            let start = curr_x;
+            let end = start + w;
+            if col >= start && col < end + sep {
+                match action {
+                    FooterAction::Tab => {
+                        self.action_sender.send(Action::TabPane).ok();
                     }
-                    return;
+                    FooterAction::Move => {
+                        self.action_sender.send(Action::MoveDown).ok();
+                    }
+                    FooterAction::PlaySelect => {
+                        if is_streams {
+                            self.action_sender.send(Action::PlayStream(false)).ok();
+                        } else {
+                            self.action_sender.send(Action::Submit).ok();
+                        }
+                    }
+                    FooterAction::OpenWith => {
+                        self.action_sender.send(Action::PlayStream(true)).ok();
+                    }
+                    FooterAction::Download => {
+                        if is_seasons {
+                            self.action_sender.send(Action::PromptDownloadSeason).ok();
+                        } else {
+                            self.action_sender.send(Action::PromptDownloadEpisode).ok();
+                        }
+                    }
+                    FooterAction::Refresh => {
+                        self.action_sender.send(Action::Refresh).ok();
+                    }
+                    FooterAction::Back => {
+                        self.action_sender.send(Action::GoBack).ok();
+                    }
                 }
-            }
-            idx += 1;
-        }
-
-        if let Some(&(s, e)) = hitboxes.get(idx) {
-            if col >= s && col < e + 2 {
-                self.action_sender.send(Action::Refresh).ok();
                 return;
             }
-        }
-        idx += 1;
-
-        if let Some(&(s, e)) = hitboxes.get(idx) {
-            if col >= s && col <= e + 3 {
-                self.action_sender.send(Action::GoBack).ok();
-            }
+            curr_x += w + sep;
         }
     }
 }

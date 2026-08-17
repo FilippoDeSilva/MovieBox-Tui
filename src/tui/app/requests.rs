@@ -1481,7 +1481,7 @@ impl App {
                                     id,
                                     season,
                                     episode,
-                                    "No streaming addons are currently installed or enabled.\nPress Ctrl+P or open /addons to install/enable a stream provider.".into(),
+                                    "No streaming addons are currently installed or enabled.\nPress Ctrl+P or open /config to install/enable a stream provider.".into(),
                                 ))
                                 .ok();
                             return;
@@ -1521,7 +1521,7 @@ impl App {
                                     id,
                                     season,
                                     episode,
-                                    "No HTTP streams found from active addons for this title.\nPress r to retry or install additional stream addons via /addons.".into(),
+                                    "No HTTP streams found from active addons for this title.\nPress r to retry or install additional stream addons via /config.".into(),
                                 ))
                                 .ok();
                         }

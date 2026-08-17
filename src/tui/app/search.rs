@@ -207,16 +207,6 @@ impl App {
                     None
                 }
             }
-            crate::tui::commands::ParsedCommand::Reload => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
-                if current_mode == crate::tui::state::AppMode::Tv {
-                    self.action_sender.send(Action::TvReloadPlaylists).ok();
-                } else {
-                    self.action_sender.send(Action::Refresh).ok();
-                }
-                Some(true)
-            }
             crate::tui::commands::ParsedCommand::List => {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.apply_tv_search_results(query, lower_query);

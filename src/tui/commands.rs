@@ -5,7 +5,6 @@ pub enum SlashCommand {
     Browse,
     History,
     List,
-    Reload,
     Config,
     DownloadDir,
     Theme,
@@ -28,7 +27,6 @@ pub enum ParsedCommand<'a> {
     Browse,
     History,
     List,
-    Reload,
     Config,
     DownloadDir(&'a str),
     Theme,
@@ -47,11 +45,10 @@ pub enum ParsedCommand<'a> {
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 18] = [
         Self::Browse,
         Self::History,
         Self::List,
-        Self::Reload,
         Self::Config,
         Self::DownloadDir,
         Self::Theme,
@@ -74,7 +71,6 @@ impl SlashCommand {
             Self::Browse => "/browse",
             Self::History => "/history",
             Self::List => "/list",
-            Self::Reload => "/reload",
             Self::Config => "/config",
             Self::DownloadDir => "/download-dir",
             Self::Theme => "/theme",
@@ -93,18 +89,11 @@ impl SlashCommand {
         }
     }
 
-    pub fn description(self, state: &AppState) -> &'static str {
+    pub fn description(self, _state: &AppState) -> &'static str {
         match self {
             Self::Browse => "Curated, rated & most-watched views",
             Self::History => "Watch history",
             Self::List => "Show all TV channels",
-            Self::Reload => {
-                if state.is_tv_mode {
-                    "Reload IPTV playlists"
-                } else {
-                    "Refresh catalog & streams"
-                }
-            }
             Self::Config => "Configure IPTV playlists",
             Self::DownloadDir => "View or change download folder",
             Self::Theme => "Theme picker",
@@ -131,7 +120,6 @@ impl SlashCommand {
             }
             Self::History => state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode,
             Self::List | Self::Config => state.tv_enabled && state.is_tv_mode,
-            Self::Reload => state.is_tv_mode,
             Self::EnableBdix => {
                 state.streaming_enabled
                     && !state.is_tv_mode
@@ -197,7 +185,6 @@ impl SlashCommand {
             "/browse" => Some(ParsedCommand::Browse),
             "/history" => Some(ParsedCommand::History),
             "/list" => Some(ParsedCommand::List),
-            "/reload" => Some(ParsedCommand::Reload),
             "/config" => Some(ParsedCommand::Config),
             "/download-dir" => Some(ParsedCommand::DownloadDir(arg)),
             "/theme" => Some(ParsedCommand::Theme),

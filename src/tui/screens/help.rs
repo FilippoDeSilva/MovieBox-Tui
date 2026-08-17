@@ -83,7 +83,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Open Alternative Player Picker", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [r] / /reload  ", theme.header),
+            Span::styled("    [r]            ", theme.header),
             Span::styled("Reload TV Playlists", theme.text),
         ]));
         help_text.push(Line::from(vec![
@@ -101,10 +101,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         )]));
         help_text.push(Line::from(vec![
             Span::styled("    [Ctrl+P]       ", theme.header),
-            Span::styled("Open Addons Manager", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
-            Span::styled("    /addons        ", theme.header),
             Span::styled("Open Addons Manager", theme.text),
         ]));
         help_text.push(Line::from(vec![

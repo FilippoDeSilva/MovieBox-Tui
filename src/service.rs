@@ -80,7 +80,7 @@ impl MovieBoxService {
 
                 if catalog_addons.is_empty() {
                     return Err(
-                        "No catalog/metadata addon enabled. Open /addons to configure one."
+                        "No catalog/metadata addon enabled. Open /config to configure one."
                             .to_string(),
                     );
                 }
