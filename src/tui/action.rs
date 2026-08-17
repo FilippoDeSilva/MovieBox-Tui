@@ -17,7 +17,7 @@ pub enum Action {
     SwitchToStreamingMode,
     SwitchProvider(crate::providers::models::ProviderKind),
     ShowTvConfig,
-    TvChannelsLoaded(Vec<crate::providers::m3u::Channel>, usize),
+    TvChannelsLoaded(Vec<crate::providers::tv::Channel>, usize),
     TvPlaylistAdd(String),
     TvPlaylistRemove(usize),
     TvReloadPlaylists,

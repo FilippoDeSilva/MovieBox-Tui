@@ -26,7 +26,8 @@ src/
     fourkhdhub/                 4KHDHub provider (client, hubcloud resolver, parser)
     bdix/circleftp/             BDIX CircleFTP provider
     bdix/dhakaflix/             BDIX DhakaFlix provider
-    m3u.rs                      M3U playlist parser (URL and local file)
+    addons/                     Community HTTP addons provider
+    tv/                         Live TV / IPTV provider (M3U parser and models)
   service.rs                    MovieBoxService headless engine (search, details, streams, captions)
   updater.rs                    GitHub release update check
   tui/

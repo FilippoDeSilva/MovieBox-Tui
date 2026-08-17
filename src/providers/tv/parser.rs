@@ -1,15 +1,6 @@
-use serde::{Deserialize, Serialize};
+use super::models::Channel;
 use std::path::PathBuf;
 use std::time::SystemTime;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Channel {
-    pub id: String,
-    pub name: String,
-    pub logo: String,
-    pub group: String,
-    pub stream_url: String,
-}
 
 pub struct M3UParser {
     cache_dir: PathBuf,

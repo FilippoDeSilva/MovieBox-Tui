@@ -1,9 +1,11 @@
 pub mod addons;
 pub mod bdix;
 pub mod fourkhdhub;
-pub mod m3u;
 pub mod models;
 pub mod moviebox;
+pub mod tv;
+
+pub use tv as m3u;
 
 use models::Release;
 

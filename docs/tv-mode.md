@@ -24,7 +24,7 @@ file path, and the app parses, groups, dedupes, and lets you search and play the
 
 ## Parsing and search
 
-`providers/m3u.rs` parses each source (http(s) or local file), extracting channel id,
+`src/providers/tv/` parses each source (http(s) or local file), extracting channel id,
 name, logo, `group-title`, and stream URL. Channels are **deduped by stream URL**
 across all playlists. The search box filters by name or group; the status bar reports
 how many channels were imported and which playlists failed.

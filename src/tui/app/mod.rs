@@ -192,7 +192,7 @@ impl App {
         let playlists = self.state.tv_playlists.clone();
         let sender = self.action_sender.clone();
         tokio::spawn(async move {
-            let parser = crate::providers::m3u::M3UParser::new();
+            let parser = crate::providers::tv::M3UParser::new();
             let mut all_channels = Vec::new();
             let mut failed = 0usize;
             for source in &playlists {

@@ -51,8 +51,8 @@ src/
     bdix/
       circleftp/     BDIX CircleFTP provider (client + parser).
       dhakaflix/     BDIX DhakaFlix provider (client + parser).
-    addons/          Community HTTP addons provider (client, aggregator, adapter).
-    m3u.rs           M3U playlist parser (http(s) URL or local file).
+    addons/          Community HTTP addons provider (client, aggregator, adapter, models).
+    tv/              Live TV / IPTV provider (models + M3U parser).
 
   service.rs         MovieBoxService: unified multi-provider headless client &
                      engine (suggest, search, details, homepage, resolutions,

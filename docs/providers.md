@@ -70,7 +70,7 @@ which `app/playback.rs::launch_player` feeds to the external player.
 
 ## M3U playlists (TV mode)
 
-`providers/m3u.rs` parses an M3U playlist from an `https://` URL or a local file path.
+`providers/tv` parses an M3U playlist from an `https://` URL or a local file path.
 Each channel yields `{ id, name, logo, group, stream_url }`; TV mode groups channels by
 `group-title` and dedupes by `stream_url`. See [tv-mode.md](tv-mode.md).
 
