@@ -30,12 +30,12 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 ### TV Mode (Live IPTV)
 - **`Enter`**: Play selected TV channel immediately.
 - **`o`**: Open player selection picker for the channel.
-- **`r` / `/reload`**: Reload all active M3U playlist sources.
+- **`r`**: Reload all active M3U playlist sources.
 - **`/config`**: Open TV Playlist Manager dialog.
 - **`/list`**: Show all loaded channels.
 
 ### Addon Mode (HTTP Addons)
-- **`Ctrl+P` / `/addons`**: Open Addon Manager dialog.
+- **`Ctrl+P` / `/config`**: Open Addon Manager dialog.
 - **`Enter`**: Select title or play resolved stream.
 - **`o`**: Open player selection picker for the stream.
 - **`d`**: Download HTTP stream release.
@@ -63,8 +63,7 @@ Type these commands directly into the search bar:
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
 | `/history` | Streaming | View watch history with latest progress |
 | `/list` | TV | View live TV channels |
-| `/reload` | TV / Streaming / Addon | Reload active playlist (TV) or refresh catalog & search results |
-| `/config` | TV | Manage IPTV playlists (TV Mode) |
+| `/config` | TV / Addon | Manage IPTV playlists (TV Mode) or configure HTTP addons (Addon Mode) |
 | `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |
 | `/disable-streaming` | All | Disable Streaming Mode navigation |
 | `/enable-tv` | All | Enable TV Mode navigation in bottom dock |
