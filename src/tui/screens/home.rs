@@ -33,13 +33,7 @@ fn search_view_state(state: &AppState) -> SearchViewState {
         SearchViewState::Error
     } else if !state.search_results.is_empty() {
         SearchViewState::Results
-    } else if state.active_browse_preset.is_some()
-        || (!state.search_query.trim().is_empty()
-            && state
-                .status_message
-                .to_ascii_lowercase()
-                .starts_with("no matches"))
-    {
+    } else if !state.search_query.trim().is_empty() || state.active_browse_preset.is_some() {
         SearchViewState::NoResults
     } else {
         SearchViewState::Empty

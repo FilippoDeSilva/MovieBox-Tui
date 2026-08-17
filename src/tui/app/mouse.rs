@@ -251,7 +251,9 @@ impl App {
             return None;
         }
 
-        let is_landing = self.state.search_results.is_empty();
+        let is_landing = self.state.search_results.is_empty()
+            && (self.state.search_query.trim().is_empty()
+                || self.state.input_mode == InputMode::Editing);
         let logo_height = if self.state.basic_terminal { 2 } else { 6 };
         let search_width =
             crate::tui::screens::home::search_deck_width(area, &self.state, is_landing);
