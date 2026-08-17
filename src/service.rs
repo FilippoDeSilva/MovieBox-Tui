@@ -491,23 +491,3 @@ pub fn resolve_download_dir(custom_dir: Option<&Path>) -> PathBuf {
 
     ensure_moviebox_subdir(&base_dir)
 }
-
-#[cfg(test)]
-mod tests {
-    #[tokio::test]
-    async fn test_addon_fetch_meta_live() {
-        let client = crate::providers::addons::AddonClient::new();
-        let res = client
-            .fetch_meta("https://v3-cinemeta.strem.io", "movie", "tt1375666")
-            .await;
-        assert!(res.is_ok(), "fetch_meta failed: {:?}", res.err());
-        let meta = res.unwrap();
-        let json = crate::providers::addons::adapter::meta_detail_to_moviebox_json(&meta);
-        println!(
-            "meta_detail_to_moviebox_json: {}",
-            serde_json::to_string_pretty(&json).unwrap()
-        );
-        assert_eq!(meta.id, "tt1375666");
-        assert_eq!(meta.name, "Inception");
-    }
-}
