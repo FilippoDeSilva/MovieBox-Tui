@@ -66,7 +66,6 @@ Type these commands directly into the search bar:
 | `/list` | TV | View live TV channels |
 | `/reload` | TV / Streaming / Addon | Reload active playlist (TV) or refresh catalog & search results |
 | `/config` | TV / Addon | Manage IPTV playlists (TV) or Addon Manager (Addon Mode) |
-| `/addons` | Addon / Streaming | Open Addon Manager dialog |
 | `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |
 | `/disable-streaming` | All | Disable Streaming Mode navigation |
 | `/enable-tv` | All | Enable TV Mode navigation in bottom dock |

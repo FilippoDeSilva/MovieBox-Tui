@@ -7,7 +7,6 @@ pub enum SlashCommand {
     List,
     Reload,
     Config,
-    Addons,
     DownloadDir,
     Theme,
     Update,
@@ -31,7 +30,6 @@ pub enum ParsedCommand<'a> {
     List,
     Reload,
     Config,
-    Addons,
     DownloadDir(&'a str),
     Theme,
     Update,
@@ -49,13 +47,12 @@ pub enum ParsedCommand<'a> {
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 19] = [
         Self::Browse,
         Self::History,
         Self::List,
         Self::Reload,
         Self::Config,
-        Self::Addons,
         Self::DownloadDir,
         Self::Theme,
         Self::Update,
@@ -79,7 +76,6 @@ impl SlashCommand {
             Self::List => "/list",
             Self::Reload => "/reload",
             Self::Config => "/config",
-            Self::Addons => "/addons",
             Self::DownloadDir => "/download-dir",
             Self::Theme => "/theme",
             Self::Update => "/update",
@@ -110,7 +106,6 @@ impl SlashCommand {
                 }
             }
             Self::Config => "Configure IPTV playlists",
-            Self::Addons => "Open Addon Manager dialog",
             Self::DownloadDir => "View or change download folder",
             Self::Theme => "Theme picker",
             Self::Update => "Check for newer release",
@@ -137,7 +132,6 @@ impl SlashCommand {
             Self::History => state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode,
             Self::List | Self::Config => state.tv_enabled && state.is_tv_mode,
             Self::Reload => state.is_tv_mode,
-            Self::Addons => state.addons_enabled && (state.is_addon_mode || !state.is_tv_mode),
             Self::EnableBdix => {
                 state.streaming_enabled
                     && !state.is_tv_mode
@@ -205,7 +199,6 @@ impl SlashCommand {
             "/list" => Some(ParsedCommand::List),
             "/reload" => Some(ParsedCommand::Reload),
             "/config" => Some(ParsedCommand::Config),
-            "/addons" => Some(ParsedCommand::Addons),
             "/download-dir" => Some(ParsedCommand::DownloadDir(arg)),
             "/theme" => Some(ParsedCommand::Theme),
             "/update" => Some(ParsedCommand::Update),

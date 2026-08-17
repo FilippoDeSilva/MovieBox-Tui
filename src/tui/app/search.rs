@@ -234,15 +234,14 @@ impl App {
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Config => {
+                let current_mode = self.state.mode();
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.action_sender.send(Action::ShowTvConfig).ok();
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                 } else if current_mode == crate::tui::state::AppMode::Addon {
                     self.action_sender.send(Action::ShowAddonManager).ok();
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                 } else {
+                    let ctrl_t = crate::tui::text::ctrl_key("T");
+                    let ctrl_a = crate::tui::text::ctrl_key("A");
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
                     self.state.notify(
@@ -251,19 +250,6 @@ impl App {
                         format!("Command /config is available in TV Mode ({ctrl_t}) or Addon Mode ({ctrl_a})."),
                     );
                 }
-                Some(true)
-            }
-            crate::tui::commands::ParsedCommand::Addons => {
-                if !self.state.addons_enabled {
-                    self.state.addons_enabled = true;
-                    self.persist_config();
-                }
-                if current_mode != crate::tui::state::AppMode::Addon {
-                    self.action_sender.send(Action::ToggleAddonMode).ok();
-                }
-                self.action_sender.send(Action::ShowAddonManager).ok();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::DownloadDir(raw_arg) => {
