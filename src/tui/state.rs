@@ -19,6 +19,13 @@ pub enum DetailsPane {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppMode {
+    Streaming,
+    Tv,
+    Addon,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputMode {
     Normal,
     Editing,
@@ -313,6 +320,33 @@ const fn cache_capacity(n: usize) -> std::num::NonZeroUsize {
 }
 
 impl AppState {
+    pub fn mode(&self) -> AppMode {
+        if self.is_tv_mode && !self.is_addon_mode {
+            AppMode::Tv
+        } else if self.is_addon_mode && !self.is_tv_mode {
+            AppMode::Addon
+        } else {
+            AppMode::Streaming
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: AppMode) {
+        match mode {
+            AppMode::Streaming => {
+                self.is_tv_mode = false;
+                self.is_addon_mode = false;
+            }
+            AppMode::Tv => {
+                self.is_tv_mode = true;
+                self.is_addon_mode = false;
+            }
+            AppMode::Addon => {
+                self.is_tv_mode = false;
+                self.is_addon_mode = true;
+            }
+        }
+    }
+
     pub fn notify(
         &mut self,
         kind: crate::tui::overlay::NotificationKind,

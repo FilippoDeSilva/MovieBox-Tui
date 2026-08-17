@@ -384,7 +384,8 @@ impl App {
         let mut buttons: Vec<(ModeBtn, u16)> = Vec::new();
         let sep = 5_u16;
 
-        let is_streaming = !self.state.is_tv_mode && !self.state.is_addon_mode;
+        let current_mode = self.state.mode();
+        let is_streaming = current_mode == crate::tui::state::AppMode::Streaming;
         if self.state.streaming_enabled {
             let b1_len = if is_streaming {
                 (1 + ctrl_p.len() + 2 + self.state.active_provider.label().chars().count()) as u16
@@ -395,7 +396,7 @@ impl App {
         }
 
         if self.state.tv_enabled {
-            let b2_len = if self.state.is_tv_mode {
+            let b2_len = if current_mode == crate::tui::state::AppMode::Tv {
                 6_u16
             } else {
                 (1 + ctrl_t.len() + 2 + 2) as u16
@@ -404,7 +405,7 @@ impl App {
         }
 
         if self.state.addons_enabled {
-            let b3_len = if self.state.is_addon_mode {
+            let b3_len = if current_mode == crate::tui::state::AppMode::Addon {
                 10_u16
             } else {
                 (1 + ctrl_a.len() + 2 + 6) as u16
@@ -429,12 +430,12 @@ impl App {
                         }
                     }
                     ModeBtn::Tv => {
-                        if !self.state.is_tv_mode {
+                        if current_mode != crate::tui::state::AppMode::Tv {
                             self.action_sender.send(Action::ToggleTvMode).ok();
                         }
                     }
                     ModeBtn::Addon => {
-                        if !self.state.is_addon_mode {
+                        if current_mode != crate::tui::state::AppMode::Addon {
                             self.action_sender.send(Action::ToggleAddonMode).ok();
                         }
                     }

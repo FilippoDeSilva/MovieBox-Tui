@@ -226,45 +226,45 @@ pub fn notifications(
         let has_message =
             !notification.message.is_empty() && notification.message != notification.title;
 
-        let max_content_w = (area.width.saturating_sub(8) as usize).clamp(24, 52);
+        let max_card_width = (area.width.saturating_sub(4) as usize).min(72);
+        let title_w = crate::tui::text::width(&notification.title).saturating_add(6);
+        let badge_w = badge.len().saturating_add(6);
+        let raw_msg_w = if has_message {
+            crate::tui::text::width(&notification.message).saturating_add(6)
+        } else {
+            0
+        };
+
+        let target_card_width = title_w
+            .max(badge_w)
+            .max(raw_msg_w)
+            .clamp(36, max_card_width) as u16;
+
+        let inner_width = (target_card_width.saturating_sub(4) as usize).max(1);
+
         let msg_lines: Vec<String> = if has_message {
-            notification
-                .message
-                .lines()
-                .take(3)
-                .map(|line| middle_truncate(line.trim(), max_content_w))
-                .filter(|line| !line.is_empty())
+            crate::tui::text::wrap_text(&notification.message, inner_width)
+                .into_iter()
+                .take(4)
                 .collect()
         } else {
             Vec::new()
         };
 
-        let title_w = crate::tui::text::width(&notification.title).saturating_add(6);
-        let msg_w = msg_lines
-            .iter()
-            .map(|line| crate::tui::text::width(line).saturating_add(6))
-            .max()
-            .unwrap_or(0);
-        let badge_w = badge.len().saturating_add(4);
-
-        let width = title_w
-            .max(msg_w)
-            .max(badge_w)
-            .clamp(28, 56)
-            .min(area.width.saturating_sub(4) as usize) as u16;
-
         let height = 2 + 1 + msg_lines.len() as u16;
 
-        if width < 10 || y < area.y.saturating_add(height) {
+        if target_card_width < 10 || y < area.y.saturating_add(height) {
             break;
         }
 
         y = y.saturating_sub(height);
 
         let toast_area = Rect::new(
-            area.right().saturating_sub(width).saturating_sub(2),
+            area.right()
+                .saturating_sub(target_card_width)
+                .saturating_sub(2),
             y,
-            width,
+            target_card_width,
             height,
         );
 
@@ -272,13 +272,13 @@ pub fn notifications(
 
         let mut lines = Vec::new();
         lines.push(Line::from(vec![Span::styled(
-            crate::tui::text::truncate_width(&notification.title, width.saturating_sub(4) as usize),
+            crate::tui::text::truncate_width(&notification.title, inner_width),
             theme.text.add_modifier(Modifier::BOLD),
         )]));
 
         for line in &msg_lines {
             lines.push(Line::from(vec![Span::styled(
-                crate::tui::text::truncate_width(line, width.saturating_sub(4) as usize),
+                crate::tui::text::truncate_width(line, inner_width),
                 theme.subtext1,
             )]));
         }
@@ -370,8 +370,4 @@ fn notification_style(
         NotificationKind::Warning => ("WARNING", theme.rating),
         NotificationKind::Error => ("ERROR", theme.error),
     }
-}
-
-fn middle_truncate(value: &str, maximum_width: usize) -> String {
-    crate::tui::text::truncate_middle_width(value, maximum_width)
 }

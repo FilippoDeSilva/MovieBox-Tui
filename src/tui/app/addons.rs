@@ -36,15 +36,30 @@ impl App {
         match action {
             Action::ToggleAddonMode => {
                 self.reset_mode_state();
-                self.state.is_addon_mode = !self.state.is_addon_mode;
+                let will_be_addon = !self.state.is_addon_mode;
+                if will_be_addon {
+                    self.state.set_mode(crate::tui::state::AppMode::Addon);
+                } else if self.state.streaming_enabled {
+                    self.state.set_mode(crate::tui::state::AppMode::Streaming);
+                } else if self.state.tv_enabled {
+                    self.state.set_mode(crate::tui::state::AppMode::Tv);
+                }
                 if self.state.is_addon_mode {
-                    self.state.is_tv_mode = false;
                     self.state.active_provider = crate::providers::models::ProviderKind::Addons;
                     self.load_installed_addons_from_config();
                     if self.state.installed_addons.is_empty() {
                         self.action_sender.send(Action::ShowAddonManager).ok();
                     } else {
                         self.state.set_status("Addon mode active.".to_string(), 150);
+                    }
+                } else if self.state.is_tv_mode {
+                    self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
+                    self.state
+                        .set_status("Loading TV playlists...".to_string(), 200);
+                    self.load_tv_playlists_from_config();
+                    self.reload_tv_playlists();
+                    if self.state.tv_playlists.is_empty() {
+                        self.action_sender.send(Action::ShowTvConfig).ok();
                     }
                 } else {
                     self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
@@ -60,8 +75,7 @@ impl App {
 
             Action::SwitchToStreamingMode => {
                 self.reset_mode_state();
-                self.state.is_addon_mode = false;
-                self.state.is_tv_mode = false;
+                self.state.set_mode(crate::tui::state::AppMode::Streaming);
                 self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
                 self.state.set_status(
                     format!(

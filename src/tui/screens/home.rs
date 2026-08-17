@@ -376,11 +376,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let ctrl_a = crate::tui::text::ctrl_key("A");
         let ctrl_p = crate::tui::text::ctrl_key("P");
 
+        let current_mode = state.mode();
         let mut mode_tabs: Vec<Vec<Span>> = Vec::new();
 
         if state.streaming_enabled {
             let mut spans = vec![];
-            if !state.is_tv_mode && !state.is_addon_mode {
+            if current_mode == crate::tui::state::AppMode::Streaming {
                 spans.push(Span::styled("[", theme.text_dim));
                 spans.push(Span::styled(&ctrl_p, theme.shortcut));
                 spans.push(Span::styled("] ", theme.text_dim));
@@ -399,7 +400,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         if state.tv_enabled {
             let mut spans = vec![];
-            if state.is_tv_mode {
+            if current_mode == crate::tui::state::AppMode::Tv {
                 spans.push(Span::styled("[ ", theme.text_dim));
                 spans.push(Span::styled(
                     "TV",
@@ -417,7 +418,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         if state.addons_enabled {
             let mut spans = vec![];
-            if state.is_addon_mode {
+            if current_mode == crate::tui::state::AppMode::Addon {
                 spans.push(Span::styled("[ ", theme.text_dim));
                 spans.push(Span::styled(
                     "Addons",

@@ -35,7 +35,14 @@ impl App {
                 self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
                 self.state.active_preview_request =
                     self.state.active_preview_request.wrapping_add(1);
-                self.state.is_tv_mode = !self.state.is_tv_mode;
+                let will_be_tv = !self.state.is_tv_mode;
+                if will_be_tv {
+                    self.state.set_mode(crate::tui::state::AppMode::Tv);
+                } else if self.state.streaming_enabled {
+                    self.state.set_mode(crate::tui::state::AppMode::Streaming);
+                } else if self.state.addons_enabled {
+                    self.state.set_mode(crate::tui::state::AppMode::Addon);
+                }
                 self.state.active_browse_preset = None;
                 self.state.browse_metrics.clear();
                 self.state.tick_count = 0;
@@ -64,10 +71,22 @@ impl App {
                     if self.state.tv_playlists.is_empty() {
                         self.action_sender.send(Action::ShowTvConfig).ok();
                     }
+                } else if self.state.is_addon_mode {
+                    self.state.tv_config_popup = false;
+                    self.state.search_query.clear();
+                    self.state.search_results.clear();
+                    self.state.active_provider = crate::providers::models::ProviderKind::Addons;
+                    self.load_installed_addons_from_config();
+                    if self.state.installed_addons.is_empty() {
+                        self.action_sender.send(Action::ShowAddonManager).ok();
+                    } else {
+                        self.state.set_status("Addon mode active.".to_string(), 150);
+                    }
                 } else {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
+                    self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
                     self.state.set_status(
                         format!(
                             "Streaming mode active ({}).",

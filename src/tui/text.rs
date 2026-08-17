@@ -168,3 +168,48 @@ pub const CTRL_PREFIX: &str = "Ctrl+";
 pub fn ctrl_key(key: &str) -> String {
     format!("{CTRL_PREFIX}{key}")
 }
+
+pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return Vec::new();
+    }
+    let mut lines = Vec::new();
+    for raw_line in text.lines() {
+        let trimmed = raw_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let mut current_line = String::new();
+        let mut current_len = 0;
+
+        for word in trimmed.split_whitespace() {
+            let word_len = width(word);
+            if current_len == 0 {
+                if word_len > max_width {
+                    lines.push(truncate_width(word, max_width));
+                } else {
+                    current_line.push_str(word);
+                    current_len = word_len;
+                }
+            } else if current_len + 1 + word_len <= max_width {
+                current_line.push(' ');
+                current_line.push_str(word);
+                current_len += 1 + word_len;
+            } else {
+                lines.push(current_line);
+                if word_len > max_width {
+                    lines.push(truncate_width(word, max_width));
+                    current_line = String::new();
+                    current_len = 0;
+                } else {
+                    current_line = word.to_string();
+                    current_len = word_len;
+                }
+            }
+        }
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+    }
+    lines
+}
