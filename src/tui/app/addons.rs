@@ -43,12 +43,15 @@ impl App {
                         150,
                     );
                 }
+                self.persist_config();
             }
 
             Action::SwitchToStreamingMode => {
                 self.reset_mode_state();
                 self.state.set_mode(crate::tui::state::AppMode::Streaming);
-                self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
+                if self.state.active_provider == crate::providers::models::ProviderKind::Addons {
+                    self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
+                }
                 self.state.set_status(
                     format!(
                         "Streaming mode active ({}).",
@@ -56,6 +59,7 @@ impl App {
                     ),
                     150,
                 );
+                self.persist_config();
             }
 
             Action::ShowAddonManager => {

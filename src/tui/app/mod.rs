@@ -64,6 +64,28 @@ impl App {
         } else {
             config.active_provider
         };
+
+        match config.active_mode.as_str() {
+            "tv" if state.tv_enabled => {
+                state.set_mode(crate::tui::state::AppMode::Tv);
+            }
+            "addon" if state.addons_enabled => {
+                state.set_mode(crate::tui::state::AppMode::Addon);
+                state.active_provider = crate::providers::models::ProviderKind::Addons;
+            }
+            _ => {
+                if state.streaming_enabled {
+                    state.set_mode(crate::tui::state::AppMode::Streaming);
+                } else if state.tv_enabled {
+                    state.set_mode(crate::tui::state::AppMode::Tv);
+                } else if state.addons_enabled {
+                    state.set_mode(crate::tui::state::AppMode::Addon);
+                    state.active_provider = crate::providers::models::ProviderKind::Addons;
+                } else {
+                    state.set_mode(crate::tui::state::AppMode::Streaming);
+                }
+            }
+        }
         state.active_theme_kind = config.active_theme;
         state.default_player = config.default_player;
         state.download_dir = config.download_dir.map(std::path::PathBuf::from);
@@ -84,7 +106,7 @@ impl App {
 
         let service = std::sync::Arc::new(crate::service::MovieBoxService::new());
 
-        let app = Self {
+        let mut app = Self {
             theme,
             state,
             client: service.client.clone(),
@@ -97,6 +119,12 @@ impl App {
         };
         if app.fourk_client.is_none() {
             log::warn!("4KHDHub client unavailable; provider will be disabled");
+        }
+        if app.state.is_tv_mode {
+            app.load_tv_playlists_from_config();
+            app.reload_tv_playlists();
+        } else if app.state.is_addon_mode {
+            app.load_installed_addons_from_config();
         }
         if provider_was_sanitized {
             app.persist_config();
@@ -117,9 +145,15 @@ impl App {
     }
 
     fn persist_config(&self) {
+        let active_mode = match self.state.mode() {
+            crate::tui::state::AppMode::Tv => "tv",
+            crate::tui::state::AppMode::Addon => "addon",
+            crate::tui::state::AppMode::Streaming => "streaming",
+        };
         let config = crate::tui::config::Config {
             auto_update: self.state.auto_update,
             last_update_check: self.state.last_update_check,
+            active_mode: active_mode.to_string(),
             active_provider: self.state.active_provider,
             active_theme: self.state.active_theme_kind.clone(),
             bdix_enabled: self.state.bdix_enabled,

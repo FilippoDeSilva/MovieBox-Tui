@@ -78,7 +78,11 @@ impl App {
                     self.state.tv_config_popup = false;
                     self.state.search_query.clear();
                     self.state.search_results.clear();
-                    self.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
+                    if self.state.active_provider == crate::providers::models::ProviderKind::Addons
+                    {
+                        self.state.active_provider =
+                            crate::providers::models::ProviderKind::MovieBox;
+                    }
                     self.state.set_status(
                         format!(
                             "Streaming mode active ({}).",
@@ -87,6 +91,7 @@ impl App {
                         150,
                     );
                 }
+                self.persist_config();
             }
 
             Action::ShowTvConfig => {

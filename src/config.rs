@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub auto_update: bool,
     pub last_update_check: u64,
+    pub active_mode: String,
     pub active_provider: ProviderKind,
     pub active_theme: String,
     pub bdix_enabled: bool,
@@ -20,6 +21,7 @@ impl Default for Config {
         Self {
             auto_update: true,
             last_update_check: 0,
+            active_mode: "streaming".to_string(),
             active_provider: ProviderKind::MovieBox,
             active_theme: String::new(),
             bdix_enabled: false,
@@ -57,6 +59,9 @@ pub fn load() -> Config {
     }
     if let Some(v) = value.get("last_update_check").and_then(|v| v.as_u64()) {
         config.last_update_check = v;
+    }
+    if let Some(v) = value.get("active_mode").and_then(|v| v.as_str()) {
+        config.active_mode = v.to_string();
     }
     if let Some(provider) = value.get("active_provider").and_then(|v| v.as_str()) {
         config.active_provider = ProviderKind::parse(provider).unwrap_or(config.active_provider);
@@ -97,6 +102,7 @@ pub fn save(config: &Config) {
     let json = serde_json::json!({
         "auto_update": config.auto_update,
         "last_update_check": config.last_update_check,
+        "active_mode": config.active_mode,
         "active_provider": config.active_provider.cache_key(),
         "active_theme": config.active_theme,
         "bdix_enabled": config.bdix_enabled,
