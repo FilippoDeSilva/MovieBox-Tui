@@ -231,21 +231,34 @@ impl App {
         }
 
         if self.state.addon_manager_popup {
-            let rows = self.state.addon_manager_rows();
-            let total_rows = rows.len();
+            let addons_count = self.state.installed_addons.len();
             let popup_width = 76u16.min(area.width.saturating_sub(4)).max(56);
             let popup_height = if self.state.addon_input_active {
                 7u16
             } else {
-                total_rows.min(10).saturating_add(6) as u16
+                (addons_count as u16)
+                    .saturating_add(6)
+                    .min(area.height.saturating_sub(4))
+                    .max(7)
             };
             let popup = centered_rect(area, popup_width, popup_height, 36, 80);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 if !self.state.addon_input_active {
-                    let item_start_y = popup.y + 1;
-                    if row >= item_start_y && (row - item_start_y) < total_rows as u16 {
-                        let clicked_idx = (row - item_start_y) as usize;
-                        self.state.addon_manager_selected = clicked_idx;
+                    let list_start_y = popup.y + 1;
+                    let button_y = list_start_y + addons_count as u16 + 1;
+                    if row > list_start_y && row < button_y {
+                        let clicked_addon_idx = (row - list_start_y - 1) as usize;
+                        if clicked_addon_idx < addons_count {
+                            self.state.addon_manager_selected = clicked_addon_idx + 1;
+                            self.addon_manager_activate();
+                        }
+                    } else if row == button_y {
+                        let rel_x = col.saturating_sub(popup.x + 1);
+                        if rel_x <= 25 {
+                            self.state.addon_manager_selected = addons_count + 1;
+                        } else {
+                            self.state.addon_manager_selected = addons_count + 2;
+                        }
                         self.addon_manager_activate();
                     }
                 }

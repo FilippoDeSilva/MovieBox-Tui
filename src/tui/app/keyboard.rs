@@ -325,6 +325,22 @@ impl App {
                                 }
                                 self.state.addon_manager_selected = next;
                             }
+                            KeyCode::Left | KeyCode::BackTab => {
+                                let total = self.state.addon_manager_rows().len();
+                                let done_idx = total.saturating_sub(1);
+                                let add_idx = total.saturating_sub(2);
+                                if self.state.addon_manager_selected == done_idx {
+                                    self.state.addon_manager_selected = add_idx;
+                                }
+                            }
+                            KeyCode::Right | KeyCode::Tab => {
+                                let total = self.state.addon_manager_rows().len();
+                                let done_idx = total.saturating_sub(1);
+                                let add_idx = total.saturating_sub(2);
+                                if self.state.addon_manager_selected == add_idx {
+                                    self.state.addon_manager_selected = done_idx;
+                                }
+                            }
                             KeyCode::Char('d') | KeyCode::Delete => {
                                 use crate::tui::state::AddonManagerRow;
                                 if let Some(AddonManagerRow::Addon(index)) = self
