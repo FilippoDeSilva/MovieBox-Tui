@@ -32,7 +32,7 @@ impl M3UParser {
         url: &str,
     ) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
         let trimmed = url.trim();
-        let is_remote = trimmed.starts_with("http://") || trimmed.starts_with("https://");
+        let is_remote = crate::tui::text::is_http_url(trimmed);
         let content = if is_remote {
             let file_path = self.cache_dir.join(cache_filename(trimmed));
             let mut needs_download = true;
@@ -58,7 +58,7 @@ impl M3UParser {
                     .error_for_status()?
                     .text()
                     .await?;
-                let _ = write_cache_file(&file_path, res.as_bytes()).await;
+                let _ = crate::cache::atomic_write_file_async(&file_path, res.as_bytes()).await;
                 res
             } else {
                 match tokio::fs::read_to_string(&file_path).await {
@@ -98,7 +98,7 @@ impl M3UParser {
             if fresh_channels.is_empty() {
                 return Ok(fresh_channels);
             }
-            let _ = write_cache_file(&file_path, fresh.as_bytes()).await;
+            let _ = crate::cache::atomic_write_file_async(&file_path, fresh.as_bytes()).await;
             return Ok(fresh_channels);
         }
         Ok(channels)
@@ -158,32 +158,6 @@ impl M3UParser {
     }
 }
 
-async fn write_cache_file(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
-    let stamp = SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    tokio::fs::write(&temporary, bytes).await?;
-    if tokio::fs::rename(&temporary, path).await.is_err() {
-        let _ = tokio::fs::remove_file(path).await;
-        if let Err(error) = tokio::fs::rename(&temporary, path).await {
-            let _ = tokio::fs::remove_file(&temporary).await;
-            return Err(error);
-        }
-    }
-    Ok(())
-}
-
 fn cache_filename(raw: &str) -> String {
-    use md5::{Digest, Md5};
-    let mut hasher = Md5::new();
-    hasher.update(raw.as_bytes());
-    let result = hasher.finalize();
-    let mut name = String::with_capacity(32);
-    for byte in result {
-        use std::fmt::Write;
-        let _ = write!(&mut name, "{byte:02x}");
-    }
-    format!("{name}.m3u")
+    format!("{}.m3u", crate::cache::md5_hex(raw))
 }

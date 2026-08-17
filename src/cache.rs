@@ -33,6 +33,59 @@ fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value
     None
 }
 
+pub fn md5_hex(value: &str) -> String {
+    use md5::{Digest, Md5};
+    let mut hasher = Md5::new();
+    hasher.update(value.as_bytes());
+    let result = hasher.finalize();
+    let mut safe_query = String::with_capacity(32);
+    for b in result {
+        use std::fmt::Write;
+        let _ = write!(&mut safe_query, "{:02x}", b);
+    }
+    safe_query
+}
+
+pub fn atomic_write_file(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
+    std::fs::write(&temporary, bytes)?;
+    if std::fs::rename(&temporary, path).is_err() {
+        let _ = std::fs::remove_file(path);
+        if let Err(error) = std::fs::rename(&temporary, path) {
+            let _ = std::fs::remove_file(&temporary);
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+
+pub async fn atomic_write_file_async(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await.ok();
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
+    tokio::fs::write(&temporary, bytes).await?;
+    if tokio::fs::rename(&temporary, path).await.is_err() {
+        let _ = tokio::fs::remove_file(path).await;
+        if let Err(error) = tokio::fs::rename(&temporary, path).await {
+            let _ = tokio::fs::remove_file(&temporary).await;
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+
 fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
     if data.is_null() {
         return;
@@ -44,27 +97,11 @@ fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
         );
         return;
     };
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    if fs::write(&temporary, content).is_err() {
+    if let Err(error) = atomic_write_file(path, &content) {
         log::warn!(
-            "failed to write cache to {}",
-            crate::logging::sanitize_path(&temporary)
+            "failed to commit cache to {}: {error}",
+            crate::logging::sanitize_path(path)
         );
-        return;
-    }
-    if fs::rename(&temporary, path).is_err() {
-        let _ = fs::remove_file(path);
-        if fs::rename(&temporary, path).is_err() {
-            log::warn!(
-                "failed to commit cache to {}",
-                crate::logging::sanitize_path(path)
-            );
-            let _ = fs::remove_file(temporary);
-        }
     }
 }
 
@@ -81,16 +118,7 @@ fn stream_payload_has_results(data: &serde_json::Value) -> bool {
 }
 
 fn hash_key(value: &str) -> String {
-    use md5::{Digest, Md5};
-    let mut hasher = Md5::new();
-    hasher.update(value.as_bytes());
-    let result = hasher.finalize();
-    let mut safe_query = String::with_capacity(32);
-    for b in result {
-        use std::fmt::Write;
-        let _ = write!(&mut safe_query, "{:02x}", b);
-    }
-    safe_query
+    md5_hex(value)
 }
 
 pub fn get_provider_cache_dir(provider: ProviderKind, subdir: &str) -> PathBuf {
@@ -355,27 +383,11 @@ pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> 
 
 pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {
     let path = get_namespaced_image_path(namespace, id);
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    if std::fs::write(&temporary, bytes).is_err() {
+    if let Err(error) = atomic_write_file(&path, bytes) {
         log::warn!(
-            "failed to write image cache to {}",
-            crate::logging::sanitize_path(&temporary)
+            "failed to commit image cache to {}: {error}",
+            crate::logging::sanitize_path(&path)
         );
-        return;
-    }
-    if std::fs::rename(&temporary, &path).is_err() {
-        let _ = std::fs::remove_file(&path);
-        if std::fs::rename(&temporary, &path).is_err() {
-            log::warn!(
-                "failed to commit image cache to {}",
-                crate::logging::sanitize_path(&path)
-            );
-            let _ = std::fs::remove_file(temporary);
-        }
     }
 }
 

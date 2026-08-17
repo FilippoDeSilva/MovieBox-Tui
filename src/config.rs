@@ -106,21 +106,8 @@ pub fn save(config: &Config) {
         "default_player": config.default_player,
         "download_dir": config.download_dir
     });
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    if let Err(error) = std::fs::write(&temporary, json.to_string()) {
+    if let Err(error) = crate::cache::atomic_write_file(&path, json.to_string().as_bytes()) {
         log::warn!("failed to write config: {error}");
-        return;
-    }
-    if std::fs::rename(&temporary, &path).is_err() {
-        let _ = std::fs::remove_file(&path);
-        if let Err(error) = std::fs::rename(&temporary, &path) {
-            let _ = std::fs::remove_file(&temporary);
-            log::warn!("failed to commit config: {error}");
-        }
     }
 }
 
@@ -155,20 +142,7 @@ pub fn save_addons(addons: &[InstalledAddon]) {
     let Ok(json) = serde_json::to_string_pretty(addons) else {
         return;
     };
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = path.with_extension(format!("tmp-addons-{}-{stamp}", std::process::id()));
-    if let Err(error) = std::fs::write(&temporary, json) {
+    if let Err(error) = crate::cache::atomic_write_file(&path, json.as_bytes()) {
         log::warn!("failed to write addons config: {error}");
-        return;
-    }
-    if std::fs::rename(&temporary, &path).is_err() {
-        let _ = std::fs::remove_file(&path);
-        if let Err(error) = std::fs::rename(&temporary, &path) {
-            let _ = std::fs::remove_file(&temporary);
-            log::warn!("failed to commit addons config: {error}");
-        }
     }
 }

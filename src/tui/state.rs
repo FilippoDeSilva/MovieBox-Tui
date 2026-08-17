@@ -456,8 +456,7 @@ pub enum TvManagerRow {
 }
 
 fn playlist_is_url(source: &str) -> bool {
-    let trimmed = source.trim_start();
-    trimmed.starts_with("http://") || trimmed.starts_with("https://")
+    crate::tui::text::is_http_url(source)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

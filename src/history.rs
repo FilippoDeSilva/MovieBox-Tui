@@ -53,21 +53,8 @@ impl HistoryManager {
     pub fn save(&self) {
         if let Some(path) = Self::history_file_path() {
             if let Ok(content) = serde_json::to_string(self) {
-                let stamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos();
-                let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-                if let Err(error) = fs::write(&temporary, content) {
+                if let Err(error) = crate::cache::atomic_write_file(&path, content.as_bytes()) {
                     log::warn!("failed to save watch history: {error}");
-                    return;
-                }
-                if fs::rename(&temporary, &path).is_err() {
-                    let _ = fs::remove_file(&path);
-                    if let Err(error) = fs::rename(&temporary, &path) {
-                        let _ = fs::remove_file(&temporary);
-                        log::warn!("failed to commit watch history: {error}");
-                    }
                 }
             }
         }

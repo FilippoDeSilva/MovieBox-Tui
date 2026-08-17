@@ -12,12 +12,7 @@ pub fn meta_to_search_result(item: &MetaItem) -> SearchResult {
         .as_deref()
         .or(item.year.as_deref())
         .or(item.released.as_deref())
-        .map(|s| {
-            s.chars()
-                .filter(|c| c.is_ascii_digit())
-                .take(4)
-                .collect::<String>()
-        })
+        .map(crate::tui::text::extract_4digit_year)
         .unwrap_or_default();
 
     let title = if !item.name.trim().is_empty() {
@@ -54,12 +49,7 @@ pub fn metas_to_moviebox_search_json(metas: Vec<MetaItem>) -> serde_json::Value 
                 .as_deref()
                 .or(item.year.as_deref())
                 .or(item.released.as_deref())
-                .map(|s| {
-                    s.chars()
-                        .filter(|c| c.is_ascii_digit())
-                        .take(4)
-                        .collect::<String>()
-                })
+                .map(crate::tui::text::extract_4digit_year)
                 .unwrap_or_default();
 
             let title = if !item.name.trim().is_empty() {
@@ -138,11 +128,7 @@ pub fn meta_detail_to_moviebox_json(detail: &MetaDetail) -> serde_json::Value {
         .or(detail.year.as_deref())
         .or(detail.released.as_deref())
         .unwrap_or_default();
-    let year: String = year_raw
-        .chars()
-        .filter(|c| c.is_ascii_digit())
-        .take(4)
-        .collect();
+    let year = crate::tui::text::extract_4digit_year(year_raw);
 
     let mut genres = detail.genres.clone();
     if genres.is_empty() {

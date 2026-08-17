@@ -213,3 +213,12 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     }
     lines
 }
+
+pub fn is_http_url(source: &str) -> bool {
+    let trimmed = source.trim();
+    trimmed.starts_with("http://") || trimmed.starts_with("https://")
+}
+
+pub fn extract_4digit_year(raw: &str) -> String {
+    raw.chars().filter(|c| c.is_ascii_digit()).take(4).collect()
+}
