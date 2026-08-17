@@ -464,7 +464,6 @@ pub enum AddonManagerRow {
     Header(&'static str),
     Addon(usize),
     AddUrl,
-    Done,
 }
 
 impl AppState {
@@ -494,7 +493,6 @@ impl AppState {
             rows.push(AddonManagerRow::Addon(index));
         }
         rows.push(AddonManagerRow::AddUrl);
-        rows.push(AddonManagerRow::Done);
         rows
     }
 }

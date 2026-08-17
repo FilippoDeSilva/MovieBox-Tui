@@ -284,10 +284,6 @@ impl App {
             AddonManagerRow::AddUrl => {
                 self.action_sender.send(Action::AddonInputToggle(true)).ok();
             }
-            AddonManagerRow::Done => {
-                self.reset_transient_overlays();
-                self.state.addon_manager_popup = false;
-            }
             AddonManagerRow::Header(_) => {}
         }
     }

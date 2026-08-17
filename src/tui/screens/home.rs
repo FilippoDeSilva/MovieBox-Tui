@@ -1148,7 +1148,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .split(inner_area);
 
             let is_add_selected = state.addon_manager_selected == state.installed_addons.len() + 1;
-            let is_done_selected = state.addon_manager_selected == state.installed_addons.len() + 2;
 
             let mut items = vec![ratatui::widgets::ListItem::new(ratatui::text::Line::from(
                 vec![
@@ -1221,26 +1220,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 )
             };
 
-            let done_prefix = if is_done_selected {
-                if state.basic_terminal { "> " } else { "▌ " }
-            } else {
-                "  "
-            };
-            let done_button = if is_done_selected {
-                ratatui::text::Span::styled(
-                    format!("{done_prefix}[ Done ]"),
-                    theme.success.add_modifier(ratatui::style::Modifier::BOLD),
-                )
-            } else {
-                ratatui::text::Span::styled(format!("{done_prefix}[ Done ]"), theme.success)
-            };
-
-            let button_line = ratatui::text::Line::from(vec![
-                ratatui::text::Span::raw(" "),
-                add_button,
-                ratatui::text::Span::raw("    "),
-                done_button,
-            ]);
+            let button_line =
+                ratatui::text::Line::from(vec![ratatui::text::Span::raw(" "), add_button]);
             frame.render_widget(ratatui::widgets::Paragraph::new(button_line), sections[1]);
 
             let footer = ratatui::text::Line::from(vec![
