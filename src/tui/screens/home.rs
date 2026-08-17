@@ -1107,6 +1107,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(inner_area);
 
+            let max_input_len = inner_area.width.saturating_sub(6) as usize;
+            let display_buffer = if state.addon_input_buffer.chars().count() > max_input_len {
+                let skip = state.addon_input_buffer.chars().count() - max_input_len + 3;
+                let truncated: String = state.addon_input_buffer.chars().skip(skip).collect();
+                format!("...{truncated}")
+            } else {
+                state.addon_input_buffer.clone()
+            };
+
             let lines = vec![
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::raw(" "),
@@ -1114,15 +1123,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ]),
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::styled(" ❯ ", theme.sapphire),
-                    ratatui::text::Span::styled(&state.addon_input_buffer, theme.text),
+                    ratatui::text::Span::styled(display_buffer, theme.text),
                     ratatui::text::Span::styled("█", theme.rating),
                 ]),
             ];
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(lines)
-                    .wrap(ratatui::widgets::Wrap { trim: false }),
-                sections[0],
-            );
+            frame.render_widget(ratatui::widgets::Paragraph::new(lines), sections[0]);
 
             let footer = ratatui::text::Line::from(vec![
                 crate::tui::overlay::key_hint("Enter", "Add", theme),
