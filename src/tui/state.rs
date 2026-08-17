@@ -176,6 +176,7 @@ pub struct AppState {
     pub addon_manager_selected: usize,
     pub addon_input_active: bool,
     pub addon_input_buffer: String,
+    pub addon_input_cursor: usize,
     pub history: crate::history::HistoryManager,
 }
 
@@ -309,6 +310,7 @@ impl Default for AppState {
             addon_manager_selected: 0,
             addon_input_active: false,
             addon_input_buffer: String::new(),
+            addon_input_cursor: 0,
             history: crate::history::HistoryManager::new(),
         }
     }

@@ -265,24 +265,53 @@ impl App {
                                 KeyCode::Esc => {
                                     self.state.addon_input_active = false;
                                     self.state.addon_input_buffer.clear();
+                                    self.state.addon_input_cursor = 0;
                                 }
                                 KeyCode::Enter => {
                                     let buffer = self.state.addon_input_buffer.trim().to_string();
                                     self.state.addon_input_active = false;
                                     self.state.addon_input_buffer.clear();
+                                    self.state.addon_input_cursor = 0;
                                     if !buffer.is_empty() {
                                         self.action_sender
                                             .send(Action::AddonAddManifest(buffer))
                                             .ok();
                                     }
                                 }
+                                KeyCode::Left => {
+                                    self.state.addon_input_cursor =
+                                        self.state.addon_input_cursor.saturating_sub(1);
+                                }
+                                KeyCode::Right => {
+                                    if self.state.addon_input_cursor
+                                        < self.state.addon_input_buffer.chars().count()
+                                    {
+                                        self.state.addon_input_cursor += 1;
+                                    }
+                                }
                                 KeyCode::Backspace => {
-                                    crate::tui::text::remove_last_grapheme(
-                                        &mut self.state.addon_input_buffer,
-                                    );
+                                    if self.state.addon_input_cursor > 0 {
+                                        let mut chars: Vec<char> =
+                                            self.state.addon_input_buffer.chars().collect();
+                                        chars.remove(self.state.addon_input_cursor - 1);
+                                        self.state.addon_input_buffer = chars.into_iter().collect();
+                                        self.state.addon_input_cursor -= 1;
+                                    }
+                                }
+                                KeyCode::Delete => {
+                                    let mut chars: Vec<char> =
+                                        self.state.addon_input_buffer.chars().collect();
+                                    if self.state.addon_input_cursor < chars.len() {
+                                        chars.remove(self.state.addon_input_cursor);
+                                        self.state.addon_input_buffer = chars.into_iter().collect();
+                                    }
                                 }
                                 KeyCode::Char(c) if !c.is_control() => {
-                                    self.state.addon_input_buffer.push(c);
+                                    let mut chars: Vec<char> =
+                                        self.state.addon_input_buffer.chars().collect();
+                                    chars.insert(self.state.addon_input_cursor, c);
+                                    self.state.addon_input_buffer = chars.into_iter().collect();
+                                    self.state.addon_input_cursor += 1;
                                 }
                                 _ => {}
                             }

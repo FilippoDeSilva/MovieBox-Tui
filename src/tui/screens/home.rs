@@ -1107,14 +1107,40 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(inner_area);
 
-            let max_input_len = inner_area.width.saturating_sub(6) as usize;
-            let display_buffer = if state.addon_input_buffer.chars().count() > max_input_len {
-                let skip = state.addon_input_buffer.chars().count() - max_input_len + 3;
-                let truncated: String = state.addon_input_buffer.chars().skip(skip).collect();
-                format!("...{truncated}")
+            let chars: Vec<char> = state.addon_input_buffer.chars().collect();
+            let cursor = state.addon_input_cursor.min(chars.len());
+            let max_width = inner_area.width.saturating_sub(6) as usize;
+
+            let mut start = 0;
+            if cursor >= max_width {
+                start = cursor - max_width + 1;
+            }
+
+            let mut before_cursor: String = chars[start..cursor].iter().collect();
+            if start > 0 && before_cursor.chars().count() > 3 {
+                before_cursor = format!("...{}", &before_cursor[3..]);
+            }
+
+            let cursor_char = if cursor < chars.len() {
+                chars[cursor].to_string()
             } else {
-                state.addon_input_buffer.clone()
+                " ".to_string()
             };
+
+            let end = (start + max_width).min(chars.len());
+            let mut after_cursor: String = chars[cursor.saturating_add(1).min(chars.len())..end]
+                .iter()
+                .collect();
+            if end < chars.len() {
+                let len = after_cursor.chars().count();
+                if len > 3 {
+                    let mut a_chars: Vec<char> = after_cursor.chars().collect();
+                    a_chars.truncate(len - 3);
+                    after_cursor = format!("{}...", a_chars.into_iter().collect::<String>());
+                } else if len > 0 {
+                    after_cursor = "...".to_string();
+                }
+            }
 
             let lines = vec![
                 ratatui::text::Line::from(vec![
@@ -1123,8 +1149,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ]),
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::styled(" ❯ ", theme.sapphire),
-                    ratatui::text::Span::styled(display_buffer, theme.text),
-                    ratatui::text::Span::styled("█", theme.rating),
+                    ratatui::text::Span::styled(before_cursor, theme.text),
+                    ratatui::text::Span::styled(
+                        cursor_char,
+                        theme.text.add_modifier(ratatui::style::Modifier::REVERSED),
+                    ),
+                    ratatui::text::Span::styled(after_cursor, theme.text),
                 ]),
             ];
             frame.render_widget(ratatui::widgets::Paragraph::new(lines), sections[0]);
