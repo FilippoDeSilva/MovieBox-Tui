@@ -8,6 +8,7 @@
   - Pre-installed and locked Cinemeta out-of-the-box as the default core metadata provider with zero API keys required.
   - Added interactive Addon Manager dialog (`/addons`, `Ctrl+P` in Addon Mode) with one-click enabling, removal, and manifest URL adding.
   - Added concurrent multi-addon stream resolution aggregating playable releases from all enabled stream addons.
+  - Added a smart runtime torrent detector that automatically detects if an addon's streams are 100% blocked raw torrents (e.g., Torrentio without Debrid) and flashes a UI warning toast that only HTTP streams are supported.
 - **Addon Mode `/browse` & Curated Catalog Exploration**:
   - Added `/browse` support in Addon Mode with a minimal, organized 4-preset catalog picker (`Top Movies`, `Top Series`, `Top Rated Movies`, `Top Rated Series`).
   - Added direct catalog fetching (`/catalog/{type}/{id}.json`) with poster hydration, details navigation, stream resolution, and `/reload` support.
@@ -30,6 +31,9 @@
   - Added complete mouse click support for Addon Manager modal and browse popups.
 
 ### Fixed
+- **Addon Stream Sorting & Rendering**:
+  - Fixed addon streams randomly scrambling on UI hover when sizes are tied by adding a secondary stable sort based on the mirror label.
+  - Fixed misleading `0MB` stream sizes for community addons that omit video sizes by cleanly rendering `--` instead.
 - **Terminal Race Condition & Blank Screen on `/clear-cache`**:
   - Replaced physical terminal clear with a soft image refresh when executing `/clear-cache`, resolving a race condition with terminal emulators that swallowed the full Home screen render and caused the screen to go completely blank after a few seconds.
   - Added comprehensive state isolation preventing search queries, results, and details states from lingering after cache clears.

@@ -41,7 +41,6 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 - **`d`**: Download HTTP stream release.
 - **`r`**: Refresh addon catalog search results.
 - **`/browse`**: Browse curated addon catalogs (Top Movies, Top Series, Top Rated).
-- **`/config`**: Open Addon Manager dialog.
 
 ## Mouse Controls
 
@@ -65,7 +64,7 @@ Type these commands directly into the search bar:
 | `/history` | Streaming | View watch history with latest progress |
 | `/list` | TV | View live TV channels |
 | `/reload` | TV / Streaming / Addon | Reload active playlist (TV) or refresh catalog & search results |
-| `/config` | TV / Addon | Manage IPTV playlists (TV) or Addon Manager (Addon Mode) |
+| `/config` | TV | Manage IPTV playlists (TV Mode) |
 | `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |
 | `/disable-streaming` | All | Disable Streaming Mode navigation |
 | `/enable-tv` | All | Enable TV Mode navigation in bottom dock |
