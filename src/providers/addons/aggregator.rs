@@ -70,7 +70,14 @@ pub async fn aggregate_streams(
             std::cmp::Ordering::Equal => {
                 let size_a = a.size_bytes.unwrap_or(0);
                 let size_b = b.size_bytes.unwrap_or(0);
-                size_b.cmp(&size_a)
+                match size_b.cmp(&size_a) {
+                    std::cmp::Ordering::Equal => {
+                        let label_a = a.mirrors.first().map(|m| m.label.as_str()).unwrap_or("");
+                        let label_b = b.mirrors.first().map(|m| m.label.as_str()).unwrap_or("");
+                        label_a.cmp(label_b)
+                    }
+                    other => other,
+                }
             }
             other => other,
         }

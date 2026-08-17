@@ -785,7 +785,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("codecName")
                             .and_then(|c| c.as_str())
                             .unwrap_or("None");
-                        let size_str = file.get("size").and_then(|s| s.as_str()).unwrap_or("0");
+                        let size_str = file.get("size").and_then(|s| s.as_str());
 
                         let duration = file.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
                         let duration_str = if duration > 0 {
@@ -801,15 +801,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             "--:--".to_string()
                         };
 
-                        let size_formatted = if let Ok(bytes) = size_str.parse::<f64>() {
-                            let mb = bytes / 1024.0 / 1024.0;
-                            if mb > 1024.0 {
-                                format!("{:.1}GB", mb / 1024.0)
+                        let size_formatted = if let Some(s) = size_str {
+                            if let Ok(bytes) = s.parse::<f64>() {
+                                let mb = bytes / 1024.0 / 1024.0;
+                                if mb > 1024.0 {
+                                    format!("{:.1}GB", mb / 1024.0)
+                                } else {
+                                    format!("{:.0}MB", mb)
+                                }
                             } else {
-                                format!("{:.0}MB", mb)
+                                "--".to_string()
                             }
                         } else {
-                            "Unknown".to_string()
+                            "--".to_string()
                         };
 
                         let is_selected = Some(i) == selected_idx;
