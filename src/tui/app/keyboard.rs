@@ -210,7 +210,11 @@ impl App {
                     };
 
                     if !query.is_empty() {
-                        self.state.search_query = query.clone();
+                        if query.starts_with('/') {
+                            self.state.search_query.clear();
+                        } else {
+                            self.state.search_query = query.clone();
+                        }
                         self.state.input_mode = InputMode::Normal;
                         self.state.search_suggestions.clear();
                         self.state.suggest_index = None;
@@ -509,6 +513,9 @@ impl App {
                                 || key.modifiers == KeyModifiers::SHIFT) =>
                         {
                             self.state.input_mode = InputMode::Editing;
+                            if c == '/' {
+                                self.state.search_query.clear();
+                            }
                             self.state.search_query.push(c);
 
                             self.state.search_suggestions.clear();

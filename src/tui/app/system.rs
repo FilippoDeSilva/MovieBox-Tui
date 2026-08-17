@@ -215,56 +215,57 @@ impl App {
                     .and_then(|result| result);
                     sender.send(Action::CacheCleared(result)).ok();
                 });
+                self.state
+                    .fetch_cancel
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                self.state.fetch_cancel =
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
+                self.state.active_preview_request =
+                    self.state.active_preview_request.wrapping_add(1);
+                self.state.active_search_request = self.state.active_search_request.wrapping_add(1);
+                self.state.active_details_request =
+                    self.state.active_details_request.wrapping_add(1);
+                self.state.active_resource_request =
+                    self.state.active_resource_request.wrapping_add(1);
+                self.reset_transient_overlays();
+                self.state.active_screen = Screen::Home;
+                self.state.input_mode = crate::tui::state::InputMode::Normal;
+                self.state.is_loading = false;
+                self.state.clear_search_state();
+                self.state.clear_details_state();
                 self.state.stream_pool.clear();
                 self.state.image_cache.clear();
-                self.state.search_posters.clear();
-                self.state.failed_posters.clear();
-                self.state.search_poster_protocols.clear();
-                self.state.in_flight_posters.clear();
-                self.state.browse_metrics.clear();
                 self.state.preview_cache.clear();
-                self.state.poster_image = None;
-                self.state.poster_protocol = None;
-                self.state.search_preview = None;
-                self.state.search_error = None;
-                self.state.search_list_state.select(None);
-                self.state.selected_resources = None;
-                self.state.active_subject_id = None;
-                self.state.selected_details = None;
-                self.state.details_pane = crate::tui::state::DetailsPane::default();
-                self.state.selected_season = 1;
-                self.state.selected_episode = 1;
-                self.state.language_chosen = false;
-                self.state.season_list_state.select(None);
-                self.state.episode_list_state.select(None);
-                self.state.language_list_state.select(None);
-                self.state.available_seasons.clear();
-                self.state.available_episode_numbers.clear();
                 if self.state.is_tv_mode {
                     self.state.tv_channels.clear();
-                    self.state.search_results.clear();
                 }
-                self.prepare_image_refresh();
+                self.prepare_image_soft_refresh();
                 self.state.set_status("Clearing cache...".to_string(), 150);
+                self.state.dirty = true;
             }
 
             Action::CacheCleared(result) => match result {
                 Ok(()) => {
                     if self.state.is_tv_mode && !self.state.tv_playlists.is_empty() {
-                        self.state.set_status(
-                            "Cache cleared. Reloading TV playlists...".to_string(),
-                            150,
+                        self.state.notify(
+                            NotificationKind::Success,
+                            "Cache Cleared",
+                            "Temporary cache cleared. Reloading TV playlists...",
                         );
                         self.reload_tv_playlists();
                     } else {
-                        self.state
-                            .set_status("Cache cleared completely.".to_string(), 150);
+                        self.state.notify(
+                            NotificationKind::Success,
+                            "Cache Cleared",
+                            "All temporary cache files cleared completely.",
+                        );
                     }
                 }
                 Err(error) => {
                     log::error!("cache clear failed: {error}");
                     self.state
-                        .notify(NotificationKind::Error, "Cache clear failed", error);
+                        .notify(NotificationKind::Error, "Cache Clear Failed", error);
                 }
             },
 

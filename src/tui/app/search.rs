@@ -129,8 +129,9 @@ impl App {
 
         match parsed {
             crate::tui::commands::ParsedCommand::ClearCache => {
-                self.action_sender.send(Action::ClearCache).ok();
                 self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.action_sender.send(Action::ClearCache).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Github => {
