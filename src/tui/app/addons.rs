@@ -13,6 +13,7 @@ impl App {
         self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
 
         self.state.active_browse_preset = None;
+        self.state.active_addon_catalog = None;
         self.state.browse_metrics.clear();
         self.state.tick_count = 0;
         self.reset_transient_overlays();

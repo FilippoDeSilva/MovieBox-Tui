@@ -128,6 +128,58 @@ impl AddonClient {
         Ok(Vec::new())
     }
 
+    pub async fn fetch_catalog(
+        &self,
+        base_url: &str,
+        r#type: &str,
+        catalog_id: &str,
+        extra: Option<&str>,
+    ) -> Result<Vec<MetaItem>, String> {
+        let endpoint = if let Some(ext) = extra.filter(|s| !s.trim().is_empty()) {
+            format!("{base_url}/catalog/{type}/{catalog_id}/{ext}.json")
+        } else {
+            format!("{base_url}/catalog/{type}/{catalog_id}.json")
+        };
+        let resp = self
+            .http
+            .get(&endpoint)
+            .send()
+            .await
+            .map_err(|e| format!("Catalog request failed: {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Catalog returned HTTP {}", resp.status()));
+        }
+
+        let raw: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("Invalid catalog response JSON: {e}"))?;
+
+        if let Some(metas_arr) = raw.get("metas").and_then(|m| m.as_array()) {
+            let metas: Vec<MetaItem> =
+                serde_json::from_value(serde_json::Value::Array(metas_arr.clone()))
+                    .map_err(|e| format!("Failed to parse metas: {e}"))?;
+            return Ok(metas);
+        } else if let Some(items_arr) = raw
+            .get("items")
+            .or_else(|| raw.get("results"))
+            .and_then(|m| m.as_array())
+        {
+            let metas: Vec<MetaItem> =
+                serde_json::from_value(serde_json::Value::Array(items_arr.clone()))
+                    .map_err(|e| format!("Failed to parse items: {e}"))?;
+            return Ok(metas);
+        } else if let Some(arr) = raw.as_array() {
+            let metas: Vec<MetaItem> =
+                serde_json::from_value(serde_json::Value::Array(arr.clone()))
+                    .map_err(|e| format!("Failed to parse raw array metas: {e}"))?;
+            return Ok(metas);
+        }
+
+        Ok(Vec::new())
+    }
+
     pub async fn fetch_meta(
         &self,
         base_url: &str,

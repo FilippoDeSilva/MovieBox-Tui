@@ -158,6 +158,80 @@ impl MovieBoxService {
         }
     }
 
+    pub async fn fetch_addon_catalog(
+        &self,
+        manifest_url: &str,
+        r#type: &str,
+        catalog_id: &str,
+    ) -> Result<serde_json::Value, String> {
+        let base_url = crate::providers::addons::AddonClient::base_addon_url(manifest_url);
+        let metas = self
+            .addon_client
+            .fetch_catalog(&base_url, r#type, catalog_id, None)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if metas.is_empty() {
+            return Err("No catalog items found".to_string());
+        }
+
+        let mut seen_ids = std::collections::HashSet::new();
+        let subjects = metas
+            .into_iter()
+            .filter(|item| seen_ids.insert(item.id.clone()))
+            .map(|item| {
+                let is_series = item.r#type.eq_ignore_ascii_case("series")
+                    || item.r#type.eq_ignore_ascii_case("tv")
+                    || item.r#type.eq_ignore_ascii_case("anime");
+                let year: String = item
+                    .release_info
+                    .as_deref()
+                    .or(item.year.as_deref())
+                    .or(item.released.as_deref())
+                    .map(|s| {
+                        s.chars()
+                            .filter(|c| c.is_ascii_digit())
+                            .take(4)
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default();
+
+                let desc = item.description.clone();
+                let rating = item.imdb_rating.clone().or(item.rating.clone());
+                let genres = item.genres.clone();
+                let poster_url = item
+                    .poster
+                    .clone()
+                    .or(item.cover.clone())
+                    .unwrap_or_default();
+                let title = if !item.name.trim().is_empty() {
+                    item.name.clone()
+                } else {
+                    item.title.clone().unwrap_or_else(|| "Unknown".to_string())
+                };
+
+                serde_json::json!({
+                    "subjectId": item.id,
+                    "title": title,
+                    "subjectType": if is_series { 2 } else { 1 },
+                    "releaseDate": year,
+                    "cover": {
+                        "url": poster_url
+                    },
+                    "description": desc,
+                    "imdbRating": rating,
+                    "genres": genres
+                })
+            })
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::json!({
+            "results": [{
+                "subjects": subjects
+            }]
+        }))
+    }
+
     pub async fn details(
         &self,
         provider: ProviderKind,

@@ -240,6 +240,7 @@ impl App {
                 }
                 self.state.show_browse_popup = false;
                 self.state.active_browse_preset = Some(preset);
+                self.state.active_addon_catalog = None;
                 self.state.browse_list_state.select(None);
                 self.state.search_query.clear();
                 self.action_sender
@@ -248,6 +249,42 @@ impl App {
                         page: 1,
                     })
                     .ok();
+            }
+
+            Action::SelectAddonCatalog(target) => {
+                self.state.show_browse_popup = false;
+                self.state.browse_list_state.select(None);
+                let context = self.prepare_addon_catalog_request(&target);
+                let request_id = self.state.active_search_request;
+                let sender = self.action_sender.clone();
+                let service = self.service.clone();
+                let manifest_url = target.manifest_url.clone();
+                let r_type = target.r#type.clone();
+                let cat_id = target.catalog_id.clone();
+
+                tokio::spawn(async move {
+                    let result = service
+                        .fetch_addon_catalog(&manifest_url, &r_type, &cat_id)
+                        .await;
+                    match result {
+                        Ok(res) => {
+                            sender
+                                .send(Action::SearchSuccess {
+                                    context,
+                                    request_id,
+                                    query: String::new(),
+                                    page: 1,
+                                    payload: res,
+                                })
+                                .ok();
+                        }
+                        Err(error) => {
+                            sender
+                                .send(Action::SearchFailure(context, request_id, 1, error))
+                                .ok();
+                        }
+                    }
+                });
             }
 
             Action::SearchSuccess {

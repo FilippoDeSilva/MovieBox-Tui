@@ -36,6 +36,7 @@ impl App {
         self.state.active_screen = Screen::Home;
         self.state.is_homepage_mode = false;
         self.state.active_browse_preset = None;
+        self.state.active_addon_catalog = None;
         self.state.browse_metrics.clear();
         self.state.is_tv_mode = false;
         self.state.is_loading = false;
@@ -430,6 +431,7 @@ impl App {
                         self.state.search_poster_protocols.clear();
                         self.state.search_results.clear();
                         self.state.active_browse_preset = None;
+                        self.state.active_addon_catalog = None;
                         self.state.browse_metrics.clear();
                         self.state.search_error = None;
                         self.state.search_query.clear();

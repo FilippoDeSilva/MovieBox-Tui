@@ -47,16 +47,33 @@ impl App {
         }
 
         if self.state.show_browse_popup {
-            let presets = BrowsePreset::ALL;
-            let popup = centered_rect(area, 40, presets.len() as u16 + 4, 30, 60);
+            let is_addon = self.state.mode() == crate::tui::state::AppMode::Addon;
+            let total_count = if is_addon {
+                crate::providers::addons::models::curated_catalog_presets(
+                    &self.state.installed_addons,
+                )
+                .len()
+            } else {
+                BrowsePreset::ALL.len()
+            };
+            let popup = centered_rect(area, 40, total_count as u16 + 4, 30, 60);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 let item_y = popup.y.saturating_add(1);
-                if row >= item_y && (row - item_y) < presets.len() as u16 {
+                if row >= item_y && (row - item_y) < total_count as u16 {
                     let clicked_idx = (row - item_y) as usize;
                     self.state.browse_list_state.select(Some(clicked_idx));
-                    if let Some(preset) = presets.get(clicked_idx).copied() {
-                        self.state.show_browse_popup = false;
-                        self.state.browse_list_state.select(None);
+                    self.state.show_browse_popup = false;
+                    self.state.browse_list_state.select(None);
+                    if is_addon {
+                        let targets = crate::providers::addons::models::curated_catalog_presets(
+                            &self.state.installed_addons,
+                        );
+                        if let Some(target) = targets.get(clicked_idx).cloned() {
+                            self.action_sender
+                                .send(Action::SelectAddonCatalog(target))
+                                .ok();
+                        }
+                    } else if let Some(preset) = BrowsePreset::ALL.get(clicked_idx).copied() {
                         self.action_sender.send(Action::SelectBrowse(preset)).ok();
                     }
                 }

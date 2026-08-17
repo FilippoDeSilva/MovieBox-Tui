@@ -44,6 +44,7 @@ impl App {
                     self.state.set_mode(crate::tui::state::AppMode::Addon);
                 }
                 self.state.active_browse_preset = None;
+                self.state.active_addon_catalog = None;
                 self.state.browse_metrics.clear();
                 self.state.tick_count = 0;
                 self.reset_transient_overlays();

@@ -479,3 +479,110 @@ impl InstalledAddon {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddonCatalogTarget {
+    pub label: String,
+    pub addon_name: String,
+    pub manifest_url: String,
+    pub r#type: String,
+    pub catalog_id: String,
+}
+
+pub fn curated_catalog_presets(addons: &[InstalledAddon]) -> Vec<AddonCatalogTarget> {
+    let mut targets = Vec::new();
+    let enabled_catalogs: Vec<&InstalledAddon> = addons
+        .iter()
+        .filter(|a| a.enabled && a.provides_catalog)
+        .collect();
+
+    let multi = enabled_catalogs.len() > 1;
+
+    for addon in &enabled_catalogs {
+        let suffix = if multi {
+            format!(" ({})", addon.name)
+        } else {
+            String::new()
+        };
+
+        let has_movies =
+            addon.types.is_empty() || addon.types.iter().any(|t| t.eq_ignore_ascii_case("movie"));
+        let has_series =
+            addon.types.is_empty() || addon.types.iter().any(|t| t.eq_ignore_ascii_case("series"));
+
+        if has_movies {
+            targets.push(AddonCatalogTarget {
+                label: format!("Top Movies{suffix}"),
+                addon_name: addon.name.clone(),
+                manifest_url: addon.manifest_url.clone(),
+                r#type: "movie".to_string(),
+                catalog_id: "top".to_string(),
+            });
+        }
+        if has_series {
+            targets.push(AddonCatalogTarget {
+                label: format!("Top Series{suffix}"),
+                addon_name: addon.name.clone(),
+                manifest_url: addon.manifest_url.clone(),
+                r#type: "series".to_string(),
+                catalog_id: "top".to_string(),
+            });
+        }
+        if has_movies && addon.is_core() {
+            targets.push(AddonCatalogTarget {
+                label: format!("Top Rated Movies{suffix}"),
+                addon_name: addon.name.clone(),
+                manifest_url: addon.manifest_url.clone(),
+                r#type: "movie".to_string(),
+                catalog_id: "imdbRating".to_string(),
+            });
+        }
+        if has_series && addon.is_core() {
+            targets.push(AddonCatalogTarget {
+                label: format!("Top Rated Series{suffix}"),
+                addon_name: addon.name.clone(),
+                manifest_url: addon.manifest_url.clone(),
+                r#type: "series".to_string(),
+                catalog_id: "imdbRating".to_string(),
+            });
+        }
+        if targets.len() >= 6 {
+            break;
+        }
+    }
+
+    if targets.is_empty() {
+        let cinemeta = InstalledAddon::cinemeta_default();
+        targets.push(AddonCatalogTarget {
+            label: "Top Movies".to_string(),
+            addon_name: cinemeta.name.clone(),
+            manifest_url: cinemeta.manifest_url.clone(),
+            r#type: "movie".to_string(),
+            catalog_id: "top".to_string(),
+        });
+        targets.push(AddonCatalogTarget {
+            label: "Top Series".to_string(),
+            addon_name: cinemeta.name.clone(),
+            manifest_url: cinemeta.manifest_url.clone(),
+            r#type: "series".to_string(),
+            catalog_id: "top".to_string(),
+        });
+        targets.push(AddonCatalogTarget {
+            label: "Top Rated Movies".to_string(),
+            addon_name: cinemeta.name.clone(),
+            manifest_url: cinemeta.manifest_url.clone(),
+            r#type: "movie".to_string(),
+            catalog_id: "imdbRating".to_string(),
+        });
+        targets.push(AddonCatalogTarget {
+            label: "Top Rated Series".to_string(),
+            addon_name: cinemeta.name.clone(),
+            manifest_url: cinemeta.manifest_url.clone(),
+            r#type: "series".to_string(),
+            catalog_id: "imdbRating".to_string(),
+        });
+    }
+
+    targets.truncate(6);
+    targets
+}

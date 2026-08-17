@@ -150,6 +150,10 @@ impl App {
                         self.action_sender
                             .send(Action::FetchHomepage { tab_id, page: 1 })
                             .ok();
+                    } else if let Some(catalog) = self.state.active_addon_catalog.clone() {
+                        self.action_sender
+                            .send(Action::SelectAddonCatalog(catalog))
+                            .ok();
                     } else if !query.is_empty() {
                         self.action_sender
                             .send(Action::Search {
@@ -285,8 +289,17 @@ impl App {
             }
 
             Action::ShowBrowseMenu => {
-                if self.state.is_tv_mode
-                    || self.state.active_provider
+                let current_mode = self.state.mode();
+                if current_mode == crate::tui::state::AppMode::Tv {
+                    let ctrl_s = crate::tui::text::ctrl_key("S");
+                    let ctrl_a = crate::tui::text::ctrl_key("A");
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "TV Mode",
+                        format!("Command /browse is available in Streaming Mode ({ctrl_s}) or Addon Mode ({ctrl_a})."),
+                    );
+                } else if current_mode == crate::tui::state::AppMode::Streaming
+                    && self.state.active_provider
                         != crate::providers::models::ProviderKind::MovieBox
                 {
                     self.state.set_status(

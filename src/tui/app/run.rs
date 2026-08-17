@@ -194,6 +194,7 @@ impl App {
             | Action::Search { .. }
             | Action::FetchHomepage { .. }
             | Action::SelectBrowse(..)
+            | Action::SelectAddonCatalog(..)
             | Action::SearchSuccess { .. }
             | Action::SearchFailure(..)
             | Action::HomepageSuccess { .. }

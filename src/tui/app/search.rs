@@ -178,13 +178,7 @@ impl App {
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",
-                        format!("Command /browse is only available in Streaming Mode. Switch with {ctrl_s}."),
-                    );
-                } else if current_mode == crate::tui::state::AppMode::Addon {
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Addon Mode",
-                        format!("Command /browse is only available in Streaming Mode. Switch with {ctrl_s}."),
+                        format!("Command /browse is available in Streaming Mode ({ctrl_s}) or Addon Mode ({ctrl_a})."),
                     );
                 } else {
                     self.action_sender.send(Action::ShowBrowseMenu).ok();
@@ -595,6 +589,7 @@ impl App {
         self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
         self.state.is_homepage_mode = false;
         self.state.active_browse_preset = None;
+        self.state.active_addon_catalog = None;
         self.state.browse_metrics.clear();
         self.state.current_page = 1;
         self.state.active_screen = Screen::Home;
@@ -612,6 +607,37 @@ impl App {
         self.state.poster_protocol = None;
         self.state
             .set_status(format!("Searching for '{}'...", query), 150);
+        self.request_context()
+    }
+
+    pub(super) fn prepare_addon_catalog_request(
+        &mut self,
+        target: &crate::providers::addons::models::AddonCatalogTarget,
+    ) -> RequestContext {
+        self.state.active_search_request = self.state.active_search_request.wrapping_add(1);
+        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
+        self.state.is_homepage_mode = false;
+        self.state.active_browse_preset = None;
+        self.state.active_addon_catalog = Some(target.clone());
+        self.state.browse_metrics.clear();
+        self.state.current_page = 1;
+        self.state.active_screen = Screen::Home;
+        self.state.active_subject_id = None;
+        self.state.selected_details = None;
+        self.state.selected_resources = None;
+        self.state.is_loading = true;
+        self.state.search_error = None;
+        self.state.search_list_state.select(Some(0));
+        self.state.search_suggestions.clear();
+        self.state.suggest_index = None;
+        self.state.search_preview = None;
+        self.state.preview_loading = false;
+        self.state.poster_image = None;
+        self.state.poster_protocol = None;
+        self.state.failed_posters.clear();
+        self.state.in_flight_posters.clear();
+        self.state.search_results.clear();
+        self.state.search_query.clear();
         self.request_context()
     }
 

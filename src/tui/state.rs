@@ -97,6 +97,7 @@ pub struct AppState {
     pub show_browse_popup: bool,
     pub browse_list_state: ListState,
     pub active_browse_preset: Option<BrowsePreset>,
+    pub active_addon_catalog: Option<crate::providers::addons::models::AddonCatalogTarget>,
     pub browse_metrics: std::collections::HashMap<String, BrowseMetrics>,
 
     pub poster_protocol: Option<(ratatui::layout::Rect, ratatui_image::protocol::Protocol)>,
@@ -236,6 +237,7 @@ impl Default for AppState {
             show_browse_popup: false,
             browse_list_state: ListState::default(),
             active_browse_preset: None,
+            active_addon_catalog: None,
             browse_metrics: std::collections::HashMap::new(),
             poster_protocol: None,
             image_picker: None,

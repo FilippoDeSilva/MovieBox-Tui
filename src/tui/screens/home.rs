@@ -26,6 +26,7 @@ fn search_view_state(state: &AppState) -> SearchViewState {
     } else if state.is_loading
         && (!state.search_query.trim().is_empty()
             || state.active_browse_preset.is_some()
+            || state.active_addon_catalog.is_some()
             || state.is_homepage_mode)
     {
         SearchViewState::Loading
@@ -33,7 +34,10 @@ fn search_view_state(state: &AppState) -> SearchViewState {
         SearchViewState::Error
     } else if !state.search_results.is_empty() {
         SearchViewState::Results
-    } else if !state.search_query.trim().is_empty() || state.active_browse_preset.is_some() {
+    } else if !state.search_query.trim().is_empty()
+        || state.active_browse_preset.is_some()
+        || state.active_addon_catalog.is_some()
+    {
         SearchViewState::NoResults
     } else {
         SearchViewState::Empty
@@ -128,6 +132,8 @@ fn render_search_state(
             let dots = state.loading_dots();
             let msg = if let Some(preset) = state.active_browse_preset {
                 format!("Loading {}{dots}", preset.label())
+            } else if let Some(catalog) = &state.active_addon_catalog {
+                format!("Loading {}{dots}", catalog.label)
             } else if state.is_homepage_mode {
                 format!("Loading discover{dots}")
             } else if !state.search_query.trim().is_empty() {
@@ -146,6 +152,8 @@ fn render_search_state(
             };
             let msg = if let Some(preset) = state.active_browse_preset {
                 format!("No items found for {}", preset.label())
+            } else if let Some(catalog) = &state.active_addon_catalog {
+                format!("No items found for {}", catalog.label)
             } else if state.search_query.trim().eq_ignore_ascii_case("/history") {
                 "No watch history found".to_string()
             } else if !state.search_query.trim().is_empty() {
@@ -1239,10 +1247,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     if state.show_browse_popup {
-        let items: Vec<String> = crate::tui::state::BrowsePreset::ALL
-            .iter()
-            .map(|preset| preset.label().to_string())
-            .collect();
+        let items: Vec<String> = if state.mode() == crate::tui::state::AppMode::Addon {
+            crate::providers::addons::models::curated_catalog_presets(&state.installed_addons)
+                .into_iter()
+                .map(|target| target.label)
+                .collect()
+        } else {
+            crate::tui::state::BrowsePreset::ALL
+                .iter()
+                .map(|preset| preset.label().to_string())
+                .collect()
+        };
         crate::tui::clear_area(frame, area, theme);
         crate::tui::overlay::picker(
             frame,

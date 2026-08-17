@@ -72,6 +72,7 @@ pub enum Action {
     SelectTheme(String),
     ShowBrowseMenu,
     SelectBrowse(crate::tui::state::BrowsePreset),
+    SelectAddonCatalog(crate::providers::addons::models::AddonCatalogTarget),
     LaunchMpv(String, Option<String>),
     DownloadStream(Option<String>),
     StartDownload(Option<String>, Option<String>),

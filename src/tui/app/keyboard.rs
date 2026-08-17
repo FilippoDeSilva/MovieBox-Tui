@@ -94,13 +94,23 @@ impl App {
         }
 
         if self.state.show_browse_popup {
+            let is_addon = self.state.mode() == crate::tui::state::AppMode::Addon;
+            let total_count = if is_addon {
+                crate::providers::addons::models::curated_catalog_presets(
+                    &self.state.installed_addons,
+                )
+                .len()
+            } else {
+                crate::tui::state::BrowsePreset::ALL.len()
+            };
+
             match key.code {
                 KeyCode::Esc => {
                     self.state.show_browse_popup = false;
                     self.state.browse_list_state.select(None);
                 }
                 KeyCode::Up => {
-                    let max = crate::tui::state::BrowsePreset::ALL.len().saturating_sub(1);
+                    let max = total_count.saturating_sub(1);
                     let next = match self.state.browse_list_state.selected() {
                         Some(0) | None => max,
                         Some(index) => index.saturating_sub(1),
@@ -108,7 +118,7 @@ impl App {
                     self.state.browse_list_state.select(Some(next));
                 }
                 KeyCode::Down => {
-                    let max = crate::tui::state::BrowsePreset::ALL.len().saturating_sub(1);
+                    let max = total_count.saturating_sub(1);
                     let next = match self.state.browse_list_state.selected() {
                         Some(index) if index < max => index + 1,
                         _ => 0,
@@ -117,7 +127,18 @@ impl App {
                 }
                 KeyCode::Enter => {
                     let index = self.state.browse_list_state.selected().unwrap_or(0);
-                    if let Some(preset) = crate::tui::state::BrowsePreset::ALL.get(index).copied() {
+                    if is_addon {
+                        let targets = crate::providers::addons::models::curated_catalog_presets(
+                            &self.state.installed_addons,
+                        );
+                        if let Some(target) = targets.get(index).cloned() {
+                            self.action_sender
+                                .send(Action::SelectAddonCatalog(target))
+                                .ok();
+                        }
+                    } else if let Some(preset) =
+                        crate::tui::state::BrowsePreset::ALL.get(index).copied()
+                    {
                         self.action_sender.send(Action::SelectBrowse(preset)).ok();
                     }
                 }
