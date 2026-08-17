@@ -453,6 +453,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             vertical_chunks[7],
         );
     } else {
+        if state.is_loading && state.search_results.is_empty() {
+            render_search_state(frame, area, state, theme, SearchViewState::Loading);
+            return;
+        }
+
         let has_results = !state.search_results.is_empty();
         let suggestion_height =
             if state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty() {
@@ -504,9 +509,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         );
 
         let list_block = Block::default();
-        if state.is_loading && state.search_results.is_empty() {
-            render_search_state(frame, results_chunk, state, theme, SearchViewState::Loading);
-        } else if !state.search_results.is_empty() {
+        if !state.search_results.is_empty() {
             let poster_width = if state.image_supported {
                 state.poster_rows.saturating_mul(4).div_ceil(3).max(6)
             } else {

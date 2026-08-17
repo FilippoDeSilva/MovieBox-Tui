@@ -247,6 +247,10 @@ impl App {
     }
 
     fn handle_home_mouse(&mut self, col: u16, row: u16, area: Rect) -> Option<Action> {
+        if self.state.is_loading && self.state.search_results.is_empty() {
+            return None;
+        }
+
         let is_landing = self.state.search_results.is_empty();
         let logo_height = if self.state.basic_terminal { 2 } else { 6 };
         let search_width =
