@@ -142,7 +142,9 @@ impl App {
             } => {
                 let lower_query = query.trim().to_lowercase();
 
-                if lower_query == "/history" {
+                if lower_query == "/history"
+                    && self.state.mode() == crate::tui::state::AppMode::Streaming
+                {
                     self.state.input_mode = InputMode::Normal;
                     self.state.is_loading = false;
                     self.state.is_homepage_mode = false;
@@ -203,6 +205,9 @@ impl App {
                 }
 
                 if self.handle_search_command(&query, &lower_query).is_some() {
+                    return None;
+                }
+                if query.trim().starts_with('/') {
                     return None;
                 }
                 let context = self.prepare_search_request(&query);

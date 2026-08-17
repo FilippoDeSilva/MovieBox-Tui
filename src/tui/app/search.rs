@@ -96,7 +96,36 @@ impl App {
     }
 
     pub(super) fn handle_search_command(&mut self, query: &str, lower_query: &str) -> Option<bool> {
-        let parsed = crate::tui::commands::SlashCommand::parse(query)?;
+        let trimmed = query.trim();
+        if !trimmed.starts_with('/') {
+            return None;
+        }
+
+        if trimmed == "/" {
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+            return Some(true);
+        }
+
+        let parsed = match crate::tui::commands::SlashCommand::parse(trimmed) {
+            Some(p) => p,
+            None => {
+                let cmd_name = trimmed.split_whitespace().next().unwrap_or(trimmed);
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.notify(
+                    NotificationKind::Warning,
+                    "Unknown Command",
+                    format!("Command '{cmd_name}' is not recognized. Type '/' to view available commands."),
+                );
+                return Some(true);
+            }
+        };
+
+        let current_mode = self.state.mode();
+        let ctrl_s = crate::tui::text::ctrl_key("S");
+        let ctrl_t = crate::tui::text::ctrl_key("T");
+        let ctrl_a = crate::tui::text::ctrl_key("A");
 
         match parsed {
             crate::tui::commands::ParsedCommand::ClearCache => {
@@ -120,6 +149,22 @@ impl App {
                 self.action_sender.send(Action::CheckForUpdates).ok();
                 Some(true)
             }
+            crate::tui::commands::ParsedCommand::ToggleUpdate => {
+                self.state.auto_update = !self.state.auto_update;
+                self.persist_config();
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Auto Update Check",
+                    if self.state.auto_update {
+                        "Enabled"
+                    } else {
+                        "Disabled"
+                    },
+                );
+                Some(true)
+            }
             crate::tui::commands::ParsedCommand::Theme => {
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
@@ -129,28 +174,48 @@ impl App {
             crate::tui::commands::ParsedCommand::Browse => {
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
-                if self.state.is_tv_mode {
+                if current_mode == crate::tui::state::AppMode::Tv {
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",
-                        "Browse categories are only available in Streaming Mode.",
+                        format!("Command /browse is only available in Streaming Mode. Switch with {ctrl_s}."),
                     );
-                } else if self.state.is_addon_mode {
+                } else if current_mode == crate::tui::state::AppMode::Addon {
                     self.state.notify(
                         NotificationKind::Info,
                         "Addon Mode",
-                        "Browse categories are only available in Streaming Mode (Addon Mode uses catalog search).",
+                        format!("Command /browse is only available in Streaming Mode. Switch with {ctrl_s}."),
                     );
                 } else {
                     self.action_sender.send(Action::ShowBrowseMenu).ok();
                 }
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::History => None,
+            crate::tui::commands::ParsedCommand::History => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                if current_mode == crate::tui::state::AppMode::Tv {
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "TV Mode",
+                        format!("Command /history is only available in Streaming Mode. Switch with {ctrl_s}."),
+                    );
+                    Some(true)
+                } else if current_mode == crate::tui::state::AppMode::Addon {
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Addon Mode",
+                        format!("Command /history is only available in Streaming Mode. Switch with {ctrl_s}."),
+                    );
+                    Some(true)
+                } else {
+                    None
+                }
+            }
             crate::tui::commands::ParsedCommand::Reload => {
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
-                if self.state.is_tv_mode {
+                if current_mode == crate::tui::state::AppMode::Tv {
                     self.action_sender.send(Action::TvReloadPlaylists).ok();
                 } else {
                     self.action_sender.send(Action::Refresh).ok();
@@ -158,32 +223,47 @@ impl App {
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::List => {
-                if self.state.is_tv_mode {
+                if current_mode == crate::tui::state::AppMode::Tv {
                     self.apply_tv_search_results(query, lower_query);
-                    Some(true)
                 } else {
-                    None
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "TV Mode",
+                        format!(
+                            "Command /list is only available in TV Mode. Switch with {ctrl_t}."
+                        ),
+                    );
                 }
+                Some(true)
             }
             crate::tui::commands::ParsedCommand::Config => {
-                if self.state.is_tv_mode {
+                if current_mode == crate::tui::state::AppMode::Tv {
                     self.action_sender.send(Action::ShowTvConfig).ok();
                     self.state.search_query.clear();
-                    Some(true)
-                } else if self.state.is_addon_mode {
+                    self.state.input_mode = InputMode::Normal;
+                } else if current_mode == crate::tui::state::AppMode::Addon {
                     self.action_sender.send(Action::ShowAddonManager).ok();
                     self.state.search_query.clear();
-                    Some(true)
+                    self.state.input_mode = InputMode::Normal;
                 } else {
-                    None
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Configuration",
+                        format!("Command /config is available in TV Mode ({ctrl_t}) or Addon Mode ({ctrl_a})."),
+                    );
                 }
+                Some(true)
             }
             crate::tui::commands::ParsedCommand::Addons => {
                 if !self.state.addons_enabled {
                     self.state.addons_enabled = true;
                     self.persist_config();
                 }
-                if !self.state.is_addon_mode {
+                if current_mode != crate::tui::state::AppMode::Addon {
                     self.action_sender.send(Action::ToggleAddonMode).ok();
                 }
                 self.action_sender.send(Action::ShowAddonManager).ok();
@@ -301,25 +381,19 @@ impl App {
 
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::ToggleUpdate => {
-                self.state.auto_update = !self.state.auto_update;
-                self.persist_config();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
-                self.state.notify(
-                    NotificationKind::Info,
-                    "Automatic updates",
-                    if self.state.auto_update {
-                        "Enabled"
-                    } else {
-                        "Disabled"
-                    },
-                );
-                Some(true)
-            }
             crate::tui::commands::ParsedCommand::EnableBdix
             | crate::tui::commands::ParsedCommand::DisableBdix => {
                 let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableBdix;
+                if current_mode != crate::tui::state::AppMode::Streaming {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "BDIX Sources",
+                        format!("BDIX FTP sources are only available in Streaming Mode. Switch with {ctrl_s}."),
+                    );
+                    return Some(true);
+                }
                 if self.state.bdix_enabled == enable_req {
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
