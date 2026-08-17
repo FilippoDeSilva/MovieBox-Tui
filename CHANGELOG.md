@@ -66,6 +66,8 @@
   - Centralized atomic file operations (`atomic_write_file`, `atomic_write_file_async`), MD5 digest formatting (`md5_hex`), and text extraction helpers in `cache.rs` and `service.rs`.
   - Centralized application paths, border type resolution, and mode status announcements across TUI modules.
 - **Addon Manager UI Optimization**:
+  - Implemented full cursor navigation (`Left`/`Right` keys) and inline editing (`Backspace`/`Delete`) for the Addon Manager input field.
+  - Implemented a scrolling viewport renderer for the Addon Manager input, allowing editing of very long manifest URLs without wrapping or truncation.
   - Compacted the Addon Manager dialog with an aligned two-tier layout placing `[ Add Manifest URL ]` and `[ Done ]` action buttons side-by-side.
 - **Multi-System Core Module Decoupling**:
   - Promoted `player.rs` (process management & detection), `config.rs` (shared configuration), and `updater.rs` (release checks) to core modules in `src/`, preparing the architecture for upcoming CLI and GUI frontends with full backward compatibility.
