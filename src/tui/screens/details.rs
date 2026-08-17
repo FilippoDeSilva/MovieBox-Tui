@@ -127,24 +127,66 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let raw_title = details_json
         .get("title")
+        .or_else(|| details_json.get("name"))
         .and_then(|t| t.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| {
+            state
+                .search_results
+                .iter()
+                .find(|r| {
+                    if let Some(act_id) = state.active_subject_id.as_deref() {
+                        r.id == act_id
+                    } else {
+                        false
+                    }
+                })
+                .map(|r| r.title.as_str())
+        })
         .unwrap_or("Unknown Title");
     let title = crate::providers::moviebox::clean_moviebox_title(raw_title);
     let intro = details_json
         .get("description")
+        .or_else(|| details_json.get("intro"))
+        .or_else(|| details_json.get("synopsis"))
+        .or_else(|| details_json.get("overview"))
         .and_then(|d| d.as_str())
-        .or_else(|| details_json.get("intro").and_then(|i| i.as_str()))
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| {
+            state.search_preview.as_ref().and_then(|p| {
+                p.get("description")
+                    .or_else(|| p.get("intro"))
+                    .or_else(|| p.get("synopsis"))
+                    .and_then(|s| s.as_str())
+            })
+        })
         .unwrap_or("No description available.");
     let year = details_json
         .get("releaseDate")
+        .or_else(|| details_json.get("year"))
+        .or_else(|| details_json.get("releaseInfo"))
         .and_then(|y| y.as_str())
-        .or_else(|| details_json.get("year").and_then(|y| y.as_str()))
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| {
+            state
+                .search_results
+                .iter()
+                .find(|r| {
+                    if let Some(act_id) = state.active_subject_id.as_deref() {
+                        r.id == act_id
+                    } else {
+                        false
+                    }
+                })
+                .map(|r| r.release_year.as_str())
+        })
         .unwrap_or("N/A");
     let type_val = crate::tui::state::stype(details_json);
     let type_str = if type_val == 2 { "Series" } else { "Movie" };
 
     let genres = details_json
         .get("genre")
+        .or_else(|| details_json.get("genres"))
         .and_then(|g| {
             if let Some(a) = g.as_array() {
                 let joined = a
@@ -312,36 +354,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(placeholder, poster_area);
     }
 
-    let is_currently_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
-        let provider = subject_provider(state, subject_id).cache_key();
-        let (se, ep) = if type_val == 2 {
-            let se_idx = state.season_list_state.selected().unwrap_or(0);
-            let ep_idx = state.episode_list_state.selected().unwrap_or(0);
-            let se_num = state
-                .available_seasons
-                .get(se_idx)
-                .and_then(|s| s.get("se"))
-                .and_then(|v| v.as_i64())
-                .unwrap_or(1) as usize;
-            let ep_num = if let Some(eps) = state.available_episode_numbers.get(se_idx) {
-                eps.get(ep_idx).copied().unwrap_or(ep_idx + 1)
-            } else {
-                ep_idx + 1
-            };
-            (se_num, ep_num)
-        } else {
-            (0, 0)
-        };
-        state.history.is_watched(provider, subject_id, se, ep)
-    } else {
-        false
-    };
-
-    let display_title = if is_currently_watched {
-        format!("✓ {title}")
-    } else {
-        title.to_string()
-    };
+    let display_title = title.to_string();
 
     let title_line = Line::from(vec![
         Span::styled(
@@ -653,7 +666,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .iter()
                 .map(|&ep| {
                     if state.history.is_watched(provider, subject_id, se_num, ep) {
-                        ListItem::new(format!("✓ Episode {}", ep)).style(theme.text_dim)
+                        ListItem::new(format!("Episode {}", ep)).style(theme.text_dim)
                     } else {
                         ListItem::new(format!("Episode {}", ep)).style(theme.text)
                     }
@@ -792,10 +805,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("codecName")
                             .and_then(|c| c.as_str())
                             .unwrap_or("None");
-                        let upload_by = file
-                            .get("uploadBy")
-                            .and_then(|u| u.as_str())
-                            .unwrap_or("Unknown");
                         let size_str = file.get("size").and_then(|s| s.as_str()).unwrap_or("0");
 
                         let duration = file.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
@@ -860,10 +869,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         };
 
                         let is_fourk = file.get("_fourk_release").is_some();
-                        let language = file
+                        let is_addon = file.get("_addon_release").is_some();
+                        let raw_release_title = file
+                            .get("fileName")
+                            .or_else(|| file.get("title"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let release_title = crate::tui::text::clean_stream_text(raw_release_title);
+                        let raw_upload_by = file
+                            .get("uploadBy")
+                            .and_then(|u| u.as_str())
+                            .unwrap_or("Unknown");
+                        let upload_by = crate::tui::text::clean_stream_text(raw_upload_by);
+                        let raw_language = file
                             .get("language")
                             .and_then(|value| value.as_str())
                             .unwrap_or("Unknown");
+                        let language = crate::tui::text::clean_stream_text(raw_language);
                         let source_count = file
                             .get("sourceCount")
                             .and_then(|value| value.as_u64())
@@ -872,10 +894,53 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         let codec = codec.to_uppercase();
                         let mut stream_spans = vec![
                             Span::styled(pointer, marker_style),
-                            Span::styled(format!("{size_formatted:<9}"), primary_style),
-                            Span::styled(format!("{codec:<8}"), secondary_style),
+                            Span::styled(format!("{size_formatted:<9} "), primary_style),
+                            Span::styled(format!("{codec:<11} "), secondary_style),
                         ];
-                        if is_fourk && stream_width >= 58 {
+                        if is_addon {
+                            let fixed = 10 + 12;
+                            let remaining = stream_width.saturating_sub(fixed);
+                            let has_lang = language != "Unknown" && !language.is_empty();
+                            let lang_str = if has_lang {
+                                format!("{language:<15} ")
+                            } else {
+                                "".to_string()
+                            };
+                            let lang_len = lang_str.len();
+
+                            if remaining >= 45 {
+                                let title_avail =
+                                    remaining.saturating_sub(lang_len + upload_by.len() + 3);
+                                let display_title = crate::tui::text::truncate_width(
+                                    &release_title,
+                                    title_avail.max(12),
+                                );
+                                if has_lang {
+                                    stream_spans.push(Span::styled(lang_str, secondary_style));
+                                }
+                                stream_spans.push(Span::styled(
+                                    format!("{display_title}  "),
+                                    primary_style,
+                                ));
+                                stream_spans
+                                    .push(Span::styled(upload_by.to_string(), secondary_style));
+                            } else if remaining >= 25 {
+                                let title_avail = remaining.saturating_sub(upload_by.len() + 2);
+                                let display_title = crate::tui::text::truncate_width(
+                                    &release_title,
+                                    title_avail.max(8),
+                                );
+                                stream_spans.push(Span::styled(
+                                    format!("{display_title}  "),
+                                    primary_style,
+                                ));
+                                stream_spans
+                                    .push(Span::styled(upload_by.to_string(), secondary_style));
+                            } else {
+                                stream_spans
+                                    .push(Span::styled(upload_by.to_string(), secondary_style));
+                            }
+                        } else if is_fourk && stream_width >= 58 {
                             let mirror_str = format!(
                                 "{source_count} mirror{}",
                                 if source_count == 1 { "" } else { "s" }
@@ -883,7 +948,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             let mirror_width = mirror_str.len() + 2;
                             let max_lang_width = stream_width.saturating_sub(9 + 8 + mirror_width);
                             let display_lang =
-                                crate::tui::text::truncate_width(language, max_lang_width);
+                                crate::tui::text::truncate_width(&language, max_lang_width);
                             stream_spans.push(Span::styled(
                                 format!("{display_lang:<16}  "),
                                 secondary_style,
@@ -892,13 +957,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         } else if is_fourk && stream_width >= 38 {
                             let max_lang_width = stream_width.saturating_sub(9 + 8 + 2);
                             let display_lang =
-                                crate::tui::text::truncate_width(language, max_lang_width);
+                                crate::tui::text::truncate_width(&language, max_lang_width);
                             stream_spans
                                 .push(Span::styled(display_lang.to_string(), secondary_style));
                         } else if !is_fourk && stream_width >= 64 {
                             let fixed_width = 9 + 8 + 12;
                             let uploader = crate::tui::text::truncate_width(
-                                upload_by,
+                                &upload_by,
                                 stream_width.saturating_sub(fixed_width).max(4),
                             );
                             stream_spans
@@ -1016,7 +1081,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let msg = if waiting_for_language {
                 "Choose an audio track to load streams.".to_string()
             } else if let Some(error) = &state.stream_error {
-                if error.contains("No stream sources") || error.contains("not listed") {
+                if state.is_addon_mode {
+                    error.clone()
+                } else if error.contains("No stream sources") || error.contains("not listed") {
                     format!("{error}.\nPress Ctrl+P to try another provider, or r to refresh.")
                 } else {
                     format!("{error} — press r to retry or Ctrl+P to switch provider.")
@@ -1390,28 +1457,11 @@ fn render_workflow(
                 format!("Season {}", state.selected_season)
             },
         ));
-        let is_watched = if let Some(subject_id) = state.active_subject_id.as_deref() {
-            let provider = subject_provider(state, subject_id).cache_key();
-            state.history.is_watched(
-                provider,
-                subject_id,
-                state.selected_season,
-                state.selected_episode,
-            )
-        } else {
-            false
-        };
 
         let ep_label = if compact {
             format!("E{}", state.selected_episode)
         } else {
             format!("Episode {}", state.selected_episode)
-        };
-
-        let ep_label = if is_watched {
-            format!("✓ {ep_label}")
-        } else {
-            ep_label
         };
 
         steps.push((crate::tui::state::DetailsPane::Episodes, ep_label));

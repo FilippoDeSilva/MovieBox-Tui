@@ -374,13 +374,16 @@ impl App {
     }
 
     pub(super) fn get_selected_release(&self) -> Option<Release> {
-        self.state
+        let item = self
+            .state
             .selected_resources
             .as_ref()?
             .get("list")?
             .as_array()?
-            .get(self.state.resource_list_state.selected().unwrap_or(0))?
-            .get("_fourk_release")
+            .get(self.state.resource_list_state.selected().unwrap_or(0))?;
+
+        item.get("_addon_release")
+            .or_else(|| item.get("_fourk_release"))
             .and_then(|value| serde_json::from_value(value.clone()).ok())
     }
 }
@@ -417,26 +420,27 @@ impl App {
                 }
                 match self.state.active_screen {
                     Screen::Home => {
-                        if !self.state.search_results.is_empty()
-                            || !self.state.search_query.is_empty()
-                        {
-                            self.state.active_preview_request =
-                                self.state.active_preview_request.wrapping_add(1);
-                            self.state.search_poster_protocols.clear();
-                            self.state.search_results.clear();
-                            self.state.active_browse_preset = None;
-                            self.state.browse_metrics.clear();
-                            self.state.search_error = None;
-                            self.state.search_query.clear();
-                            self.state.search_suggestions.clear();
-                            self.state.suggest_index = None;
-                            self.state.search_preview = None;
-                            self.state.preview_loading = false;
-                            self.state.poster_image = None;
-                            self.state.poster_protocol = None;
-                            self.state.search_list_state.select(None);
-                            self.state.set_status("Search cleared.".to_string(), 150);
-                        }
+                        self.state.is_loading = false;
+                        self.state.active_search_request =
+                            self.state.active_search_request.wrapping_add(1);
+                        self.state.active_homepage_request =
+                            self.state.active_homepage_request.wrapping_add(1);
+                        self.state.active_preview_request =
+                            self.state.active_preview_request.wrapping_add(1);
+                        self.state.search_poster_protocols.clear();
+                        self.state.search_results.clear();
+                        self.state.active_browse_preset = None;
+                        self.state.browse_metrics.clear();
+                        self.state.search_error = None;
+                        self.state.search_query.clear();
+                        self.state.search_suggestions.clear();
+                        self.state.suggest_index = None;
+                        self.state.search_preview = None;
+                        self.state.preview_loading = false;
+                        self.state.poster_image = None;
+                        self.state.poster_protocol = None;
+                        self.state.search_list_state.select(None);
+                        self.state.set_status("Search cleared.".to_string(), 150);
                     }
                     Screen::Details => {
                         self.state
@@ -787,7 +791,29 @@ impl App {
                             return None;
                         }
                         self.state.active_screen = Screen::Details;
-                        self.state.selected_details = None;
+                        self.state.active_subject_id = Some(item.id.clone());
+                        let mut fallback_details = serde_json::json!({
+                            "id": item.id,
+                            "subjectId": item.id,
+                            "title": item.title,
+                            "subjectType": item.stype,
+                            "releaseDate": item.release_year,
+                            "cover": { "url": item.cover_url },
+                        });
+                        if let Some(preview) = &self.state.search_preview {
+                            if let Some(preview_obj) = preview.as_object() {
+                                if let Some(fallback_obj) = fallback_details.as_object_mut() {
+                                    for (k, v) in preview_obj {
+                                        if !fallback_obj.contains_key(k)
+                                            || fallback_obj[k].is_null()
+                                        {
+                                            fallback_obj.insert(k.clone(), v.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        self.state.selected_details = Some(fallback_details);
                         self.state.selected_resources = None;
                         self.state.is_loading = true;
                         self.state.is_fetching_streams = false;
@@ -797,7 +823,16 @@ impl App {
                         self.state.season_list_state.select(Some(0));
                         self.state.episode_list_state.select(Some(0));
                         self.state.language_chosen = false;
-                        self.state.poster_image = None;
+                        if let Some(cached) = self
+                            .state
+                            .image_cache
+                            .get(&item.id)
+                            .or_else(|| self.state.search_posters.get(&item.id))
+                        {
+                            self.state.poster_image = Some((**cached).clone());
+                        } else {
+                            self.state.poster_image = None;
+                        }
                         self.state.available_seasons.clear();
                         self.state
                             .set_status(format!("Loading details for {}...", item.title), 150);

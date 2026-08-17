@@ -1,0 +1,38 @@
+# Addon Mode (HTTP Addons)
+
+Addon Mode enables support for community HTTP addon manifests. You can install any standard addon manifest URL to fetch metadata catalogs and aggregate direct HTTP/HTTPS media streams.
+
+## Features
+
+- **Standard Protocol Support**: Compatibility with standard addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`).
+- **Core Metadata Protection**: Cinemeta is pre-installed out-of-the-box as the core metadata provider (`[Core]`) and locked to prevent accidental removal.
+- **Direct HTTP Stream Engine**: Automatically extracts and filters direct Cloudflare R2, PixelDrain, direct video CDN, and HubCloud/HubDrive HTTP streams.
+- **Multi-Addon Concurrency**: Simultaneously queries all enabled stream addons and aggregates releases.
+- **Quality & Size Parsing**: Ranks streams by quality (`4K UHD / 2160p`, `1080p`, `720p`, `SD`), file size in GB/MB, and audio language tracks (e.g. `[Dual]`, `[Multi]`, `Hindi + English`).
+
+## Entering Addon Mode
+
+- `Ctrl+A`: Toggle / Enter **Addon Mode**.
+- `Ctrl+S`: Return to standard **Streaming Mode**.
+- `Ctrl+T`: Toggle **TV Mode**.
+- `/enable-addons`: Enables Addon Mode in configuration and updates the footer navigation.
+- `/disable-addons`: Disables Addon Mode in configuration.
+- `/addons`: Opens the Addon Manager modal.
+- `/addon-setup`: Opens the Setup Wizard modal.
+
+## Setup Wizard & Addon Manager
+
+1. **Setup Wizard**:
+   - **Cinemeta**: Official catalog and metadata provider (pre-installed, free, no API key required).
+   - **Anime Kitsu**: Anime metadata provider (free, no API key required).
+   - **Custom URL**: Direct input for custom catalog/metadata manifest URLs.
+
+2. **Addon Manager**:
+   - Interactive modal listing installed addons with capability badges (`[Core]`, `[Meta]`, `[Streams]`, `[Catalog]`).
+   - `[x] / [ ]`: Toggle addon enabled/disabled state (`Enter` or `Space`). Core provider remains locked.
+   - `[ Add Manifest URL ]`: Install any public HTTP addon manifest.
+   - `[d]` or `[Delete]`: Remove the selected addon (protected for core addons).
+
+## Persistence
+
+Installed addons are atomically saved to `addons_config.json` inside the application config directory (`~/Library/Application Support/moviebox-tui/` on macOS, `~/.config/moviebox-tui/` on Linux, `%APPDATA%\moviebox-tui\` on Windows).

@@ -9,6 +9,7 @@ pub enum ProviderKind {
     FourKHdHub,
     BdixCircleFtp,
     BdixDhakaFlix,
+    Addons,
 }
 
 impl ProviderKind {
@@ -25,6 +26,7 @@ impl ProviderKind {
             Self::FourKHdHub => "fourkhdhub",
             Self::BdixCircleFtp => "bdix_circleftp",
             Self::BdixDhakaFlix => "bdix_dhakaflix",
+            Self::Addons => "addons",
         }
     }
 
@@ -34,6 +36,7 @@ impl ProviderKind {
             Self::FourKHdHub => "4KHDHub",
             Self::BdixCircleFtp => "CircleFTP (BDIX)",
             Self::BdixDhakaFlix => "DhakaFlix (BDIX)",
+            Self::Addons => "Addons",
         }
     }
 
@@ -43,6 +46,7 @@ impl ProviderKind {
             "4khdhub" | "fourkhdhub" => Some(Self::FourKHdHub),
             "bdix_circleftp" | "circleftp (bdix)" => Some(Self::BdixCircleFtp),
             "bdix_dhakaflix" | "dhakaflix (bdix)" => Some(Self::BdixDhakaFlix),
+            "addons" | "addon" | "stremio" => Some(Self::Addons),
             _ => None,
         }
     }

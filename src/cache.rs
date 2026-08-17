@@ -22,8 +22,10 @@ fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value
             }
         }
         if let Ok(content) = fs::read_to_string(path) {
-            if let Ok(val) = serde_json::from_str(&content) {
-                return Some(val);
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if !val.is_null() {
+                    return Some(val);
+                }
             }
         }
         let _ = fs::remove_file(path);
@@ -32,6 +34,9 @@ fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value
 }
 
 fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
+    if data.is_null() {
+        return;
+    }
     let Ok(content) = serde_json::to_vec(data) else {
         log::warn!(
             "failed to serialize cache for {}",

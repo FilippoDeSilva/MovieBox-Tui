@@ -125,3 +125,36 @@ pub fn sanitize_language_label(name: &str) -> String {
         other => other.to_string(),
     }
 }
+
+pub fn strip_emojis(input: &str) -> String {
+    input
+        .chars()
+        .filter(|&c| {
+            let u = c as u32;
+            !((0x1F000..=0x1FAFF).contains(&u)
+                || (0x2600..=0x27BF).contains(&u)
+                || (0x2300..=0x23FF).contains(&u)
+                || (0x2B00..=0x2BFF).contains(&u)
+                || (0xFE00..=0xFE0F).contains(&u)
+                || u == 0x200D)
+        })
+        .collect::<String>()
+}
+
+pub fn clean_stream_text(input: &str) -> String {
+    let without_emojis = strip_emojis(input);
+    let mut cleaned = String::new();
+    let mut last_was_space = false;
+    for c in without_emojis.chars() {
+        if c.is_whitespace() {
+            if !last_was_space && !cleaned.is_empty() {
+                cleaned.push(' ');
+                last_was_space = true;
+            }
+        } else {
+            cleaned.push(c);
+            last_was_space = false;
+        }
+    }
+    cleaned.trim().to_string()
+}

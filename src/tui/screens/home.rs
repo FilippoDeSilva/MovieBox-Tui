@@ -23,7 +23,11 @@ enum SearchViewState {
 fn search_view_state(state: &AppState) -> SearchViewState {
     if state.input_mode == InputMode::Editing {
         SearchViewState::Editing
-    } else if state.is_loading {
+    } else if state.is_loading
+        && (!state.search_query.trim().is_empty()
+            || state.active_browse_preset.is_some()
+            || state.is_homepage_mode)
+    {
         SearchViewState::Loading
     } else if state.search_error.is_some() {
         SearchViewState::Error
@@ -218,6 +222,8 @@ fn search_content(
     let content = if state.search_query.is_empty() {
         if state.is_tv_mode {
             "Search live channels…".to_string()
+        } else if state.is_addon_mode {
+            "Search movies and series via addons…".to_string()
         } else {
             "Search movies and series…".to_string()
         }
@@ -388,25 +394,78 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
 
         let mut footer_spans = vec![];
-        if !state.is_tv_mode {
+        if state.addons_enabled {
             footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+            footer_spans.push(Span::styled("Ctrl+S", theme.shortcut));
             footer_spans.push(Span::styled("] ", theme.text_dim));
             footer_spans.push(Span::styled(
-                state.active_provider.label(),
-                theme.text.add_modifier(Modifier::BOLD),
+                "Streaming",
+                if !state.is_tv_mode && !state.is_addon_mode {
+                    theme.text.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text_dim
+                },
+            ));
+            footer_spans.push(Span::raw("   "));
+
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled(
+                "TV",
+                if state.is_tv_mode {
+                    theme.text.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text_dim
+                },
+            ));
+            footer_spans.push(Span::raw("   "));
+
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("Ctrl+A", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled(
+                "Addons",
+                if state.is_addon_mode {
+                    theme.text.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text_dim
+                },
+            ));
+            footer_spans.push(Span::raw("   "));
+
+            if !state.is_tv_mode && !state.is_addon_mode {
+                footer_spans.push(Span::styled("[", theme.text_dim));
+                footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+                footer_spans.push(Span::styled("] ", theme.text_dim));
+                footer_spans.push(Span::styled(
+                    state.active_provider.label(),
+                    theme.text.add_modifier(Modifier::BOLD),
+                ));
+                footer_spans.push(Span::raw("   "));
+            }
+        } else {
+            if !state.is_tv_mode {
+                footer_spans.push(Span::styled("[", theme.text_dim));
+                footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
+                footer_spans.push(Span::styled("] ", theme.text_dim));
+                footer_spans.push(Span::styled(
+                    state.active_provider.label(),
+                    theme.text.add_modifier(Modifier::BOLD),
+                ));
+                footer_spans.push(Span::raw("   "));
+            }
+
+            footer_spans.push(Span::styled("[", theme.text_dim));
+            footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
+            footer_spans.push(Span::styled("] ", theme.text_dim));
+            footer_spans.push(Span::styled(
+                if state.is_tv_mode { "Streaming" } else { "TV" },
+                theme.text_dim,
             ));
             footer_spans.push(Span::raw("   "));
         }
 
-        footer_spans.push(Span::styled("[", theme.text_dim));
-        footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
-        footer_spans.push(Span::styled("] ", theme.text_dim));
-        footer_spans.push(Span::styled(
-            if state.is_tv_mode { "Streaming" } else { "TV" },
-            theme.text_dim,
-        ));
-        footer_spans.push(Span::raw("   "));
         footer_spans.push(Span::styled("[", theme.text_dim));
         footer_spans.push(Span::styled("?", theme.shortcut));
         footer_spans.push(Span::styled("] ", theme.text_dim));
@@ -866,19 +925,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .map(|source| crate::tui::text::width(source))
             .max()
             .unwrap_or(28)
-            .max(40)
+            .max(48)
             .max(crate::tui::text::width(
                 "[ Add URL ] [ Add file ] [ Reload ] [ Done ]",
             ));
-        let (popup_width, popup_height) = if state.tv_input_active {
-            (content_width.saturating_add(6) as u16, 6)
+        let popup_width = 68u16
+            .max(content_width.saturating_add(6) as u16)
+            .min(area.width.saturating_sub(4));
+        let popup_height = if state.tv_input_active {
+            7u16
         } else {
-            (
-                content_width.saturating_add(6) as u16,
-                total_rows.min(10).saturating_add(5) as u16,
-            )
+            total_rows.min(10).saturating_add(6) as u16
         };
-        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 70);
+        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 74);
         crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
 
         let title = format!(
@@ -907,21 +966,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         .split(inner_area);
 
         if state.tv_input_active {
-            let prompt = format!(
-                "{}: {}{}",
-                if state.tv_input_is_file {
-                    "Enter playlist file path"
-                } else {
-                    "Enter playlist URL"
-                },
-                state.tv_input_buffer,
-                "_"
-            );
+            let label = if state.tv_input_is_file {
+                "Enter playlist file path:"
+            } else {
+                "Enter playlist URL:"
+            };
+            let lines = vec![
+                ratatui::text::Line::from(vec![
+                    ratatui::text::Span::raw(" "),
+                    ratatui::text::Span::styled(label, theme.sapphire),
+                ]),
+                ratatui::text::Line::from(vec![
+                    ratatui::text::Span::styled(" ❯ ", theme.sapphire),
+                    ratatui::text::Span::styled(&state.tv_input_buffer, theme.text),
+                    ratatui::text::Span::styled("█", theme.rating),
+                ]),
+            ];
             frame.render_widget(
-                ratatui::widgets::Paragraph::new(ratatui::text::Line::from(
-                    ratatui::text::Span::styled(prompt, theme.text),
-                ))
-                .wrap(ratatui::widgets::Wrap { trim: true }),
+                ratatui::widgets::Paragraph::new(lines)
+                    .wrap(ratatui::widgets::Wrap { trim: false }),
                 sections[0],
             );
         } else {
@@ -929,21 +992,49 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .iter()
                 .map(|row| {
                     use crate::tui::state::TvManagerRow;
-                    let (text, style) = match row {
-                        TvManagerRow::Header(label) => (label.to_string(), theme.muted),
+                    match row {
+                        TvManagerRow::Header(label) => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled(label.to_string(), theme.muted),
+                            ]))
+                        }
                         TvManagerRow::Playlist(index) => {
                             let source =
                                 state.tv_playlists.get(*index).cloned().unwrap_or_default();
-                            (format!("{} {}", index + 1, source), theme.text)
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled(
+                                    format!("{} {}", index + 1, source),
+                                    theme.text,
+                                ),
+                            ]))
                         }
-                        TvManagerRow::AddUrl => ("[ Add URL ]".to_string(), theme.sapphire),
-                        TvManagerRow::AddFile => ("[ Add file ]".to_string(), theme.sapphire),
-                        TvManagerRow::Reload => ("[ Reload ]".to_string(), theme.rating),
-                        TvManagerRow::Done => ("[ Done ]".to_string(), theme.success),
-                    };
-                    ratatui::widgets::ListItem::new(ratatui::text::Line::from(
-                        ratatui::text::Span::styled(text, style),
-                    ))
+                        TvManagerRow::AddUrl => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Add URL ]", theme.sapphire),
+                            ]))
+                        }
+                        TvManagerRow::AddFile => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Add file ]", theme.sapphire),
+                            ]))
+                        }
+                        TvManagerRow::Reload => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Reload ]", theme.rating),
+                            ]))
+                        }
+                        TvManagerRow::Done => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Done ]", theme.success),
+                            ]))
+                        }
+                    }
                 })
                 .collect();
 
@@ -970,6 +1061,291 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 crate::tui::overlay::key_hint("↑↓", "Move", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Enter", "Select", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("d", "Remove", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Esc", "Close", theme),
+            ])
+        };
+
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(footer)
+                .alignment(ratatui::layout::Alignment::Center)
+                .block(
+                    ratatui::widgets::Block::default()
+                        .borders(ratatui::widgets::Borders::TOP)
+                        .border_style(theme.muted),
+                ),
+            sections[1],
+        );
+    }
+
+    if state.addon_wizard_popup {
+        let options = crate::tui::state::AddonWizardOption::ALL;
+        let total_rows = options.len();
+        let popup_width = 72u16.min(area.width.saturating_sub(4)).max(52);
+        let popup_height = if state.addon_input_active {
+            7u16
+        } else {
+            total_rows.saturating_add(6) as u16
+        };
+        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 76);
+        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
+
+        let popup_block = ratatui::widgets::Block::default()
+            .title(" Setup Metadata Provider ")
+            .title_style(theme.title)
+            .borders(ratatui::widgets::Borders::ALL)
+            .border_type(if state.basic_terminal {
+                ratatui::widgets::BorderType::Plain
+            } else {
+                ratatui::widgets::BorderType::Rounded
+            })
+            .border_style(theme.sapphire);
+
+        let inner_area = popup_block.inner(popup_area);
+        frame.render_widget(popup_block, popup_area);
+
+        let sections = ratatui::layout::Layout::vertical([
+            ratatui::layout::Constraint::Min(1),
+            ratatui::layout::Constraint::Length(2),
+        ])
+        .split(inner_area);
+
+        if state.addon_input_active {
+            let label = "Enter Custom Manifest URL:";
+            let lines = vec![
+                ratatui::text::Line::from(vec![
+                    ratatui::text::Span::raw(" "),
+                    ratatui::text::Span::styled(label, theme.sapphire),
+                ]),
+                ratatui::text::Line::from(vec![
+                    ratatui::text::Span::styled(" ❯ ", theme.sapphire),
+                    ratatui::text::Span::styled(&state.addon_input_buffer, theme.text),
+                    ratatui::text::Span::styled("█", theme.rating),
+                ]),
+            ];
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(lines)
+                    .wrap(ratatui::widgets::Wrap { trim: false }),
+                sections[0],
+            );
+        } else {
+            let items: Vec<ratatui::widgets::ListItem> = options
+                .iter()
+                .enumerate()
+                .map(|(index, opt)| {
+                    let style = if index == state.addon_wizard_selected {
+                        theme.text.add_modifier(Modifier::BOLD)
+                    } else {
+                        theme.text
+                    };
+                    ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                        ratatui::text::Span::raw(" "),
+                        ratatui::text::Span::styled(opt.label(), style),
+                    ]))
+                })
+                .collect();
+
+            let list = ratatui::widgets::List::new(items)
+                .highlight_style(crate::tui::overlay::selection_style(
+                    theme,
+                    state.basic_terminal,
+                ))
+                .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
+
+            let mut list_state = ratatui::widgets::ListState::default();
+            list_state.select(Some(state.addon_wizard_selected));
+            frame.render_stateful_widget(list, sections[0], &mut list_state);
+        }
+
+        let footer = if state.addon_input_active {
+            ratatui::text::Line::from(vec![
+                crate::tui::overlay::key_hint("Enter", "Submit", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Esc", "Cancel", theme),
+            ])
+        } else {
+            ratatui::text::Line::from(vec![
+                crate::tui::overlay::key_hint("↑↓", "Move", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Enter", "Select", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Esc", "Close", theme),
+            ])
+        };
+
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(footer)
+                .alignment(ratatui::layout::Alignment::Center)
+                .block(
+                    ratatui::widgets::Block::default()
+                        .borders(ratatui::widgets::Borders::TOP)
+                        .border_style(theme.muted),
+                ),
+            sections[1],
+        );
+    }
+
+    if state.addon_manager_popup {
+        let rows = state.addon_manager_rows();
+        let total_rows = rows.len();
+        let popup_width = 76u16.min(area.width.saturating_sub(4)).max(56);
+        let popup_height = if state.addon_input_active {
+            7u16
+        } else {
+            total_rows.min(10).saturating_add(6) as u16
+        };
+        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 80);
+        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
+
+        let title = format!(
+            " Addons Manager · {}/{} ",
+            state.addon_manager_selected.saturating_add(1),
+            total_rows.max(1)
+        );
+        let popup_block = ratatui::widgets::Block::default()
+            .title(title)
+            .title_style(theme.title)
+            .borders(ratatui::widgets::Borders::ALL)
+            .border_type(if state.basic_terminal {
+                ratatui::widgets::BorderType::Plain
+            } else {
+                ratatui::widgets::BorderType::Rounded
+            })
+            .border_style(theme.lavender);
+
+        let inner_area = popup_block.inner(popup_area);
+        frame.render_widget(popup_block, popup_area);
+
+        let sections = ratatui::layout::Layout::vertical([
+            ratatui::layout::Constraint::Min(1),
+            ratatui::layout::Constraint::Length(2),
+        ])
+        .split(inner_area);
+
+        if state.addon_input_active {
+            let lines = vec![
+                ratatui::text::Line::from(vec![
+                    ratatui::text::Span::raw(" "),
+                    ratatui::text::Span::styled("Enter Addon Manifest URL:", theme.sapphire),
+                ]),
+                ratatui::text::Line::from(vec![
+                    ratatui::text::Span::styled(" ❯ ", theme.sapphire),
+                    ratatui::text::Span::styled(&state.addon_input_buffer, theme.text),
+                    ratatui::text::Span::styled("█", theme.rating),
+                ]),
+            ];
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(lines)
+                    .wrap(ratatui::widgets::Wrap { trim: false }),
+                sections[0],
+            );
+        } else {
+            let items: Vec<ratatui::widgets::ListItem> = rows
+                .iter()
+                .map(|row| {
+                    use crate::tui::state::AddonManagerRow;
+                    match row {
+                        AddonManagerRow::Header(label) => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled(label.to_string(), theme.muted),
+                            ]))
+                        }
+                        AddonManagerRow::Addon(index) => {
+                            let addon = state.installed_addons.get(*index);
+                            if let Some(a) = addon {
+                                let check = if a.enabled {
+                                    ratatui::text::Span::styled("[x] ", theme.success)
+                                } else {
+                                    ratatui::text::Span::styled("[ ] ", theme.text_dim)
+                                };
+                                let name = ratatui::text::Span::styled(
+                                    format!(
+                                        "{} v{} ",
+                                        a.name,
+                                        a.version.as_deref().unwrap_or("1.0")
+                                    ),
+                                    theme.text,
+                                );
+                                let mut badges = Vec::new();
+                                if a.is_core() {
+                                    badges.push(ratatui::text::Span::styled(
+                                        "[Core] ",
+                                        theme.lavender,
+                                    ));
+                                }
+                                if a.provides_meta {
+                                    badges.push(ratatui::text::Span::styled(
+                                        "[Meta] ",
+                                        theme.sapphire,
+                                    ));
+                                }
+                                if a.provides_stream {
+                                    badges.push(ratatui::text::Span::styled(
+                                        "[Streams] ",
+                                        theme.rating,
+                                    ));
+                                }
+                                if a.provides_catalog {
+                                    badges
+                                        .push(ratatui::text::Span::styled("[Catalog]", theme.teal));
+                                }
+                                let mut spans = vec![ratatui::text::Span::raw(" "), check, name];
+                                spans.extend(badges);
+                                ratatui::widgets::ListItem::new(ratatui::text::Line::from(spans))
+                            } else {
+                                ratatui::widgets::ListItem::new(ratatui::text::Line::from(
+                                    ratatui::text::Span::raw(""),
+                                ))
+                            }
+                        }
+                        AddonManagerRow::AddUrl => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Add Manifest URL ]", theme.sapphire),
+                            ]))
+                        }
+                        AddonManagerRow::SetupWizard => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Setup Wizard ]", theme.rating),
+                            ]))
+                        }
+                        AddonManagerRow::Done => {
+                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled("[ Done ]", theme.success),
+                            ]))
+                        }
+                    }
+                })
+                .collect();
+
+            let list = ratatui::widgets::List::new(items)
+                .highlight_style(crate::tui::overlay::selection_style(
+                    theme,
+                    state.basic_terminal,
+                ))
+                .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
+
+            let mut list_state = ratatui::widgets::ListState::default();
+            list_state.select(Some(state.addon_manager_selected));
+            frame.render_stateful_widget(list, sections[0], &mut list_state);
+        }
+
+        let footer = if state.addon_input_active {
+            ratatui::text::Line::from(vec![
+                crate::tui::overlay::key_hint("Enter", "Add", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Esc", "Cancel", theme),
+            ])
+        } else {
+            ratatui::text::Line::from(vec![
+                crate::tui::overlay::key_hint("↑↓", "Move", theme),
+                ratatui::text::Span::raw("  "),
+                crate::tui::overlay::key_hint("Enter/Space", "Toggle/Select", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("d", "Remove", theme),
                 ratatui::text::Span::raw("  "),

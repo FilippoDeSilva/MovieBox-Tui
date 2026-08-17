@@ -5,6 +5,7 @@ use crate::providers::{
 };
 use crate::tui::{action::Action, state::AppState, theme::Theme};
 
+mod addons;
 mod download;
 mod keyboard;
 mod mouse;
@@ -44,6 +45,7 @@ impl App {
         state.auto_update = config.auto_update;
         state.last_update_check = config.last_update_check;
         state.bdix_enabled = config.bdix_enabled;
+        state.addons_enabled = config.addons_enabled;
         let provider_was_sanitized = !state.bdix_enabled && config.active_provider.is_bdix();
         state.active_provider = if provider_was_sanitized {
             crate::providers::models::ProviderKind::MovieBox
@@ -53,6 +55,7 @@ impl App {
         state.active_theme_kind = config.active_theme;
         state.default_player = config.default_player;
         state.download_dir = config.download_dir.map(std::path::PathBuf::from);
+        state.installed_addons = crate::config::load_addons();
 
         let mut theme = crate::tui::theme::Theme::new();
         if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
@@ -108,6 +111,7 @@ impl App {
             active_provider: self.state.active_provider,
             active_theme: self.state.active_theme_kind.clone(),
             bdix_enabled: self.state.bdix_enabled,
+            addons_enabled: self.state.addons_enabled,
             default_player: self.state.default_player.clone(),
             download_dir: self
                 .state
@@ -116,6 +120,14 @@ impl App {
                 .map(|p| p.to_string_lossy().to_string()),
         };
         crate::tui::config::save(&config);
+    }
+
+    fn save_installed_addons(&self) {
+        crate::config::save_addons(&self.state.installed_addons);
+    }
+
+    fn load_installed_addons_from_config(&mut self) {
+        self.state.installed_addons = crate::config::load_addons();
     }
 
     fn save_tv_playlists(&self) {
@@ -214,6 +226,46 @@ impl App {
                 self.state.tv_config_popup = false;
             }
             TvManagerRow::Header(_) => {}
+        }
+    }
+
+    fn addon_manager_activate(&mut self) {
+        use crate::tui::state::AddonManagerRow;
+        let Some(row) = self
+            .state
+            .addon_manager_rows()
+            .get(self.state.addon_manager_selected)
+            .copied()
+        else {
+            return;
+        };
+        match row {
+            AddonManagerRow::Addon(index) => {
+                self.action_sender
+                    .send(Action::AddonToggleEnabled(index))
+                    .ok();
+            }
+            AddonManagerRow::AddUrl => {
+                self.action_sender.send(Action::AddonInputToggle(true)).ok();
+            }
+            AddonManagerRow::SetupWizard => {
+                self.action_sender.send(Action::ShowAddonWizard).ok();
+            }
+            AddonManagerRow::Done => {
+                self.reset_transient_overlays();
+                self.state.addon_manager_popup = false;
+            }
+            AddonManagerRow::Header(_) => {}
+        }
+    }
+
+    fn addon_wizard_activate(&mut self) {
+        use crate::tui::state::AddonWizardOption;
+        let selected = self.state.addon_wizard_selected;
+        if selected < AddonWizardOption::ALL.len() {
+            self.action_sender
+                .send(Action::AddonWizardSelect(selected))
+                .ok();
         }
     }
 }

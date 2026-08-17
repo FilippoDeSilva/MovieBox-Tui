@@ -15,6 +15,7 @@ pub struct MovieBoxService {
     pub fourk_client: Option<FourKHdHubClient>,
     pub circleftp_client: CircleFtpClient,
     pub dhakaflix_client: DhakaFlixClient,
+    pub addon_client: crate::providers::addons::AddonClient,
     pub http_client: reqwest::Client,
 }
 
@@ -36,6 +37,7 @@ impl MovieBoxService {
             fourk_client: FourKHdHubClient::new().ok(),
             circleftp_client: CircleFtpClient::new(),
             dhakaflix_client: DhakaFlixClient::new(),
+            addon_client: crate::providers::addons::AddonClient::new(),
             http_client,
         }
     }
@@ -69,6 +71,90 @@ impl MovieBoxService {
             ProviderKind::BdixDhakaFlix => {
                 Provider::search(&self.dhakaflix_client, query, page).await
             }
+            ProviderKind::Addons => {
+                let addons = crate::config::load_addons();
+                let catalog_addons: Vec<_> = addons
+                    .iter()
+                    .filter(|a| a.enabled && (a.provides_meta || a.provides_catalog))
+                    .collect();
+
+                if catalog_addons.is_empty() {
+                    return Err(
+                        "No catalog/metadata addon enabled. Open /addons to configure one."
+                            .to_string(),
+                    );
+                }
+
+                let mut combined = Vec::new();
+                for addon in catalog_addons {
+                    let base_url =
+                        crate::providers::addons::AddonClient::base_addon_url(&addon.manifest_url);
+                    if let Ok(movies) = self
+                        .addon_client
+                        .fetch_catalog_search(&base_url, "movie", "top", query)
+                        .await
+                    {
+                        combined.extend(movies);
+                    }
+                    if let Ok(series) = self
+                        .addon_client
+                        .fetch_catalog_search(&base_url, "series", "top", query)
+                        .await
+                    {
+                        combined.extend(series);
+                    }
+                    if !combined.is_empty() {
+                        break;
+                    }
+                }
+
+                if combined.is_empty() {
+                    return Err(format!("No matches found for '{query}'."));
+                }
+
+                let mut seen_ids = std::collections::HashSet::new();
+                let subjects = combined
+                    .into_iter()
+                    .filter(|item| seen_ids.insert(item.id.clone()))
+                    .map(|item| {
+                        let is_series = item.r#type.eq_ignore_ascii_case("series")
+                            || item.r#type.eq_ignore_ascii_case("tv")
+                            || item.r#type.eq_ignore_ascii_case("anime");
+                        let year: String = item
+                            .release_info
+                            .as_deref()
+                            .map(|s| {
+                                s.chars()
+                                    .filter(|c| c.is_ascii_digit())
+                                    .take(4)
+                                    .collect::<String>()
+                            })
+                            .unwrap_or_default();
+
+                        let desc = item.description.clone();
+                        let rating = item.imdb_rating.clone();
+                        let genres = item.genres.clone();
+
+                        serde_json::json!({
+                            "subjectId": item.id,
+                            "title": item.name,
+                            "subjectType": if is_series { 2 } else { 1 },
+                            "releaseDate": year,
+                            "description": desc,
+                            "intro": desc,
+                            "imdbRatingValue": rating,
+                            "genre": genres,
+                            "cover": { "url": item.poster }
+                        })
+                    })
+                    .collect::<Vec<_>>();
+
+                Ok(serde_json::json!({
+                    "results": [{
+                        "subjects": subjects
+                    }]
+                }))
+            }
         }
     }
 
@@ -91,6 +177,52 @@ impl MovieBoxService {
             }
             ProviderKind::BdixDhakaFlix => {
                 Provider::details(&self.dhakaflix_client, subject_id).await
+            }
+            ProviderKind::Addons => {
+                let addons = crate::config::load_addons();
+                let meta_addons: Vec<_> = addons
+                    .iter()
+                    .filter(|a| a.enabled && a.provides_meta)
+                    .collect();
+
+                let types_to_try = ["movie", "series", "anime", "tv", "other"];
+                for addon in &meta_addons {
+                    let base_url =
+                        crate::providers::addons::AddonClient::base_addon_url(&addon.manifest_url);
+                    for t in types_to_try {
+                        if let Ok(d) = self.addon_client.fetch_meta(&base_url, t, subject_id).await
+                        {
+                            return Ok(
+                                crate::providers::addons::adapter::meta_detail_to_moviebox_json(&d),
+                            );
+                        }
+                    }
+                }
+
+                for addon in &addons {
+                    if addon.enabled
+                        && !meta_addons
+                            .iter()
+                            .any(|m| m.manifest_url == addon.manifest_url)
+                    {
+                        let base_url = crate::providers::addons::AddonClient::base_addon_url(
+                            &addon.manifest_url,
+                        );
+                        for t in types_to_try {
+                            if let Ok(d) =
+                                self.addon_client.fetch_meta(&base_url, t, subject_id).await
+                            {
+                                return Ok(
+                                    crate::providers::addons::adapter::meta_detail_to_moviebox_json(
+                                        &d,
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                }
+
+                Err(format!("Could not fetch metadata for ID '{subject_id}'."))
             }
         }
     }
@@ -358,4 +490,24 @@ pub fn resolve_download_dir(custom_dir: Option<&Path>) -> PathBuf {
     }
 
     ensure_moviebox_subdir(&base_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_addon_fetch_meta_live() {
+        let client = crate::providers::addons::AddonClient::new();
+        let res = client
+            .fetch_meta("https://v3-cinemeta.strem.io", "movie", "tt1375666")
+            .await;
+        assert!(res.is_ok(), "fetch_meta failed: {:?}", res.err());
+        let meta = res.unwrap();
+        let json = crate::providers::addons::adapter::meta_detail_to_moviebox_json(&meta);
+        println!(
+            "meta_detail_to_moviebox_json: {}",
+            serde_json::to_string_pretty(&json).unwrap()
+        );
+        assert_eq!(meta.id, "tt1375666");
+        assert_eq!(meta.name, "Inception");
+    }
 }

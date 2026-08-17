@@ -17,6 +17,10 @@ impl App {
                     if self.state.is_tv_mode {
                         commands.push("/list");
                         commands.push("/config");
+                    } else if self.state.is_addon_mode {
+                        commands.push("/addons");
+                        commands.push("/addon-setup");
+                        commands.push("/config");
                     } else {
                         commands.push("/browse");
                         commands.push("/history");
@@ -35,6 +39,13 @@ impl App {
                         commands.push("/disable-bdix");
                     } else {
                         commands.push("/enable-bdix");
+                    }
+                    if self.state.addons_enabled {
+                        commands.push("/disable-addons");
+                        commands.push("/addons");
+                        commands.push("/addon-setup");
+                    } else {
+                        commands.push("/enable-addons");
                     }
 
                     let mut suggestions = vec![];
@@ -276,6 +287,9 @@ impl App {
                     return None;
                 }
                 if !self.context_is_current(context) || query != self.state.search_query.trim() {
+                    if self.state.search_query.trim().is_empty() {
+                        self.state.is_loading = false;
+                    }
                     return None;
                 }
                 self.state.current_page = page;
@@ -470,6 +484,9 @@ impl App {
                     return None;
                 }
                 if !self.context_is_current(context) {
+                    if self.state.search_query.trim().is_empty() {
+                        self.state.is_loading = false;
+                    }
                     return None;
                 }
                 if page > 1 && self.state.current_page >= page {
@@ -908,6 +925,104 @@ impl App {
                     }
                 }
 
+                if let Some(final_obj) = final_payload.as_object_mut() {
+                    if let Some(existing) = &self.state.selected_details {
+                        if let Some(existing_obj) = existing.as_object() {
+                            if final_obj
+                                .get("title")
+                                .and_then(|t| t.as_str())
+                                .is_none_or(|s| s.trim().is_empty())
+                            {
+                                if let Some(v) = existing_obj.get("title") {
+                                    final_obj.insert("title".to_string(), v.clone());
+                                }
+                            }
+                            if final_obj
+                                .get("releaseDate")
+                                .and_then(|y| y.as_str())
+                                .is_none_or(|s| s.trim().is_empty())
+                            {
+                                if let Some(v) = existing_obj.get("releaseDate") {
+                                    final_obj.insert("releaseDate".to_string(), v.clone());
+                                }
+                            }
+                            if (!final_obj.contains_key("cover")
+                                || final_obj
+                                    .get("cover")
+                                    .and_then(|c| c.get("url"))
+                                    .and_then(|u| u.as_str())
+                                    .is_none_or(|s| s.trim().is_empty()))
+                                && let Some(v) = existing_obj.get("cover")
+                            {
+                                final_obj.insert("cover".to_string(), v.clone());
+                            }
+                            if final_obj
+                                .get("description")
+                                .and_then(|d| d.as_str())
+                                .is_none_or(|s| s.trim().is_empty())
+                                && let Some(v) = existing_obj
+                                    .get("description")
+                                    .or_else(|| existing_obj.get("intro"))
+                            {
+                                final_obj.insert("description".to_string(), v.clone());
+                            }
+                            if final_obj
+                                .get("imdbRatingValue")
+                                .and_then(|r| r.as_str())
+                                .is_none_or(|s| s.trim().is_empty())
+                                && let Some(v) = existing_obj.get("imdbRatingValue")
+                            {
+                                final_obj.insert("imdbRatingValue".to_string(), v.clone());
+                            }
+                            if (!final_obj.contains_key("genre")
+                                || final_obj
+                                    .get("genre")
+                                    .and_then(|g| g.as_array())
+                                    .is_none_or(|a| a.is_empty()))
+                                && let Some(v) = existing_obj.get("genre")
+                            {
+                                final_obj.insert("genre".to_string(), v.clone());
+                            }
+                        }
+                    }
+
+                    if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
+                        if final_obj
+                            .get("title")
+                            .and_then(|t| t.as_str())
+                            .is_none_or(|s| s.trim().is_empty())
+                        {
+                            final_obj.insert(
+                                "title".to_string(),
+                                serde_json::Value::String(res.title.clone()),
+                            );
+                        }
+                        if final_obj
+                            .get("releaseDate")
+                            .and_then(|y| y.as_str())
+                            .is_none_or(|s| s.trim().is_empty())
+                        {
+                            final_obj.insert(
+                                "releaseDate".to_string(),
+                                serde_json::Value::String(res.release_year.clone()),
+                            );
+                        }
+                        if (!final_obj.contains_key("cover")
+                            || final_obj
+                                .get("cover")
+                                .and_then(|c| c.get("url"))
+                                .and_then(|u| u.as_str())
+                                .is_none_or(|s| s.trim().is_empty()))
+                            && res.cover_url.is_some()
+                        {
+                            final_obj.insert(
+                                "cover".to_string(),
+                                serde_json::json!({ "url": res.cover_url }),
+                            );
+                        }
+                    }
+                }
+
                 self.state.active_subject_id = Some(id.clone());
                 self.state.selected_details = Some(final_payload.clone());
                 let payload = final_payload;
@@ -1120,7 +1235,6 @@ impl App {
                     self.action_sender.send(Action::InitStreamPool(id)).ok();
                 }
             }
-
             Action::DetailsFailure(context, request_id, err) => {
                 if request_id != self.state.active_details_request {
                     return None;
@@ -1135,25 +1249,64 @@ impl App {
                 self.state.is_loading = false;
                 self.state.is_resolving_playback = false;
                 self.state.is_waiting_for_download_stream = false;
-                self.state.selected_details = None;
-                self.state.selected_resources = None;
-                self.state.active_subject_id = None;
-                self.state.details_pane = crate::tui::state::DetailsPane::default();
-                self.state.selected_season = 1;
-                self.state.selected_episode = 1;
-                self.state.language_chosen = false;
-                self.state.season_list_state.select(None);
-                self.state.episode_list_state.select(None);
-                self.state.language_list_state.select(None);
-                self.state.available_seasons.clear();
-                self.state.available_episode_numbers.clear();
-                self.state.stream_pool.clear();
-                self.state.poster_image = None;
-                self.state.poster_protocol = None;
-                self.state.search_preview = None;
-                self.state.preview_loading = false;
+                if self.state.selected_details.is_none() {
+                    self.state.details_pane = crate::tui::state::DetailsPane::default();
+                    self.state.selected_season = 1;
+                    self.state.selected_episode = 1;
+                }
+                self.state.is_fetching_streams = false;
+                self.state.stream_error = None;
                 self.state
                     .set_status(format!("Details fetch failed: {}", err), 150);
+
+                if self.state.active_screen == Screen::Details {
+                    if let Some(id) = self.state.active_subject_id.clone().or_else(|| {
+                        self.state
+                            .selected_details
+                            .as_ref()
+                            .and_then(|d| d.get("id"))
+                            .and_then(|i| i.as_str())
+                            .map(|s| s.to_string())
+                    }) {
+                        self.state.active_subject_id = Some(id.clone());
+
+                        if self.state.poster_image.is_none() {
+                            if let Some(cached_img) = self
+                                .state
+                                .image_cache
+                                .get(&id)
+                                .or_else(|| self.state.search_posters.get(&id))
+                            {
+                                self.state.poster_image = Some((**cached_img).clone());
+                            } else if let Some(details) = &self.state.selected_details {
+                                if let Some(url) =
+                                    crate::tui::app::playback::extract_cover_url(details)
+                                {
+                                    let url_clone = url.to_string();
+                                    let action_tx = self.action_sender.clone();
+                                    let id_clone = id.clone();
+                                    let http_client = self.client.http_client().clone();
+                                    tokio::spawn(async move {
+                                        let client = reqwest::Client::builder()
+                                            .timeout(std::time::Duration::from_secs(5))
+                                            .build()
+                                            .unwrap_or(http_client);
+                                        if let Some(bytes) =
+                                            network::fetch_poster_bytes(&client, &url_clone).await
+                                        {
+                                            if let Some(img) = network::decode_poster(bytes).await {
+                                                let _ = action_tx
+                                                    .send(Action::PosterSuccess(id_clone, img));
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+
+                        self.action_sender.send(Action::InitStreamPool(id)).ok();
+                    }
+                }
             }
 
             Action::InitStreamPool(subject_id) => {
@@ -1265,7 +1418,8 @@ impl App {
                     }
                 }
 
-                let context = self.request_context();
+                let mut context = self.request_context();
+                context.provider = self.provider_for_subject(&subject_id);
 
                 if !force_refresh {
                     let id_clone = subject_id.clone();
@@ -1292,6 +1446,68 @@ impl App {
                         });
                         return None;
                     }
+                }
+
+                if context.provider == ProviderKind::Addons {
+                    let sender = self.action_sender.clone();
+                    let client = self.state.addon_client.clone();
+                    let addons = crate::config::load_addons();
+                    let id = subject_id.clone();
+                    let is_series = self
+                        .state
+                        .selected_details
+                        .as_ref()
+                        .map(|d| crate::tui::state::stype(d) == 2)
+                        .unwrap_or(season > 0);
+
+                    let has_stream_addons = addons.iter().any(|a| a.enabled && a.provides_stream);
+                    tokio::spawn(async move {
+                        if !has_stream_addons {
+                            sender
+                                .send(Action::EpisodeStreamsFailed(
+                                    context,
+                                    request_id,
+                                    id,
+                                    season,
+                                    episode,
+                                    "No streaming addons are currently installed or enabled.\nPress Ctrl+P or open /addons to install/enable a stream provider.".into(),
+                                ))
+                                .ok();
+                            return;
+                        }
+
+                        let releases = crate::providers::addons::aggregate_streams(
+                            &client, &addons, &id, season, episode, is_series,
+                        )
+                        .await;
+
+                        if !releases.is_empty() {
+                            sender
+                                .send(Action::EpisodeStreamsReady(
+                                    context,
+                                    request_id,
+                                    id,
+                                    season,
+                                    episode,
+                                    crate::providers::addons::adapter::releases_to_moviebox_json(
+                                        &releases,
+                                    ),
+                                ))
+                                .ok();
+                        } else {
+                            sender
+                                .send(Action::EpisodeStreamsFailed(
+                                    context,
+                                    request_id,
+                                    id,
+                                    season,
+                                    episode,
+                                    "No HTTP streams found from active addons for this title.\nPress r to retry or install additional stream addons via /addons.".into(),
+                                ))
+                                .ok();
+                        }
+                    });
+                    return None;
                 }
 
                 if context.provider == ProviderKind::FourKHdHub || context.provider.is_bdix() {

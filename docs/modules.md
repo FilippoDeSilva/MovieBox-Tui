@@ -51,6 +51,7 @@ src/
     bdix/
       circleftp/     BDIX CircleFTP provider (client + parser).
       dhakaflix/     BDIX DhakaFlix provider (client + parser).
+    addons/          Community HTTP addons provider (client, aggregator, adapter).
     m3u.rs           M3U playlist parser (http(s) URL or local file).
 
   service.rs         MovieBoxService: unified multi-provider headless client &
@@ -95,6 +96,7 @@ src/
     system.rs        handle_system: tick/quit/focus/resize/help/refresh/cache/
                      theme/status/updates.
     tv.rs            handle_tv: playlist manager + TV actions.
+    addons.rs        handle_addons: addon manager + Setup Wizard + HTTP addon actions.
 ```
 
 See [architecture.md](architecture.md) for the event loop, async model and data flow,

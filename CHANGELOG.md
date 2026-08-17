@@ -2,7 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+- **Addon Mode (Community HTTP Addons)**:
+  - Added full support for community HTTP addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`) with dedicated `Ctrl+A` mode switching.
+  - Pre-installed and locked Cinemeta out-of-the-box as the default core metadata provider with zero API keys required.
+  - Added interactive Addon Manager dialog (`/addons`, `Ctrl+P` in Addon Mode) and Addon Setup Wizard (`/addon-setup`, `/wizard`).
+  - Added concurrent multi-addon stream resolution aggregating playable releases from all enabled stream addons.
+- **Dynamic Multi-Source Host & Resolver Resolution**:
+  - Added 100% dynamic domain-based host extractor (`extract_domain_label`) and stream tag parser (`detect_stream_host`) identifying and formatting direct hosts (Pixeldrain, Hubcloud, Fast Download, Google Drive, Mega, etc.) and debrid resolvers without hardcoded tables.
+- **Full Emoji & Symbol Sanitization**:
+  - Added `strip_emojis` and `clean_stream_text` sanitizing all raw stream titles, release names, source labels, and languages from community addons for clean terminal alignment without broken characters.
+  - Standardized checkbox representations to clean ASCII `[x] / [ ]`.
+- **Complete Mouse Navigation**:
+  - Added dynamic footer hitboxes for `[Ctrl+S] Streaming`, `[Ctrl+T] TV`, `[Ctrl+A] Addons`, `[Ctrl+P] {Provider}`, `[?] Help`, `[q] Quit`.
+  - Added complete mouse click support for Addon Manager and Setup Wizard modals.
+
 ### Fixed
+- **Resilient Addon Metadata & Fallbacks**:
+  - Added flexible visitors and serde aliases for `genres`, `cast`, `director`, `imdbRating`, `releaseInfo`, and `runtime` preventing deserialization failures across varied community addon JSON schemas.
+  - Added multi-tier fallback resolution in the Details screen to guarantee titles, release years, synopsis, and posters are always preserved from search results and previews.
 - **Android / Termux TLS Certificate Compatibility**:
   - Switched `reqwest` to use pure-Rust embedded `webpki-roots` certificate verification, resolving `rustls-platform-verifier` crashes and panics in non-JVM Android CLI environments like Termux.
 - **Transparent Stream & Search Diagnostics**:

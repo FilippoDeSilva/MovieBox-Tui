@@ -33,7 +33,8 @@ Searching and watching media through web browsers often means dealing with heavy
 
 ## Features at a Glance
 
-- **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, and custom IPTV playlists).
+- **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, community HTTP addons, and custom IPTV playlists).
+- **Addon Mode:** Install community HTTP addon manifests for custom catalog metadata (Cinemeta, Anime Kitsu) and direct stream resolution.
 - **Smooth Video Playback:** Plays directly in **mpv**, **VLC**, or **IINA** using your computer's hardware for smooth video.
 - **Easy Downloads:** Download single episodes or entire seasons with one keypress. Completed episodes are skipped automatically.
 - **Simple Terminal Interface:** Full keyboard and mouse support, beautiful color themes, and movie poster art.
@@ -107,6 +108,7 @@ All in-depth guides and technical details are available in the [`docs/`](docs/) 
 - [Media Players](docs/players.md) — Supported players, custom paths, and launch options
 - [Downloads & Organization](docs/downloads.md) — Folder layout, batch downloading, and subtitles
 - [Live TV & Playlists](docs/tv-mode.md) — How to add and manage custom M3U playlists
+- [Addon Mode & HTTP Addons](docs/addons-mode.md) — How to install and manage community HTTP addon manifests
 - [Configuration Reference](docs/config.md) — Config files and environment variables
 - [Providers](docs/providers.md) — Supported content sources and protocols
 - [Troubleshooting & Debugging](docs/debugging.md) — Fixing common issues and reporting bugs

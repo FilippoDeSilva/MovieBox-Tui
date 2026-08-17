@@ -30,6 +30,7 @@ pub(super) async fn provider_search(
         fourk_client: fourk.cloned(),
         circleftp_client: circleftp.clone(),
         dhakaflix_client: dhakaflix.clone(),
+        addon_client: crate::providers::addons::AddonClient::new(),
         http_client: moviebox.http_client().clone(),
     };
     service.search(provider, query, page).await
@@ -48,6 +49,7 @@ pub(super) async fn provider_details(
         fourk_client: fourk.cloned(),
         circleftp_client: circleftp.clone(),
         dhakaflix_client: dhakaflix.clone(),
+        addon_client: crate::providers::addons::AddonClient::new(),
         http_client: moviebox.http_client().clone(),
     };
     service.details(provider, subject_id).await

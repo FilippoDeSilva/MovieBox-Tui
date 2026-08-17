@@ -217,6 +217,59 @@ impl App {
             return true;
         }
 
+        if self.state.addon_wizard_popup {
+            use crate::tui::state::AddonWizardOption;
+            let options = AddonWizardOption::ALL;
+            let count = options.len();
+            let popup_width = 72u16.min(area.width.saturating_sub(4)).max(50);
+            let popup_height = if self.state.addon_input_active {
+                7u16
+            } else {
+                (count as u16).saturating_add(6)
+            };
+            let popup = centered_rect(area, popup_width, popup_height, 36, 76);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                if !self.state.addon_input_active {
+                    let item_start_y = popup.y + 1;
+                    if row >= item_start_y && (row - item_start_y) < count as u16 {
+                        let clicked_idx = (row - item_start_y) as usize;
+                        self.state.addon_wizard_selected = clicked_idx;
+                        self.addon_wizard_activate();
+                    }
+                }
+            } else {
+                self.state.addon_wizard_popup = false;
+                self.state.addon_input_active = false;
+            }
+            return true;
+        }
+
+        if self.state.addon_manager_popup {
+            let rows = self.state.addon_manager_rows();
+            let total_rows = rows.len();
+            let popup_width = 76u16.min(area.width.saturating_sub(4)).max(56);
+            let popup_height = if self.state.addon_input_active {
+                7u16
+            } else {
+                total_rows.min(10).saturating_add(6) as u16
+            };
+            let popup = centered_rect(area, popup_width, popup_height, 36, 80);
+            if popup.contains(ratatui::layout::Position::new(col, row)) {
+                if !self.state.addon_input_active {
+                    let item_start_y = popup.y + 1;
+                    if row >= item_start_y && (row - item_start_y) < total_rows as u16 {
+                        let clicked_idx = (row - item_start_y) as usize;
+                        self.state.addon_manager_selected = clicked_idx;
+                        self.addon_manager_activate();
+                    }
+                }
+            } else {
+                self.state.addon_manager_popup = false;
+                self.state.addon_input_active = false;
+            }
+            return true;
+        }
+
         false
     }
 
@@ -371,66 +424,75 @@ impl App {
     }
 
     fn handle_home_footer_click(&mut self, col: u16, width: u16) {
-        let provider_label = self.state.active_provider.label();
-        let tv_label = if self.state.is_tv_mode {
-            "Streaming"
-        } else {
-            "TV"
-        };
+        enum FooterBtn {
+            Streaming,
+            Tv,
+            Addon,
+            Provider,
+            Help,
+            Quit,
+        }
 
-        let provider_w = 9 + provider_label.chars().count() as u16;
-        let tv_w = 9 + tv_label.chars().count() as u16;
-        let help_w = 8_u16;
-        let quit_w = 8_u16;
+        let mut buttons: Vec<(FooterBtn, u16)> = Vec::new();
         let sep = 3_u16;
 
-        let total_w = if !self.state.is_tv_mode {
-            provider_w + sep + tv_w + sep + help_w + sep + quit_w
-        } else {
-            tv_w + sep + help_w + sep + quit_w
-        };
+        if self.state.addons_enabled {
+            buttons.push((FooterBtn::Streaming, 19));
+            buttons.push((FooterBtn::Tv, 12));
+            buttons.push((FooterBtn::Addon, 16));
 
-        let start_x = width.saturating_sub(total_w) / 2;
-
-        if !self.state.is_tv_mode {
-            let b1_start = start_x;
-            let b1_end = b1_start + provider_w;
-
-            let b2_start = b1_end + sep;
-            let b2_end = b2_start + tv_w;
-
-            let b3_start = b2_end + sep;
-            let b3_end = b3_start + help_w;
-
-            let b4_start = b3_end + sep;
-            let b4_end = b4_start + quit_w;
-
-            if col >= b1_start && col <= b1_end + 1 {
-                self.cycle_provider();
-            } else if col >= b2_start && col <= b2_end + 1 {
-                self.action_sender.send(Action::ToggleTvMode).ok();
-            } else if col >= b3_start && col <= b3_end + 1 {
-                self.action_sender.send(Action::ToggleHelp).ok();
-            } else if col >= b4_start && col <= b4_end + 2 {
-                self.action_sender.send(Action::Quit).ok();
+            if !self.state.is_tv_mode && !self.state.is_addon_mode {
+                let p_len = 9 + self.state.active_provider.label().chars().count() as u16;
+                buttons.push((FooterBtn::Provider, p_len));
             }
         } else {
-            let b2_start = start_x;
-            let b2_end = b2_start + tv_w;
-
-            let b3_start = b2_end + sep;
-            let b3_end = b3_start + help_w;
-
-            let b4_start = b3_end + sep;
-            let b4_end = b4_start + quit_w;
-
-            if col >= b2_start && col <= b2_end + 1 {
-                self.action_sender.send(Action::ToggleTvMode).ok();
-            } else if col >= b3_start && col <= b3_end + 1 {
-                self.action_sender.send(Action::ToggleHelp).ok();
-            } else if col >= b4_start && col <= b4_end + 2 {
-                self.action_sender.send(Action::Quit).ok();
+            if !self.state.is_tv_mode {
+                let p_len = 9 + self.state.active_provider.label().chars().count() as u16;
+                buttons.push((FooterBtn::Provider, p_len));
             }
+            let tv_label = if self.state.is_tv_mode {
+                "Streaming"
+            } else {
+                "TV"
+            };
+            let tv_w = 9 + tv_label.chars().count() as u16;
+            buttons.push((FooterBtn::Tv, tv_w));
+        }
+
+        buttons.push((FooterBtn::Help, 8));
+        buttons.push((FooterBtn::Quit, 8));
+
+        let total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
+            + (buttons.len().saturating_sub(1) as u16) * sep;
+        let mut curr_x = width.saturating_sub(total_w) / 2;
+
+        for (btn, w) in buttons {
+            let start = curr_x;
+            let end = start + w;
+            if col >= start && col <= end + 1 {
+                match btn {
+                    FooterBtn::Streaming => {
+                        self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                    }
+                    FooterBtn::Tv => {
+                        self.action_sender.send(Action::ToggleTvMode).ok();
+                    }
+                    FooterBtn::Addon => {
+                        self.action_sender.send(Action::ToggleAddonMode).ok();
+                    }
+                    FooterBtn::Provider => {
+                        self.cycle_provider();
+                    }
+                    FooterBtn::Help => {
+                        self.action_sender.send(Action::ToggleHelp).ok();
+                    }
+                    FooterBtn::Quit => {
+                        self.action_sender.send(Action::Quit).ok();
+                    }
+                }
+                return;
+            }
+            curr_x += w + sep;
         }
     }
 

@@ -126,7 +126,31 @@ impl App {
         if lower_query == "/browse" {
             self.state.search_query.clear();
             self.state.input_mode = InputMode::Normal;
-            self.action_sender.send(Action::ShowBrowseMenu).ok();
+            if self.state.is_tv_mode {
+                self.state.notify(
+                    NotificationKind::Info,
+                    "TV Mode",
+                    "Browse categories are only available in Streaming Mode.",
+                );
+            } else if self.state.is_addon_mode {
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Addon Mode",
+                    "Browse categories are only available in Streaming Mode (Addon Mode uses catalog search).",
+                );
+            } else {
+                self.action_sender.send(Action::ShowBrowseMenu).ok();
+            }
+            return Some(true);
+        }
+        if lower_query == "/reload" {
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+            if self.state.is_tv_mode {
+                self.action_sender.send(Action::TvReloadPlaylists).ok();
+            } else {
+                self.action_sender.send(Action::Refresh).ok();
+            }
             return Some(true);
         }
         if lower_query.starts_with("/download-dir") {
@@ -292,6 +316,69 @@ impl App {
             }
             return Some(true);
         }
+        if lower_query == "/enable-addons" || lower_query == "/disable-addons" {
+            let enable_req = lower_query == "/enable-addons";
+            if self.state.addons_enabled == enable_req {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Addon Mode",
+                    if enable_req {
+                        "Already Enabled"
+                    } else {
+                        "Already Disabled"
+                    },
+                );
+                return Some(true);
+            }
+
+            self.state.addons_enabled = enable_req;
+            self.persist_config();
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+            self.state.notify(
+                NotificationKind::Info,
+                "Addon Mode",
+                if self.state.addons_enabled {
+                    "Enabled (Press Ctrl+A to switch to Addon Mode)"
+                } else {
+                    "Disabled"
+                },
+            );
+            if !self.state.addons_enabled && self.state.is_addon_mode {
+                self.action_sender.send(Action::SwitchToStreamingMode).ok();
+            }
+            return Some(true);
+        }
+
+        if lower_query == "/addons" || (self.state.is_addon_mode && lower_query == "/config") {
+            if !self.state.addons_enabled {
+                self.state.addons_enabled = true;
+                self.persist_config();
+            }
+            if !self.state.is_addon_mode {
+                self.action_sender.send(Action::ToggleAddonMode).ok();
+            }
+            self.action_sender.send(Action::ShowAddonManager).ok();
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+            return Some(true);
+        }
+
+        if lower_query == "/addon-setup" || lower_query == "/wizard" {
+            if !self.state.addons_enabled {
+                self.state.addons_enabled = true;
+                self.persist_config();
+            }
+            if !self.state.is_addon_mode {
+                self.action_sender.send(Action::ToggleAddonMode).ok();
+            }
+            self.action_sender.send(Action::ShowAddonWizard).ok();
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+            return Some(true);
+        }
 
         if self.state.is_tv_mode {
             if lower_query == "/config" {
@@ -428,6 +515,7 @@ impl App {
     }
 
     pub(super) fn prepare_details_request(&mut self, id: &str) -> RequestContext {
+        self.state.active_subject_id = Some(id.to_string());
         self.state.poster_protocol = None;
         self.state.is_loading = true;
         self.state.active_details_request = self.state.active_details_request.wrapping_add(1);

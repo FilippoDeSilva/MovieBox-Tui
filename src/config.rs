@@ -1,3 +1,4 @@
+use crate::providers::addons::models::InstalledAddon;
 use crate::providers::models::ProviderKind;
 use std::path::PathBuf;
 
@@ -7,6 +8,7 @@ pub struct Config {
     pub active_provider: ProviderKind,
     pub active_theme: String,
     pub bdix_enabled: bool,
+    pub addons_enabled: bool,
     pub default_player: Option<String>,
     pub download_dir: Option<String>,
 }
@@ -19,6 +21,7 @@ impl Default for Config {
             active_provider: ProviderKind::MovieBox,
             active_theme: String::new(),
             bdix_enabled: false,
+            addons_enabled: false,
             default_player: None,
             download_dir: None,
         }
@@ -27,6 +30,10 @@ impl Default for Config {
 
 fn path() -> Option<PathBuf> {
     dirs::config_dir().map(|dir| dir.join("moviebox-tui").join("config.json"))
+}
+
+pub fn addons_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|dir| dir.join("moviebox-tui").join("addons_config.json"))
 }
 
 pub fn load() -> Config {
@@ -56,6 +63,9 @@ pub fn load() -> Config {
     if let Some(v) = value.get("bdix_enabled").and_then(|v| v.as_bool()) {
         config.bdix_enabled = v;
     }
+    if let Some(v) = value.get("addons_enabled").and_then(|v| v.as_bool()) {
+        config.addons_enabled = v;
+    }
     if let Some(v) = value.get("default_player").and_then(|v| v.as_str()) {
         config.default_player = Some(v.to_string());
     }
@@ -80,6 +90,7 @@ pub fn save(config: &Config) {
         "active_provider": config.active_provider.cache_key(),
         "active_theme": config.active_theme,
         "bdix_enabled": config.bdix_enabled,
+        "addons_enabled": config.addons_enabled,
         "default_player": config.default_player,
         "download_dir": config.download_dir
     });
@@ -97,6 +108,55 @@ pub fn save(config: &Config) {
         if let Err(error) = std::fs::rename(&temporary, &path) {
             let _ = std::fs::remove_file(&temporary);
             log::warn!("failed to commit config: {error}");
+        }
+    }
+}
+
+pub fn load_addons() -> Vec<InstalledAddon> {
+    let mut list = addons_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|content| serde_json::from_str::<Vec<InstalledAddon>>(&content).ok())
+        .unwrap_or_default();
+
+    if !list.iter().any(|a| a.is_core()) {
+        list.insert(0, InstalledAddon::cinemeta_default());
+        save_addons(&list);
+    } else {
+        for a in &mut list {
+            if a.is_core() {
+                a.enabled = true;
+            }
+        }
+    }
+    list
+}
+
+pub fn save_addons(addons: &[InstalledAddon]) {
+    let Some(path) = addons_path() else {
+        return;
+    };
+    if let Some(app_dir) = path.parent()
+        && std::fs::create_dir_all(app_dir).is_err()
+    {
+        return;
+    }
+    let Ok(json) = serde_json::to_string_pretty(addons) else {
+        return;
+    };
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-addons-{}-{stamp}", std::process::id()));
+    if let Err(error) = std::fs::write(&temporary, json) {
+        log::warn!("failed to write addons config: {error}");
+        return;
+    }
+    if std::fs::rename(&temporary, &path).is_err() {
+        let _ = std::fs::remove_file(&path);
+        if let Err(error) = std::fs::rename(&temporary, &path) {
+            let _ = std::fs::remove_file(&temporary);
+            log::warn!("failed to commit addons config: {error}");
         }
     }
 }

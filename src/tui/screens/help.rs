@@ -7,169 +7,194 @@ use ratatui::{
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
-    let global = vec![
-        Line::from(vec![Span::styled(
-            "  Global",
-            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-        )]),
-        Line::from(vec![
-            Span::styled("    [?]        ", theme.header),
-            Span::styled("Toggle Help Menu", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [q]        ", theme.header),
-            Span::styled("Quit Application", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [Esc]      ", theme.header),
-            Span::styled("Go Back / Clear", theme.text),
-        ]),
-        Line::from(vec![
-            Span::styled("    [Ctrl+T]   ", theme.header),
-            Span::styled("Switch Streaming / TV Mode", theme.text),
-        ]),
-    ];
+    let mode_title = if state.is_tv_mode {
+        "TV Mode"
+    } else if state.is_addon_mode {
+        "Addon Mode"
+    } else {
+        "Streaming Mode"
+    };
 
-    let navigation = vec![
-        Line::from(vec![]),
+    let mut help_text: Vec<Line> = vec![
         Line::from(vec![Span::styled(
-            "  Navigation",
+            "  Mode Switching & Navigation",
             theme.header.add_modifier(ratatui::style::Modifier::BOLD),
         )]),
         Line::from(vec![
-            Span::styled("    [↑] / [↓]  ", theme.header),
-            Span::styled("Scroll Lists", theme.text),
+            Span::styled("    [Ctrl+S]       ", theme.header),
+            Span::styled("Switch to Streaming Mode", theme.text),
         ]),
         Line::from(vec![
-            Span::styled("    [←] / [→]  ", theme.header),
+            Span::styled("    [Ctrl+T]       ", theme.header),
+            Span::styled("Switch to TV Mode", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [Ctrl+A]       ", theme.header),
+            Span::styled("Switch to Addon Mode", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [↑] / [↓]      ", theme.header),
+            Span::styled("Scroll Lists / Navigate", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [←] / [→]      ", theme.header),
             Span::styled("Jump Page of Results", theme.text),
         ]),
         Line::from(vec![
-            Span::styled("    [Enter]    ", theme.header),
-            Span::styled("Select / Submit", theme.text),
+            Span::styled("    [Esc]          ", theme.header),
+            Span::styled("Go Back / Clear Input", theme.text),
         ]),
+        Line::from(vec![
+            Span::styled("    [?]            ", theme.header),
+            Span::styled("Toggle Help Menu", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [q]            ", theme.header),
+            Span::styled("Quit Application", theme.text),
+        ]),
+        Line::from(vec![]),
     ];
 
-    let mut help_text = global;
     if state.is_tv_mode {
-        help_text.extend(navigation);
-        help_text.extend(vec![
-            Line::from(vec![]),
-            Line::from(vec![Span::styled(
-                "  TV Controls",
-                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-            )]),
-            Line::from(vec![
-                Span::styled("    [Enter]    ", theme.header),
-                Span::styled("Play Channel", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    [o]        ", theme.header),
-                Span::styled("Open Player Picker", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    [r]        ", theme.header),
-                Span::styled("Reload Playlists", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /config    ", theme.header),
-                Span::styled("Configure Playlists", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /list      ", theme.header),
-                Span::styled("Show Channels", theme.text),
-            ]),
-        ]);
+        help_text.push(Line::from(vec![Span::styled(
+            "  TV Mode Controls",
+            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+        )]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [Enter]        ", theme.header),
+            Span::styled("Play Selected Channel", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [o]            ", theme.header),
+            Span::styled("Open Alternative Player Picker", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [r] / /reload  ", theme.header),
+            Span::styled("Reload TV Playlists", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /config        ", theme.header),
+            Span::styled("Manage M3U Playlists", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /list          ", theme.header),
+            Span::styled("Show All TV Channels", theme.text),
+        ]));
+    } else if state.is_addon_mode {
+        help_text.push(Line::from(vec![Span::styled(
+            "  Addon Mode Controls",
+            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+        )]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [Ctrl+P]       ", theme.header),
+            Span::styled("Open Addons Manager", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /addons        ", theme.header),
+            Span::styled("Open Addons Manager", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /addon-setup   ", theme.header),
+            Span::styled("Open Addon Setup Wizard", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [Enter]        ", theme.header),
+            Span::styled("Select Movie / Play Stream", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [o]            ", theme.header),
+            Span::styled("Open Alternative Player Picker", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [d]            ", theme.header),
+            Span::styled("Download Video Stream", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [r]            ", theme.header),
+            Span::styled("Refresh Catalog / Streams", theme.text),
+        ]));
     } else {
-        help_text.extend(vec![Line::from(vec![
-            Span::styled("    [Ctrl+P]   ", theme.header),
+        help_text.push(Line::from(vec![Span::styled(
+            "  Streaming Controls",
+            theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+        )]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [Ctrl+P]       ", theme.header),
             Span::styled(
-                format!(
-                    "Switch Provider (active: {})",
-                    state.active_provider.label()
-                ),
+                format!("Switch Provider ({})", state.active_provider.label()),
                 theme.text,
             ),
-        ])]);
-        help_text.extend(navigation);
-        help_text.extend(vec![
-            Line::from(vec![
-                Span::styled("    [Tab]      ", theme.header),
-                Span::styled("Next Details Pane", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    [Shift+Tab]", theme.header),
-                Span::styled("Previous Details Pane", theme.text),
-            ]),
-            Line::from(vec![]),
-            Line::from(vec![Span::styled(
-                "  Playback & Download",
-                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-            )]),
-            Line::from(vec![
-                Span::styled("    [Enter]    ", theme.header),
-                Span::styled("Play with Default Player", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    [o]        ", theme.header),
-                Span::styled("Open Player Picker", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    [d]        ", theme.header),
-                Span::styled("Download Video", theme.text),
-            ]),
-            Line::from(vec![]),
-            Line::from(vec![Span::styled(
-                "  Discover & Search",
-                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-            )]),
-            Line::from(vec![
-                Span::styled("    /browse    ", theme.header),
-                Span::styled("Browse Movies & Shows", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /history   ", theme.header),
-                Span::styled("Watch History", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /github    ", theme.header),
-                Span::styled("Open GitHub Repo", theme.text),
-            ]),
-            Line::from(vec![]),
-            Line::from(vec![Span::styled(
-                "  System",
-                theme.header.add_modifier(ratatui::style::Modifier::BOLD),
-            )]),
-            Line::from(vec![
-                Span::styled("    [r]        ", theme.header),
-                Span::styled("Refresh Streams/Search", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /update    ", theme.header),
-                Span::styled("Check for Updates", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /toggle-update ", theme.header),
-                Span::styled("Toggle Auto Updates", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /clear-cache   ", theme.header),
-                Span::styled("Clear App Cache", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /enable-bdix   ", theme.header),
-                Span::styled("Enable BDIX FTP", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /disable-bdix  ", theme.header),
-                Span::styled("Disable BDIX FTP", theme.text),
-            ]),
-            Line::from(vec![
-                Span::styled("    /theme         ", theme.header),
-                Span::styled("Change UI Theme", theme.text),
-            ]),
-        ]);
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [Tab] / [S-Tab]", theme.header),
+            Span::styled("Next / Previous Details Pane", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [Enter]        ", theme.header),
+            Span::styled("Play with Default Player", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [o]            ", theme.header),
+            Span::styled("Open Alternative Player Picker", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [d]            ", theme.header),
+            Span::styled("Download Episode / Season Batch", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /browse        ", theme.header),
+            Span::styled("Browse Movies & Series Categories", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /history       ", theme.header),
+            Span::styled("Watch History", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [r]            ", theme.header),
+            Span::styled("Refresh Results / Streams", theme.text),
+        ]));
     }
+
+    help_text.push(Line::from(vec![]));
+
+    help_text.push(Line::from(vec![Span::styled(
+        "  System & Settings",
+        theme.header.add_modifier(ratatui::style::Modifier::BOLD),
+    )]));
+    help_text.push(Line::from(vec![
+        Span::styled("    /theme         ", theme.header),
+        Span::styled("Change Color Theme", theme.text),
+    ]));
+    help_text.push(Line::from(vec![
+        Span::styled("    /download-dir  ", theme.header),
+        Span::styled("Configure Download Directory", theme.text),
+    ]));
+    help_text.push(Line::from(vec![
+        Span::styled("    /clear-cache   ", theme.header),
+        Span::styled("Clear Application Cache", theme.text),
+    ]));
+    help_text.push(Line::from(vec![
+        Span::styled("    /update        ", theme.header),
+        Span::styled("Check for GitHub Updates", theme.text),
+    ]));
+    help_text.push(Line::from(vec![
+        Span::styled("    /toggle-update ", theme.header),
+        Span::styled("Toggle Auto Updates on Startup", theme.text),
+    ]));
+    if !state.is_tv_mode && !state.is_addon_mode {
+        help_text.push(Line::from(vec![
+            Span::styled("    /enable-bdix   ", theme.header),
+            Span::styled("Enable BDIX FTP Providers", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /disable-bdix  ", theme.header),
+            Span::styled("Disable BDIX FTP Providers", theme.text),
+        ]));
+    }
+    help_text.push(Line::from(vec![
+        Span::styled("    /github        ", theme.header),
+        Span::styled("Open GitHub Repository", theme.text),
+    ]));
 
     let content_width = help_text.iter().map(Line::width).max().unwrap_or(42) as u16;
     let total_lines = help_text.len() as u16;
@@ -193,8 +218,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
 
     crate::tui::clear_area(frame, area, theme);
 
+    let title = format!(" Help · {mode_title} ");
     let block = Block::default()
-        .title(" Keybindings Help ")
+        .title(title)
         .title_alignment(Alignment::Center)
         .title_style(theme.title)
         .borders(Borders::ALL)

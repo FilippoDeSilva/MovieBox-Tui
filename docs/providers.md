@@ -12,6 +12,7 @@ shared typed models in `providers/models.rs` and the moviebox JSON schema used b
 | `FourKHdHub`    | `providers/fourkhdhub`     | 4K releases; hubcloud mirror resolver.      |
 | `BdixCircleFtp` | `providers/bdix/circleftp` | BDIX FTP directory scrapes.                 |
 | `BdixDhakaFlix` | `providers/bdix/dhakaflix` | BDIX indexer.                               |
+| `Addons`        | `providers/addons`         | Community HTTP addons (Cinemeta, streams).  |
 
 BDIX sources are only reachable from supported Bangladeshi ISPs and are hidden by
 default (`bdix_enabled` in config; `/enable-bdix`).
@@ -60,6 +61,12 @@ which `app/playback.rs::launch_player` feeds to the external player.
 
 - `circleftp` and `dhakaflix` scrape FTP-style indexes; both are used behind the
   Bangladesh-only gate.
+
+## Community HTTP Addons
+
+- `providers/addons` communicates with HTTP addon manifests (`/manifest.json`).
+- Cinemeta provides catalog searches and metadata details (`/catalog`, `/meta`).
+- Stream addons (e.g. HdHub, direct CDN manifests) resolve playable HTTP/HTTPS streams concurrently. See [addons-mode.md](addons-mode.md).
 
 ## M3U playlists (TV mode)
 

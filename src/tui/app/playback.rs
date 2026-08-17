@@ -254,7 +254,22 @@ impl App {
                             ),
                         );
                         let available_players = self.state.available_players.clone();
-                        let client = if release.provider == ProviderKind::BdixCircleFtp {
+                        let client = if release.provider == ProviderKind::Addons {
+                            let sender_clone = self.action_sender.clone();
+                            let source = crate::providers::models::PlaybackSource::bare(
+                                ProviderKind::Addons,
+                                first_mirror.resolver_url.clone(),
+                                None,
+                            );
+                            if open_with || default_player.is_none() {
+                                sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
+                            } else if let Some(player) = default_player {
+                                sender_clone
+                                    .send(Action::LaunchPlayback(player, source))
+                                    .ok();
+                            }
+                            return None;
+                        } else if release.provider == ProviderKind::BdixCircleFtp {
                             let sender_clone = self.action_sender.clone();
                             let source = crate::providers::models::PlaybackSource::bare(
                                 ProviderKind::BdixCircleFtp,

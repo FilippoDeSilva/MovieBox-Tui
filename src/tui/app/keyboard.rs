@@ -18,8 +18,35 @@ impl App {
                 self.action_sender.send(Action::ToggleTvMode).ok();
                 return None;
             }
+            if let KeyCode::Char('a') = key.code {
+                if !self.state.addons_enabled {
+                    self.state.addons_enabled = true;
+                    self.persist_config();
+                }
+                self.action_sender.send(Action::ToggleAddonMode).ok();
+                return None;
+            }
+            if let KeyCode::Char('s') = key.code {
+                if !self.state.is_tv_mode && !self.state.is_addon_mode {
+                    self.state
+                        .set_status("Already in Streaming Mode.".to_string(), 120);
+                } else {
+                    self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                }
+                return None;
+            }
             if let KeyCode::Char('p') = key.code {
-                self.cycle_provider();
+                if self.state.is_tv_mode {
+                    self.state.notify(
+                        crate::tui::overlay::NotificationKind::Info,
+                        "TV Mode",
+                        "Provider cycling is only available in Streaming Mode.",
+                    );
+                } else if self.state.is_addon_mode {
+                    self.action_sender.send(Action::ShowAddonManager).ok();
+                } else {
+                    self.cycle_provider();
+                }
                 return None;
             }
         }
@@ -204,6 +231,156 @@ impl App {
             },
             InputMode::Normal => match self.state.active_screen {
                 Screen::Home => {
+                    if self.state.addon_wizard_popup {
+                        if self.state.addon_input_active {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.state.addon_input_active = false;
+                                    self.state.addon_input_buffer.clear();
+                                }
+                                KeyCode::Enter => {
+                                    let buffer = self.state.addon_input_buffer.trim().to_string();
+                                    self.state.addon_input_active = false;
+                                    self.state.addon_input_buffer.clear();
+                                    if !buffer.is_empty() {
+                                        self.action_sender
+                                            .send(Action::AddonAddManifest(buffer))
+                                            .ok();
+                                    }
+                                }
+                                KeyCode::Backspace => {
+                                    crate::tui::text::remove_last_grapheme(
+                                        &mut self.state.addon_input_buffer,
+                                    );
+                                }
+                                KeyCode::Char(c) if !c.is_control() => {
+                                    self.state.addon_input_buffer.push(c);
+                                }
+                                _ => {}
+                            }
+                            return None;
+                        }
+                        match key.code {
+                            KeyCode::Esc => {
+                                self.reset_transient_overlays();
+                                self.state.addon_wizard_popup = false;
+                            }
+                            KeyCode::Up => {
+                                self.state.addon_wizard_selected =
+                                    if self.state.addon_wizard_selected == 0 {
+                                        crate::tui::state::AddonWizardOption::ALL
+                                            .len()
+                                            .saturating_sub(1)
+                                    } else {
+                                        self.state.addon_wizard_selected - 1
+                                    };
+                            }
+                            KeyCode::Down => {
+                                let total = crate::tui::state::AddonWizardOption::ALL.len();
+                                self.state.addon_wizard_selected =
+                                    if self.state.addon_wizard_selected + 1 >= total {
+                                        0
+                                    } else {
+                                        self.state.addon_wizard_selected + 1
+                                    };
+                            }
+                            KeyCode::Enter => {
+                                self.addon_wizard_activate();
+                            }
+                            _ => {}
+                        }
+                        return None;
+                    }
+
+                    if self.state.addon_manager_popup {
+                        if self.state.addon_input_active {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.state.addon_input_active = false;
+                                    self.state.addon_input_buffer.clear();
+                                }
+                                KeyCode::Enter => {
+                                    let buffer = self.state.addon_input_buffer.trim().to_string();
+                                    self.state.addon_input_active = false;
+                                    self.state.addon_input_buffer.clear();
+                                    if !buffer.is_empty() {
+                                        self.action_sender
+                                            .send(Action::AddonAddManifest(buffer))
+                                            .ok();
+                                    }
+                                }
+                                KeyCode::Backspace => {
+                                    crate::tui::text::remove_last_grapheme(
+                                        &mut self.state.addon_input_buffer,
+                                    );
+                                }
+                                KeyCode::Char(c) if !c.is_control() => {
+                                    self.state.addon_input_buffer.push(c);
+                                }
+                                _ => {}
+                            }
+                            return None;
+                        }
+                        match key.code {
+                            KeyCode::Esc => {
+                                self.reset_transient_overlays();
+                                self.state.addon_manager_popup = false;
+                            }
+                            KeyCode::Up => {
+                                use crate::tui::state::AddonManagerRow;
+                                let rows = self.state.addon_manager_rows();
+                                let total = rows.len();
+                                let mut next = if self.state.addon_manager_selected == 0 {
+                                    total.saturating_sub(1)
+                                } else {
+                                    self.state.addon_manager_selected - 1
+                                };
+                                while next != self.state.addon_manager_selected
+                                    && matches!(rows.get(next), Some(AddonManagerRow::Header(_)))
+                                {
+                                    next = if next == 0 {
+                                        total.saturating_sub(1)
+                                    } else {
+                                        next - 1
+                                    };
+                                }
+                                self.state.addon_manager_selected = next;
+                            }
+                            KeyCode::Down => {
+                                use crate::tui::state::AddonManagerRow;
+                                let rows = self.state.addon_manager_rows();
+                                let total = rows.len();
+                                let mut next = if self.state.addon_manager_selected + 1 >= total {
+                                    0
+                                } else {
+                                    self.state.addon_manager_selected + 1
+                                };
+                                while next != self.state.addon_manager_selected
+                                    && matches!(rows.get(next), Some(AddonManagerRow::Header(_)))
+                                {
+                                    next = if next + 1 >= total { 0 } else { next + 1 };
+                                }
+                                self.state.addon_manager_selected = next;
+                            }
+                            KeyCode::Char('d') | KeyCode::Delete => {
+                                use crate::tui::state::AddonManagerRow;
+                                if let Some(AddonManagerRow::Addon(index)) = self
+                                    .state
+                                    .addon_manager_rows()
+                                    .get(self.state.addon_manager_selected)
+                                    .copied()
+                                {
+                                    self.action_sender.send(Action::AddonRemove(index)).ok();
+                                }
+                            }
+                            KeyCode::Enter | KeyCode::Char(' ') => {
+                                self.addon_manager_activate();
+                            }
+                            _ => {}
+                        }
+                        return None;
+                    }
+
                     if self.state.tv_config_popup {
                         if self.state.tv_input_active {
                             match key.code {
@@ -329,7 +506,11 @@ impl App {
                             self.action_sender.send(Action::Quit).ok();
                         }
                         KeyCode::Char('r') => {
-                            self.action_sender.send(Action::Refresh).ok();
+                            if self.state.is_tv_mode {
+                                self.action_sender.send(Action::TvReloadPlaylists).ok();
+                            } else {
+                                self.action_sender.send(Action::Refresh).ok();
+                            }
                         }
                         KeyCode::Char('o') | KeyCode::Char('O')
                             if self.state.input_mode == InputMode::Normal

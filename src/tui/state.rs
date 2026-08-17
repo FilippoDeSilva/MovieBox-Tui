@@ -157,6 +157,17 @@ pub struct AppState {
     pub tv_input_active: bool,
     pub tv_input_buffer: String,
     pub tv_input_is_file: bool,
+
+    pub is_addon_mode: bool,
+    pub addons_enabled: bool,
+    pub installed_addons: Vec<crate::providers::addons::models::InstalledAddon>,
+    pub addon_client: crate::providers::addons::AddonClient,
+    pub addon_wizard_popup: bool,
+    pub addon_wizard_selected: usize,
+    pub addon_manager_popup: bool,
+    pub addon_manager_selected: usize,
+    pub addon_input_active: bool,
+    pub addon_input_buffer: String,
     pub history: crate::history::HistoryManager,
 }
 
@@ -279,6 +290,16 @@ impl Default for AppState {
             tv_input_active: false,
             tv_input_buffer: String::new(),
             tv_input_is_file: false,
+            is_addon_mode: false,
+            addons_enabled: false,
+            installed_addons: Vec::new(),
+            addon_client: crate::providers::addons::AddonClient::new(),
+            addon_wizard_popup: false,
+            addon_wizard_selected: 0,
+            addon_manager_popup: false,
+            addon_manager_selected: 0,
+            addon_input_active: false,
+            addon_input_buffer: String::new(),
             history: crate::history::HistoryManager::new(),
         }
     }
@@ -347,6 +368,34 @@ fn playlist_is_url(source: &str) -> bool {
     trimmed.starts_with("http://") || trimmed.starts_with("https://")
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddonManagerRow {
+    Header(&'static str),
+    Addon(usize),
+    AddUrl,
+    SetupWizard,
+    Done,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddonWizardOption {
+    Cinemeta,
+    AnimeKitsu,
+    CustomUrl,
+}
+
+impl AddonWizardOption {
+    pub const ALL: [Self; 3] = [Self::Cinemeta, Self::AnimeKitsu, Self::CustomUrl];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Cinemeta => "Cinemeta (Official Catalog & Metadata · Free)",
+            Self::AnimeKitsu => "Anime Kitsu (Anime Metadata · Free)",
+            Self::CustomUrl => "Custom Catalog / Manifest URL",
+        }
+    }
+}
+
 impl AppState {
     pub fn tv_manager_rows(&self) -> Vec<TvManagerRow> {
         let mut rows = vec![TvManagerRow::Header("URL playlists")];
@@ -365,6 +414,17 @@ impl AppState {
         rows.push(TvManagerRow::AddFile);
         rows.push(TvManagerRow::Reload);
         rows.push(TvManagerRow::Done);
+        rows
+    }
+
+    pub fn addon_manager_rows(&self) -> Vec<AddonManagerRow> {
+        let mut rows = vec![AddonManagerRow::Header("Installed Addons")];
+        for index in 0..self.installed_addons.len() {
+            rows.push(AddonManagerRow::Addon(index));
+        }
+        rows.push(AddonManagerRow::AddUrl);
+        rows.push(AddonManagerRow::SetupWizard);
+        rows.push(AddonManagerRow::Done);
         rows
     }
 }

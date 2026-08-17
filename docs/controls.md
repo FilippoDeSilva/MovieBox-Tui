@@ -1,21 +1,47 @@
 # Controls & Shortcuts
 
-MovieBox-TUI is designed for fast keyboard navigation with complete mouse support throughout the interface. You can also press `?` anywhere inside the application to open the interactive help dialog.
+MovieBox-TUI is designed for fast keyboard navigation with complete mouse support throughout the interface. You can press `?` anywhere inside the application to open the mode-aware interactive help dialog.
 
-## Keyboard Shortcuts
+## Global Shortcuts
 
 | Key | Action |
 | :--- | :--- |
-| **Arrow keys** | Navigate search results, catalog shelves, seasons, episodes, and modal dialogs |
-| **Enter** | Open or confirm the selected item |
-| **Esc** | Go back, close popup dialog, or clear active input |
-| **`d`** | Download the selected episode or full season |
-| **`o`** | Open stream with a different media player |
-| **`r`** | Refresh the current page or stream list |
-| **`Ctrl+P`** | Switch content provider (MovieBox, 4KHDHub, BDIX, etc.) |
-| **`Ctrl+T`** | Toggle live IPTV mode |
+| **Arrow keys** | Navigate lists, search results, tabs, and modal dialogs |
+| **Enter** | Open, play, or confirm the selected item |
+| **Esc** | Go back, dismiss popup dialog, or clear active search |
+| **`Ctrl+S`** | Switch to standard **Streaming Mode** |
+| **`Ctrl+T`** | Toggle / switch to **TV Mode** |
+| **`Ctrl+A`** | Toggle / switch to **Addon Mode** |
 | **`?`** | Open interactive in-app help menu |
 | **`Ctrl+C` / `q`** | Quit application and restore terminal |
+
+## Mode-Specific Controls
+
+### Streaming Mode
+- **`Ctrl+P`**: Cycle content providers (`MovieBox` $\to$ `4KHDHub` $\to$ `BDIX`).
+- **`Tab` / `Shift+Tab`**: Switch details screen panes (Seasons, Episodes, Streams, Overview).
+- **`Enter`**: Play with default player.
+- **`o`**: Open player selection picker for the current stream.
+- **`d`**: Download current episode or full season batch.
+- **`r`**: Refresh search results / stream list.
+- **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
+- **`/history`**: Open watch history.
+
+### TV Mode (Live IPTV)
+- **`Enter`**: Play selected TV channel immediately.
+- **`o`**: Open player selection picker for the channel.
+- **`r` / `/reload`**: Reload all active M3U playlist sources.
+- **`/config`**: Open TV Playlist Manager dialog.
+- **`/list`**: Show all loaded channels.
+
+### Addon Mode (HTTP Addons)
+- **`Ctrl+P` / `/addons`**: Open Addon Manager dialog.
+- **`/addon-setup` / `/wizard`**: Open Addon Setup Wizard.
+- **`Enter`**: Select title or play resolved stream.
+- **`o`**: Open player selection picker for the stream.
+- **`d`**: Download HTTP stream release.
+- **`r`**: Refresh addon catalog search results.
+- **`/config`**: Open Addon Manager dialog.
 
 ## Mouse Controls
 
@@ -25,25 +51,30 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | **Click suggestion item** | Search for that suggestion immediately |
 | **Click search result row** | Select item and load preview; click again to open full details |
 | **Click audio / season / episode / stream** | Switch audio language, change season, select episode, or start playback |
-| **Click footer buttons** | Switch provider (`[Ctrl+P]`), toggle TV (`[Ctrl+T]`), help (`[?]`), or quit (`[q]`) |
-| **Click modal buttons** | Choose a theme, subtitles, player, or confirm downloads |
+| **Click footer buttons** | Switch provider / mode, open help (`[?]`), or quit (`[q]`) |
+| **Click modal buttons** | Choose a theme, subtitles, player, or confirm actions |
 | **Click outside a modal** | Dismiss popup dialog |
 
 ## Slash Commands
 
 Type these commands directly into the search bar:
 
-| Command | Action |
-| :--- | :--- |
-| `/browse` | Browse curated popular, top-rated, and trending titles |
-| `/download-dir` | View, change, or reset the download directory |
-| `/history` | View watch history with latest progress per series |
-| `/list` | View live TV channels (in TV mode) |
-| `/config` | Manage custom IPTV playlists |
-| `/theme` | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight) |
-| `/update` | Check if a new release is available |
-| `/toggle-update` | Toggle automatic startup update checks |
-| `/clear-cache` | Clear temporary cache files |
-| `/enable-bdix` | Enable BDIX FTP sources (Bangladesh ISPs only) |
-| `/disable-bdix` | Disable BDIX FTP sources |
-| `/github` | Open the project repository |
+| Command | Applicable Mode | Action |
+| :--- | :--- | :--- |
+| `/browse` | Streaming | Browse curated popular, top-rated, and trending titles |
+| `/history` | Streaming | View watch history with latest progress |
+| `/list` | TV | View live TV channels |
+| `/reload` | TV | Reload M3U playlists |
+| `/config` | TV / Addon | Manage custom IPTV playlists (in TV) or Addons (in Addon mode) |
+| `/addons` | Addon / All | Open Addon Manager modal |
+| `/addon-setup` | Addon / All | Open Addon Setup Wizard |
+| `/enable-addons` | All | Enable Addon Mode navigation |
+| `/disable-addons` | All | Disable Addon Mode navigation |
+| `/download-dir` | All | View, change, or reset the download directory |
+| `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight) |
+| `/clear-cache` | All | Clear temporary cache files |
+| `/update` | All | Check if a new release is available on GitHub |
+| `/toggle-update` | All | Toggle automatic startup update checks |
+| `/enable-bdix` | Streaming | Enable BDIX FTP sources (Bangladesh ISPs only) |
+| `/disable-bdix` | Streaming | Disable BDIX FTP sources |
+| `/github` | All | Open the project repository |

@@ -1,3 +1,4 @@
+pub mod addons;
 pub mod bdix;
 pub mod fourkhdhub;
 pub mod m3u;

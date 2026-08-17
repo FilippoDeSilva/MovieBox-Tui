@@ -12,11 +12,13 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `active_provider`   | string         | Last provider (`moviebox`, `fourkhdhub`, …).                                                                |
 | `active_theme`      | string         | Theme name.                                                                                                 |
 | `bdix_enabled`      | bool           | Show BDIX providers (Bangladesh-only).                                                                      |
+| `addons_enabled`    | bool           | Enable Addon Mode (HTTP community addons).                                                                  |
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
 | `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
 
 ## Other persisted files
 
+- `addons_config.json` — list of installed HTTP addons in the config directory (see [addons-mode.md](addons-mode.md)).
 - `tv_config.json` — list of M3U playlist sources in the config directory (see [tv-mode.md](tv-mode.md)).
 - `history.json` — watch history in the system data directory (`dirs::data_dir()/moviebox-tui/`).
 - `iptv_cache/` — legacy TV image cache directory that `ClearCache` still removes.
