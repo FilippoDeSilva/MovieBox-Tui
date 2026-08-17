@@ -13,47 +13,12 @@ impl App {
                     self.state.active_suggest_request.wrapping_add(1);
                 let request_id = self.state.active_suggest_request;
                 if query.starts_with('/') {
-                    let mut commands = Vec::new();
-                    if self.state.is_tv_mode {
-                        commands.push("/list");
-                        commands.push("/reload");
-                        commands.push("/config");
-                    } else if self.state.is_addon_mode {
-                        commands.push("/addons");
-                    } else {
-                        commands.push("/browse");
-                        commands.push("/history");
-                        if self.state.addons_enabled {
-                            commands.push("/addons");
-                        }
-                    }
-                    commands.push("/download-dir");
-                    commands.push("/download-dir <path>");
-                    if self.state.download_dir.is_some() {
-                        commands.push("/download-dir reset");
-                    }
-                    commands.push("/theme");
-                    commands.push("/update");
-                    commands.push("/toggle-update");
-                    commands.push("/clear-cache");
-                    commands.push("/github");
-                    if self.state.bdix_enabled {
-                        commands.push("/disable-bdix");
-                    } else {
-                        commands.push("/enable-bdix");
-                    }
-                    if self.state.addons_enabled {
-                        commands.push("/disable-addons");
-                    } else {
-                        commands.push("/enable-addons");
-                    }
-
-                    let mut suggestions = vec![];
-                    for cmd in commands {
-                        if cmd.starts_with(&query) {
-                            suggestions.push(serde_json::json!({ "title": cmd }));
-                        }
-                    }
+                    let matching_commands =
+                        crate::tui::commands::SlashCommand::suggest(&self.state, &query);
+                    let suggestions: Vec<serde_json::Value> = matching_commands
+                        .into_iter()
+                        .map(|cmd| serde_json::json!({ "title": cmd.name() }))
+                        .collect();
                     if !suggestions.is_empty() {
                         let fake_payload = serde_json::json!({
                             "results": [{

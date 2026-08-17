@@ -96,296 +96,307 @@ impl App {
     }
 
     pub(super) fn handle_search_command(&mut self, query: &str, lower_query: &str) -> Option<bool> {
-        if lower_query == "/clear-cache" {
-            self.action_sender.send(Action::ClearCache).ok();
-            self.state.search_query.clear();
-            return Some(true);
-        }
-        if lower_query == "/github" {
-            let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            return Some(true);
-        }
-        if lower_query == "/update" {
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            self.state.update_available = None;
-            self.state.manual_update_check = true;
-            self.state
-                .set_status("Checking GitHub for updates...".to_string(), 180);
-            self.action_sender.send(Action::CheckForUpdates).ok();
-            return Some(true);
-        }
-        if lower_query == "/theme" {
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            self.action_sender.send(Action::ToggleThemePopup).ok();
-            return Some(true);
-        }
-        if lower_query == "/browse" {
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            if self.state.is_tv_mode {
-                self.state.notify(
-                    NotificationKind::Info,
-                    "TV Mode",
-                    "Browse categories are only available in Streaming Mode.",
-                );
-            } else if self.state.is_addon_mode {
-                self.state.notify(
-                    NotificationKind::Info,
-                    "Addon Mode",
-                    "Browse categories are only available in Streaming Mode (Addon Mode uses catalog search).",
-                );
-            } else {
-                self.action_sender.send(Action::ShowBrowseMenu).ok();
-            }
-            return Some(true);
-        }
-        if lower_query == "/reload" {
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            if self.state.is_tv_mode {
-                self.action_sender.send(Action::TvReloadPlaylists).ok();
-            } else {
-                self.action_sender.send(Action::Refresh).ok();
-            }
-            return Some(true);
-        }
-        if lower_query.starts_with("/download-dir") {
-            let raw_arg = query.strip_prefix("/download-dir").unwrap_or("").trim();
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
+        let parsed = crate::tui::commands::SlashCommand::parse(query)?;
 
-            if raw_arg.is_empty() {
-                let current = crate::logging::sanitize_path(self.resolve_download_base_dir());
+        match parsed {
+            crate::tui::commands::ParsedCommand::ClearCache => {
+                self.action_sender.send(Action::ClearCache).ok();
+                self.state.search_query.clear();
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::Github => {
+                let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::Update => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.update_available = None;
+                self.state.manual_update_check = true;
                 self.state
-                    .notify(NotificationKind::Info, "Download Directory", current);
-                return Some(true);
+                    .set_status("Checking GitHub for updates...".to_string(), 180);
+                self.action_sender.send(Action::CheckForUpdates).ok();
+                Some(true)
             }
+            crate::tui::commands::ParsedCommand::Theme => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.action_sender.send(Action::ToggleThemePopup).ok();
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::Browse => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                if self.state.is_tv_mode {
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "TV Mode",
+                        "Browse categories are only available in Streaming Mode.",
+                    );
+                } else if self.state.is_addon_mode {
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Addon Mode",
+                        "Browse categories are only available in Streaming Mode (Addon Mode uses catalog search).",
+                    );
+                } else {
+                    self.action_sender.send(Action::ShowBrowseMenu).ok();
+                }
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::History => None,
+            crate::tui::commands::ParsedCommand::Reload => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                if self.state.is_tv_mode {
+                    self.action_sender.send(Action::TvReloadPlaylists).ok();
+                } else {
+                    self.action_sender.send(Action::Refresh).ok();
+                }
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::List => {
+                if self.state.is_tv_mode {
+                    self.apply_tv_search_results(query, lower_query);
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            crate::tui::commands::ParsedCommand::Config => {
+                if self.state.is_tv_mode {
+                    self.action_sender.send(Action::ShowTvConfig).ok();
+                    self.state.search_query.clear();
+                    Some(true)
+                } else if self.state.is_addon_mode {
+                    self.action_sender.send(Action::ShowAddonManager).ok();
+                    self.state.search_query.clear();
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            crate::tui::commands::ParsedCommand::Addons => {
+                if !self.state.addons_enabled {
+                    self.state.addons_enabled = true;
+                    self.persist_config();
+                }
+                if !self.state.is_addon_mode {
+                    self.action_sender.send(Action::ToggleAddonMode).ok();
+                }
+                self.action_sender.send(Action::ShowAddonManager).ok();
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::DownloadDir(raw_arg) => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
 
-            if raw_arg.eq_ignore_ascii_case("reset") || raw_arg.eq_ignore_ascii_case("default") {
-                if self.state.download_dir.is_none() {
+                if raw_arg.is_empty() {
+                    let current = crate::logging::sanitize_path(self.resolve_download_base_dir());
+                    self.state
+                        .notify(NotificationKind::Info, "Download Directory", current);
+                    return Some(true);
+                }
+
+                if raw_arg.eq_ignore_ascii_case("reset") || raw_arg.eq_ignore_ascii_case("default")
+                {
+                    if self.state.download_dir.is_none() {
+                        self.state.notify(
+                            NotificationKind::Info,
+                            "Download Directory",
+                            "Already using system default (~/Downloads/MovieBox-TUI)",
+                        );
+                    } else {
+                        self.state.download_dir = None;
+                        self.persist_config();
+                        self.state.notify(
+                            NotificationKind::Success,
+                            "Download Directory",
+                            "Reset to default (~/Downloads/MovieBox-TUI)",
+                        );
+                    }
+                    return Some(true);
+                }
+
+                let clean_arg = raw_arg.trim_matches(|c| c == '\'' || c == '"').trim();
+                if clean_arg == "<path>"
+                    || clean_arg == "path"
+                    || clean_arg == "<dir>"
+                    || clean_arg == "dir"
+                {
                     self.state.notify(
                         NotificationKind::Info,
                         "Download Directory",
-                        "Already using system default (~/Downloads/MovieBox-TUI)",
+                        "Usage: /download-dir <folder_path>\nExample: /download-dir ~/Movies",
                     );
-                } else {
-                    self.state.download_dir = None;
-                    self.persist_config();
-                    self.state.notify(
-                        NotificationKind::Success,
-                        "Download Directory",
-                        "Reset to default (~/Downloads/MovieBox-TUI)",
-                    );
+                    return Some(true);
                 }
-                return Some(true);
-            }
-
-            let clean_arg = raw_arg.trim_matches(|c| c == '\'' || c == '"').trim();
-            if clean_arg == "<path>"
-                || clean_arg == "path"
-                || clean_arg == "<dir>"
-                || clean_arg == "dir"
-            {
-                self.state.notify(
-                    NotificationKind::Info,
-                    "Download Directory",
-                    "Usage: /download-dir <folder_path>\nExample: /download-dir ~/Movies",
-                );
-                return Some(true);
-            }
-            let expanded_path = if let Some(stripped) = clean_arg
-                .strip_prefix("~/")
-                .or_else(|| clean_arg.strip_prefix("~\\"))
-            {
-                if let Some(home) = dirs::home_dir() {
-                    home.join(stripped)
+                let expanded_path = if let Some(stripped) = clean_arg
+                    .strip_prefix("~/")
+                    .or_else(|| clean_arg.strip_prefix("~\\"))
+                {
+                    if let Some(home) = dirs::home_dir() {
+                        home.join(stripped)
+                    } else {
+                        std::path::PathBuf::from(clean_arg)
+                    }
+                } else if clean_arg == "~" {
+                    dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(clean_arg))
                 } else {
                     std::path::PathBuf::from(clean_arg)
-                }
-            } else if clean_arg == "~" {
-                dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(clean_arg))
-            } else {
-                std::path::PathBuf::from(clean_arg)
-            };
+                };
 
-            match std::fs::create_dir_all(&expanded_path) {
-                Ok(_) => {
-                    let test_file = expanded_path.join(format!(".mb_probe_{}", std::process::id()));
-                    match std::fs::write(&test_file, b"ok") {
-                        Ok(_) => {
-                            let _ = std::fs::remove_file(&test_file);
-                            let canonical =
-                                std::fs::canonicalize(&expanded_path).unwrap_or(expanded_path);
-                            let clean_path = {
-                                let s = canonical.to_string_lossy();
-                                if let Some(stripped) = s.strip_prefix(r"\\?\") {
-                                    std::path::PathBuf::from(stripped)
-                                } else {
-                                    canonical
-                                }
-                            };
-                            self.state.download_dir = Some(clean_path.clone());
-                            self.persist_config();
-                            let effective =
-                                crate::logging::sanitize_path(self.resolve_download_base_dir());
-                            self.state.notify(
-                                NotificationKind::Success,
-                                "Download Directory",
-                                format!("Saved: {effective}"),
-                            );
-                        }
-                        Err(err) => {
-                            self.state.notify(
-                                NotificationKind::Error,
-                                "Permission Denied",
-                                format!("Cannot write to '{}': {}", expanded_path.display(), err),
-                            );
+                match std::fs::create_dir_all(&expanded_path) {
+                    Ok(_) => {
+                        let test_file =
+                            expanded_path.join(format!(".mb_probe_{}", std::process::id()));
+                        match std::fs::write(&test_file, b"ok") {
+                            Ok(_) => {
+                                let _ = std::fs::remove_file(&test_file);
+                                let canonical =
+                                    std::fs::canonicalize(&expanded_path).unwrap_or(expanded_path);
+                                let clean_path = {
+                                    let s = canonical.to_string_lossy();
+                                    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                                        std::path::PathBuf::from(stripped)
+                                    } else {
+                                        canonical
+                                    }
+                                };
+                                self.state.download_dir = Some(clean_path.clone());
+                                self.persist_config();
+                                let effective =
+                                    crate::logging::sanitize_path(self.resolve_download_base_dir());
+                                self.state.notify(
+                                    NotificationKind::Success,
+                                    "Download Directory",
+                                    format!("Saved: {effective}"),
+                                );
+                            }
+                            Err(err) => {
+                                self.state.notify(
+                                    NotificationKind::Error,
+                                    "Permission Denied",
+                                    format!(
+                                        "Cannot write to '{}': {}",
+                                        expanded_path.display(),
+                                        err
+                                    ),
+                                );
+                            }
                         }
                     }
+                    Err(err) => {
+                        self.state.notify(
+                            NotificationKind::Error,
+                            "Invalid Directory",
+                            format!("Cannot create '{}': {}", expanded_path.display(), err),
+                        );
+                    }
                 }
-                Err(err) => {
-                    self.state.notify(
-                        NotificationKind::Error,
-                        "Invalid Directory",
-                        format!("Cannot create '{}': {}", expanded_path.display(), err),
-                    );
-                }
-            }
 
-            return Some(true);
-        }
-        if lower_query == "/toggle-update" {
-            self.state.auto_update = !self.state.auto_update;
-            self.persist_config();
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            self.state.notify(
-                NotificationKind::Info,
-                "Automatic updates",
-                if self.state.auto_update {
-                    "Enabled"
-                } else {
-                    "Disabled"
-                },
-            );
-            return Some(true);
-        }
-        if lower_query == "/enable-bdix" || lower_query == "/disable-bdix" {
-            let enable_req = lower_query == "/enable-bdix";
-            if self.state.bdix_enabled == enable_req {
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::ToggleUpdate => {
+                self.state.auto_update = !self.state.auto_update;
+                self.persist_config();
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Automatic updates",
+                    if self.state.auto_update {
+                        "Enabled"
+                    } else {
+                        "Disabled"
+                    },
+                );
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::EnableBdix
+            | crate::tui::commands::ParsedCommand::DisableBdix => {
+                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableBdix;
+                if self.state.bdix_enabled == enable_req {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "BDIX Providers",
+                        if enable_req {
+                            "Already Enabled"
+                        } else {
+                            "Already Disabled"
+                        },
+                    );
+                    return Some(true);
+                }
+
+                self.state.bdix_enabled = enable_req;
+                self.persist_config();
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "BDIX Providers",
-                    if enable_req {
-                        "Already Enabled"
+                    if self.state.bdix_enabled {
+                        "Enabled"
                     } else {
-                        "Already Disabled"
+                        "Disabled"
                     },
                 );
-                return Some(true);
+                if !self.state.bdix_enabled && self.state.active_provider.is_bdix() {
+                    let new_provider = ProviderKind::ENABLED
+                        .iter()
+                        .copied()
+                        .find(|provider| !provider.is_bdix())
+                        .unwrap_or(ProviderKind::MovieBox);
+                    self.action_sender
+                        .send(Action::SwitchProvider(new_provider))
+                        .ok();
+                }
+                Some(true)
             }
+            crate::tui::commands::ParsedCommand::EnableAddons
+            | crate::tui::commands::ParsedCommand::DisableAddons => {
+                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableAddons;
+                if self.state.addons_enabled == enable_req {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.notify(
+                        NotificationKind::Info,
+                        "Addon Mode",
+                        if enable_req {
+                            "Already Enabled"
+                        } else {
+                            "Already Disabled"
+                        },
+                    );
+                    return Some(true);
+                }
 
-            self.state.bdix_enabled = enable_req;
-            self.persist_config();
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            self.state.notify(
-                NotificationKind::Info,
-                "BDIX Providers",
-                if self.state.bdix_enabled {
-                    "Enabled"
-                } else {
-                    "Disabled"
-                },
-            );
-            if !self.state.bdix_enabled && self.state.active_provider.is_bdix() {
-                let new_provider = ProviderKind::ENABLED
-                    .iter()
-                    .copied()
-                    .find(|provider| !provider.is_bdix())
-                    .unwrap_or(ProviderKind::MovieBox);
-                self.action_sender
-                    .send(Action::SwitchProvider(new_provider))
-                    .ok();
-            }
-            return Some(true);
-        }
-        if lower_query == "/enable-addons" || lower_query == "/disable-addons" {
-            let enable_req = lower_query == "/enable-addons";
-            if self.state.addons_enabled == enable_req {
+                self.state.addons_enabled = enable_req;
+                self.persist_config();
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "Addon Mode",
-                    if enable_req {
-                        "Already Enabled"
+                    if self.state.addons_enabled {
+                        "Enabled (Press Ctrl+A to switch to Addon Mode)"
                     } else {
-                        "Already Disabled"
+                        "Disabled"
                     },
                 );
-                return Some(true);
+                if !self.state.addons_enabled && self.state.is_addon_mode {
+                    self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                }
+                Some(true)
             }
-
-            self.state.addons_enabled = enable_req;
-            self.persist_config();
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            self.state.notify(
-                NotificationKind::Info,
-                "Addon Mode",
-                if self.state.addons_enabled {
-                    "Enabled (Press Ctrl+A to switch to Addon Mode)"
-                } else {
-                    "Disabled"
-                },
-            );
-            if !self.state.addons_enabled && self.state.is_addon_mode {
-                self.action_sender.send(Action::SwitchToStreamingMode).ok();
-            }
-            return Some(true);
         }
-
-        if lower_query == "/addons" || (self.state.is_addon_mode && lower_query == "/config") {
-            if !self.state.addons_enabled {
-                self.state.addons_enabled = true;
-                self.persist_config();
-            }
-            if !self.state.is_addon_mode {
-                self.action_sender.send(Action::ToggleAddonMode).ok();
-            }
-            self.action_sender.send(Action::ShowAddonManager).ok();
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            return Some(true);
-        }
-
-        if self.state.is_tv_mode {
-            if lower_query == "/config" {
-                self.action_sender.send(Action::ShowTvConfig).ok();
-                self.state.search_query.clear();
-                return Some(true);
-            }
-            if lower_query.starts_with('/') && lower_query != "/list" {
-                self.state.set_status(
-                    "Switch to streaming mode to use this command".to_string(),
-                    150,
-                );
-                self.state.search_query.clear();
-                return Some(true);
-            }
-
-            self.apply_tv_search_results(query, lower_query);
-            return Some(true);
-        }
-
-        None
     }
 
     pub(super) fn prepare_search_request(&mut self, query: &str) -> RequestContext {

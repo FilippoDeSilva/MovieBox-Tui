@@ -55,29 +55,8 @@ fn centered_width(area: Rect, maximum: u16) -> Rect {
     }
 }
 
-pub(crate) fn slash_command_description(cmd: &str) -> Option<&'static str> {
-    let name = cmd.strip_prefix('/').unwrap_or(cmd);
-    match name {
-        "browse" => Some("Curated, rated & most-watched views"),
-        "download-dir" => Some("View current download folder"),
-        "download-dir <path>" => Some("Set custom folder (e.g. ~/Movies)"),
-        "download-dir reset" => Some("Reset download directory to default"),
-        "history" => Some("Watch history"),
-        "theme" => Some("Theme picker"),
-        "list" => Some("Show all TV channels"),
-        "reload" => Some("Reload IPTV playlists"),
-        "config" => Some("Configure IPTV playlists"),
-        "addons" => Some("Open Addons Manager"),
-        "enable-addons" => Some("Enable Addon mode navigation"),
-        "disable-addons" => Some("Disable Addon mode navigation"),
-        "update" => Some("Check for newer release"),
-        "toggle-update" => Some("Toggle automatic update checks"),
-        "clear-cache" => Some("Clear cached data"),
-        "github" => Some("Open project repository"),
-        "enable-bdix" => Some("Enable BDIX FTP sources"),
-        "disable-bdix" => Some("Disable BDIX FTP sources"),
-        _ => None,
-    }
+pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&'static str> {
+    crate::tui::commands::SlashCommand::description_for(cmd, state)
 }
 
 fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
@@ -878,7 +857,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 suggestion.as_str()
             };
 
-            let desc = slash_command_description(suggestion);
+            let desc = slash_command_description(suggestion, state);
 
             let branch_style = if is_selected {
                 theme.lavender.add_modifier(Modifier::BOLD)

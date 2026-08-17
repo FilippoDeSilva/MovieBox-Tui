@@ -1,5 +1,6 @@
 pub mod action;
 pub mod app;
+pub mod commands;
 pub use crate::config;
 pub mod event;
 pub mod overlay;
