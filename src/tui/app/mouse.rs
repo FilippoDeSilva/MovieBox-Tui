@@ -263,12 +263,16 @@ impl App {
                     Constraint::Length(1),
                     Constraint::Min(0),
                     Constraint::Length(1),
+                    Constraint::Length(1),
                 ])
                 .split(area);
 
-            let footer = vertical_chunks[6];
-            if row == footer.y {
-                self.handle_home_footer_click(col, area.width);
+            if row == vertical_chunks[6].y {
+                self.handle_home_mode_click(col, area.width);
+                return None;
+            }
+            if row == vertical_chunks[7].y {
+                self.handle_home_util_click(col, area.width);
                 return None;
             }
 
@@ -359,44 +363,44 @@ impl App {
         None
     }
 
-    fn handle_home_footer_click(&mut self, col: u16, width: u16) {
-        enum FooterBtn {
+    fn handle_home_mode_click(&mut self, col: u16, width: u16) {
+        enum ModeBtn {
             Streaming,
             Tv,
             Addon,
-            Provider,
-            Help,
-            Quit,
         }
 
-        let mut buttons: Vec<(FooterBtn, u16)> = Vec::new();
+        let ctrl_s = crate::tui::text::ctrl_key("S");
+        let ctrl_t = crate::tui::text::ctrl_key("T");
+        let ctrl_a = crate::tui::text::ctrl_key("A");
+        let ctrl_p = crate::tui::text::ctrl_key("P");
+
+        let mut buttons: Vec<(ModeBtn, u16)> = Vec::new();
         let sep = 3_u16;
 
-        if self.state.addons_enabled {
-            buttons.push((FooterBtn::Streaming, 19));
-            buttons.push((FooterBtn::Tv, 12));
-            buttons.push((FooterBtn::Addon, 16));
-
-            if !self.state.is_tv_mode && !self.state.is_addon_mode {
-                let p_len = 9 + self.state.active_provider.label().chars().count() as u16;
-                buttons.push((FooterBtn::Provider, p_len));
-            }
+        let is_streaming = !self.state.is_tv_mode && !self.state.is_addon_mode;
+        let b1_len = if is_streaming {
+            (1 + ctrl_p.len() + 2 + self.state.active_provider.label().chars().count()) as u16
         } else {
-            if !self.state.is_tv_mode {
-                let p_len = 9 + self.state.active_provider.label().chars().count() as u16;
-                buttons.push((FooterBtn::Provider, p_len));
-            }
-            let tv_label = if self.state.is_tv_mode {
-                "Streaming"
-            } else {
-                "TV"
-            };
-            let tv_w = 9 + tv_label.chars().count() as u16;
-            buttons.push((FooterBtn::Tv, tv_w));
-        }
+            (1 + ctrl_s.len() + 2 + 9) as u16
+        };
+        buttons.push((ModeBtn::Streaming, b1_len));
 
-        buttons.push((FooterBtn::Help, 8));
-        buttons.push((FooterBtn::Quit, 8));
+        let b2_len = if self.state.is_tv_mode {
+            6_u16
+        } else {
+            (1 + ctrl_t.len() + 2 + 2) as u16
+        };
+        buttons.push((ModeBtn::Tv, b2_len));
+
+        if self.state.addons_enabled {
+            let b3_len = if self.state.is_addon_mode {
+                10_u16
+            } else {
+                (1 + ctrl_a.len() + 2 + 6) as u16
+            };
+            buttons.push((ModeBtn::Addon, b3_len));
+        }
 
         let total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
             + (buttons.len().saturating_sub(1) as u16) * sep;
@@ -407,22 +411,52 @@ impl App {
             let end = start + w;
             if col >= start && col <= end + 1 {
                 match btn {
-                    FooterBtn::Streaming => {
-                        self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                    ModeBtn::Streaming => {
+                        if is_streaming {
+                            self.cycle_provider();
+                        } else {
+                            self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                        }
                     }
-                    FooterBtn::Tv => {
-                        self.action_sender.send(Action::ToggleTvMode).ok();
+                    ModeBtn::Tv => {
+                        if !self.state.is_tv_mode {
+                            self.action_sender.send(Action::ToggleTvMode).ok();
+                        }
                     }
-                    FooterBtn::Addon => {
-                        self.action_sender.send(Action::ToggleAddonMode).ok();
+                    ModeBtn::Addon => {
+                        if !self.state.is_addon_mode {
+                            self.action_sender.send(Action::ToggleAddonMode).ok();
+                        }
                     }
-                    FooterBtn::Provider => {
-                        self.cycle_provider();
-                    }
-                    FooterBtn::Help => {
+                }
+                return;
+            }
+            curr_x += w + sep;
+        }
+    }
+
+    fn handle_home_util_click(&mut self, col: u16, width: u16) {
+        enum UtilBtn {
+            Help,
+            Quit,
+        }
+
+        let buttons: [(UtilBtn, u16); 2] = [(UtilBtn::Help, 8), (UtilBtn::Quit, 8)];
+        let sep = 3_u16;
+
+        let total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
+            + (buttons.len().saturating_sub(1) as u16) * sep;
+        let mut curr_x = width.saturating_sub(total_w) / 2;
+
+        for (btn, w) in buttons {
+            let start = curr_x;
+            let end = start + w;
+            if col >= start && col <= end + 1 {
+                match btn {
+                    UtilBtn::Help => {
                         self.action_sender.send(Action::ToggleHelp).ok();
                     }
-                    FooterBtn::Quit => {
+                    UtilBtn::Quit => {
                         self.action_sender.send(Action::Quit).ok();
                     }
                 }

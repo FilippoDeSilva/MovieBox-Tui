@@ -158,3 +158,13 @@ pub fn clean_stream_text(input: &str) -> String {
     }
     cleaned.trim().to_string()
 }
+
+#[cfg(target_os = "macos")]
+pub const CTRL_PREFIX: &str = "^";
+
+#[cfg(not(target_os = "macos"))]
+pub const CTRL_PREFIX: &str = "Ctrl+";
+
+pub fn ctrl_key(key: &str) -> String {
+    format!("{CTRL_PREFIX}{key}")
+}

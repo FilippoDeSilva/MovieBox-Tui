@@ -329,6 +329,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 Constraint::Length(1),
                 Constraint::Min(0),
                 Constraint::Length(1),
+                Constraint::Length(1),
             ])
             .split(area);
 
@@ -376,92 +377,80 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             );
         }
 
-        let mut footer_spans = vec![];
-        if state.addons_enabled {
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+S", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled(
-                "Streaming",
-                if !state.is_tv_mode && !state.is_addon_mode {
-                    theme.text.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text_dim
-                },
-            ));
-            footer_spans.push(Span::raw("   "));
+        let ctrl_s = crate::tui::text::ctrl_key("S");
+        let ctrl_t = crate::tui::text::ctrl_key("T");
+        let ctrl_a = crate::tui::text::ctrl_key("A");
+        let ctrl_p = crate::tui::text::ctrl_key("P");
 
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled(
-                "TV",
-                if state.is_tv_mode {
-                    theme.text.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text_dim
-                },
+        let mut mode_spans = vec![];
+        if !state.is_tv_mode && !state.is_addon_mode {
+            mode_spans.push(Span::styled("[", theme.text_dim));
+            mode_spans.push(Span::styled(&ctrl_p, theme.shortcut));
+            mode_spans.push(Span::styled("] ", theme.text_dim));
+            mode_spans.push(Span::styled(
+                state.active_provider.label(),
+                theme.highlight.add_modifier(Modifier::BOLD),
             ));
-            footer_spans.push(Span::raw("   "));
-
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+A", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled(
-                "Addons",
-                if state.is_addon_mode {
-                    theme.text.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text_dim
-                },
-            ));
-            footer_spans.push(Span::raw("   "));
-
-            if !state.is_tv_mode && !state.is_addon_mode {
-                footer_spans.push(Span::styled("[", theme.text_dim));
-                footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
-                footer_spans.push(Span::styled("] ", theme.text_dim));
-                footer_spans.push(Span::styled(
-                    state.active_provider.label(),
-                    theme.text.add_modifier(Modifier::BOLD),
-                ));
-                footer_spans.push(Span::raw("   "));
-            }
         } else {
-            if !state.is_tv_mode {
-                footer_spans.push(Span::styled("[", theme.text_dim));
-                footer_spans.push(Span::styled("Ctrl+P", theme.shortcut));
-                footer_spans.push(Span::styled("] ", theme.text_dim));
-                footer_spans.push(Span::styled(
-                    state.active_provider.label(),
-                    theme.text.add_modifier(Modifier::BOLD),
-                ));
-                footer_spans.push(Span::raw("   "));
-            }
-
-            footer_spans.push(Span::styled("[", theme.text_dim));
-            footer_spans.push(Span::styled("Ctrl+T", theme.shortcut));
-            footer_spans.push(Span::styled("] ", theme.text_dim));
-            footer_spans.push(Span::styled(
-                if state.is_tv_mode { "Streaming" } else { "TV" },
-                theme.text_dim,
-            ));
-            footer_spans.push(Span::raw("   "));
+            mode_spans.push(Span::styled("[", theme.text_dim));
+            mode_spans.push(Span::styled(&ctrl_s, theme.shortcut));
+            mode_spans.push(Span::styled("] ", theme.text_dim));
+            mode_spans.push(Span::styled("Streaming", theme.text_dim));
         }
 
-        footer_spans.push(Span::styled("[", theme.text_dim));
-        footer_spans.push(Span::styled("?", theme.shortcut));
-        footer_spans.push(Span::styled("] ", theme.text_dim));
-        footer_spans.push(Span::styled("Help", theme.text_dim));
-        footer_spans.push(Span::raw("   "));
-        footer_spans.push(Span::styled("[", theme.text_dim));
-        footer_spans.push(Span::styled("q", theme.shortcut));
-        footer_spans.push(Span::styled("] ", theme.text_dim));
-        footer_spans.push(Span::styled("Quit", theme.text_dim));
+        mode_spans.push(Span::raw("   "));
+
+        if state.is_tv_mode {
+            mode_spans.push(Span::styled("[ ", theme.text_dim));
+            mode_spans.push(Span::styled(
+                "TV",
+                theme.highlight.add_modifier(Modifier::BOLD),
+            ));
+            mode_spans.push(Span::styled(" ]", theme.text_dim));
+        } else {
+            mode_spans.push(Span::styled("[", theme.text_dim));
+            mode_spans.push(Span::styled(&ctrl_t, theme.shortcut));
+            mode_spans.push(Span::styled("] ", theme.text_dim));
+            mode_spans.push(Span::styled("TV", theme.text_dim));
+        }
+
+        if state.addons_enabled {
+            mode_spans.push(Span::raw("   "));
+            if state.is_addon_mode {
+                mode_spans.push(Span::styled("[ ", theme.text_dim));
+                mode_spans.push(Span::styled(
+                    "Addons",
+                    theme.highlight.add_modifier(Modifier::BOLD),
+                ));
+                mode_spans.push(Span::styled(" ]", theme.text_dim));
+            } else {
+                mode_spans.push(Span::styled("[", theme.text_dim));
+                mode_spans.push(Span::styled(&ctrl_a, theme.shortcut));
+                mode_spans.push(Span::styled("] ", theme.text_dim));
+                mode_spans.push(Span::styled("Addons", theme.text_dim));
+            }
+        }
 
         frame.render_widget(
-            Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center),
+            Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Center),
             vertical_chunks[6],
+        );
+
+        let util_spans = vec![
+            Span::styled("[", theme.text_dim),
+            Span::styled("?", theme.shortcut),
+            Span::styled("] ", theme.text_dim),
+            Span::styled("Help", theme.text_dim),
+            Span::raw("   "),
+            Span::styled("[", theme.text_dim),
+            Span::styled("q", theme.shortcut),
+            Span::styled("] ", theme.text_dim),
+            Span::styled("Quit", theme.text_dim),
+        ];
+
+        frame.render_widget(
+            Paragraph::new(Line::from(util_spans)).alignment(Alignment::Center),
+            vertical_chunks[7],
         );
     } else {
         let has_results = !state.search_results.is_empty();
