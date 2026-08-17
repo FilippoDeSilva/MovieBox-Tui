@@ -24,17 +24,28 @@ impl App {
         self.state.tv_input_is_file = false;
     }
 
+    pub(super) fn reset_mode_state(&mut self) {
+        self.state
+            .fetch_cancel
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.state.fetch_cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
+        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
+        self.state.active_search_request = self.state.active_search_request.wrapping_add(1);
+        self.state.active_details_request = self.state.active_details_request.wrapping_add(1);
+        self.state.active_resource_request = self.state.active_resource_request.wrapping_add(1);
+        self.state.tick_count = 0;
+        self.reset_transient_overlays();
+        self.state.input_mode = crate::tui::state::InputMode::Normal;
+        self.state.is_loading = false;
+        self.state.clear_search_state();
+        self.state.clear_details_state();
+    }
+
     pub(super) async fn handle_tv(&mut self, action: Action) -> Option<()> {
         match action {
             Action::ToggleTvMode => {
-                self.state
-                    .fetch_cancel
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
-                self.state.fetch_cancel =
-                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-                self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
-                self.state.active_preview_request =
-                    self.state.active_preview_request.wrapping_add(1);
+                self.reset_mode_state();
                 let will_be_tv = !self.state.is_tv_mode;
                 if will_be_tv {
                     self.state.set_mode(crate::tui::state::AppMode::Tv);
@@ -43,28 +54,9 @@ impl App {
                 } else if self.state.addons_enabled {
                     self.state.set_mode(crate::tui::state::AppMode::Addon);
                 }
-                self.state.active_browse_preset = None;
-                self.state.active_addon_catalog = None;
-                self.state.browse_metrics.clear();
-                self.state.tick_count = 0;
-                self.reset_transient_overlays();
-                self.state.input_mode = crate::tui::state::InputMode::Normal;
-                self.state.is_loading = false;
-                self.state.is_fetching_streams = false;
-                self.state.pending_episode_fetch = None;
-                self.state.selected_details = None;
-                self.state.selected_resources = None;
-                self.state.active_subject_id = None;
-                self.state.search_suggestions.clear();
-                self.state.suggest_index = None;
-                self.state.search_preview = None;
-                self.state.poster_image = None;
-                self.state.poster_protocol = None;
                 if self.state.is_tv_mode {
                     self.state.tv_config_popup = false;
-                    self.state.search_query.clear();
                     self.state.tv_channels.clear();
-                    self.state.search_results.clear();
                     self.state
                         .set_status("Loading TV playlists...".to_string(), 200);
                     self.load_tv_playlists_from_config();
@@ -74,7 +66,6 @@ impl App {
                     }
                 } else if self.state.is_addon_mode {
                     self.state.tv_config_popup = false;
-                    self.state.search_query.clear();
                     self.state.search_results.clear();
                     self.state.active_provider = crate::providers::models::ProviderKind::Addons;
                     self.load_installed_addons_from_config();

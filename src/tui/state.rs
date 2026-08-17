@@ -379,6 +379,41 @@ impl AppState {
         self.status_timer = timer;
     }
 
+    pub fn clear_search_state(&mut self) {
+        self.search_query.clear();
+        self.search_results.clear();
+        self.search_error = None;
+        self.search_suggestions.clear();
+        self.suggest_index = None;
+        self.search_preview = None;
+        self.preview_loading = false;
+        self.active_browse_preset = None;
+        self.active_addon_catalog = None;
+        self.browse_metrics.clear();
+        self.poster_image = None;
+        self.poster_protocol = None;
+        self.failed_posters.clear();
+        self.in_flight_posters.clear();
+        self.search_list_state.select(None);
+        self.is_homepage_mode = false;
+    }
+
+    pub fn clear_details_state(&mut self) {
+        self.active_subject_id = None;
+        self.selected_details = None;
+        self.selected_resources = None;
+        self.is_fetching_streams = false;
+        self.pending_episode_fetch = None;
+        self.stream_error = None;
+        self.available_seasons.clear();
+        self.available_episode_numbers.clear();
+        self.season_list_state.select(None);
+        self.episode_list_state.select(None);
+        self.resource_list_state.select(None);
+        self.language_list_state.select(None);
+        self.details_pane = DetailsPane::Streams;
+    }
+
     pub fn loading_dots(&self) -> &'static str {
         match (self.tick_count / 4) % 4 {
             0 => "",
@@ -387,6 +422,27 @@ impl AppState {
             _ => "...",
         }
     }
+}
+
+pub fn cycle_list_selection(state: &mut ListState, total_items: usize, forward: bool) {
+    if total_items == 0 {
+        state.select(None);
+        return;
+    }
+    let max = total_items.saturating_sub(1);
+    let next = if forward {
+        match state.selected() {
+            Some(i) if i >= max => 0,
+            Some(i) => i + 1,
+            None => 0,
+        }
+    } else {
+        match state.selected() {
+            Some(0) | None => max,
+            Some(i) => i.saturating_sub(1),
+        }
+    };
+    state.select(Some(next));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

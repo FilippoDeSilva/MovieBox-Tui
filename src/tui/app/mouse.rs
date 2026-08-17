@@ -23,11 +23,8 @@ impl App {
     fn handle_overlay_mouse(&mut self, col: u16, row: u16, area: Rect) -> bool {
         if self.state.show_theme_popup {
             let items = crate::tui::theme::AVAILABLE_THEMES;
-            let popup = centered_rect(area, 40, items.len() as u16 + 4, 30, 60);
-            if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let item_y = popup.y.saturating_add(1);
-                if row >= item_y && (row - item_y) < items.len() as u16 {
-                    let clicked_idx = (row - item_y) as usize;
+            match hit_test_centered_picker(area, col, row, 40, items.len(), 30, 60) {
+                Some(Some(clicked_idx)) => {
                     self.state.theme_list_state.select(Some(clicked_idx));
                     if let Some(theme_name) = items.get(clicked_idx) {
                         self.action_sender
@@ -39,9 +36,11 @@ impl App {
                             .set_status(format!("{theme_name} theme applied."), 150);
                     }
                 }
-            } else {
-                self.state.show_theme_popup = false;
-                self.state.theme_list_state.select(None);
+                Some(None) => {}
+                None => {
+                    self.state.show_theme_popup = false;
+                    self.state.theme_list_state.select(None);
+                }
             }
             return true;
         }
@@ -56,11 +55,8 @@ impl App {
             } else {
                 BrowsePreset::ALL.len()
             };
-            let popup = centered_rect(area, 40, total_count as u16 + 4, 30, 60);
-            if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let item_y = popup.y.saturating_add(1);
-                if row >= item_y && (row - item_y) < total_count as u16 {
-                    let clicked_idx = (row - item_y) as usize;
+            match hit_test_centered_picker(area, col, row, 40, total_count, 30, 60) {
+                Some(Some(clicked_idx)) => {
                     self.state.browse_list_state.select(Some(clicked_idx));
                     self.state.show_browse_popup = false;
                     self.state.browse_list_state.select(None);
@@ -77,9 +73,11 @@ impl App {
                         self.action_sender.send(Action::SelectBrowse(preset)).ok();
                     }
                 }
-            } else {
-                self.state.show_browse_popup = false;
-                self.state.browse_list_state.select(None);
+                Some(None) => {}
+                None => {
+                    self.state.show_browse_popup = false;
+                    self.state.browse_list_state.select(None);
+                }
             }
             return true;
         }
@@ -112,33 +110,31 @@ impl App {
 
         if self.state.player_picker_popup {
             let count = self.state.available_players.len();
-            let popup = centered_rect(area, 40, count as u16 + 4, 24, 60);
-            if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let item_y = popup.y.saturating_add(1);
-                if row >= item_y && (row - item_y) < count as u16 {
-                    let clicked_idx = (row - item_y) as usize;
+            match hit_test_centered_picker(area, col, row, 40, count, 24, 60) {
+                Some(Some(clicked_idx)) => {
                     self.state.player_picker_state.select(Some(clicked_idx));
                     self.action_sender.send(Action::Submit).ok();
                 }
-            } else {
-                self.state.player_picker_popup = false;
+                Some(None) => {}
+                None => {
+                    self.state.player_picker_popup = false;
+                }
             }
             return true;
         }
 
         if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
             let count = self.state.subtitle_list.len().min(8);
-            let popup = centered_rect(area, 44, count as u16 + 4, 30, 60);
-            if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let item_y = popup.y.saturating_add(1);
-                if row >= item_y && (row - item_y) < count as u16 {
-                    let clicked_idx = (row - item_y) as usize;
+            match hit_test_centered_picker(area, col, row, 44, count, 30, 60) {
+                Some(Some(clicked_idx)) => {
                     self.state.subtitle_list_state.select(Some(clicked_idx));
                     self.action_sender.send(Action::Submit).ok();
                 }
-            } else {
-                self.state.subtitle_popup = false;
-                self.state.is_download_subtitle_popup = false;
+                Some(None) => {}
+                None => {
+                    self.state.subtitle_popup = false;
+                    self.state.is_download_subtitle_popup = false;
+                }
             }
             return true;
         }
@@ -824,5 +820,27 @@ fn centered_width_rect(area: Rect, width: u16) -> Rect {
         y: area.y,
         width: w,
         height: area.height,
+    }
+}
+
+fn hit_test_centered_picker(
+    area: Rect,
+    col: u16,
+    row: u16,
+    width_pct: u16,
+    total_items: usize,
+    min_w: u16,
+    max_w: u16,
+) -> Option<Option<usize>> {
+    let popup = centered_rect(area, width_pct, total_items as u16 + 4, min_w, max_w);
+    if popup.contains(ratatui::layout::Position::new(col, row)) {
+        let item_y = popup.y.saturating_add(1);
+        if row >= item_y && (row - item_y) < total_items as u16 {
+            Some(Some((row - item_y) as usize))
+        } else {
+            Some(None)
+        }
+    } else {
+        None
     }
 }

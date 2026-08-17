@@ -110,20 +110,18 @@ impl App {
                     self.state.browse_list_state.select(None);
                 }
                 KeyCode::Up => {
-                    let max = total_count.saturating_sub(1);
-                    let next = match self.state.browse_list_state.selected() {
-                        Some(0) | None => max,
-                        Some(index) => index.saturating_sub(1),
-                    };
-                    self.state.browse_list_state.select(Some(next));
+                    crate::tui::state::cycle_list_selection(
+                        &mut self.state.browse_list_state,
+                        total_count,
+                        false,
+                    );
                 }
                 KeyCode::Down => {
-                    let max = total_count.saturating_sub(1);
-                    let next = match self.state.browse_list_state.selected() {
-                        Some(index) if index < max => index + 1,
-                        _ => 0,
-                    };
-                    self.state.browse_list_state.select(Some(next));
+                    crate::tui::state::cycle_list_selection(
+                        &mut self.state.browse_list_state,
+                        total_count,
+                        true,
+                    );
                 }
                 KeyCode::Enter => {
                     let index = self.state.browse_list_state.selected().unwrap_or(0);
@@ -156,40 +154,30 @@ impl App {
                     }
                 }
                 KeyCode::Up => {
-                    let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
-                    let i = match self.state.theme_list_state.selected() {
-                        Some(i) => {
-                            if i == 0 {
-                                max
-                            } else {
-                                i - 1
-                            }
-                        }
-                        None => 0,
-                    };
-                    self.state.theme_list_state.select(Some(i));
-                    let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
-                    self.action_sender
-                        .send(Action::SelectTheme(selected_theme))
-                        .ok();
+                    crate::tui::state::cycle_list_selection(
+                        &mut self.state.theme_list_state,
+                        crate::tui::theme::AVAILABLE_THEMES.len(),
+                        false,
+                    );
+                    if let Some(i) = self.state.theme_list_state.selected() {
+                        let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
+                        self.action_sender
+                            .send(Action::SelectTheme(selected_theme))
+                            .ok();
+                    }
                 }
                 KeyCode::Down => {
-                    let max = crate::tui::theme::AVAILABLE_THEMES.len().saturating_sub(1);
-                    let i = match self.state.theme_list_state.selected() {
-                        Some(i) => {
-                            if i >= max {
-                                0
-                            } else {
-                                i + 1
-                            }
-                        }
-                        None => 0,
-                    };
-                    self.state.theme_list_state.select(Some(i));
-                    let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
-                    self.action_sender
-                        .send(Action::SelectTheme(selected_theme))
-                        .ok();
+                    crate::tui::state::cycle_list_selection(
+                        &mut self.state.theme_list_state,
+                        crate::tui::theme::AVAILABLE_THEMES.len(),
+                        true,
+                    );
+                    if let Some(i) = self.state.theme_list_state.selected() {
+                        let selected_theme = crate::tui::theme::AVAILABLE_THEMES[i].to_string();
+                        self.action_sender
+                            .send(Action::SelectTheme(selected_theme))
+                            .ok();
+                    }
                 }
                 KeyCode::Enter => {
                     self.state.show_theme_popup = false;

@@ -4,35 +4,6 @@ use crate::tui::action::Action;
 use crate::tui::overlay::NotificationKind;
 
 impl App {
-    fn reset_mode_state(&mut self) {
-        self.state
-            .fetch_cancel
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-        self.state.fetch_cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
-        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
-
-        self.state.active_browse_preset = None;
-        self.state.active_addon_catalog = None;
-        self.state.browse_metrics.clear();
-        self.state.tick_count = 0;
-        self.reset_transient_overlays();
-        self.state.input_mode = crate::tui::state::InputMode::Normal;
-        self.state.is_loading = false;
-        self.state.is_fetching_streams = false;
-        self.state.pending_episode_fetch = None;
-        self.state.selected_details = None;
-        self.state.selected_resources = None;
-        self.state.active_subject_id = None;
-        self.state.search_suggestions.clear();
-        self.state.suggest_index = None;
-        self.state.search_preview = None;
-        self.state.poster_image = None;
-        self.state.poster_protocol = None;
-        self.state.search_query.clear();
-        self.state.search_results.clear();
-    }
-
     pub(super) async fn handle_addons(&mut self, action: Action) -> Option<()> {
         match action {
             Action::ToggleAddonMode => {

@@ -24,44 +24,15 @@ impl App {
         if provider == self.state.active_provider {
             return;
         }
-        self.reset_transient_overlays();
         self.prepare_image_soft_refresh();
-        self.state
-            .fetch_cancel
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-        self.state.fetch_cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        self.state.provider_generation = self.state.provider_generation.wrapping_add(1);
-        self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
+        self.reset_mode_state();
         self.state.active_provider = provider;
         self.state.active_screen = Screen::Home;
-        self.state.is_homepage_mode = false;
-        self.state.active_browse_preset = None;
-        self.state.active_addon_catalog = None;
-        self.state.browse_metrics.clear();
-        self.state.is_tv_mode = false;
-        self.state.is_loading = false;
-        self.state.is_fetching_streams = false;
-        self.state.stream_error = None;
-        self.state.search_error = None;
-        self.state.search_results.clear();
-        self.state.search_suggestions.clear();
-        self.state.search_preview = None;
-        self.state.preview_loading = false;
-        self.state.selected_details = None;
-        self.state.selected_resources = None;
-        self.state.active_subject_id = None;
         self.state.details_pane = crate::tui::state::DetailsPane::default();
         self.state.selected_season = 1;
         self.state.selected_episode = 1;
         self.state.language_chosen = false;
-        self.state.season_list_state.select(None);
-        self.state.episode_list_state.select(None);
-        self.state.language_list_state.select(None);
-        self.state.pending_episode_fetch = None;
-        self.state.available_seasons.clear();
-        self.state.available_episode_numbers.clear();
         self.state.stream_pool.clear();
-        self.state.is_resolving_playback = false;
         self.state
             .cancel_download
             .store(true, std::sync::atomic::Ordering::SeqCst);

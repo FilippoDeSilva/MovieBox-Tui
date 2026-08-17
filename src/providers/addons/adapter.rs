@@ -40,6 +40,67 @@ pub fn meta_to_search_result(item: &MetaItem) -> SearchResult {
     }
 }
 
+pub fn metas_to_moviebox_search_json(metas: Vec<MetaItem>) -> serde_json::Value {
+    let mut seen_ids = std::collections::HashSet::new();
+    let subjects = metas
+        .into_iter()
+        .filter(|item| seen_ids.insert(item.id.clone()))
+        .map(|item| {
+            let is_series = item.r#type.eq_ignore_ascii_case("series")
+                || item.r#type.eq_ignore_ascii_case("tv")
+                || item.r#type.eq_ignore_ascii_case("anime");
+            let year: String = item
+                .release_info
+                .as_deref()
+                .or(item.year.as_deref())
+                .or(item.released.as_deref())
+                .map(|s| {
+                    s.chars()
+                        .filter(|c| c.is_ascii_digit())
+                        .take(4)
+                        .collect::<String>()
+                })
+                .unwrap_or_default();
+
+            let title = if !item.name.trim().is_empty() {
+                item.name.clone()
+            } else {
+                item.title.clone().unwrap_or_else(|| "Unknown".to_string())
+            };
+
+            let poster_url = item
+                .poster
+                .clone()
+                .or_else(|| item.cover.clone())
+                .unwrap_or_default();
+
+            let desc = item.description.clone();
+            let rating = item.imdb_rating.clone().or_else(|| item.rating.clone());
+            let genres = item.genres.clone();
+
+            serde_json::json!({
+                "subjectId": item.id,
+                "title": title,
+                "subjectType": if is_series { 2 } else { 1 },
+                "releaseDate": year,
+                "description": desc,
+                "intro": desc,
+                "imdbRatingValue": rating,
+                "genre": genres,
+                "cover": {
+                    "url": poster_url
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    serde_json::json!({
+        "results": [{
+            "subjects": subjects
+        }]
+    })
+}
+
 pub fn meta_detail_to_moviebox_json(detail: &MetaDetail) -> serde_json::Value {
     let is_series = detail.r#type.eq_ignore_ascii_case("series")
         || detail.r#type.eq_ignore_ascii_case("tv")
