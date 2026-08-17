@@ -120,6 +120,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Download Video Stream", theme.text),
         ]));
         help_text.push(Line::from(vec![
+            Span::styled("    /browse        ", theme.header),
+            Span::styled("Browse Addon Catalogs", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    /config        ", theme.header),
+            Span::styled("Manage Addons", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
             Span::styled("    [r]            ", theme.header),
             Span::styled("Refresh Catalog / Streams", theme.text),
         ]));

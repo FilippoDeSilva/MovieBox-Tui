@@ -6,8 +6,15 @@
 - **Addon Mode (Community HTTP Addons)**:
   - Added full support for community HTTP addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`) with dedicated `Ctrl+A` mode switching.
   - Pre-installed and locked Cinemeta out-of-the-box as the default core metadata provider with zero API keys required.
-    - Added interactive Addon Manager dialog (`/addons`, `Ctrl+P` in Addon Mode) with one-click enabling, removal, and manifest URL adding.
+  - Added interactive Addon Manager dialog (`/addons`, `Ctrl+P` in Addon Mode) with one-click enabling, removal, and manifest URL adding.
   - Added concurrent multi-addon stream resolution aggregating playable releases from all enabled stream addons.
+- **Addon Mode `/browse` & Curated Catalog Exploration**:
+  - Added `/browse` support in Addon Mode with a minimal, organized 4-preset catalog picker (`Top Movies`, `Top Series`, `Top Rated Movies`, `Top Rated Series`).
+  - Added direct catalog fetching (`/catalog/{type}/{id}.json`) with poster hydration, details navigation, stream resolution, and `/reload` support.
+- **Strict Slash Command Guarding & Guidance**:
+  - Intercepted all `/` slash commands to guarantee zero remote catalog network requests.
+  - Added warning toast notifications for unrecognized slash commands (`"Command '/xyz' is not recognized. Type '/' to view available commands."`).
+  - Added platform-aware mode-guidance toasts (`^T` / `^S` / `^A` on macOS, `Ctrl+T` / `Ctrl+S` / `Ctrl+A` on Linux/Windows) for mode-restricted commands.
 - **Dynamic Multi-Source Host & Resolver Resolution**:
   - Added 100% dynamic domain-based host extractor (`extract_domain_label`) and stream tag parser (`detect_stream_host`) identifying and formatting direct hosts (Pixeldrain, Hubcloud, Fast Download, Google Drive, Mega, etc.) and debrid resolvers without hardcoded tables.
 - **Full Emoji & Symbol Sanitization**:
@@ -15,9 +22,15 @@
   - Standardized checkbox representations to clean ASCII `[x] / [ ]`.
 - **Complete Mouse Navigation**:
   - Added dynamic footer hitboxes for `[Ctrl+S] Streaming`, `[Ctrl+T] TV`, `[Ctrl+A] Addons`, `[Ctrl+P] {Provider}`, `[?] Help`, `[q] Quit`.
-  - Added complete mouse click support for Addon Manager modal.
+  - Added complete mouse click support for Addon Manager modal and browse popups.
 
 ### Fixed
+- **Atomic Mode Highlight & Single Active Selection**:
+  - Added canonical `AppMode` enum (`Streaming`, `Tv`, `Addon`) and atomic state transitions guaranteeing that only one active mode is highlighted in the bottom dock at any time.
+  - Hardened state isolation with automatic cleanup across mode switches.
+- **Notification Readability & Word-Boundary Wrapping**:
+  - Replaced horizontal middle-truncation with unicode display-width aware word wrapping (`wrap_text`).
+  - Added adaptive width (up to 72 chars) and dynamic height scaling with guaranteed unbroken rounded borders.
 - **Resilient Addon Metadata & Fallbacks**:
   - Added flexible visitors and serde aliases for `genres`, `cast`, `director`, `imdbRating`, `releaseInfo`, and `runtime` preventing deserialization failures across varied community addon JSON schemas.
   - Added multi-tier fallback resolution in the Details screen to guarantee titles, release years, synopsis, and posters are always preserved from search results and previews.
