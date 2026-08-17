@@ -18,20 +18,13 @@ Addon Mode enables support for community HTTP addon manifests. You can install a
 - `/enable-addons`: Enables Addon Mode in configuration and updates the footer navigation.
 - `/disable-addons`: Disables Addon Mode in configuration.
 - `/addons`: Opens the Addon Manager modal.
-- `/addon-setup`: Opens the Setup Wizard modal.
 
-## Setup Wizard & Addon Manager
+## Addon Manager
 
-1. **Setup Wizard**:
-   - **Cinemeta**: Official catalog and metadata provider (pre-installed, free, no API key required).
-   - **Anime Kitsu**: Anime metadata provider (free, no API key required).
-   - **Custom URL**: Direct input for custom catalog/metadata manifest URLs.
-
-2. **Addon Manager**:
-   - Interactive modal listing installed addons with capability badges (`[Core]`, `[Meta]`, `[Streams]`, `[Catalog]`).
-   - `[x] / [ ]`: Toggle addon enabled/disabled state (`Enter` or `Space`). Core provider remains locked.
-   - `[ Add Manifest URL ]`: Install any public HTTP addon manifest.
-   - `[d]` or `[Delete]`: Remove the selected addon (protected for core addons).
+- Interactive modal listing installed addons with capability badges (`[Core]`, `[Meta]`, `[Streams]`, `[Catalog]`).
+- `[x] / [ ]`: Toggle addon enabled/disabled state (`Enter` or `Space`). Core provider remains locked.
+- `[ Add Manifest URL ]`: Install any public HTTP addon manifest by URL.
+- `[d]` or `[Delete]`: Remove the selected addon (protected for core addons).
 
 ## Persistence
 

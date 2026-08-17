@@ -366,20 +366,6 @@ impl App {
             return Some(true);
         }
 
-        if lower_query == "/addon-setup" || lower_query == "/wizard" {
-            if !self.state.addons_enabled {
-                self.state.addons_enabled = true;
-                self.persist_config();
-            }
-            if !self.state.is_addon_mode {
-                self.action_sender.send(Action::ToggleAddonMode).ok();
-            }
-            self.action_sender.send(Action::ShowAddonWizard).ok();
-            self.state.search_query.clear();
-            self.state.input_mode = InputMode::Normal;
-            return Some(true);
-        }
-
         if self.state.is_tv_mode {
             if lower_query == "/config" {
                 self.action_sender.send(Action::ShowTvConfig).ok();

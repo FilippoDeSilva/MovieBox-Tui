@@ -1080,113 +1080,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         );
     }
 
-    if state.addon_wizard_popup {
-        let options = crate::tui::state::AddonWizardOption::ALL;
-        let total_rows = options.len();
-        let popup_width = 72u16.min(area.width.saturating_sub(4)).max(52);
-        let popup_height = if state.addon_input_active {
-            7u16
-        } else {
-            total_rows.saturating_add(6) as u16
-        };
-        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 76);
-        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
-
-        let popup_block = ratatui::widgets::Block::default()
-            .title(" Setup Metadata Provider ")
-            .title_style(theme.title)
-            .borders(ratatui::widgets::Borders::ALL)
-            .border_type(if state.basic_terminal {
-                ratatui::widgets::BorderType::Plain
-            } else {
-                ratatui::widgets::BorderType::Rounded
-            })
-            .border_style(theme.sapphire);
-
-        let inner_area = popup_block.inner(popup_area);
-        frame.render_widget(popup_block, popup_area);
-
-        let sections = ratatui::layout::Layout::vertical([
-            ratatui::layout::Constraint::Min(1),
-            ratatui::layout::Constraint::Length(2),
-        ])
-        .split(inner_area);
-
-        if state.addon_input_active {
-            let label = "Enter Custom Manifest URL:";
-            let lines = vec![
-                ratatui::text::Line::from(vec![
-                    ratatui::text::Span::raw(" "),
-                    ratatui::text::Span::styled(label, theme.sapphire),
-                ]),
-                ratatui::text::Line::from(vec![
-                    ratatui::text::Span::styled(" ❯ ", theme.sapphire),
-                    ratatui::text::Span::styled(&state.addon_input_buffer, theme.text),
-                    ratatui::text::Span::styled("█", theme.rating),
-                ]),
-            ];
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(lines)
-                    .wrap(ratatui::widgets::Wrap { trim: false }),
-                sections[0],
-            );
-        } else {
-            let items: Vec<ratatui::widgets::ListItem> = options
-                .iter()
-                .enumerate()
-                .map(|(index, opt)| {
-                    let style = if index == state.addon_wizard_selected {
-                        theme.text.add_modifier(Modifier::BOLD)
-                    } else {
-                        theme.text
-                    };
-                    ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
-                        ratatui::text::Span::raw(" "),
-                        ratatui::text::Span::styled(opt.label(), style),
-                    ]))
-                })
-                .collect();
-
-            let list = ratatui::widgets::List::new(items)
-                .highlight_style(crate::tui::overlay::selection_style(
-                    theme,
-                    state.basic_terminal,
-                ))
-                .highlight_symbol(if state.basic_terminal { "> " } else { "▌ " });
-
-            let mut list_state = ratatui::widgets::ListState::default();
-            list_state.select(Some(state.addon_wizard_selected));
-            frame.render_stateful_widget(list, sections[0], &mut list_state);
-        }
-
-        let footer = if state.addon_input_active {
-            ratatui::text::Line::from(vec![
-                crate::tui::overlay::key_hint("Enter", "Submit", theme),
-                ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Esc", "Cancel", theme),
-            ])
-        } else {
-            ratatui::text::Line::from(vec![
-                crate::tui::overlay::key_hint("↑↓", "Move", theme),
-                ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Enter", "Select", theme),
-                ratatui::text::Span::raw("  "),
-                crate::tui::overlay::key_hint("Esc", "Close", theme),
-            ])
-        };
-
-        frame.render_widget(
-            ratatui::widgets::Paragraph::new(footer)
-                .alignment(ratatui::layout::Alignment::Center)
-                .block(
-                    ratatui::widgets::Block::default()
-                        .borders(ratatui::widgets::Borders::TOP)
-                        .border_style(theme.muted),
-                ),
-            sections[1],
-        );
-    }
-
     if state.addon_manager_popup {
         let rows = state.addon_manager_rows();
         let total_rows = rows.len();
@@ -1305,12 +1198,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
                                 ratatui::text::Span::raw(" "),
                                 ratatui::text::Span::styled("[ Add Manifest URL ]", theme.sapphire),
-                            ]))
-                        }
-                        AddonManagerRow::SetupWizard => {
-                            ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
-                                ratatui::text::Span::raw(" "),
-                                ratatui::text::Span::styled("[ Setup Wizard ]", theme.rating),
                             ]))
                         }
                         AddonManagerRow::Done => {

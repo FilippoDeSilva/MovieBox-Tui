@@ -6,7 +6,7 @@
 - **Addon Mode (Community HTTP Addons)**:
   - Added full support for community HTTP addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`) with dedicated `Ctrl+A` mode switching.
   - Pre-installed and locked Cinemeta out-of-the-box as the default core metadata provider with zero API keys required.
-  - Added interactive Addon Manager dialog (`/addons`, `Ctrl+P` in Addon Mode) and Addon Setup Wizard (`/addon-setup`, `/wizard`).
+    - Added interactive Addon Manager dialog (`/addons`, `Ctrl+P` in Addon Mode) with one-click enabling, removal, and manifest URL adding.
   - Added concurrent multi-addon stream resolution aggregating playable releases from all enabled stream addons.
 - **Dynamic Multi-Source Host & Resolver Resolution**:
   - Added 100% dynamic domain-based host extractor (`extract_domain_label`) and stream tag parser (`detect_stream_host`) identifying and formatting direct hosts (Pixeldrain, Hubcloud, Fast Download, Google Drive, Mega, etc.) and debrid resolvers without hardcoded tables.
@@ -15,7 +15,7 @@
   - Standardized checkbox representations to clean ASCII `[x] / [ ]`.
 - **Complete Mouse Navigation**:
   - Added dynamic footer hitboxes for `[Ctrl+S] Streaming`, `[Ctrl+T] TV`, `[Ctrl+A] Addons`, `[Ctrl+P] {Provider}`, `[?] Help`, `[q] Quit`.
-  - Added complete mouse click support for Addon Manager and Setup Wizard modals.
+  - Added complete mouse click support for Addon Manager modal.
 
 ### Fixed
 - **Resilient Addon Metadata & Fallbacks**:

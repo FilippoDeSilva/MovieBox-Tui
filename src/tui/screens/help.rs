@@ -94,10 +94,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Open Addons Manager", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    /addon-setup   ", theme.header),
-            Span::styled("Open Addon Setup Wizard", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
             Span::styled("    [Enter]        ", theme.header),
             Span::styled("Select Movie / Play Stream", theme.text),
         ]));

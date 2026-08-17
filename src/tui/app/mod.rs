@@ -248,24 +248,11 @@ impl App {
             AddonManagerRow::AddUrl => {
                 self.action_sender.send(Action::AddonInputToggle(true)).ok();
             }
-            AddonManagerRow::SetupWizard => {
-                self.action_sender.send(Action::ShowAddonWizard).ok();
-            }
             AddonManagerRow::Done => {
                 self.reset_transient_overlays();
                 self.state.addon_manager_popup = false;
             }
             AddonManagerRow::Header(_) => {}
-        }
-    }
-
-    fn addon_wizard_activate(&mut self) {
-        use crate::tui::state::AddonWizardOption;
-        let selected = self.state.addon_wizard_selected;
-        if selected < AddonWizardOption::ALL.len() {
-            self.action_sender
-                .send(Action::AddonWizardSelect(selected))
-                .ok();
         }
     }
 }

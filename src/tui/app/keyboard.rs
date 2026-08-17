@@ -231,67 +231,6 @@ impl App {
             },
             InputMode::Normal => match self.state.active_screen {
                 Screen::Home => {
-                    if self.state.addon_wizard_popup {
-                        if self.state.addon_input_active {
-                            match key.code {
-                                KeyCode::Esc => {
-                                    self.state.addon_input_active = false;
-                                    self.state.addon_input_buffer.clear();
-                                }
-                                KeyCode::Enter => {
-                                    let buffer = self.state.addon_input_buffer.trim().to_string();
-                                    self.state.addon_input_active = false;
-                                    self.state.addon_input_buffer.clear();
-                                    if !buffer.is_empty() {
-                                        self.action_sender
-                                            .send(Action::AddonAddManifest(buffer))
-                                            .ok();
-                                    }
-                                }
-                                KeyCode::Backspace => {
-                                    crate::tui::text::remove_last_grapheme(
-                                        &mut self.state.addon_input_buffer,
-                                    );
-                                }
-                                KeyCode::Char(c) if !c.is_control() => {
-                                    self.state.addon_input_buffer.push(c);
-                                }
-                                _ => {}
-                            }
-                            return None;
-                        }
-                        match key.code {
-                            KeyCode::Esc => {
-                                self.reset_transient_overlays();
-                                self.state.addon_wizard_popup = false;
-                            }
-                            KeyCode::Up => {
-                                self.state.addon_wizard_selected =
-                                    if self.state.addon_wizard_selected == 0 {
-                                        crate::tui::state::AddonWizardOption::ALL
-                                            .len()
-                                            .saturating_sub(1)
-                                    } else {
-                                        self.state.addon_wizard_selected - 1
-                                    };
-                            }
-                            KeyCode::Down => {
-                                let total = crate::tui::state::AddonWizardOption::ALL.len();
-                                self.state.addon_wizard_selected =
-                                    if self.state.addon_wizard_selected + 1 >= total {
-                                        0
-                                    } else {
-                                        self.state.addon_wizard_selected + 1
-                                    };
-                            }
-                            KeyCode::Enter => {
-                                self.addon_wizard_activate();
-                            }
-                            _ => {}
-                        }
-                        return None;
-                    }
-
                     if self.state.addon_manager_popup {
                         if self.state.addon_input_active {
                             match key.code {

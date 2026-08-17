@@ -162,8 +162,6 @@ pub struct AppState {
     pub addons_enabled: bool,
     pub installed_addons: Vec<crate::providers::addons::models::InstalledAddon>,
     pub addon_client: crate::providers::addons::AddonClient,
-    pub addon_wizard_popup: bool,
-    pub addon_wizard_selected: usize,
     pub addon_manager_popup: bool,
     pub addon_manager_selected: usize,
     pub addon_input_active: bool,
@@ -294,8 +292,6 @@ impl Default for AppState {
             addons_enabled: false,
             installed_addons: Vec::new(),
             addon_client: crate::providers::addons::AddonClient::new(),
-            addon_wizard_popup: false,
-            addon_wizard_selected: 0,
             addon_manager_popup: false,
             addon_manager_selected: 0,
             addon_input_active: false,
@@ -373,27 +369,7 @@ pub enum AddonManagerRow {
     Header(&'static str),
     Addon(usize),
     AddUrl,
-    SetupWizard,
     Done,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AddonWizardOption {
-    Cinemeta,
-    AnimeKitsu,
-    CustomUrl,
-}
-
-impl AddonWizardOption {
-    pub const ALL: [Self; 3] = [Self::Cinemeta, Self::AnimeKitsu, Self::CustomUrl];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Cinemeta => "Cinemeta (Official Catalog & Metadata · Free)",
-            Self::AnimeKitsu => "Anime Kitsu (Anime Metadata · Free)",
-            Self::CustomUrl => "Custom Catalog / Manifest URL",
-        }
-    }
 }
 
 impl AppState {
@@ -423,7 +399,6 @@ impl AppState {
             rows.push(AddonManagerRow::Addon(index));
         }
         rows.push(AddonManagerRow::AddUrl);
-        rows.push(AddonManagerRow::SetupWizard);
         rows.push(AddonManagerRow::Done);
         rows
     }

@@ -16,7 +16,7 @@ layout, runtime behavior, and operational workflows in prose tied to the source 
 | [cache.md](cache.md)                         | Cache layout, namespaces, TTLs, atomic writes, purge                            | current |
 | [logging.md](logging.md)                     | File logging, `MOVIEBOX_LOG`, rotation, sanitization, sharing logs              | current |
 | [tv-mode.md](tv-mode.md)                     | User-owned M3U playlists, manager, search, playback, config                     | current |
-| [addons-mode.md](addons-mode.md)             | Community HTTP addons, Setup Wizard, streams aggregation, config                | current |
+| [addons-mode.md](addons-mode.md)             | Community HTTP addons, Addon Manager, streams aggregation, config               | current |
 | [config.md](config.md)                       | `config.json` fields and `MOVIEBOX_*` environment variables                     | current |
 | [downloads.md](downloads.md)                 | Download engine: resume, ranges, segments, retry, cancel                        | current |
 | [cross-platform.md](cross-platform.md)       | OS support, terminal protocols, Termux, focus handling                          | current |

@@ -42,7 +42,7 @@ impl App {
                     self.state.active_provider = crate::providers::models::ProviderKind::Addons;
                     self.load_installed_addons_from_config();
                     if self.state.installed_addons.is_empty() {
-                        self.action_sender.send(Action::ShowAddonWizard).ok();
+                        self.action_sender.send(Action::ShowAddonManager).ok();
                     } else {
                         self.state.set_status("Addon mode active.".to_string(), 150);
                     }
@@ -75,22 +75,11 @@ impl App {
             Action::ShowAddonManager => {
                 self.reset_transient_overlays();
                 self.state.addon_manager_popup = true;
-                self.state.addon_wizard_popup = false;
                 self.state.input_mode = crate::tui::state::InputMode::Normal;
                 self.state.addon_manager_selected = 1;
                 self.state.addon_input_active = false;
                 self.state.addon_input_buffer.clear();
                 self.load_installed_addons_from_config();
-            }
-
-            Action::ShowAddonWizard => {
-                self.reset_transient_overlays();
-                self.state.addon_wizard_popup = true;
-                self.state.addon_manager_popup = false;
-                self.state.input_mode = crate::tui::state::InputMode::Normal;
-                self.state.addon_wizard_selected = 0;
-                self.state.addon_input_active = false;
-                self.state.addon_input_buffer.clear();
             }
 
             Action::AddonAddManifest(manifest_url) => {
@@ -169,28 +158,6 @@ impl App {
                     }
                 }
             }
-
-            Action::AddonWizardSelect(index) => match index {
-                0 => {
-                    self.action_sender
-                        .send(Action::AddonAddManifest(
-                            "https://v3-cinemeta.strem.io/manifest.json".to_string(),
-                        ))
-                        .ok();
-                }
-                1 => {
-                    self.action_sender
-                        .send(Action::AddonAddManifest(
-                            "https://anime-kitsu.strem.fun/manifest.json".to_string(),
-                        ))
-                        .ok();
-                }
-                2 => {
-                    self.state.addon_input_active = true;
-                    self.state.addon_input_buffer.clear();
-                }
-                _ => {}
-            },
 
             Action::AddonInputToggle(active) => {
                 self.state.addon_input_active = active;

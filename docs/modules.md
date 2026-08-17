@@ -96,7 +96,7 @@ src/
     system.rs        handle_system: tick/quit/focus/resize/help/refresh/cache/
                      theme/status/updates.
     tv.rs            handle_tv: playlist manager + TV actions.
-    addons.rs        handle_addons: addon manager + Setup Wizard + HTTP addon actions.
+    addons.rs        handle_addons: addon manager + HTTP addon actions.
 ```
 
 See [architecture.md](architecture.md) for the event loop, async model and data flow,

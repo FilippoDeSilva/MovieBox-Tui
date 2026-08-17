@@ -36,7 +36,6 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 
 ### Addon Mode (HTTP Addons)
 - **`Ctrl+P` / `/addons`**: Open Addon Manager dialog.
-- **`/addon-setup` / `/wizard`**: Open Addon Setup Wizard.
 - **`Enter`**: Select title or play resolved stream.
 - **`o`**: Open player selection picker for the stream.
 - **`d`**: Download HTTP stream release.
@@ -67,7 +66,6 @@ Type these commands directly into the search bar:
 | `/reload` | TV | Reload M3U playlists |
 | `/config` | TV / Addon | Manage custom IPTV playlists (in TV) or Addons (in Addon mode) |
 | `/addons` | Addon / All | Open Addon Manager modal |
-| `/addon-setup` | Addon / All | Open Addon Setup Wizard |
 | `/enable-addons` | All | Enable Addon Mode navigation |
 | `/disable-addons` | All | Disable Addon Mode navigation |
 | `/download-dir` | All | View, change, or reset the download directory |

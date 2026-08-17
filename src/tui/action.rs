@@ -23,11 +23,9 @@ pub enum Action {
     TvReloadPlaylists,
     TvInputToggle(bool),
     ShowAddonManager,
-    ShowAddonWizard,
     AddonAddManifest(String),
     AddonToggleEnabled(usize),
     AddonRemove(usize),
-    AddonWizardSelect(usize),
     AddonInputToggle(bool),
     Search {
         query: String,

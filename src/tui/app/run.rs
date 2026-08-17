@@ -169,11 +169,9 @@ impl App {
             Action::ToggleAddonMode
             | Action::SwitchToStreamingMode
             | Action::ShowAddonManager
-            | Action::ShowAddonWizard
             | Action::AddonAddManifest(..)
             | Action::AddonToggleEnabled(..)
             | Action::AddonRemove(..)
-            | Action::AddonWizardSelect(..)
             | Action::AddonInputToggle(..) => {
                 self.handle_addons(action).await;
             }

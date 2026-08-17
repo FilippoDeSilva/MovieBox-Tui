@@ -19,7 +19,6 @@ impl App {
                         commands.push("/config");
                     } else if self.state.is_addon_mode {
                         commands.push("/addons");
-                        commands.push("/addon-setup");
                         commands.push("/config");
                     } else {
                         commands.push("/browse");
@@ -43,7 +42,6 @@ impl App {
                     if self.state.addons_enabled {
                         commands.push("/disable-addons");
                         commands.push("/addons");
-                        commands.push("/addon-setup");
                     } else {
                         commands.push("/enable-addons");
                     }

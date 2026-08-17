@@ -217,33 +217,6 @@ impl App {
             return true;
         }
 
-        if self.state.addon_wizard_popup {
-            use crate::tui::state::AddonWizardOption;
-            let options = AddonWizardOption::ALL;
-            let count = options.len();
-            let popup_width = 72u16.min(area.width.saturating_sub(4)).max(50);
-            let popup_height = if self.state.addon_input_active {
-                7u16
-            } else {
-                (count as u16).saturating_add(6)
-            };
-            let popup = centered_rect(area, popup_width, popup_height, 36, 76);
-            if popup.contains(ratatui::layout::Position::new(col, row)) {
-                if !self.state.addon_input_active {
-                    let item_start_y = popup.y + 1;
-                    if row >= item_start_y && (row - item_start_y) < count as u16 {
-                        let clicked_idx = (row - item_start_y) as usize;
-                        self.state.addon_wizard_selected = clicked_idx;
-                        self.addon_wizard_activate();
-                    }
-                }
-            } else {
-                self.state.addon_wizard_popup = false;
-                self.state.addon_input_active = false;
-            }
-            return true;
-        }
-
         if self.state.addon_manager_popup {
             let rows = self.state.addon_manager_rows();
             let total_rows = rows.len();
