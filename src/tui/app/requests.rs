@@ -16,13 +16,16 @@ impl App {
                     let mut commands = Vec::new();
                     if self.state.is_tv_mode {
                         commands.push("/list");
+                        commands.push("/reload");
                         commands.push("/config");
                     } else if self.state.is_addon_mode {
                         commands.push("/addons");
-                        commands.push("/config");
                     } else {
                         commands.push("/browse");
                         commands.push("/history");
+                        if self.state.addons_enabled {
+                            commands.push("/addons");
+                        }
                     }
                     commands.push("/download-dir");
                     commands.push("/download-dir <path>");
@@ -41,7 +44,6 @@ impl App {
                     }
                     if self.state.addons_enabled {
                         commands.push("/disable-addons");
-                        commands.push("/addons");
                     } else {
                         commands.push("/enable-addons");
                     }

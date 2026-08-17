@@ -64,8 +64,8 @@ Type these commands directly into the search bar:
 | `/history` | Streaming | View watch history with latest progress |
 | `/list` | TV | View live TV channels |
 | `/reload` | TV | Reload M3U playlists |
-| `/config` | TV / Addon | Manage custom IPTV playlists (in TV) or Addons (in Addon mode) |
-| `/addons` | Addon / All | Open Addon Manager modal |
+| `/config` | TV | Manage custom IPTV playlists |
+| `/addons` | Addon / Streaming | Open Addon Manager dialog |
 | `/enable-addons` | All | Enable Addon Mode navigation |
 | `/disable-addons` | All | Disable Addon Mode navigation |
 | `/download-dir` | All | View, change, or reset the download directory |
