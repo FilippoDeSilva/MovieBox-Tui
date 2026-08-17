@@ -15,6 +15,11 @@
   - Intercepted all `/` slash commands to guarantee zero remote catalog network requests.
   - Added warning toast notifications for unrecognized slash commands (`"Command '/xyz' is not recognized. Type '/' to view available commands."`).
   - Added platform-aware mode-guidance toasts (`^T` / `^S` / `^A` on macOS, `Ctrl+T` / `Ctrl+S` / `Ctrl+A` on Linux/Windows) for mode-restricted commands.
+- **Active Mode & Provider State Persistence**:
+  - Added `active_mode` configuration field in `config.json` automatically persisting and restoring the last active mode (`streaming`, `tv`, `addon`) and active provider across app restarts.
+- **Configurable Mode Navigation**:
+  - Added `/enable-streaming`, `/disable-streaming`, `/enable-tv`, and `/disable-tv` slash commands alongside `/enable-addons` and `/disable-addons`.
+  - Enforced safety validation ensuring at least one mode remains active and gracefully migrating focus when disabling the current mode.
 - **Dynamic Multi-Source Host & Resolver Resolution**:
   - Added 100% dynamic domain-based host extractor (`extract_domain_label`) and stream tag parser (`detect_stream_host`) identifying and formatting direct hosts (Pixeldrain, Hubcloud, Fast Download, Google Drive, Mega, etc.) and debrid resolvers without hardcoded tables.
 - **Full Emoji & Symbol Sanitization**:
@@ -46,6 +51,13 @@
   - Maintained visibility of Audio Languages, Seasons, and Episodes selector tabs side-by-side in standard ~80-column terminals when focusing Streams, preventing tabs from disappearing when 0 streams are available.
 
 ### Changed
+- **Modular TV Provider Architecture**:
+  - Reorganized Live TV / IPTV provider into a dedicated module directory (`src/providers/tv/`) with separated `models.rs` and `parser.rs`.
+- **Core Infrastructure Consolidation**:
+  - Centralized atomic file operations (`atomic_write_file`, `atomic_write_file_async`), MD5 digest formatting (`md5_hex`), and text extraction helpers in `cache.rs` and `service.rs`.
+  - Centralized application paths, border type resolution, and mode status announcements across TUI modules.
+- **Addon Manager UI Optimization**:
+  - Compacted the Addon Manager dialog with an aligned two-tier layout placing `[ Add Manifest URL ]` and `[ Done ]` action buttons side-by-side.
 - **Multi-System Core Module Decoupling**:
   - Promoted `player.rs` (process management & detection), `config.rs` (shared configuration), and `updater.rs` (release checks) to core modules in `src/`, preparing the architecture for upcoming CLI and GUI frontends with full backward compatibility.
 

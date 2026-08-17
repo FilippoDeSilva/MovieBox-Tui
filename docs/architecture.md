@@ -44,11 +44,13 @@ src/
                                 episode-stream actions
       navigation.rs             list navigation, submit actions, provider helpers
       tv.rs                     TV mode: playlist manager + playback
+      addons.rs                 Addon mode: addon manager + HTTP addon actions
       keyboard.rs               raw key-event handling
       mouse.rs                  mouse click handling and hitbox routing
       system.rs                 help, refresh, cache, theme, updates, focus, resize
     state.rs                    AppState: all UI state + in-memory LRU caches
     action.rs                   the Action enum (event/message model)
+    commands.rs                 Slash command registry, parsing, and suggestions
     event.rs                    EventHandler: input events + tick → Action channel
     overlay.rs                  popups, pickers, notifications
     screens/                    render-only modules (home, details, help)
@@ -105,7 +107,8 @@ interval, forwarding them into the action channel (capacity 128).
 
 ## Configuration and persistence
 
-- `config.json` — settings (theme, provider, auto-update, `default_player`, BDIX) in the config dir.
+- `config.json` — settings (mode persistence, mode toggles, theme, provider, auto-update, `default_player`, download directory, BDIX) in the config dir.
+- `addons_config.json` — installed HTTP community addons in the config dir.
 - `tv_config.json` — user M3U playlist sources (URLs or file paths) in the config dir.
 - `history.json` — watch history in the system data dir.
 - Cache lives under the system cache dir, keyed per provider.

@@ -9,10 +9,13 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | ------------------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
 | `auto_update`       | bool           | Check for updates on startup (max once/hour).                                                               |
 | `last_update_check` | u64            | Epoch seconds of the last update check.                                                                     |
+| `active_mode`       | string         | Last active mode (`streaming`, `tv`, `addon`) restored on startup.                                         |
 | `active_provider`   | string         | Last provider (`moviebox`, `fourkhdhub`, …).                                                                |
 | `active_theme`      | string         | Theme name.                                                                                                 |
 | `bdix_enabled`      | bool           | Show BDIX providers (Bangladesh-only).                                                                      |
-| `addons_enabled`    | bool           | Enable Addon Mode (HTTP community addons).                                                                  |
+| `streaming_enabled` | bool           | Enable Streaming Mode navigation in bottom dock (`/enable-streaming`, `/disable-streaming`).                 |
+| `tv_enabled`        | bool           | Enable TV Mode navigation in bottom dock (`/enable-tv`, `/disable-tv`).                                     |
+| `addons_enabled`    | bool           | Enable Addon Mode navigation in bottom dock (`/enable-addons`, `/disable-addons`).                          |
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
 | `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
 

@@ -14,8 +14,9 @@ src/
   cache.rs           Disk cache: provider-namespaced directories, TTL expiry,
                      atomic temp-file writes, payload validation, background purge.
 
-  config.rs          Config struct: load/save config.json (provider, theme,
-                     auto-update, default player, bdix flag).
+  config.rs          Config struct: load/save config.json (mode persistence,
+                     mode toggles, provider, theme, auto-update, default player,
+                     download directory, bdix flag).
 
   download.rs        Download engine (pure, async): resume via .part files,
                      HTTP ranges, optional multi-segment download, retries, cancel
@@ -63,6 +64,8 @@ src/
   tui/
     action.rs        The Action enum: every UI event/message (input, network
                      results, downloads, playback, tv, system).
+    commands.rs      Slash command registry (SlashCommand enum, argument parsing,
+                     availability filters, dynamic suggestions, descriptions).
     state.rs         AppState: all UI state, LRU image/preview caches, and the
                      PlayerKind enum + label()/parse(), tv manager row model.
     event.rs         EventHandler: crossterm event stream + tick interval,

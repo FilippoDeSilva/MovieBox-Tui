@@ -23,7 +23,7 @@ git config core.hooksPath .githooks
 cargo run --release
 ```
 
-To test playback and download features locally, install `mpv` (see the [README](README.md#requirements)).
+To test playback and download features locally, install `mpv` (see [Media Players](docs/players.md)).
 
 ## Project layout
 
@@ -34,11 +34,12 @@ Short version:
 
 - `src/tui/app/`: The application object (`App`). `run.rs` holds the thin
   `handle_action` dispatcher that routes every `Action` to a `handle_*` method in its
-  module (`run.rs`, `requests.rs`, `playback.rs`, `download.rs`, `navigation.rs`,
-  `tv.rs`, `system.rs`, `keyboard.rs`, `network.rs`).
-- `src/tui/`: UI state, event loop plumbing, player commands, screens, themes.
-- `src/providers/`: HTTP clients for the streaming sources (`moviebox`, `fourkhdhub`,
-  `bdix`), plus `m3u.rs` for TV playlists.
+  module (`run.rs`, `requests.rs`, `search.rs`, `playback.rs`, `download.rs`,
+  `navigation.rs`, `tv.rs`, `addons.rs`, `keyboard.rs`, `mouse.rs`, `system.rs`, `network.rs`).
+- `src/tui/`: UI state, event loop plumbing, slash commands (`commands.rs`), screens, themes.
+- `src/providers/`: HTTP clients for streaming sources (`moviebox`, `fourkhdhub`,
+  `bdix`), community HTTP addons (`addons/`), and Live TV playlists (`tv/`).
+- `src/service.rs`: Unified headless multi-provider client & engine.
 - `src/download.rs`: Background media downloading.
 - `src/cache.rs`: Local disk caching to minimize API calls.
 

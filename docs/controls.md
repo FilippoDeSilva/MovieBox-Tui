@@ -64,10 +64,14 @@ Type these commands directly into the search bar:
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
 | `/history` | Streaming | View watch history with latest progress |
 | `/list` | TV | View live TV channels |
-| `/reload` | TV / Streaming / Addon | Reload active playlist, catalog, or search results |
+| `/reload` | TV / Streaming / Addon | Reload active playlist (TV) or refresh catalog & search results |
 | `/config` | TV / Addon | Manage IPTV playlists (TV) or Addon Manager (Addon Mode) |
 | `/addons` | Addon / Streaming | Open Addon Manager dialog |
-| `/enable-addons` | All | Enable Addon Mode navigation |
+| `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |
+| `/disable-streaming` | All | Disable Streaming Mode navigation |
+| `/enable-tv` | All | Enable TV Mode navigation in bottom dock |
+| `/disable-tv` | All | Disable TV Mode navigation |
+| `/enable-addons` | All | Enable Addon Mode navigation in bottom dock |
 | `/disable-addons` | All | Disable Addon Mode navigation |
 | `/download-dir` | All | View, change, or reset the download directory |
 | `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight) |
