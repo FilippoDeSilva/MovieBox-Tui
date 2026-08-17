@@ -10,14 +10,14 @@ pub async fn aggregate_streams(
     season: usize,
     episode: usize,
     is_series: bool,
-) -> Vec<Release> {
+) -> (Vec<Release>, Vec<String>) {
     let stream_addons: Vec<&InstalledAddon> = addons
         .iter()
         .filter(|a| a.enabled && a.provides_stream)
         .collect();
 
     if stream_addons.is_empty() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
 
     let media_type = if is_series { "series" } else { "movie" };
@@ -42,25 +42,33 @@ pub async fn aggregate_streams(
             match streams_res {
                 Ok(items) => {
                     let mut releases = Vec::new();
-                    for item in items {
+                    for item in &items {
                         if let Some(rel) =
-                            stream_item_to_release(&addon_name, &item, season, episode)
+                            stream_item_to_release(&addon_name, item, season, episode)
                         {
                             releases.push(rel);
                         }
                     }
-                    releases
+                    if !items.is_empty() && releases.is_empty() {
+                        (releases, Some(addon_name))
+                    } else {
+                        (releases, None)
+                    }
                 }
-                Err(_) => Vec::new(),
+                Err(_) => (Vec::new(), None),
             }
         }));
     }
 
     let results = futures::future::join_all(tasks).await;
     let mut all_releases = Vec::new();
+    let mut blocked_addons = Vec::new();
 
-    for releases in results.into_iter().flatten() {
-        all_releases.extend(releases);
+    for res in results.into_iter().flatten() {
+        all_releases.extend(res.0);
+        if let Some(blocked) = res.1 {
+            blocked_addons.push(blocked);
+        }
     }
 
     all_releases.sort_by(|a, b| {
@@ -83,7 +91,7 @@ pub async fn aggregate_streams(
         }
     });
 
-    all_releases
+    (all_releases, blocked_addons)
 }
 
 fn quality_score(quality: Option<&str>) -> u32 {

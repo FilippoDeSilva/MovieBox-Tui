@@ -1487,10 +1487,18 @@ impl App {
                             return;
                         }
 
-                        let releases = crate::providers::addons::aggregate_streams(
-                            &client, &addons, &id, season, episode, is_series,
-                        )
-                        .await;
+                        let (releases, blocked_addons) =
+                            crate::providers::addons::aggregate_streams(
+                                &client, &addons, &id, season, episode, is_series,
+                            )
+                            .await;
+
+                        if !blocked_addons.is_empty() {
+                            sender.send(Action::SetStatus(format!(
+                                "Warning: {} streams blocked (raw torrents). Only HTTP streams are supported.",
+                                blocked_addons.join(", ")
+                            ))).ok();
+                        }
 
                         if !releases.is_empty() {
                             sender
