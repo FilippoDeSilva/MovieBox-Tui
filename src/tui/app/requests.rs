@@ -124,6 +124,10 @@ impl App {
             }
 
             Action::SelectSuggestion { query } => {
+                self.state.search_query = query.clone();
+                self.state.suggest_index = None;
+                self.state.search_suggestions.clear();
+                self.state.input_mode = InputMode::Normal;
                 self.action_sender
                     .send(Action::Search {
                         query,

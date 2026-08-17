@@ -59,7 +59,7 @@ pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&
     crate::tui::commands::SlashCommand::description_for(cmd, state)
 }
 
-fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
+pub(crate) fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
     let query_width = if state.search_query.is_empty() {
         crate::tui::text::width(if state.is_tv_mode {
             "Search live channels…"

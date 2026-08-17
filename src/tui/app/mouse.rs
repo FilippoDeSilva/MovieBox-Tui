@@ -247,11 +247,11 @@ impl App {
     }
 
     fn handle_home_mouse(&mut self, col: u16, row: u16, area: Rect) -> Option<Action> {
-        let is_landing = self.state.search_results.is_empty()
-            && (self.state.search_query.trim().is_empty()
-                || (self.state.is_tv_mode && !self.state.is_loading));
-
+        let is_landing = self.state.search_results.is_empty();
         let logo_height = if self.state.basic_terminal { 2 } else { 6 };
+        let search_width =
+            crate::tui::screens::home::search_deck_width(area, &self.state, is_landing);
+
         let search_bar_area = if is_landing {
             let vertical_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -266,65 +266,28 @@ impl App {
                 ])
                 .split(area);
 
-            let s_width = if self.state.basic_terminal {
-                54
-            } else {
-                (area.width.saturating_sub(4)).clamp(24, 76)
-            };
-            let s_bar = centered_width_rect(vertical_chunks[4], s_width);
-
             let footer = vertical_chunks[6];
             if row == footer.y {
                 self.handle_home_footer_click(col, area.width);
                 return None;
             }
 
-            s_bar
+            centered_width_rect(vertical_chunks[4], search_width)
         } else {
-            let has_results = !self.state.search_results.is_empty();
-            let suggestion_height = if self.state.input_mode == InputMode::Editing
-                && !self.state.search_suggestions.is_empty()
-            {
-                self.state.search_suggestions.len().min(6) as u16 + 3
-            } else {
-                0
-            };
-            let chunks = if has_results {
-                Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Min(0),
-                    ])
-                    .split(area)
-            } else {
-                Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(suggestion_height),
-                        Constraint::Length(0),
-                        Constraint::Min(0),
-                    ])
-                    .split(area)
-            };
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                ])
+                .split(area);
 
-            if has_results {
-                Rect {
-                    x: chunks[0].x + 2,
-                    y: chunks[0].y,
-                    width: chunks[0].width.saturating_sub(4),
-                    height: chunks[0].height,
-                }
-            } else {
-                let base_width = if self.state.basic_terminal {
-                    54
-                } else {
-                    (area.width.saturating_sub(4)).clamp(24, 76)
-                };
-                centered_width_rect(chunks[0], base_width)
+            Rect {
+                x: chunks[0].x + 2,
+                y: chunks[0].y,
+                width: chunks[0].width.saturating_sub(4),
+                height: chunks[0].height,
             }
         };
 
