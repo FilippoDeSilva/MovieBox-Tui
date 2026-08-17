@@ -376,7 +376,7 @@ impl App {
         let ctrl_p = crate::tui::text::ctrl_key("P");
 
         let mut buttons: Vec<(ModeBtn, u16)> = Vec::new();
-        let sep = 3_u16;
+        let sep = 5_u16;
 
         let is_streaming = !self.state.is_tv_mode && !self.state.is_addon_mode;
         let b1_len = if is_streaming {
@@ -442,7 +442,7 @@ impl App {
         }
 
         let buttons: [(UtilBtn, u16); 2] = [(UtilBtn::Help, 8), (UtilBtn::Quit, 8)];
-        let sep = 3_u16;
+        let sep = 5_u16;
 
         let total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
             + (buttons.len().saturating_sub(1) as u16) * sep;

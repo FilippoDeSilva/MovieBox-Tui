@@ -398,7 +398,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             mode_spans.push(Span::styled("Streaming", theme.text_dim));
         }
 
-        mode_spans.push(Span::raw("   "));
+        mode_spans.push(Span::raw("     "));
 
         if state.is_tv_mode {
             mode_spans.push(Span::styled("[ ", theme.text_dim));
@@ -415,7 +415,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
 
         if state.addons_enabled {
-            mode_spans.push(Span::raw("   "));
+            mode_spans.push(Span::raw("     "));
             if state.is_addon_mode {
                 mode_spans.push(Span::styled("[ ", theme.text_dim));
                 mode_spans.push(Span::styled(
@@ -441,7 +441,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             Span::styled("?", theme.shortcut),
             Span::styled("] ", theme.text_dim),
             Span::styled("Help", theme.text_dim),
-            Span::raw("   "),
+            Span::raw("     "),
             Span::styled("[", theme.text_dim),
             Span::styled("q", theme.shortcut),
             Span::styled("] ", theme.text_dim),
