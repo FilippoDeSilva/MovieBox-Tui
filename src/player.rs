@@ -40,12 +40,6 @@ impl PlayerKind {
     }
 }
 
-const MPV_WINDOWS: &str = r"C:\Program Files\mpv\mpv.exe";
-const MPV_MACOS: &str = "/Applications/mpv.app/Contents/MacOS/mpv";
-const VLC_WINDOWS: &str = r"C:\Program Files\VideoLAN\VLC\vlc.exe";
-const VLC_WINDOWS_X86: &str = r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe";
-const VLC_MACOS: &str = "/Applications/VLC.app/Contents/MacOS/VLC";
-
 pub fn detect() -> Vec<PlayerKind> {
     let mut players = Vec::new();
 
@@ -113,6 +107,23 @@ pub fn command(
     }
 }
 
+fn build_player_process_command(executable: &str) -> Command {
+    if executable.starts_with("flatpak run ") {
+        let parts = executable.split_whitespace().collect::<Vec<_>>();
+        let mut cmd = Command::new(parts.first().unwrap_or(&"flatpak"));
+        if parts.len() > 1 && parts[1] == "run" {
+            cmd.arg("run");
+            cmd.arg("--file-forwarding");
+            cmd.args(&parts[2..]);
+        } else {
+            cmd.args(&parts[1..]);
+        }
+        cmd
+    } else {
+        Command::new(executable)
+    }
+}
+
 fn android_intent_command(url: &str) -> Command {
     let mut command;
     if executable_on_path("termux-open") {
@@ -162,20 +173,7 @@ fn mpv_command(
         "mpv"
     };
     let executable = mpv_executable().unwrap_or_else(|| fallback.into());
-    let mut command = if executable.starts_with("flatpak run ") {
-        let parts = executable.split(' ').collect::<Vec<_>>();
-        let mut cmd = Command::new(parts.first().unwrap_or(&"flatpak"));
-        if parts.len() > 1 && parts[1] == "run" {
-            cmd.arg("run");
-            cmd.arg("--file-forwarding");
-            cmd.args(&parts[2..]);
-        } else {
-            cmd.args(&parts[1..]);
-        }
-        cmd
-    } else {
-        Command::new(&executable)
-    };
+    let mut command = build_player_process_command(&executable);
     let prefix = if iina { "--mpv-" } else { "--" };
 
     if let Some((width, height)) = window {
@@ -217,22 +215,12 @@ fn mpv_command(
         command.arg(format!("{prefix}http-header-fields={fields}"));
     }
     if let Some(subtitle) = subtitle {
-        if executable.starts_with("flatpak run ") {
-            let opt = if iina {
-                "--mpv-sub-files"
-            } else {
-                "--sub-file"
-            };
-            command.arg(opt);
-            command.arg("@@").arg(subtitle).arg("@@");
+        let opt = if iina {
+            "--mpv-sub-files"
         } else {
-            let opt = if iina {
-                "--mpv-sub-files"
-            } else {
-                "--sub-file"
-            };
-            command.arg(format!("{}={}", opt, subtitle));
-        }
+            "--sub-file"
+        };
+        command.arg(format!("{opt}={subtitle}"));
     }
 
     command.arg(url);
@@ -321,20 +309,8 @@ fn vlc_command(
         "vlc"
     };
     let executable = vlc_executable().unwrap_or_else(|| fallback.into());
-    let mut command = if executable.starts_with("flatpak run ") {
-        let parts = executable.split(' ').collect::<Vec<_>>();
-        let mut cmd = Command::new(parts.first().unwrap_or(&"flatpak"));
-        if parts.len() > 1 && parts[1] == "run" {
-            cmd.arg("run");
-            cmd.arg("--file-forwarding");
-            cmd.args(&parts[2..]);
-        } else {
-            cmd.args(&parts[1..]);
-        }
-        cmd
-    } else {
-        Command::new(&executable)
-    };
+    let mut command = build_player_process_command(&executable);
+
     if let Some((width, height)) = window {
         command
             .arg(format!("--width={width}"))
@@ -356,11 +332,7 @@ fn vlc_command(
         }
     }
     if let Some(subtitle) = subtitle {
-        if executable.starts_with("flatpak run ") {
-            command.arg("--sub-file").arg("@@").arg(subtitle).arg("@@");
-        } else {
-            command.arg(format!("--sub-file={subtitle}"));
-        }
+        command.arg(format!("--sub-file={subtitle}"));
     }
 
     command.arg(url);
@@ -374,26 +346,79 @@ fn mpv_executable() -> Option<String> {
             if let Some(executable) = configured_executable("MOVIEBOX_MPV_PATH") {
                 return Some(executable);
             }
-            let fallback = if cfg!(target_os = "windows") {
-                "mpv.exe"
-            } else {
-                "mpv"
-            };
-            #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
-            let mut paths = vec![MPV_WINDOWS.to_string(), MPV_MACOS.to_string()];
+
+            let mut candidates = Vec::new();
+
+            #[cfg(target_os = "windows")]
+            {
+                candidates.push(r"C:\Program Files\mpv\mpv.exe".to_string());
+                candidates.push(r"C:\Program Files (x86)\mpv\mpv.exe".to_string());
+                if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                    candidates.push(format!(r"{local}\Programs\mpv\mpv.exe"));
+                }
+                if let Ok(appdata) = std::env::var("APPDATA") {
+                    candidates.push(format!(r"{appdata}\mpv\mpv.exe"));
+                }
+                if let Some(home) = dirs::home_dir() {
+                    candidates.push(
+                        home.join(r"scoop\shims\mpv.exe")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+                candidates.push(r"C:\ProgramData\chocolatey\bin\mpv.exe".to_string());
+            }
+
             #[cfg(target_os = "macos")]
-            if let Some(home) = dirs::home_dir() {
-                paths.push(
-                    home.join("Applications/mpv.app/Contents/MacOS/mpv")
-                        .to_string_lossy()
-                        .into_owned(),
-                );
+            {
+                candidates.push("/Applications/mpv.app/Contents/MacOS/mpv".to_string());
+                if let Some(home) = dirs::home_dir() {
+                    candidates.push(
+                        home.join("Applications/mpv.app/Contents/MacOS/mpv")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+                candidates.push("/opt/homebrew/bin/mpv".to_string());
+                candidates.push("/usr/local/bin/mpv".to_string());
             }
-            #[cfg(windows)]
-            if let Ok(local) = std::env::var("LOCALAPPDATA") {
-                paths.push(format!(r"{local}\Programs\mpv\mpv.exe"));
+
+            #[cfg(target_os = "linux")]
+            {
+                if let Some(home) = dirs::home_dir() {
+                    candidates.push(
+                        home.join(".local/share/flatpak/exports/bin/io.mpv.Mpv")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+                candidates.push("/var/lib/flatpak/exports/bin/io.mpv.Mpv".to_string());
+                candidates.push("/snap/bin/mpv".to_string());
+                candidates.push("/var/lib/snapd/snap/bin/mpv".to_string());
+                candidates.push("/usr/bin/mpv".to_string());
+                candidates.push("/usr/local/bin/mpv".to_string());
+                candidates.push("/app/bin/mpv".to_string());
             }
-            first_executable(&paths, fallback).or_else(|| flatpak_executable("io.mpv.Mpv"))
+
+            for path in candidates {
+                if Path::new(&path).is_file() {
+                    return Some(path);
+                }
+            }
+
+            let bin_names = if cfg!(target_os = "windows") {
+                &["mpv.exe", "mpv"][..]
+            } else {
+                &["mpv", "io.mpv.Mpv"][..]
+            };
+
+            for bin in bin_names {
+                if let Some(path) = find_in_path(bin) {
+                    return Some(path);
+                }
+            }
+
+            flatpak_executable("io.mpv.Mpv")
         })
         .clone()
 }
@@ -405,39 +430,80 @@ fn vlc_executable() -> Option<String> {
             if let Some(executable) = configured_executable("MOVIEBOX_VLC_PATH") {
                 return Some(executable);
             }
-            let fallback = if cfg!(target_os = "windows") {
-                "vlc.exe"
-            } else {
-                "vlc"
-            };
 
-            #[cfg_attr(not(any(target_os = "macos", windows)), allow(unused_mut))]
-            let mut paths = vec![
-                VLC_WINDOWS.to_string(),
-                VLC_WINDOWS_X86.to_string(),
-                VLC_MACOS.to_string(),
-            ];
+            let mut candidates = Vec::new();
+
+            #[cfg(target_os = "windows")]
+            {
+                candidates.push(r"C:\Program Files\VideoLAN\VLC\vlc.exe".to_string());
+                candidates.push(r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe".to_string());
+                if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                    candidates.push(format!(r"{local}\Microsoft\WindowsApps\vlc.exe"));
+                    candidates.push(format!(r"{local}\Programs\VLC\vlc.exe"));
+                }
+                if let Ok(appdata) = std::env::var("APPDATA") {
+                    candidates.push(format!(r"{appdata}\vlc\vlc.exe"));
+                }
+                if let Some(home) = dirs::home_dir() {
+                    candidates.push(
+                        home.join(r"scoop\shims\vlc.exe")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+                candidates.push(r"C:\ProgramData\chocolatey\bin\vlc.exe".to_string());
+            }
 
             #[cfg(target_os = "macos")]
-            if let Some(home) = dirs::home_dir() {
-                paths.push(
-                    home.join("Applications/VLC.app/Contents/MacOS/VLC")
-                        .to_string_lossy()
-                        .into_owned(),
-                );
+            {
+                candidates.push("/Applications/VLC.app/Contents/MacOS/VLC".to_string());
+                if let Some(home) = dirs::home_dir() {
+                    candidates.push(
+                        home.join("Applications/VLC.app/Contents/MacOS/VLC")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+                candidates.push("/opt/homebrew/bin/vlc".to_string());
+                candidates.push("/usr/local/bin/vlc".to_string());
             }
 
-            #[cfg(windows)]
-            let windows_app_path = std::env::var("LOCALAPPDATA")
-                .map(|l| format!(r"{}\Microsoft\WindowsApps\vlc.exe", l))
-                .unwrap_or_default();
-
-            #[cfg(windows)]
-            if !windows_app_path.is_empty() {
-                paths.push(windows_app_path);
+            #[cfg(target_os = "linux")]
+            {
+                if let Some(home) = dirs::home_dir() {
+                    candidates.push(
+                        home.join(".local/share/flatpak/exports/bin/org.videolan.VLC")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+                candidates.push("/var/lib/flatpak/exports/bin/org.videolan.VLC".to_string());
+                candidates.push("/snap/bin/vlc".to_string());
+                candidates.push("/var/lib/snapd/snap/bin/vlc".to_string());
+                candidates.push("/usr/bin/vlc".to_string());
+                candidates.push("/usr/local/bin/vlc".to_string());
+                candidates.push("/app/bin/vlc".to_string());
             }
 
-            first_executable(&paths, fallback).or_else(|| flatpak_executable("org.videolan.VLC"))
+            for path in candidates {
+                if Path::new(&path).is_file() {
+                    return Some(path);
+                }
+            }
+
+            let bin_names = if cfg!(target_os = "windows") {
+                &["vlc.exe", "vlc"][..]
+            } else {
+                &["vlc", "org.videolan.VLC"][..]
+            };
+
+            for bin in bin_names {
+                if let Some(path) = find_in_path(bin) {
+                    return Some(path);
+                }
+            }
+
+            flatpak_executable("org.videolan.VLC")
         })
         .clone()
 }
@@ -446,7 +512,8 @@ fn vlc_executable() -> Option<String> {
 fn iina_available() -> bool {
     configured_executable("MOVIEBOX_IINA_PATH").is_some()
         || iina_app_exists()
-        || command_exists("iina")
+        || executable_on_path("iina")
+        || executable_on_path("iina-cli")
 }
 
 #[cfg(target_os = "macos")]
@@ -464,14 +531,15 @@ fn iina_cli_exists() -> bool {
     configured_executable("MOVIEBOX_IINA_PATH").is_some()
         || cli_global.exists()
         || cli_local.exists()
-        || command_exists("iina")
+        || executable_on_path("iina")
+        || executable_on_path("iina-cli")
 }
 
 fn flatpak_executable(app_id: &str) -> Option<String> {
     if !cfg!(target_os = "linux") {
         return None;
     }
-    if command_exists("flatpak") {
+    if executable_on_path("flatpak") {
         let mut cmd = Command::new("flatpak");
         cmd.arg("info")
             .arg(app_id)
@@ -480,79 +548,88 @@ fn flatpak_executable(app_id: &str) -> Option<String> {
         if cmd.output().map(|o| o.status.success()).unwrap_or(false) {
             return Some(format!("flatpak run {}", app_id));
         }
+
+        let mut user_cmd = Command::new("flatpak");
+        user_cmd
+            .arg("info")
+            .arg("--user")
+            .arg(app_id)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        if user_cmd
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return Some(format!("flatpak run {}", app_id));
+        }
     }
     None
 }
 
-fn first_executable(paths: &[String], fallback: &str) -> Option<String> {
-    paths
-        .iter()
-        .find(|path| Path::new(path).exists())
-        .cloned()
-        .or_else(|| command_exists(fallback).then(|| fallback.to_string()))
-}
-
 fn configured_executable(variable: &str) -> Option<String> {
-    std::env::var(variable)
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .filter(|value| Path::new(value).exists() || command_exists(value))
+    let val = std::env::var(variable).ok()?;
+    let trimmed = val.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.starts_with("flatpak run ")
+        || Path::new(trimmed).exists()
+        || executable_on_path(trimmed)
+    {
+        Some(trimmed.to_string())
+    } else {
+        None
+    }
 }
 
-fn command_exists(command: &str) -> bool {
-    let mut cmd = Command::new(command);
-    cmd.arg("--version")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
+fn find_in_path(name: &str) -> Option<String> {
+    if std::path::Path::new(name).is_file() {
+        return Some(name.to_string());
     }
-    cmd.output().is_ok_and(|output| output.status.success())
+    #[cfg(windows)]
+    if std::path::Path::new(&format!("{name}.exe")).is_file() {
+        return Some(format!("{name}.exe"));
+    }
+
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        let candidate = dir.join(name);
+        #[cfg(windows)]
+        {
+            let candidates = [
+                candidate.clone(),
+                candidate.with_extension("exe"),
+                candidate.with_extension("cmd"),
+            ];
+            for c in candidates {
+                if c.is_file() {
+                    return Some(c.to_string_lossy().into_owned());
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            if candidate.is_file() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if candidate
+                        .metadata()
+                        .map(|m| m.permissions().mode() & 0o111 != 0)
+                        .unwrap_or(false)
+                    {
+                        return Some(candidate.to_string_lossy().into_owned());
+                    }
+                }
+                #[cfg(not(unix))]
+                return Some(candidate.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
 }
 
 fn executable_on_path(name: &str) -> bool {
-    if std::path::Path::new(name).is_file() {
-        return true;
-    }
-    #[cfg(windows)]
-    if std::path::Path::new(&format!("{name}.exe")).is_file()
-        || std::path::Path::new(&format!("{name}.cmd")).is_file()
-    {
-        return true;
-    }
-
-    let Some(path) = std::env::var_os("PATH") else {
-        return false;
-    };
-    std::env::split_paths(&path).any(|dir| {
-        let candidate = dir.join(name);
-        #[cfg(windows)]
-        let candidates = vec![
-            candidate.clone(),
-            candidate.with_extension("exe"),
-            candidate.with_extension("cmd"),
-        ];
-        #[cfg(not(windows))]
-        let candidates = vec![candidate];
-
-        candidates.into_iter().any(|candidate| {
-            if !candidate.is_file() {
-                return false;
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                candidate
-                    .metadata()
-                    .map(|m| m.permissions().mode() & 0o111 != 0)
-                    .unwrap_or(false)
-            }
-            #[cfg(not(unix))]
-            {
-                true
-            }
-        })
-    })
+    find_in_path(name).is_some()
 }

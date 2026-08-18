@@ -10,6 +10,11 @@
   - Added cross-provider title-based history deduplication and auto-resume from the last watched position.
 - **Addon Mode Watch History Parity**:
   - Added full watch history support (`/history`) in Addon Mode matching Streaming Mode, enabling seamless watch progress tracking, scrub bars, and completion badges for community HTTP addon content.
+- **Universal Multi-OS Player Detection & Flathub/Snap Compatibility**:
+  - Added sub-millisecond, filesystem-backed player probing across Linux (Flathub, Flatpak exports, Snap, and Native), macOS (Homebrew, MacPorts, App Bundles), Windows (Program Files, WinApps, Scoop, Chocolatey, WinGet), and Android (Termux).
+  - Fixed Flathub/Flatpak VLC detection failure by adding direct probes for `~/.local/share/flatpak/exports/bin/org.videolan.VLC` and `/var/lib/flatpak/exports/bin/org.videolan.VLC`.
+  - Added full Flathub/Flatpak and Snap compatibility for MPV (`io.mpv.Mpv`, `/snap/bin/mpv`).
+  - Centralized player process construction (`build_player_process_command`) and standardized subtitle flag arguments (`--sub-file=<path>`) across all platforms.
 - **Codebase Optimization & Comprehensive Caching Architecture**:
   - Centralized application paths (`config_dir`, `data_dir`, `cache_dir`, `logs_dir`, `scripts_dir`, `playback_state_dir`) in `src/config.rs`.
   - Added dedicated disk caching for Addon Mode stream aggregation (`2h` TTL), catalog `/browse` presets (`1h` TTL), and verified manifests (`24h` TTL).
