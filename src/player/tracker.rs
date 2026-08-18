@@ -69,13 +69,11 @@ end)
 "#;
 
 pub fn ensure_tracker_script() -> Option<PathBuf> {
-    let mut path = dirs::data_dir()?;
-    path.push(crate::config::APP_NAME);
-    path.push("scripts");
-    if !path.exists() {
-        let _ = fs::create_dir_all(&path);
+    let dir = crate::config::scripts_dir()?;
+    if !dir.exists() {
+        let _ = fs::create_dir_all(&dir);
     }
-    path.push("moviebox_tracker.lua");
+    let path = dir.join("moviebox_tracker.lua");
     if !path.exists()
         || fs::read_to_string(&path)
             .map(|c| c != TRACKER_LUA_CONTENT)
@@ -92,14 +90,11 @@ pub fn state_file_path(
     season: usize,
     episode: usize,
 ) -> Option<PathBuf> {
-    let mut path = dirs::data_dir()?;
-    path.push(crate::config::APP_NAME);
-    path.push("playback");
-    if !path.exists() {
-        let _ = fs::create_dir_all(&path);
+    let dir = crate::config::playback_state_dir()?;
+    if !dir.exists() {
+        let _ = fs::create_dir_all(&dir);
     }
     let sanitized_id = subject_id.replace(['/', '\\', ':', ' '], "_");
     let filename = format!("{provider}_{sanitized_id}_{season}_{episode}.json");
-    path.push(filename);
-    Some(path)
+    Some(dir.join(filename))
 }

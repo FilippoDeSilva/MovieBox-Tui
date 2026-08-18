@@ -8,6 +8,13 @@
   - Added automatic startup state reconciliation (`reconcile_pending_playback_states`) ensuring watched progress is preserved even when closing the terminal or killing tmux mid-playback.
   - Added two-tone smooth scrub line progress bars (`━─────── 1% (2h 18m left) • Watched 11h ago`) and completion status badges (`[✓ Completed]`, `[✓ Watched]`) in `/history` and Details screens.
   - Added cross-provider title-based history deduplication and auto-resume from the last watched position.
+- **Addon Mode Watch History Parity**:
+  - Added full watch history support (`/history`) in Addon Mode matching Streaming Mode, enabling seamless watch progress tracking, scrub bars, and completion badges for community HTTP addon content.
+- **Codebase Optimization & Path Centralization**:
+  - Centralized application paths (`config_dir`, `data_dir`, `cache_dir`, `logs_dir`, `scripts_dir`, `playback_state_dir`) in `src/config.rs`.
+  - Streamlined `MovieBoxService` usage across background tasks and removed redundant duplicate client fields from `App` state.
+  - Centralized formatting utilities (`format_file_size`, `format_duration`) in `src/tui/text.rs`.
+  - Modernized `Config` loading and persistence with safe, standard Serde derives.
 - **Addon Mode (Community HTTP Addons)**:
   - Added full support for community HTTP addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`) with dedicated `Ctrl+A` mode switching.
   - Pre-installed and locked Cinemeta out-of-the-box as the default core metadata provider with zero API keys required.

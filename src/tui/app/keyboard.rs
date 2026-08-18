@@ -203,11 +203,19 @@ impl App {
                         .suggest_index
                         .and_then(|idx| self.state.search_suggestions.get(idx).cloned());
 
-                    let query = if let Some(sug) = selected_opt {
+                    let mut query = if let Some(sug) = selected_opt {
                         sug
                     } else {
                         self.state.search_query.trim().to_string()
                     };
+
+                    if query.starts_with('/') {
+                        let suggestions =
+                            crate::tui::commands::SlashCommand::suggest(&self.state, &query);
+                        if suggestions.len() == 1 {
+                            query = suggestions[0].name().to_string();
+                        }
+                    }
 
                     if !query.is_empty() {
                         if query.trim().eq_ignore_ascii_case("/history") {
@@ -228,6 +236,17 @@ impl App {
                                 force_refresh: false,
                             })
                             .ok();
+                    }
+                }
+                KeyCode::Tab => {
+                    let trimmed = self.state.search_query.trim();
+                    if trimmed.starts_with('/') {
+                        let suggestions =
+                            crate::tui::commands::SlashCommand::suggest(&self.state, trimmed);
+                        if let Some(first) = suggestions.first() {
+                            self.state.search_query = first.name().to_string();
+                            self.state.last_search_edit = std::time::Instant::now();
+                        }
                     }
                 }
                 KeyCode::Backspace => {

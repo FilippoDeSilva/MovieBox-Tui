@@ -11,9 +11,7 @@ pub fn init() {
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| default_level.to_string());
 
-    let log_dir = dirs::data_dir()
-        .map(|dir| dir.join(crate::config::APP_NAME).join("logs"))
-        .unwrap_or_else(std::env::temp_dir);
+    let log_dir = crate::config::logs_dir();
 
     match Logger::try_with_str(&spec) {
         Ok(logger) => {
@@ -53,13 +51,7 @@ pub fn init() {
 }
 
 pub fn log_file_path() -> std::path::PathBuf {
-    dirs::data_dir()
-        .map(|dir| {
-            dir.join(crate::config::APP_NAME)
-                .join("logs")
-                .join(format!("{}_rCURRENT.log", crate::config::APP_NAME))
-        })
-        .unwrap_or_else(std::env::temp_dir)
+    crate::config::logs_dir().join(format!("{}_rCURRENT.log", crate::config::APP_NAME))
 }
 
 pub fn display_path() -> String {

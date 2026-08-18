@@ -2,13 +2,17 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
 pub enum ProviderKind {
     #[default]
+    #[serde(rename = "moviebox", alias = "movie_box")]
     MovieBox,
+    #[serde(rename = "fourkhdhub", alias = "four_k_hd_hub", alias = "4khdhub")]
     FourKHdHub,
+    #[serde(rename = "bdix_circleftp", alias = "bdix_circle_ftp")]
     BdixCircleFtp,
+    #[serde(rename = "bdix_dhakaflix", alias = "bdix_dhaka_flix")]
     BdixDhakaFlix,
+    #[serde(rename = "addons", alias = "addon")]
     Addons,
 }
 
@@ -46,7 +50,7 @@ impl ProviderKind {
             "4khdhub" | "fourkhdhub" => Some(Self::FourKHdHub),
             "bdix_circleftp" | "circleftp (bdix)" => Some(Self::BdixCircleFtp),
             "bdix_dhakaflix" | "dhakaflix (bdix)" => Some(Self::BdixDhakaFlix),
-            "addons" | "addon" | "stremio" => Some(Self::Addons),
+            "addons" | "addon" => Some(Self::Addons),
             _ => None,
         }
     }

@@ -39,7 +39,7 @@ impl App {
         let mut events = EventHandler::new(Duration::from_millis(100));
 
         if self.state.active_provider == ProviderKind::MovieBox {
-            let client = self.client.clone();
+            let client = self.service.client.clone();
             tokio::spawn(async move {
                 let _ = client.init().await;
             });

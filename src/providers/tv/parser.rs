@@ -15,9 +15,7 @@ impl Default for M3UParser {
 
 impl M3UParser {
     pub fn new() -> Self {
-        let mut cache_dir = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-        cache_dir.push(crate::config::APP_NAME);
-        cache_dir.push("tv_playlists");
+        let cache_dir = crate::config::cache_dir().join("tv_playlists");
         std::fs::create_dir_all(&cache_dir).ok();
         let client = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(10))

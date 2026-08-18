@@ -222,3 +222,23 @@ pub fn is_http_url(source: &str) -> bool {
 pub fn extract_4digit_year(raw: &str) -> String {
     raw.chars().filter(|c| c.is_ascii_digit()).take(4).collect()
 }
+
+pub fn format_duration(secs: u64) -> String {
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    let s = secs % 60;
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
+}
+
+pub fn format_file_size(bytes: f64) -> String {
+    let mb = bytes / 1024.0 / 1024.0;
+    if mb >= 1024.0 {
+        format!("{:.1}GB", mb / 1024.0)
+    } else {
+        format!("{:.0}MB", mb)
+    }
+}

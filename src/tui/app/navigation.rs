@@ -1,4 +1,4 @@
-use super::{App, network};
+use super::App;
 use crate::providers::models::{ProviderKind, Release};
 use crate::tui::{action::Action, state::Screen};
 
@@ -61,7 +61,7 @@ impl App {
         );
         self.persist_config();
         if provider == ProviderKind::MovieBox {
-            let client = self.client.clone();
+            let client = self.service.client.clone();
             tokio::spawn(async move {
                 let _ = client.init().await;
             });
@@ -151,25 +151,13 @@ impl App {
                     .ok();
             } else {
                 let query = self.state.search_query.clone();
-                let client = self.client.clone();
-                let fourk_client = self.fourk_client.clone();
-                let circleftp_client = self.circleftp_client.clone();
-                let dhakaflix_client = self.dhakaflix_client.clone();
+                let service = self.service.clone();
                 let sender = self.action_sender.clone();
                 let context = self.request_context();
                 let request_id = self.state.active_search_request;
                 self.state.is_loading = true;
                 tokio::spawn(async move {
-                    let result = network::provider_search(
-                        &client,
-                        fourk_client.as_ref(),
-                        &circleftp_client,
-                        &dhakaflix_client,
-                        context.provider,
-                        &query,
-                        next_page,
-                    )
-                    .await;
+                    let result = service.search(context.provider, &query, next_page).await;
                     match result {
                         Ok(res) => {
                             sender

@@ -122,10 +122,9 @@ fn hash_key(value: &str) -> String {
 }
 
 pub fn get_provider_cache_dir(provider: ProviderKind, subdir: &str) -> PathBuf {
-    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-    path.push(crate::config::APP_NAME);
-    path.push(provider.cache_key());
-    path.push(subdir);
+    let path = crate::config::cache_dir()
+        .join(provider.cache_key())
+        .join(subdir);
     if !path.exists() {
         let _ = fs::create_dir_all(&path);
     }
@@ -263,13 +262,12 @@ pub fn invalidate_provider_stream_cache(
 }
 
 pub fn clear_all_cache() {
-    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-    path.push(crate::config::APP_NAME);
+    let path = crate::config::cache_dir();
     if path.exists() {
         let _ = fs::remove_dir_all(&path);
     }
-    if let Some(data_dir) = dirs::data_dir() {
-        let legacy = data_dir.join(crate::config::APP_NAME).join("iptv_cache");
+    if let Some(data_dir) = crate::config::data_dir() {
+        let legacy = data_dir.join("iptv_cache");
         if legacy.exists() {
             let _ = fs::remove_dir_all(&legacy);
         }
@@ -278,8 +276,7 @@ pub fn clear_all_cache() {
 
 pub fn clean_old_cache_background() {
     tokio::task::spawn_blocking(|| {
-        let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-        path.push(crate::config::APP_NAME);
+        let path = crate::config::cache_dir();
         if !path.exists() {
             return;
         }

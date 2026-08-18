@@ -132,7 +132,7 @@ impl App {
                 log::warn!(
                     "failed to build custom download client ({err}), falling back to default"
                 );
-                self.client.http_client().clone()
+                self.service.http_client().clone()
             });
 
         tokio::spawn(async move {
@@ -316,7 +316,7 @@ impl App {
                                 .ok();
                             return None;
                         } else {
-                            match self.fourk_client.clone() {
+                            match self.service.fourk_client.clone() {
                                 Some(client) => client,
                                 None => {
                                     self.state.is_resolving_playback = false;
@@ -382,7 +382,7 @@ impl App {
                         "Preparing download",
                         "Fetching subtitles.",
                     );
-                    let client = self.client.clone();
+                    let client = self.service.client.clone();
                     let sender = self.action_sender.clone();
                     tokio::spawn(async move {
                         if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {

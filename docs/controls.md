@@ -61,7 +61,7 @@ Type these commands directly into the search bar:
 | Command | Applicable Mode | Action |
 | :--- | :--- | :--- |
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
-| `/history` | Streaming | View watch history with latest progress |
+| `/history` | Streaming / Addon | View watch history with latest progress |
 | `/list` | TV | View live TV channels |
 | `/config` | TV / Addon | Manage IPTV playlists (TV Mode) or configure HTTP addons (Addon Mode) |
 | `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |

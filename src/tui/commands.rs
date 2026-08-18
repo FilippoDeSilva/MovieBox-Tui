@@ -124,7 +124,10 @@ impl SlashCommand {
                 (state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode)
                     || (state.addons_enabled && state.is_addon_mode)
             }
-            Self::History => state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode,
+            Self::History => {
+                (state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode)
+                    || (state.addons_enabled && state.is_addon_mode)
+            }
             Self::List => state.tv_enabled && state.is_tv_mode,
             Self::Config => {
                 (state.tv_enabled && state.is_tv_mode)

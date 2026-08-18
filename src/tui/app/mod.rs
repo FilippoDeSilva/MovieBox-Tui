@@ -1,8 +1,6 @@
 use tokio::sync::mpsc;
 
-use crate::providers::{
-    fourkhdhub::FourKHdHubClient, models::RequestContext, moviebox::client::MovieBoxClient,
-};
+use crate::providers::models::RequestContext;
 use crate::tui::{action::Action, state::AppState, theme::Theme};
 
 mod addons;
@@ -22,10 +20,6 @@ pub struct App {
     state: AppState,
     theme: Theme,
     service: std::sync::Arc<crate::service::MovieBoxService>,
-    client: MovieBoxClient,
-    fourk_client: Option<FourKHdHubClient>,
-    circleftp_client: crate::providers::bdix::circleftp::CircleFtpClient,
-    dhakaflix_client: crate::providers::bdix::dhakaflix::client::DhakaFlixClient,
     action_sender: mpsc::UnboundedSender<Action>,
     action_receiver: mpsc::UnboundedReceiver<Action>,
 }
@@ -98,21 +92,17 @@ impl App {
         }
 
         let service = std::sync::Arc::new(crate::service::MovieBoxService::new());
+        if service.fourk_client.is_none() {
+            log::warn!("4KHDHub client unavailable; provider will be disabled");
+        }
 
         let mut app = Self {
             theme,
             state,
-            client: service.client.clone(),
-            fourk_client: service.fourk_client.clone(),
-            circleftp_client: service.circleftp_client.clone(),
-            dhakaflix_client: service.dhakaflix_client.clone(),
             service,
             action_sender,
             action_receiver,
         };
-        if app.fourk_client.is_none() {
-            log::warn!("4KHDHub client unavailable; provider will be disabled");
-        }
         if app.state.is_tv_mode {
             app.load_tv_playlists_from_config();
             app.reload_tv_playlists();

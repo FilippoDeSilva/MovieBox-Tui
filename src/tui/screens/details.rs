@@ -830,36 +830,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("codecName")
                             .and_then(|c| c.as_str())
                             .unwrap_or("None");
-                        let size_str = file.get("size").and_then(|s| s.as_str());
 
                         let duration = file.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
                         let duration_str = if duration > 0 {
-                            let hours = duration / 3600;
-                            let mins = (duration % 3600) / 60;
-                            let secs = duration % 60;
-                            if hours > 0 {
-                                format!("{:02}:{:02}:{:02}", hours, mins, secs)
-                            } else {
-                                format!("{:02}:{:02}", mins, secs)
-                            }
+                            crate::tui::text::format_duration(duration)
                         } else {
                             "--:--".to_string()
                         };
 
-                        let size_formatted = if let Some(s) = size_str {
-                            if let Ok(bytes) = s.parse::<f64>() {
-                                let mb = bytes / 1024.0 / 1024.0;
-                                if mb > 1024.0 {
-                                    format!("{:.1}GB", mb / 1024.0)
-                                } else {
-                                    format!("{:.0}MB", mb)
-                                }
-                            } else {
-                                "--".to_string()
-                            }
-                        } else {
-                            "--".to_string()
-                        };
+                        let size_formatted = file
+                            .get("size")
+                            .and_then(|s| s.as_str())
+                            .and_then(|s| s.parse::<f64>().ok())
+                            .map(crate::tui::text::format_file_size)
+                            .unwrap_or_else(|| "--".to_string());
 
                         let is_selected = Some(i) == selected_idx;
                         let pointer = if is_selected {
@@ -1285,14 +1269,7 @@ fn selected_stream_summary(state: &AppState) -> Option<String> {
         .get("size")
         .and_then(|value| value.as_str())
         .and_then(|value| value.parse::<f64>().ok())
-        .map(|bytes| {
-            let megabytes = bytes / 1024.0 / 1024.0;
-            if megabytes > 1024.0 {
-                format!("{:.1} GB", megabytes / 1024.0)
-            } else {
-                format!("{megabytes:.0} MB")
-            }
-        });
+        .map(crate::tui::text::format_file_size);
     let fields = [size, resolution, codec]
         .into_iter()
         .flatten()

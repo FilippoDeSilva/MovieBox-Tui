@@ -642,7 +642,7 @@ impl App {
                             let cover_url = channel.logo.clone();
                             if !cover_url.is_empty() {
                                 let tx = self.action_sender.clone();
-                                let client = self.client.http_client().clone();
+                                let client = self.service.http_client().clone();
                                 let id2 = id.clone();
                                 tokio::spawn(async move {
                                     if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
@@ -712,7 +712,7 @@ impl App {
                         let url = url.to_string();
                         let tx = self.action_sender.clone();
                         let id2 = id.clone();
-                        let client = self.client.http_client().clone();
+                        let client = self.service.http_client().clone();
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id2.clone();
@@ -751,7 +751,7 @@ impl App {
                 }
 
                 self.state.preview_loading = true;
-                let client = self.client.clone();
+                let client = self.service.client.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
 
@@ -1053,7 +1053,7 @@ impl App {
                         let url_clone = url.to_string();
                         let action_tx = self.action_sender.clone();
                         let id_clone = id.clone();
-                        let http_client = self.client.http_client().clone();
+                        let http_client = self.service.http_client().clone();
                         tokio::spawn(async move {
                             if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                                 let id_clone = id_clone.clone();
@@ -1297,7 +1297,7 @@ impl App {
                                     let url_clone = url.to_string();
                                     let action_tx = self.action_sender.clone();
                                     let id_clone = id.clone();
-                                    let http_client = self.client.http_client().clone();
+                                    let http_client = self.service.http_client().clone();
                                     tokio::spawn(async move {
                                         let client = reqwest::Client::builder()
                                             .timeout(std::time::Duration::from_secs(5))
@@ -1532,9 +1532,9 @@ impl App {
 
                 if context.provider == ProviderKind::FourKHdHub || context.provider.is_bdix() {
                     let sender = self.action_sender.clone();
-                    let fourk_client = self.fourk_client.clone();
-                    let circleftp_client = self.circleftp_client.clone();
-                    let dhakaflix_client = self.dhakaflix_client.clone();
+                    let fourk_client = self.service.fourk_client.clone();
+                    let circleftp_client = self.service.circleftp_client.clone();
+                    let dhakaflix_client = self.service.dhakaflix_client.clone();
                     let id = subject_id.clone();
                     tokio::spawn(async move {
                         let result = match context.provider {
@@ -1647,7 +1647,7 @@ impl App {
                 absolute_episode += episode.saturating_sub(1);
                 let estimated_page = (absolute_episode / 20) + 1;
 
-                let client = self.client.clone();
+                let client = self.service.client.clone();
                 let sender = self.action_sender.clone();
                 let cancel_token = self.state.fetch_cancel.clone();
                 let id_clone = subject_id.clone();

@@ -61,10 +61,10 @@ impl WatchHistoryItem {
     }
 
     pub fn formatted_progress(&self) -> String {
-        let pos = format_time(self.progress_seconds);
+        let pos = crate::tui::text::format_duration(self.progress_seconds);
         if let Some(dur) = self.duration_seconds {
             if dur > 0 {
-                return format!("{} / {}", pos, format_time(dur));
+                return format!("{} / {}", pos, crate::tui::text::format_duration(dur));
             }
         }
         pos
@@ -116,17 +116,6 @@ impl WatchHistoryItem {
     }
 }
 
-fn format_time(secs: u64) -> String {
-    let h = secs / 3600;
-    let m = (secs % 3600) / 60;
-    let s = secs % 60;
-    if h > 0 {
-        format!("{h}:{m:02}:{s:02}")
-    } else {
-        format!("{m}:{s:02}")
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingPlaybackState {
     pub provider: String,
@@ -174,23 +163,11 @@ impl HistoryManager {
     }
 
     fn history_file_path() -> Option<PathBuf> {
-        let mut path = dirs::data_dir()?;
-        path.push(crate::config::APP_NAME);
-        if !path.exists() {
-            let _ = fs::create_dir_all(&path);
-        }
-        path.push("history.json");
-        Some(path)
+        crate::config::data_dir().map(|dir| dir.join("history.json"))
     }
 
     pub fn playback_state_dir() -> Option<PathBuf> {
-        let mut path = dirs::data_dir()?;
-        path.push(crate::config::APP_NAME);
-        path.push("playback");
-        if !path.exists() {
-            let _ = fs::create_dir_all(&path);
-        }
-        Some(path)
+        crate::config::playback_state_dir()
     }
 
     pub fn save(&self) {

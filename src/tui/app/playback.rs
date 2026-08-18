@@ -406,7 +406,7 @@ impl App {
                             }
                             return None;
                         } else {
-                            match self.fourk_client.clone() {
+                            match self.service.fourk_client.clone() {
                                 Some(client) => client,
                                 None => {
                                     self.state.is_resolving_playback = false;
@@ -469,7 +469,7 @@ impl App {
                             "Preparing playback",
                             "Fetching subtitles.",
                         );
-                        let client = self.client.clone();
+                        let client = self.service.client.clone();
                         let sender = self.action_sender.clone();
                         let link_clone = link.clone();
                         tokio::spawn(async move {

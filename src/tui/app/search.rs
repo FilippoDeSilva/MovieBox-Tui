@@ -187,20 +187,13 @@ impl App {
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::History => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 if current_mode == crate::tui::state::AppMode::Tv {
+                    self.state.search_query.clear();
+                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",
-                        format!("Command /history is only available in Streaming Mode. Switch with {ctrl_s}."),
-                    );
-                    Some(true)
-                } else if current_mode == crate::tui::state::AppMode::Addon {
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Addon Mode",
-                        format!("Command /history is only available in Streaming Mode. Switch with {ctrl_s}."),
+                        format!("Command /history is available in Streaming Mode ({ctrl_s}) or Addon Mode ({ctrl_a})."),
                     );
                     Some(true)
                 } else {
@@ -1076,22 +1069,14 @@ impl App {
         }
 
         let sender = self.action_sender.clone();
-        let req_client = self.client.http_client().clone();
-        let mb_client = self.client.clone();
-        let fourk_client = self.fourk_client.clone();
-        let circleftp_client = self.circleftp_client.clone();
-        let dhakaflix_client = self.dhakaflix_client.clone();
+        let service = self.service.clone();
 
         tokio::spawn(async move {
             let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
             for (id, cover_url, provider) in to_fetch {
                 let permit = sem.clone().acquire_owned().await.ok();
                 let tx = sender.clone();
-                let client = req_client.clone();
-                let mb_client = mb_client.clone();
-                let fourk_client = fourk_client.clone();
-                let circleftp_client = circleftp_client.clone();
-                let dhakaflix_client = dhakaflix_client.clone();
+                let service = service.clone();
 
                 tokio::spawn(async move {
                     let _permit = permit;
@@ -1111,23 +1096,14 @@ impl App {
 
                     let mut resolved_url = cover_url;
                     if resolved_url.is_none() {
-                        if let Ok(details) = network::provider_details(
-                            &mb_client,
-                            fourk_client.as_ref(),
-                            &circleftp_client,
-                            &dhakaflix_client,
-                            provider,
-                            &id,
-                        )
-                        .await
-                        {
+                        if let Ok(details) = service.details(provider, &id).await {
                             resolved_url = crate::tui::app::playback::extract_cover_url(&details);
                         }
                     }
 
                     if let Some(url) = resolved_url {
                         if !url.is_empty() {
-                            if let Some(bytes) = network::fetch_poster_bytes(&client, &url).await {
+                            if let Some(bytes) = service.fetch_poster_bytes(&url).await {
                                 let bytes_clone = bytes.clone();
                                 let id_c = id.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
