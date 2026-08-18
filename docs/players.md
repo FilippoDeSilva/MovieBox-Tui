@@ -7,8 +7,9 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 
 `player::detect()` returns players in priority order:
 
-- macOS: IINA (if present), then mpv, then VLC.
-- Linux/Windows: mpv, then VLC.
+- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, and MacPorts).
+- Linux: mpv, then VLC (probing Native `$PATH`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, and `flatpak run`).
+- Windows: mpv, then VLC (probing `Program Files`, `LOCALAPPDATA\Programs`, `Microsoft\WindowsApps`, Scoop `scoop\shims`, and Chocolatey).
 - Android/Termux: the Android intent fallback is attempted last when `termux-open` or `am` is available.
 
 Resolution runs once at startup and is cached (`OnceLock`). A preferred player can be

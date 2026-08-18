@@ -7,13 +7,17 @@ Disk caching lives in `cache.rs`; in-memory caches live in `AppState`.
 ```
 <cache dir>/moviebox-tui/
   <provider>/            moviebox, fourkhdhub, bdix_circleftp, bdix_dhakaflix, addons
-    search/<hash>.json
+    search/<hash>_<page>.json
     details/details_<hash>.json
     streams/v3_<hash>_<season>_<episode>.json   (v3_ prefix only for 4KHD)
     images/<md5>.img
   moviebox/
     homepage/<tab>_<page>.json
     captions/captions_<hash>.json
+  addons/
+    catalogs/catalog_<hash>.json
+    manifests/manifest_<hash>.json
+    streams/<hash>_<season>_<episode>.json
   tv_playlists/<md5>.m3u       cached remote playlist snapshots
 ```
 
@@ -25,9 +29,9 @@ The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
 - **Provider namespacing**: keys include `provider.cache_key()`, so results from
   different providers never collide. Image caches are namespaced by provider (or
   `iptv` for channel logos) with fallback resolution across `posters`, `moviebox`,
-  `fourkhdhub`, `iptv`, `circleftp`, and `dhakaflix`.
-- **TTL**: streams expire after 2h; search/details/captions after 24h;
-  homepage after 1h; remote TV playlist snapshots after 24h; images after 30 days
+  `fourkhdhub`, `iptv`, `circleftp`, `dhakaflix`, and `addons`.
+- **TTL**: streams expire after 2h; search/details/captions/manifests after 24h;
+  homepage/catalogs after 1h; remote TV playlist snapshots after 24h; images after 30 days
   (`IMAGE_CACHE_EXPIRY_SECS`). Local file playlists are reread directly instead of
   being served from the cache.
 - **Atomic writes**: data is written to a temp file then renamed, so a crash never

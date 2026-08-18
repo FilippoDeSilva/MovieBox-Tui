@@ -9,6 +9,9 @@ Addon Mode enables support for community HTTP addon manifests. You can install a
 - **Direct HTTP Stream Engine**: Automatically extracts and filters direct Cloudflare R2, PixelDrain, direct video CDN, and HubCloud/HubDrive HTTP streams.
 - **Multi-Addon Concurrency**: Simultaneously queries all enabled stream addons and aggregates releases.
 - **Quality & Size Parsing**: Ranks streams by quality (`4K UHD / 2160p`, `1080p`, `720p`, `SD`), file size in GB/MB, and audio language tracks (e.g. `[Dual]`, `[Multi]`, `Hindi + English`).
+- **Torrent Blocking Detection**: Automatically detects if an addon's streams are 100% blocked raw torrents (e.g. Torrentio without Debrid) and alerts the user that only HTTP streams are supported.
+- **Watch History & Progress Parity**: Full `/history` support in Addon Mode with real-time `mpv` position tracking, scrub lines, and auto-resume.
+- **High-Performance Caching**: Curated `/browse` catalogs are cached for `1 hour`, manifests for `24 hours`, and stream aggregations for `2 hours`.
 
 ## Entering Addon Mode
 

@@ -71,7 +71,7 @@ Type these commands directly into the search bar:
 | `/enable-addons` | All | Enable Addon Mode navigation in bottom dock |
 | `/disable-addons` | All | Disable Addon Mode navigation |
 | `/download-dir` | All | View, change, or reset the download directory |
-| `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight) |
+| `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight, Dracula, Gruvbox, RosePine) |
 | `/clear-cache` | All | Clear temporary cache files |
 | `/update` | All | Check if a new release is available on GitHub |
 | `/toggle-update` | All | Toggle automatic startup update checks |
