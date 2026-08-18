@@ -5,9 +5,24 @@ pub mod title;
 
 pub use title::clean_moviebox_title;
 
-use crate::providers::Provider;
+use crate::providers::models::ProviderKind;
+use crate::providers::{Provider, ProviderCapabilities};
 
 impl Provider for client::MovieBoxClient {
+    fn id(&self) -> ProviderKind {
+        ProviderKind::MovieBox
+    }
+
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            supports_search: true,
+            supports_pagination: true,
+            supports_series: true,
+            supports_subtitles: true,
+            supports_homepage: true,
+        }
+    }
+
     async fn search(&self, query: &str, page: usize) -> Result<serde_json::Value, String> {
         self.search(query, page)
             .await

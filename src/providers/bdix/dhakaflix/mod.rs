@@ -1,12 +1,26 @@
 pub mod client;
 
+use crate::providers::models::{ProviderKind, Release};
 use crate::providers::{
-    Provider, ReleaseProvider,
+    Provider, ProviderCapabilities, ReleaseProvider,
     fourkhdhub::{details_to_moviebox_json, search_to_moviebox_json},
-    models::Release,
 };
 
 impl Provider for client::DhakaFlixClient {
+    fn id(&self) -> ProviderKind {
+        ProviderKind::BdixDhakaFlix
+    }
+
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            supports_search: true,
+            supports_pagination: false,
+            supports_series: true,
+            supports_subtitles: false,
+            supports_homepage: false,
+        }
+    }
+
     async fn search(&self, query: &str, _page: usize) -> Result<serde_json::Value, String> {
         self.search(query)
             .await

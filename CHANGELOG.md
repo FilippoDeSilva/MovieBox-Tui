@@ -10,6 +10,10 @@
   - Added cross-provider title-based history deduplication and auto-resume from the last watched position.
 - **Addon Mode Watch History Parity**:
   - Added full watch history support (`/history`) in Addon Mode matching Streaming Mode, enabling seamless watch progress tracking, scrub bars, and completion badges for community HTTP addon content.
+- **Pluggable Provider Trait & Capability Architecture**:
+  - Formalized the public `Provider` and `ReleaseProvider` traits across all built-in scrapers (`MovieBox`, `4KHDHub`, `CircleFTP`, `DhakaFlix`, and `Addons`).
+  - Added `ProviderCapabilities` (`supports_search`, `supports_pagination`, `supports_series`, `supports_subtitles`, `supports_homepage`) and `MovieBoxService::capabilities()` for dynamic capability reporting.
+  - Added structured `ProviderError` boundaries (`Network`, `RateLimited`, `NotFound`, `Parsing`, `Unavailable`) with `.user_message()` for consistent error notifications.
 - **Theme System Expansion & Official Color Calibration**:
   - Added official **Dracula**, **Gruvbox**, and **Rosé Pine** themes to the `/theme` picker alongside Catppuccin and Nord.
   - Added alias parsing support for `"dracula"`, `"gruvbox"`, `"rose-pine"`, and `"catppuccin"`.

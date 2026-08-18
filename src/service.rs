@@ -46,6 +46,20 @@ impl MovieBoxService {
         &self.http_client
     }
 
+    pub fn capabilities(&self, provider: ProviderKind) -> crate::providers::ProviderCapabilities {
+        match provider {
+            ProviderKind::MovieBox => Provider::capabilities(&self.client),
+            ProviderKind::FourKHdHub => self
+                .fourk_client
+                .as_ref()
+                .map(Provider::capabilities)
+                .unwrap_or_default(),
+            ProviderKind::BdixCircleFtp => Provider::capabilities(&self.circleftp_client),
+            ProviderKind::BdixDhakaFlix => Provider::capabilities(&self.dhakaflix_client),
+            ProviderKind::Addons => Provider::capabilities(&self.addon_client),
+        }
+    }
+
     pub async fn suggest(&self, query: &str) -> Result<serde_json::Value, String> {
         self.client.suggest(query).await.map_err(|e| e.to_string())
     }

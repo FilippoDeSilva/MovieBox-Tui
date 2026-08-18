@@ -19,17 +19,14 @@ default (`bdix_enabled` in config; `/enable-bdix`).
 
 ## Shared flow
 
-Search, details, and episode-streams are dispatched per provider. Crate-internal seams
+Search, details, and episode-streams are dispatched per provider. Pluggable provider seams
 in `providers/mod.rs` give every client a shared async trait shape:
 
-- `Provider::search` / `Provider::details` return the moviebox-JSON payload the UI
-  consumes: MovieBox provides it natively; the other providers convert their typed
-  models via `fourkhdhub`'s adapters. `app/network.rs` dispatches both through the trait.
-- `ReleaseProvider::episode_streams` returns the typed `Release` list for the three
-  release-based providers; MovieBox keeps its own paginated resource path.
-
-Note: only the MovieBox search honors the `page` argument; the other providers ignore it.
-Each provider keeps its own internal format behind its adapter.
+- `Provider::id(&self) -> ProviderKind`: Returns the provider's unique identifier.
+- `Provider::capabilities(&self) -> ProviderCapabilities`: Reports supported capabilities (`supports_search`, `supports_pagination`, `supports_series`, `supports_subtitles`, `supports_homepage`).
+- `Provider::search` / `Provider::details`: Dispatches search and metadata queries. MovieBox provides it natively; other providers adapt typed models (`MediaDetails`) via adapters.
+- `ReleaseProvider::episode_streams`: Returns the typed `Release` list for release-based providers; MovieBox keeps its own paginated resource path.
+- `ProviderError`: Standardized error boundary (`Network`, `RateLimited`, `NotFound`, `Parsing`, `Unavailable`) with `.user_message(provider)` generating clean UI toast notifications.
 
 Playback resolves to a `PlaybackSource { provider, url, headers, subtitle, source_label }`,
 which `app/playback.rs::launch_player` feeds to the external player.
