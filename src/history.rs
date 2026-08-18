@@ -163,7 +163,7 @@ impl HistoryManager {
     }
 
     fn history_file_path() -> Option<PathBuf> {
-        crate::config::data_dir().map(|dir| dir.join("history.json"))
+        crate::config::history_path()
     }
 
     pub fn playback_state_dir() -> Option<PathBuf> {

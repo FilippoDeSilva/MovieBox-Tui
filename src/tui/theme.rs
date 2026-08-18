@@ -26,6 +26,18 @@ pub enum ThemeKind {
 }
 
 impl ThemeKind {
+    pub const ALL: [Self; 9] = [
+        Self::Mocha,
+        Self::Latte,
+        Self::Macchiato,
+        Self::Frappe,
+        Self::Nord,
+        Self::TokyoNight,
+        Self::Dracula,
+        Self::Gruvbox,
+        Self::RosePine,
+    ];
+
     pub fn parse(s: &str) -> Self {
         match s.to_ascii_lowercase().replace(['-', '_'], "").as_str() {
             "latte" | "light" => ThemeKind::Latte,

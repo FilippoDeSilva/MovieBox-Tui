@@ -1,65 +1,9 @@
 use super::App;
 use crate::providers::models::ProviderKind;
+use crate::tui::text::parse_duration_seconds;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 pub(crate) use crate::service::extract_cover_url;
-
-fn parse_duration_seconds(d: &str) -> Option<u64> {
-    let s = d.trim();
-    if s.is_empty() || s.eq_ignore_ascii_case("n/a") {
-        return None;
-    }
-    if s.contains(':') {
-        let parts: Vec<&str> = s.split(':').collect();
-        if parts.len() == 2 {
-            let m: u64 = parts[0].trim().parse().ok()?;
-            let s: u64 = parts[1].trim().parse().ok()?;
-            return Some(m * 60 + s);
-        } else if parts.len() == 3 {
-            let h: u64 = parts[0].trim().parse().ok()?;
-            let m: u64 = parts[1].trim().parse().ok()?;
-            let s: u64 = parts[2].trim().parse().ok()?;
-            return Some(h * 3600 + m * 60 + s);
-        }
-    }
-    let mut total = 0u64;
-    let mut current_num = String::new();
-    let mut found_any = false;
-    for c in s.chars() {
-        if c.is_ascii_digit() {
-            current_num.push(c);
-        } else if c == 'h' || c == 'H' {
-            if let Ok(n) = current_num.parse::<u64>() {
-                total += n * 3600;
-                found_any = true;
-            }
-            current_num.clear();
-        } else if c == 'm' || c == 'M' {
-            if let Ok(n) = current_num.parse::<u64>() {
-                total += n * 60;
-                found_any = true;
-            }
-            current_num.clear();
-        } else if c == 's' || c == 'S' {
-            if let Ok(n) = current_num.parse::<u64>() {
-                total += n;
-                found_any = true;
-            }
-            current_num.clear();
-        }
-    }
-    if !current_num.is_empty() && !found_any {
-        if let Ok(n) = current_num.parse::<u64>() {
-            total += n * 60;
-            found_any = true;
-        }
-    }
-    if found_any && total > 0 {
-        Some(total)
-    } else {
-        None
-    }
-}
 
 impl App {
     fn preferred_playback_player(
