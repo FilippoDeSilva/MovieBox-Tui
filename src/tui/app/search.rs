@@ -626,7 +626,7 @@ impl App {
                 let q = query.clone();
                 let provider = context.provider;
                 if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                    crate::cache::get_provider_search_cache(provider, &q)
+                    crate::cache::get_provider_search_cache(provider, &q, page)
                 })
                 .await
                 {
@@ -650,7 +650,7 @@ impl App {
                     let provider = context.provider;
                     let cached = res.clone();
                     tokio::task::spawn_blocking(move || {
-                        crate::cache::set_provider_search_cache(provider, &q, &cached);
+                        crate::cache::set_provider_search_cache(provider, &q, page, &cached);
                     });
                     sender
                         .send(Action::SearchSuccess {

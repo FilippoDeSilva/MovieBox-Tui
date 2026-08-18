@@ -123,6 +123,17 @@ impl MovieBoxService {
         r#type: &str,
         catalog_id: &str,
     ) -> Result<serde_json::Value, String> {
+        let manifest_clone = manifest_url.to_string();
+        let type_clone = r#type.to_string();
+        let cat_id_clone = catalog_id.to_string();
+        if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+            crate::cache::get_addon_catalog_cache(&manifest_clone, &type_clone, &cat_id_clone)
+        })
+        .await
+        {
+            return Ok(cached);
+        }
+
         let base_url = crate::providers::addons::AddonClient::base_addon_url(manifest_url);
         let metas = self
             .addon_client
@@ -134,7 +145,20 @@ impl MovieBoxService {
             return Err("No catalog items found".to_string());
         }
 
-        Ok(crate::providers::addons::adapter::metas_to_moviebox_search_json(metas))
+        let json = crate::providers::addons::adapter::metas_to_moviebox_search_json(metas);
+        let manifest_clone = manifest_url.to_string();
+        let type_clone = r#type.to_string();
+        let cat_id_clone = catalog_id.to_string();
+        let json_clone = json.clone();
+        tokio::task::spawn_blocking(move || {
+            crate::cache::set_addon_catalog_cache(
+                &manifest_clone,
+                &type_clone,
+                &cat_id_clone,
+                &json_clone,
+            );
+        });
+        Ok(json)
     }
 
     pub async fn details(
@@ -427,7 +451,7 @@ pub fn resolve_subtitle_dir() -> PathBuf {
             return storage;
         }
     }
-    std::env::temp_dir().join("moviebox-tui/subs")
+    crate::config::cache_dir().join("subs")
 }
 
 pub fn ensure_moviebox_subdir(path: &Path) -> PathBuf {

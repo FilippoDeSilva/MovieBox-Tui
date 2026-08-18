@@ -78,18 +78,16 @@ impl App {
         state.download_dir = config.download_dir.map(std::path::PathBuf::from);
         state.installed_addons = crate::config::load_addons();
 
-        let mut theme = crate::tui::theme::Theme::new();
-        if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
-            let theme_kind = crate::tui::theme::ThemeKind::parse(&theme_env);
-            state.active_theme_kind = theme_kind.as_str().to_string();
-            theme = crate::tui::theme::Theme::from_kind(theme_kind);
-        } else if !state.active_theme_kind.is_empty() {
-            let theme_kind = crate::tui::theme::ThemeKind::parse(&state.active_theme_kind);
-            state.active_theme_kind = theme_kind.as_str().to_string();
-            theme = crate::tui::theme::Theme::from_kind(theme_kind);
-        } else {
-            state.active_theme_kind = "Mocha".to_string();
-        }
+        let theme_str = std::env::var("MOVIEBOX_THEME").unwrap_or_else(|_| {
+            if state.active_theme_kind.is_empty() {
+                "Mocha".to_string()
+            } else {
+                state.active_theme_kind.clone()
+            }
+        });
+        let theme_kind = crate::tui::theme::ThemeKind::parse(&theme_str);
+        state.active_theme_kind = theme_kind.as_str().to_string();
+        let theme = crate::tui::theme::Theme::from_kind(theme_kind);
 
         let service = std::sync::Arc::new(crate::service::MovieBoxService::new());
         if service.fourk_client.is_none() {

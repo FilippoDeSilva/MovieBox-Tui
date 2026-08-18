@@ -10,9 +10,12 @@
   - Added cross-provider title-based history deduplication and auto-resume from the last watched position.
 - **Addon Mode Watch History Parity**:
   - Added full watch history support (`/history`) in Addon Mode matching Streaming Mode, enabling seamless watch progress tracking, scrub bars, and completion badges for community HTTP addon content.
-- **Codebase Optimization & Path Centralization**:
+- **Codebase Optimization & Comprehensive Caching Architecture**:
   - Centralized application paths (`config_dir`, `data_dir`, `cache_dir`, `logs_dir`, `scripts_dir`, `playback_state_dir`) in `src/config.rs`.
-  - Streamlined `MovieBoxService` usage across background tasks and removed redundant duplicate client fields from `App` state.
+  - Added dedicated disk caching for Addon Mode stream aggregation (`2h` TTL), catalog `/browse` presets (`1h` TTL), and verified manifests (`24h` TTL).
+  - Added search pagination caching (`search_{hash}_{page}.json`) preventing redundant API calls when navigating multi-page search results.
+  - Eliminated redundant `reqwest::Client` allocations in background poster pipelines in favor of the shared `service.http_client()`.
+  - Streamlined `MovieBoxService` usage across background tasks and removed redundant `addon_client` field from `AppState`.
   - Centralized formatting utilities (`format_file_size`, `format_duration`) in `src/tui/text.rs`.
   - Modernized `Config` loading and persistence with safe, standard Serde derives.
 - **Addon Mode (Community HTTP Addons)**:

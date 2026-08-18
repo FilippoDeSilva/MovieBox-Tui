@@ -824,6 +824,7 @@ impl App {
                     let url_clone = url.to_string();
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
+                    let http_client = self.service.http_client().clone();
                     tokio::spawn(async move {
                         if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                             let id_clone = id_clone.clone();
@@ -836,11 +837,8 @@ impl App {
                                 return;
                             }
                         }
-                        let client = reqwest::Client::builder()
-                            .timeout(std::time::Duration::from_secs(5))
-                            .build()
-                            .unwrap_or_default();
-                        if let Some(bytes) = network::fetch_poster_bytes(&client, &url_clone).await
+                        if let Some(bytes) =
+                            network::fetch_poster_bytes(&http_client, &url_clone).await
                         {
                             let bytes_clone = bytes.clone();
                             let id_clone2 = id_clone.clone();
@@ -1068,12 +1066,8 @@ impl App {
                                     return;
                                 }
                             }
-                            let client = reqwest::Client::builder()
-                                .timeout(std::time::Duration::from_secs(5))
-                                .build()
-                                .unwrap_or(http_client);
                             if let Some(bytes) =
-                                network::fetch_poster_bytes(&client, &url_clone).await
+                                network::fetch_poster_bytes(&http_client, &url_clone).await
                             {
                                 let bytes_clone = bytes.clone();
                                 let id_clone2 = id_clone.clone();
@@ -1299,12 +1293,9 @@ impl App {
                                     let id_clone = id.clone();
                                     let http_client = self.service.http_client().clone();
                                     tokio::spawn(async move {
-                                        let client = reqwest::Client::builder()
-                                            .timeout(std::time::Duration::from_secs(5))
-                                            .build()
-                                            .unwrap_or(http_client);
                                         if let Some(bytes) =
-                                            network::fetch_poster_bytes(&client, &url_clone).await
+                                            network::fetch_poster_bytes(&http_client, &url_clone)
+                                                .await
                                         {
                                             if let Some(img) = network::decode_poster(bytes).await {
                                                 let _ = action_tx
@@ -1462,7 +1453,7 @@ impl App {
 
                 if context.provider == ProviderKind::Addons {
                     let sender = self.action_sender.clone();
-                    let client = self.state.addon_client.clone();
+                    let client = self.service.addon_client.clone();
                     let addons = crate::config::load_addons();
                     let id = subject_id.clone();
                     let is_series = self
@@ -1502,16 +1493,25 @@ impl App {
                         }
 
                         if !releases.is_empty() {
-                            sender
-                                .send(Action::EpisodeStreamsReady(
-                                    context,
-                                    request_id,
-                                    id,
+                            let json = crate::providers::addons::adapter::releases_to_moviebox_json(
+                                &releases,
+                            );
+                            let id_clone = id.clone();
+                            let json_clone = json.clone();
+                            let provider = context.provider;
+                            tokio::task::spawn_blocking(move || {
+                                crate::cache::set_provider_stream_cache(
+                                    provider,
+                                    &id_clone,
                                     season,
                                     episode,
-                                    crate::providers::addons::adapter::releases_to_moviebox_json(
-                                        &releases,
-                                    ),
+                                    &json_clone,
+                                );
+                            });
+
+                            sender
+                                .send(Action::EpisodeStreamsReady(
+                                    context, request_id, id, season, episode, json,
                                 ))
                                 .ok();
                         } else {

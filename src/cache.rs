@@ -122,13 +122,9 @@ fn hash_key(value: &str) -> String {
 }
 
 pub fn get_provider_cache_dir(provider: ProviderKind, subdir: &str) -> PathBuf {
-    let path = crate::config::cache_dir()
+    crate::config::cache_dir()
         .join(provider.cache_key())
-        .join(subdir);
-    if !path.exists() {
-        let _ = fs::create_dir_all(&path);
-    }
-    path
+        .join(subdir)
 }
 
 pub fn get_provider_stream_path(
@@ -191,15 +187,19 @@ pub fn invalidate_provider_details_cache(provider: ProviderKind, subject_id: &st
     let _ = fs::remove_file(path);
 }
 
-pub fn get_provider_search_path(provider: ProviderKind, query: &str) -> PathBuf {
+pub fn get_provider_search_path(provider: ProviderKind, query: &str, page: usize) -> PathBuf {
     let mut path = get_provider_cache_dir(provider, "search");
     let hashed = hash_key(query);
-    path.push(format!("{hashed}.json"));
+    path.push(format!("{hashed}_{page}.json"));
     path
 }
 
-pub fn get_provider_search_cache(provider: ProviderKind, query: &str) -> Option<serde_json::Value> {
-    let path = get_provider_search_path(provider, query);
+pub fn get_provider_search_cache(
+    provider: ProviderKind,
+    query: &str,
+    page: usize,
+) -> Option<serde_json::Value> {
+    let path = get_provider_search_path(provider, query, page);
     let value = read_json_cache(&path, CACHE_EXPIRY_SECS)?;
     if search_payload_has_results(&value) {
         Some(value)
@@ -209,8 +209,13 @@ pub fn get_provider_search_cache(provider: ProviderKind, query: &str) -> Option<
     }
 }
 
-pub fn set_provider_search_cache(provider: ProviderKind, query: &str, data: &serde_json::Value) {
-    let path = get_provider_search_path(provider, query);
+pub fn set_provider_search_cache(
+    provider: ProviderKind,
+    query: &str,
+    page: usize,
+    data: &serde_json::Value,
+) {
+    let path = get_provider_search_path(provider, query, page);
     if !search_payload_has_results(data) {
         let _ = fs::remove_file(path);
         return;
@@ -321,12 +326,54 @@ pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
     write_json_cache(&path, data);
 }
 
+pub fn get_addon_catalog_path(manifest_url: &str, r_type: &str, catalog_id: &str) -> PathBuf {
+    let mut path = get_provider_cache_dir(ProviderKind::Addons, "catalogs");
+    let hashed = hash_key(&format!("{manifest_url}_{r_type}_{catalog_id}"));
+    path.push(format!("catalog_{hashed}.json"));
+    path
+}
+
+pub fn get_addon_catalog_cache(
+    manifest_url: &str,
+    r_type: &str,
+    catalog_id: &str,
+) -> Option<serde_json::Value> {
+    read_json_cache(
+        &get_addon_catalog_path(manifest_url, r_type, catalog_id),
+        HOMEPAGE_CACHE_EXPIRY_SECS,
+    )
+}
+
+pub fn set_addon_catalog_cache(
+    manifest_url: &str,
+    r_type: &str,
+    catalog_id: &str,
+    data: &serde_json::Value,
+) {
+    let path = get_addon_catalog_path(manifest_url, r_type, catalog_id);
+    write_json_cache(&path, data);
+}
+
+pub fn get_addon_manifest_path(manifest_url: &str) -> PathBuf {
+    let mut path = get_provider_cache_dir(ProviderKind::Addons, "manifests");
+    let hashed = hash_key(manifest_url);
+    path.push(format!("manifest_{hashed}.json"));
+    path
+}
+
+pub fn get_addon_manifest_cache(manifest_url: &str) -> Option<serde_json::Value> {
+    read_json_cache(&get_addon_manifest_path(manifest_url), CACHE_EXPIRY_SECS)
+}
+
+pub fn set_addon_manifest_cache(manifest_url: &str, data: &serde_json::Value) {
+    let path = get_addon_manifest_path(manifest_url);
+    write_json_cache(&path, data);
+}
+
 fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
-    let mut path = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-    path.push(crate::config::APP_NAME);
+    let mut path = crate::config::cache_dir();
     path.push(namespace);
     path.push("images");
-    let _ = fs::create_dir_all(&path);
     let safe_name = hash_key(id);
     path.push(format!("{safe_name}.img"));
     path
@@ -366,6 +413,7 @@ pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> 
         "iptv",
         "circleftp",
         "dhakaflix",
+        "addons",
     ];
     for fb in fallback_namespaces {
         if fb != namespace {

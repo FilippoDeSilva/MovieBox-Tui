@@ -157,9 +157,36 @@ impl App {
                 let request_id = self.state.active_search_request;
                 self.state.is_loading = true;
                 tokio::spawn(async move {
+                    let q = query.clone();
+                    let provider = context.provider;
+                    if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
+                        crate::cache::get_provider_search_cache(provider, &q, next_page)
+                    })
+                    .await
+                    {
+                        sender
+                            .send(Action::SearchSuccess {
+                                context,
+                                request_id,
+                                query,
+                                page: next_page,
+                                payload: cached,
+                            })
+                            .ok();
+                        return;
+                    }
+
                     let result = service.search(context.provider, &query, next_page).await;
                     match result {
                         Ok(res) => {
+                            let q = query.clone();
+                            let provider = context.provider;
+                            let cached = res.clone();
+                            tokio::task::spawn_blocking(move || {
+                                crate::cache::set_provider_search_cache(
+                                    provider, &q, next_page, &cached,
+                                );
+                            });
                             sender
                                 .send(Action::SearchSuccess {
                                     context,

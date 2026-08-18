@@ -67,7 +67,7 @@ impl App {
 
                 self.state
                     .set_status("Verifying addon manifest...".to_string(), 200);
-                let client = self.state.addon_client.clone();
+                let client = self.service.addon_client.clone();
                 let sender = self.action_sender.clone();
 
                 tokio::spawn(async move {
