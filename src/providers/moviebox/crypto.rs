@@ -291,3 +291,43 @@ pub(crate) fn random_spoofed_ip() -> String {
     let d: u8 = rng.random_range(1..254);
     format!("{}.{}.{}", prefix, c, d)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sorted_query_string() {
+        let url = "https://api.example.com/endpoint?b=2&a=1&c=3";
+        assert_eq!(sorted_query_string(url), "a=1&b=2&c=3");
+
+        let no_query = "https://api.example.com/endpoint";
+        assert_eq!(sorted_query_string(no_query), "");
+    }
+
+    #[test]
+    fn test_generate_x_client_token() {
+        let token = generate_x_client_token(1700000000000);
+        let parts: Vec<&str> = token.split(',').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0], "1700000000000");
+        assert_eq!(parts[1].len(), 32);
+    }
+
+    #[test]
+    fn test_generate_x_tr_signature() {
+        let sig = generate_x_tr_signature(
+            "GET",
+            Some("application/json"),
+            Some("application/json"),
+            "https://api.example.com/path?tab=1&page=2",
+            None,
+            1700000000000,
+        );
+        let parts: Vec<&str> = sig.split('|').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], "1700000000000");
+        assert_eq!(parts[1], "2");
+        assert!(!parts[2].is_empty());
+    }
+}

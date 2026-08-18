@@ -188,6 +188,10 @@ impl HistoryManager {
     }
 
     pub fn is_same_show(a: &WatchHistoryItem, b: &WatchHistoryItem) -> bool {
+        if a.stype != b.stype {
+            return false;
+        }
+
         let prov_a = crate::providers::models::ProviderKind::parse(&a.provider);
         let prov_b = crate::providers::models::ProviderKind::parse(&b.provider);
         let same_provider = match (prov_a, prov_b) {
@@ -195,13 +199,22 @@ impl HistoryManager {
             _ => a.provider.trim().eq_ignore_ascii_case(b.provider.trim()),
         };
 
-        if same_provider && !a.subject_id.is_empty() && a.subject_id == b.subject_id {
-            return true;
+        if !same_provider {
+            return false;
+        }
+
+        if !a.subject_id.is_empty() && !b.subject_id.is_empty() {
+            return a.subject_id == b.subject_id;
         }
 
         let clean_a = crate::providers::moviebox::clean_moviebox_title(&a.title);
         let clean_b = crate::providers::moviebox::clean_moviebox_title(&b.title);
         if !clean_a.is_empty() && clean_a.eq_ignore_ascii_case(&clean_b) {
+            let year_a = a.release_year.trim();
+            let year_b = b.release_year.trim();
+            if !year_a.is_empty() && !year_b.is_empty() {
+                return year_a == year_b;
+            }
             return true;
         }
         false
@@ -426,11 +439,16 @@ impl HistoryManager {
     }
 
     pub fn reconcile_pending_playback_states(&mut self) {
-        let Some(dir) = Self::playback_state_dir() else {
-            return;
-        };
-        let Ok(entries) = fs::read_dir(&dir) else {
-            return;
+        if let Some(dir) = Self::playback_state_dir() {
+            if self.reconcile_from_dir(&dir) {
+                self.save();
+            }
+        }
+    }
+
+    pub fn reconcile_from_dir(&mut self, dir: &std::path::Path) -> bool {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return false;
         };
 
         let mut modified = false;
@@ -439,6 +457,19 @@ impl HistoryManager {
             if path.extension().and_then(|e| e.to_str()) == Some("json") {
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(state) = serde_json::from_str::<PendingPlaybackState>(&content) {
+                        let key = Self::key(
+                            &state.provider,
+                            &state.subject_id,
+                            state.season,
+                            state.episode,
+                        );
+
+                        if state.completed {
+                            if self.watched.insert(key.clone()) {
+                                modified = true;
+                            }
+                        }
+
                         if let Some(existing) = self.recent.iter_mut().find(|i| {
                             let same_provider =
                                 crate::providers::models::ProviderKind::parse(&i.provider)
@@ -468,15 +499,7 @@ impl HistoryManager {
                             existing.duration_seconds = state.duration_seconds;
                             existing.completed = state.completed;
                             existing.timestamp = state.timestamp;
-                            let key = Self::key(
-                                &existing.provider,
-                                &existing.subject_id,
-                                existing.season,
-                                existing.episode,
-                            );
-                            if existing.completed {
-                                self.watched.insert(key);
-                            } else {
+                            if !existing.completed {
                                 self.watched.remove(&key);
                             }
                             modified = true;
@@ -487,8 +510,106 @@ impl HistoryManager {
             }
         }
 
-        if modified {
-            self.save();
+        modified
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dummy_item(
+        provider: &str,
+        subject_id: &str,
+        title: &str,
+        stype: i64,
+        release_year: &str,
+        season: usize,
+        episode: usize,
+    ) -> WatchHistoryItem {
+        WatchHistoryItem {
+            provider: provider.to_string(),
+            subject_id: subject_id.to_string(),
+            title: title.to_string(),
+            cover_url: None,
+            stype,
+            release_year: release_year.to_string(),
+            season,
+            episode,
+            timestamp: 1000,
+            duration_seconds: Some(3600),
+            progress_seconds: 1800,
+            completed: false,
         }
+    }
+
+    #[test]
+    fn test_is_same_show_canonical_identity() {
+        let ep1 = dummy_item("moviebox", "mb_100", "Breaking Bad", 2, "2008", 1, 1);
+        let ep2 = dummy_item("moviebox", "mb_100", "Breaking Bad", 2, "2008", 1, 2);
+        assert!(HistoryManager::is_same_show(&ep1, &ep2));
+    }
+
+    #[test]
+    fn test_is_same_show_movie_vs_series_differentiation() {
+        let movie = dummy_item("moviebox", "mb_1", "Home", 1, "2015", 0, 0);
+        let series = dummy_item("moviebox", "mb_2", "Home", 2, "2020", 1, 1);
+        assert!(!HistoryManager::is_same_show(&movie, &series));
+    }
+
+    #[test]
+    fn test_is_same_show_remakes_with_different_years() {
+        let classic = dummy_item("moviebox", "mb_old", "Halloween", 1, "1978", 0, 0);
+        let remake = dummy_item("moviebox", "mb_new", "Halloween", 1, "2018", 0, 0);
+        assert!(!HistoryManager::is_same_show(&classic, &remake));
+    }
+
+    #[test]
+    fn test_is_same_show_different_providers() {
+        let mb = dummy_item("moviebox", "mb_1", "Dune", 1, "2021", 0, 0);
+        let addon = dummy_item("addons", "tt1160419", "Dune", 1, "2021", 0, 0);
+        assert!(!HistoryManager::is_same_show(&mb, &addon));
+    }
+
+    #[test]
+    fn test_is_same_show_fallback_when_id_empty() {
+        let a = dummy_item("moviebox", "", "Inception", 1, "2010", 0, 0);
+        let b = dummy_item("moviebox", "", "Inception", 1, "2010", 0, 0);
+        assert!(HistoryManager::is_same_show(&a, &b));
+
+        let c = dummy_item("moviebox", "", "Inception", 1, "2020", 0, 0);
+        assert!(!HistoryManager::is_same_show(&a, &c));
+    }
+
+    #[test]
+    fn test_reconciliation_preserves_completed_episodes_when_recent_advanced() {
+        let mut manager = HistoryManager {
+            recent: vec![dummy_item("moviebox", "mb_series", "Show", 2, "2024", 1, 2)],
+            watched: HashSet::new(),
+        };
+
+        let temp_dir = std::env::temp_dir().join(format!("mb_test_hist_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let state_file = temp_dir.join("moviebox_mb_series_1_1.json");
+        let state = PendingPlaybackState {
+            provider: "moviebox".to_string(),
+            subject_id: "mb_series".to_string(),
+            season: 1,
+            episode: 1,
+            progress_seconds: 3600,
+            duration_seconds: Some(3600),
+            completed: true,
+            timestamp: 2000,
+        };
+        std::fs::write(&state_file, serde_json::to_string(&state).unwrap()).unwrap();
+
+        let modified = manager.reconcile_from_dir(&temp_dir);
+        assert!(modified);
+        assert!(manager.is_watched("moviebox", "mb_series", 1, 1));
+        assert_eq!(manager.recent.first().unwrap().episode, 2);
+        assert!(!state_file.exists());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

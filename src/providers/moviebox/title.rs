@@ -1,20 +1,40 @@
 pub fn clean_moviebox_title(raw_title: &str) -> String {
     let mut title = raw_title.trim();
+    if title.is_empty() {
+        return String::new();
+    }
+
+    while title.starts_with('[') {
+        if let Some(close_pos) = title.find(']') {
+            let remainder = title[close_pos + 1..].trim();
+            if !remainder.is_empty() {
+                title = remainder;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
 
     if let Some(pos) = title.find('[') {
-        title = title[..pos].trim();
+        if pos > 0 {
+            title = title[..pos].trim();
+        }
     }
 
     if let Some(pos) = title.find('(') {
-        let inside = &title[pos + 1..];
-        let inside_content = inside.split(')').next().unwrap_or("").trim();
-        let is_year = inside_content.len() == 4
-            && inside_content.chars().all(|c| c.is_ascii_digit())
-            && inside_content
-                .parse::<u32>()
-                .is_ok_and(|y| (1900..=2099).contains(&y));
-        if !is_year {
-            title = title[..pos].trim();
+        if pos > 0 {
+            let inside = &title[pos + 1..];
+            let inside_content = inside.split(')').next().unwrap_or("").trim();
+            let is_year = inside_content.len() == 4
+                && inside_content.chars().all(|c| c.is_ascii_digit())
+                && inside_content
+                    .parse::<u32>()
+                    .is_ok_and(|y| (1900..=2099).contains(&y));
+            if !is_year {
+                title = title[..pos].trim();
+            }
         }
     }
 
@@ -67,10 +87,16 @@ pub fn clean_moviebox_title(raw_title: &str) -> String {
         title = title[..s_idx].trim();
     }
 
-    title
+    let cleaned = title
         .trim_end_matches(['-', ':', '_', '.', ' '])
         .trim()
-        .to_string()
+        .to_string();
+
+    if cleaned.is_empty() {
+        raw_title.trim().to_string()
+    } else {
+        cleaned
+    }
 }
 
 pub fn language_to_code(name: &str) -> Option<&'static str> {
@@ -117,5 +143,55 @@ pub fn language_to_code(name: &str) -> Option<&'static str> {
         "tagalog" | "tl" | "fil" | "filipino" => Some("tl"),
         "malay" | "ms" | "msa" | "may" | "melayu" => Some("ms"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_moviebox_title_leading_tags() {
+        assert_eq!(
+            clean_moviebox_title("[Dub] Attack on Titan"),
+            "Attack on Titan"
+        );
+        assert_eq!(clean_moviebox_title("[1080p] Dune"), "Dune");
+        assert_eq!(
+            clean_moviebox_title("[RAW] 千と千尋の神隠し"),
+            "千と千尋の神隠し"
+        );
+        assert_eq!(
+            clean_moviebox_title("[Dub] [1080p] Solo Leveling"),
+            "Solo Leveling"
+        );
+    }
+
+    #[test]
+    fn test_clean_moviebox_title_parentheses_and_years() {
+        assert_eq!(
+            clean_moviebox_title("(500) Days of Summer"),
+            "(500) Days of Summer"
+        );
+        assert_eq!(clean_moviebox_title("Inception (2010)"), "Inception (2010)");
+        assert_eq!(
+            clean_moviebox_title("Movie Name (Director's Cut)"),
+            "Movie Name"
+        );
+    }
+
+    #[test]
+    fn test_clean_moviebox_title_trailing_brackets_and_tags() {
+        assert_eq!(clean_moviebox_title("Dune [2021]"), "Dune");
+        assert_eq!(clean_moviebox_title("Movie - Hindi Dub"), "Movie");
+        assert_eq!(clean_moviebox_title("Breaking Bad S01"), "Breaking Bad");
+        assert_eq!(clean_moviebox_title("Dark Season 2"), "Dark");
+    }
+
+    #[test]
+    fn test_clean_moviebox_title_empty_and_whitespace() {
+        assert_eq!(clean_moviebox_title(""), "");
+        assert_eq!(clean_moviebox_title("   "), "");
+        assert_eq!(clean_moviebox_title("Interstellar"), "Interstellar");
     }
 }

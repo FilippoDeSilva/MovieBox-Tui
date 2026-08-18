@@ -717,3 +717,46 @@ async fn retry_delay(attempt: usize) {
         tokio::time::sleep(Duration::from_secs(1 << (attempt - 1))).await;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_content_range_valid() {
+        let (start, total) = parse_content_range("bytes 0-1023/2048").unwrap();
+        assert_eq!(start, 0);
+        assert_eq!(total, Some(2048));
+
+        let (start, total) = parse_content_range("bytes 500-999/*").unwrap();
+        assert_eq!(start, 500);
+        assert_eq!(total, None);
+    }
+
+    #[test]
+    fn test_parse_content_range_invalid() {
+        assert!(parse_content_range("invalid range").is_err());
+        assert!(parse_content_range("bytes invalid").is_err());
+    }
+
+    #[test]
+    fn test_segment_ranges_partitioning() {
+        let total = 1000;
+        let ranges = segment_ranges(total, 4);
+        assert_eq!(ranges.len(), 4);
+        assert_eq!(ranges[0], (0, 249));
+        assert_eq!(ranges[1], (250, 499));
+        assert_eq!(ranges[2], (500, 749));
+        assert_eq!(ranges[3], (750, 999));
+    }
+
+    #[test]
+    fn test_safe_file_stem_windows_reserved() {
+        assert_eq!(safe_file_stem("CON"), "CON_");
+        assert_eq!(safe_file_stem("AUX"), "AUX_");
+        assert_eq!(
+            safe_file_stem("Normal Title: Special"),
+            "Normal Title_ Special"
+        );
+    }
+}

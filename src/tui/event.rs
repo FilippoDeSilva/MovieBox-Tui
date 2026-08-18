@@ -15,8 +15,10 @@ impl EventHandler {
         tokio::spawn({
             let signal_sender = sender.clone();
             async move {
-                if tokio::signal::ctrl_c().await.is_ok() {
-                    let _ = signal_sender.send(Action::Quit).await;
+                while tokio::signal::ctrl_c().await.is_ok() {
+                    if signal_sender.send(Action::Quit).await.is_err() {
+                        break;
+                    }
                 }
             }
         });

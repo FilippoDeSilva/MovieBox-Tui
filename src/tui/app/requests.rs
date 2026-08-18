@@ -88,12 +88,11 @@ impl App {
                             .and_then(|t| t.as_str())
                             .unwrap_or("Unknown")
                             .to_string();
-                        let clean_title = raw_title
-                            .split('[')
-                            .next()
-                            .unwrap_or(&raw_title)
-                            .trim()
-                            .to_string();
+                        let clean_title = if query.starts_with('/') {
+                            raw_title
+                        } else {
+                            crate::providers::moviebox::clean_moviebox_title(&raw_title)
+                        };
 
                         if query.starts_with('/') {
                             if clean_title.starts_with(&query)

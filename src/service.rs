@@ -292,7 +292,7 @@ impl MovieBoxService {
             request = request.header(name.as_str(), value.as_str());
         }
 
-        let response = tokio::time::timeout(std::time::Duration::from_secs(30), request.send())
+        let response = tokio::time::timeout(std::time::Duration::from_secs(8), request.send())
             .await
             .map_err(|_| "Subtitle download timed out".to_string())?
             .map_err(|e| format!("Failed to request subtitle: {e}"))?

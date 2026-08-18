@@ -102,7 +102,7 @@ impl M3UParser {
         Ok(channels)
     }
 
-    fn parse_m3u(&self, content: &str) -> Vec<Channel> {
+    pub fn parse_m3u(&self, content: &str) -> Vec<Channel> {
         let mut channels = Vec::new();
         let mut current_channel = Channel {
             id: String::new(),
@@ -112,11 +112,14 @@ impl M3UParser {
             stream_url: String::new(),
         };
 
-        let extract_attr = |line: &str, attr: &str| -> String {
-            if let Some(idx) = line.find(attr) {
-                let start = idx + attr.len();
-                if let Some(end) = line[start..].find('"') {
-                    return line[start..start + end].to_string();
+        let extract_attr = |line: &str, attr_name: &str| -> String {
+            for quote in ['"', '\''] {
+                let pattern = format!("{attr_name}={quote}");
+                if let Some(idx) = line.find(&pattern) {
+                    let start = idx + pattern.len();
+                    if let Some(end) = line[start..].find(quote) {
+                        return line[start..start + end].to_string();
+                    }
                 }
             }
             String::new()
@@ -128,9 +131,9 @@ impl M3UParser {
                 continue;
             }
             if line.starts_with("#EXTINF:") {
-                current_channel.id = extract_attr(line, "tvg-id=\"");
-                current_channel.logo = extract_attr(line, "tvg-logo=\"");
-                current_channel.group = extract_attr(line, "group-title=\"");
+                current_channel.id = extract_attr(line, "tvg-id");
+                current_channel.logo = extract_attr(line, "tvg-logo");
+                current_channel.group = extract_attr(line, "group-title");
 
                 if let Some(idx) = line.rfind(',') {
                     current_channel.name = line[idx + 1..].trim().to_string();
@@ -158,4 +161,41 @@ impl M3UParser {
 
 fn cache_filename(raw: &str) -> String {
     format!("{}.m3u", crate::cache::md5_hex(raw))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_m3u_double_and_single_quotes() {
+        let parser = M3UParser::new();
+        let content = r#"#EXTM3U
+#EXTINF:-1 tvg-id="cnn.us" tvg-logo="http://logo.png/cnn.png" group-title="News",CNN HD
+http://example.com/cnn.m3u8
+#EXTINF:-1 tvg-id='bbc.uk' tvg-logo='http://logo.png/bbc.png' group-title='News',BBC World News
+http://example.com/bbc.m3u8
+#EXTINF:-1,Discovery Channel
+http://example.com/discovery.m3u8
+"#;
+        let channels = parser.parse_m3u(content);
+        assert_eq!(channels.len(), 3);
+
+        assert_eq!(channels[0].id, "cnn.us");
+        assert_eq!(channels[0].name, "CNN HD");
+        assert_eq!(channels[0].logo, "http://logo.png/cnn.png");
+        assert_eq!(channels[0].group, "News");
+        assert_eq!(channels[0].stream_url, "http://example.com/cnn.m3u8");
+
+        assert_eq!(channels[1].id, "bbc.uk");
+        assert_eq!(channels[1].name, "BBC World News");
+        assert_eq!(channels[1].logo, "http://logo.png/bbc.png");
+        assert_eq!(channels[1].group, "News");
+        assert_eq!(channels[1].stream_url, "http://example.com/bbc.m3u8");
+
+        assert_eq!(channels[2].id, "Discovery Channel");
+        assert_eq!(channels[2].name, "Discovery Channel");
+        assert_eq!(channels[2].group, "");
+        assert_eq!(channels[2].stream_url, "http://example.com/discovery.m3u8");
+    }
 }

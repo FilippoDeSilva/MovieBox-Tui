@@ -193,14 +193,13 @@ fn mpv_command(
 
     if let Some((provider, subject_id, season, episode)) = tracker {
         if let Some(script_path) = tracker::ensure_tracker_script() {
-            command.arg(format!("{prefix}script={}", script_path.display()));
+            let script_str = script_path.to_string_lossy().replace('\\', "/");
+            command.arg(format!("{prefix}script={script_str}"));
             if let Some(state_file) =
                 tracker::state_file_path(provider, subject_id, season, episode)
             {
-                let opts = format!(
-                    "moviebox-provider={provider},moviebox-subject_id={subject_id},moviebox-season={season},moviebox-episode={episode},moviebox-state_file={}",
-                    state_file.display()
-                );
+                let opts =
+                    format_mpv_script_opts(provider, subject_id, season, episode, &state_file);
                 command.arg(format!("{prefix}script-opts={opts}"));
             }
         }
@@ -632,4 +631,41 @@ fn find_in_path(name: &str) -> Option<String> {
 
 fn executable_on_path(name: &str) -> bool {
     find_in_path(name).is_some()
+}
+
+pub fn format_mpv_script_opts(
+    provider: &str,
+    subject_id: &str,
+    season: usize,
+    episode: usize,
+    state_file: &Path,
+) -> String {
+    let state_file_str = state_file.to_string_lossy().replace('\\', "/");
+    format!(
+        "moviebox-provider={provider},moviebox-subject_id={subject_id},moviebox-season={season},moviebox-episode={episode},moviebox-state_file={state_file_str}"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_format_mpv_script_opts_windows_paths() {
+        let win_path = PathBuf::from(
+            r"C:\Users\User\AppData\Local\MovieBox-Tui\playback\moviebox_123_1_1.json",
+        );
+        let opts = format_mpv_script_opts("moviebox", "123", 1, 1, &win_path);
+        assert!(!opts.contains(r"\"));
+        assert!(opts.contains("moviebox-state_file=C:/Users/User/AppData/Local/MovieBox-Tui/playback/moviebox_123_1_1.json"));
+    }
+
+    #[test]
+    fn test_format_mpv_script_opts_unix_paths() {
+        let unix_path =
+            PathBuf::from("/home/user/.local/share/moviebox-tui/playback/moviebox_123_1_1.json");
+        let opts = format_mpv_script_opts("moviebox", "123", 1, 1, &unix_path);
+        assert!(opts.contains("moviebox-state_file=/home/user/.local/share/moviebox-tui/playback/moviebox_123_1_1.json"));
+    }
 }
