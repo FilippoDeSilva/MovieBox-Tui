@@ -143,7 +143,8 @@ impl App {
                 let lower_query = query.trim().to_lowercase();
 
                 if lower_query == "/history"
-                    && self.state.mode() == crate::tui::state::AppMode::Streaming
+                    && (self.state.mode() == crate::tui::state::AppMode::Streaming
+                        || self.state.mode() == crate::tui::state::AppMode::Addon)
                 {
                     self.state.input_mode = InputMode::Normal;
                     self.state.is_loading = false;
@@ -166,16 +167,15 @@ impl App {
                     self.state.search_suggestions.clear();
                     self.state.suggest_index = None;
 
+                    self.state.search_query = "/history".to_string();
                     let mut recent = self.state.history.recent.clone();
                     if recent.is_empty() {
-                        self.state.search_query.clear();
                         self.state.notify(
                             crate::tui::overlay::NotificationKind::Info,
                             "History",
                             "No watch history found.",
                         );
                     } else {
-                        self.state.search_query = "/history".to_string();
                         recent.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
 
                         for item in recent {
