@@ -132,5 +132,12 @@ pub enum Action {
         crate::providers::models::PlaybackSource,
     ),
     MarkWatched(crate::history::WatchHistoryItem),
+    UpdateProgress {
+        item: crate::history::WatchHistoryItem,
+        progress: u64,
+        duration: Option<u64>,
+        completed: bool,
+    },
+    ReconcileHistory,
     PlayerCrashed(Option<i32>, String),
 }

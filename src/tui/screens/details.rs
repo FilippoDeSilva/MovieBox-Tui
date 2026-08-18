@@ -377,6 +377,30 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if !duration_str.is_empty() {
         metadata.push(duration.to_string());
     }
+    let subject_id = state.active_subject_id.as_deref().unwrap_or("");
+    let provider = subject_provider(state, subject_id).cache_key();
+    if type_val == 1 {
+        if let Some(hist) = state
+            .history
+            .get_item(provider, subject_id, 0, 0, Some(&title))
+        {
+            if hist.is_in_progress() {
+                let p_bar = hist.progress_bar(8);
+                let pct = hist
+                    .progress_percentage()
+                    .map(|p| format!("{:.0}%", p))
+                    .unwrap_or_default();
+                let rem = hist
+                    .formatted_remaining()
+                    .map(|r| format!(" • {r}"))
+                    .unwrap_or_default();
+                metadata.push(format!("{p_bar} {pct}{rem}"));
+            } else if hist.completed {
+                metadata.push("[✓ Watched]".to_string());
+            }
+        }
+    }
+    metadata.retain(|s| !s.trim().is_empty());
     let meta_line = Line::from(vec![Span::styled(
         metadata.join(" • "),
         metadata_style(theme),
@@ -653,10 +677,31 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ep_numbers
                 .iter()
                 .map(|&ep| {
-                    if state.history.is_watched(provider, subject_id, se_num, ep) {
-                        ListItem::new(format!("Episode {}", ep)).style(theme.text_dim)
+                    if let Some(hist) =
+                        state
+                            .history
+                            .get_item(provider, subject_id, se_num, ep, Some(&title))
+                    {
+                        if hist.completed {
+                            ListItem::new(format!("✓ Episode {}", ep)).style(theme.text_dim)
+                        } else if hist.is_in_progress() {
+                            let pct = hist
+                                .progress_percentage()
+                                .map(|p| format!(" ({:.0}%)", p))
+                                .unwrap_or_default();
+                            let remaining = hist
+                                .formatted_remaining()
+                                .map(|r| format!(" • {r}"))
+                                .unwrap_or_default();
+                            ListItem::new(format!("▶ Episode {}{pct}{remaining}", ep))
+                                .style(theme.accent)
+                        } else {
+                            ListItem::new(format!("  Episode {}", ep)).style(theme.text)
+                        }
+                    } else if state.history.is_watched(provider, subject_id, se_num, ep) {
+                        ListItem::new(format!("✓ Episode {}", ep)).style(theme.text_dim)
                     } else {
-                        ListItem::new(format!("Episode {}", ep)).style(theme.text)
+                        ListItem::new(format!("  Episode {}", ep)).style(theme.text)
                     }
                 })
                 .collect()

@@ -685,21 +685,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 };
 
                 let is_history = state.search_query.trim().to_lowercase() == "/history";
-                if is_history {
-                    let mut extra = vec![];
-                    if res.season > 0 {
-                        extra.push(format!("S{:02}E{:02}", res.season, res.episode));
-                    }
-                    extra.push(res.provider.to_string());
-
-                    if !extra.is_empty() {
-                        if type_tag.is_empty() {
-                            type_tag = extra.join(" • ");
-                        } else {
-                            type_tag = format!("{} • {}", type_tag, extra.join(" • "));
-                        }
-                    }
-                } else if type_tag.is_empty() {
+                if !is_history && type_tag.is_empty() {
                     type_tag = "Unknown".to_string();
                 }
 
@@ -713,59 +699,126 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                 let mut info_spans = vec![];
 
-                macro_rules! push_year {
-                    () => {
-                        if res.release_year != "Unknown" && !res.release_year.is_empty() {
-                            info_spans
-                                .push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        }
-                    };
-                }
-
-                if is_selected {
-                    if let Some(meta) = &state.search_preview {
-                        let rating = meta
-                            .get("imdbRating")
-                            .or_else(|| meta.get("imdbRatingValue"))
-                            .and_then(|v| v.as_str());
-                        if let Some(r) = rating {
-                            let star = if state.basic_terminal { "* " } else { "★ " };
-                            info_spans.push(ratatui::text::Span::styled(star, theme.rating));
-                            info_spans.push(ratatui::text::Span::styled(r, theme.text));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        }
-                        push_year!();
-
-                        let mut g_names = vec![];
-                        if let Some(genres) = meta.get("genres").and_then(|g| g.as_array()) {
-                            g_names = genres
-                                .iter()
-                                .filter_map(|g| {
-                                    g.get("name")
-                                        .and_then(|n| n.as_str())
-                                        .map(|s| s.to_string())
-                                })
-                                .collect();
-                        }
-                        if !g_names.is_empty() {
-                            info_spans
-                                .push(ratatui::text::Span::styled(g_names.join(" • "), theme.text));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        }
-                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                    } else if state.preview_loading {
-                        push_year!();
+                if is_history {
+                    if !type_tag.is_empty() {
                         info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                         info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                        info_spans.push(ratatui::text::Span::styled("Loading...", theme.text_dim));
+                    }
+                    if res.season > 0 {
+                        info_spans.push(ratatui::text::Span::styled(
+                            format!("S{:02}E{:02}", res.season, res.episode),
+                            theme.text,
+                        ));
+                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                    }
+
+                    if let Some(hist) = state.history.get_item(
+                        res.provider.cache_key(),
+                        &res.id,
+                        res.season,
+                        res.episode,
+                        Some(&res.title),
+                    ) {
+                        if hist.is_in_progress() {
+                            let (filled, empty) = hist.progress_bar_parts(8);
+                            info_spans.push(ratatui::text::Span::styled(
+                                filled,
+                                theme.accent.add_modifier(ratatui::style::Modifier::BOLD),
+                            ));
+                            info_spans.push(ratatui::text::Span::styled(empty, theme.text_dim));
+
+                            let pct = hist
+                                .progress_percentage()
+                                .map(|p| format!(" {:.0}%", p))
+                                .unwrap_or_default();
+                            info_spans.push(ratatui::text::Span::styled(pct, theme.text));
+
+                            if let Some(r) = hist.formatted_remaining() {
+                                info_spans.push(ratatui::text::Span::styled(
+                                    format!(" ({r})"),
+                                    theme.text_dim,
+                                ));
+                            }
+                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            info_spans.push(ratatui::text::Span::styled(
+                                format!("Watched {}", hist.formatted_relative_time()),
+                                theme.text_dim,
+                            ));
+                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        } else if hist.completed {
+                            info_spans
+                                .push(ratatui::text::Span::styled("[✓ Completed]", theme.text_dim));
+                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            info_spans.push(ratatui::text::Span::styled(
+                                format!("Watched {}", hist.formatted_relative_time()),
+                                theme.text_dim,
+                            ));
+                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        }
+                    }
+
+                    info_spans.push(ratatui::text::Span::styled(
+                        res.provider.to_string(),
+                        theme.text,
+                    ));
+                } else {
+                    macro_rules! push_year {
+                        () => {
+                            if res.release_year != "Unknown" && !res.release_year.is_empty() {
+                                info_spans
+                                    .push(ratatui::text::Span::styled(&res.release_year, theme.text));
+                                info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            }
+                        };
+                    }
+
+                    if is_selected {
+                        if let Some(meta) = &state.search_preview {
+                            let rating = meta
+                                .get("imdbRating")
+                                .or_else(|| meta.get("imdbRatingValue"))
+                                .and_then(|v| v.as_str());
+                            if let Some(r) = rating {
+                                let star = if state.basic_terminal { "* " } else { "★ " };
+                                info_spans.push(ratatui::text::Span::styled(star, theme.rating));
+                                info_spans.push(ratatui::text::Span::styled(r, theme.text));
+                                info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            }
+                            push_year!();
+
+                            let mut g_names = vec![];
+                            if let Some(genres) = meta.get("genres").and_then(|g| g.as_array()) {
+                                g_names = genres
+                                    .iter()
+                                    .filter_map(|g| {
+                                        g.get("name")
+                                            .and_then(|n| n.as_str())
+                                            .map(|s| s.to_string())
+                                    })
+                                    .collect();
+                            }
+                            if !g_names.is_empty() {
+                                info_spans.push(ratatui::text::Span::styled(
+                                    g_names.join(" • "),
+                                    theme.text,
+                                ));
+                                info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            }
+                            info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                        } else if state.preview_loading {
+                            push_year!();
+                            info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            info_spans
+                                .push(ratatui::text::Span::styled("Loading...", theme.text_dim));
+                        } else {
+                            push_year!();
+                            info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                        }
                     } else {
                         push_year!();
                         info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                     }
-                } else {
-                    push_year!();
-                    info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                 }
 
                 if text_layout[2].height > 0 && !info_spans.is_empty() {

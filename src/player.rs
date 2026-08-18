@@ -1,3 +1,5 @@
+pub mod tracker;
+
 use std::{path::Path, process::Command};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,11 +94,21 @@ pub fn command(
     subtitle: Option<&str>,
     headers: &[(String, String)],
     window: Option<(u32, u32)>,
+    resume_seconds: Option<u64>,
+    tracker: Option<(&str, &str, usize, usize)>,
 ) -> Command {
     match kind {
-        PlayerKind::Mpv => mpv_command(url, subtitle, headers, false, window),
-        PlayerKind::Iina => iina_command(url, subtitle, headers, window),
-        PlayerKind::Vlc => vlc_command(url, subtitle, headers, window),
+        PlayerKind::Mpv => mpv_command(
+            url,
+            subtitle,
+            headers,
+            false,
+            window,
+            resume_seconds,
+            tracker,
+        ),
+        PlayerKind::Iina => iina_command(url, subtitle, headers, window, resume_seconds, tracker),
+        PlayerKind::Vlc => vlc_command(url, subtitle, headers, window, resume_seconds),
         PlayerKind::AndroidIntent => android_intent_command(url),
     }
 }
@@ -141,6 +153,8 @@ fn mpv_command(
     headers: &[(String, String)],
     iina: bool,
     window: Option<(u32, u32)>,
+    resume_seconds: Option<u64>,
+    tracker: Option<(&str, &str, usize, usize)>,
 ) -> Command {
     let fallback = if cfg!(target_os = "windows") {
         "mpv.exe"
@@ -171,6 +185,27 @@ fn mpv_command(
 
     if !iina {
         command.arg("--idle=no").arg("--keep-open=no");
+    }
+
+    if let Some(start) = resume_seconds {
+        if start > 0 {
+            command.arg(format!("{prefix}start={start}"));
+        }
+    }
+
+    if let Some((provider, subject_id, season, episode)) = tracker {
+        if let Some(script_path) = tracker::ensure_tracker_script() {
+            command.arg(format!("{prefix}script={}", script_path.display()));
+            if let Some(state_file) =
+                tracker::state_file_path(provider, subject_id, season, episode)
+            {
+                let opts = format!(
+                    "moviebox-provider={provider},moviebox-subject_id={subject_id},moviebox-season={season},moviebox-episode={episode},moviebox-state_file={}",
+                    state_file.display()
+                );
+                command.arg(format!("{prefix}script-opts={opts}"));
+            }
+        }
     }
 
     if !headers.is_empty() {
@@ -211,6 +246,8 @@ fn iina_command(
     subtitle: Option<&str>,
     headers: &[(String, String)],
     window: Option<(u32, u32)>,
+    resume_seconds: Option<u64>,
+    tracker: Option<(&str, &str, usize, usize)>,
 ) -> Command {
     let configured = configured_executable("MOVIEBOX_IINA_PATH");
     let cli_global = std::path::Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
@@ -236,7 +273,15 @@ fn iina_command(
         Command::new("iina")
     };
 
-    let mpv = mpv_command(url, subtitle, headers, true, window);
+    let mpv = mpv_command(
+        url,
+        subtitle,
+        headers,
+        true,
+        window,
+        resume_seconds,
+        tracker,
+    );
     for arg in mpv.get_args() {
         command.arg(arg);
     }
@@ -249,8 +294,18 @@ fn iina_command(
     subtitle: Option<&str>,
     headers: &[(String, String)],
     window: Option<(u32, u32)>,
+    resume_seconds: Option<u64>,
+    tracker: Option<(&str, &str, usize, usize)>,
 ) -> Command {
-    mpv_command(url, subtitle, headers, false, window)
+    mpv_command(
+        url,
+        subtitle,
+        headers,
+        false,
+        window,
+        resume_seconds,
+        tracker,
+    )
 }
 
 fn vlc_command(
@@ -258,6 +313,7 @@ fn vlc_command(
     subtitle: Option<&str>,
     headers: &[(String, String)],
     window: Option<(u32, u32)>,
+    resume_seconds: Option<u64>,
 ) -> Command {
     let fallback = if cfg!(target_os = "windows") {
         "vlc.exe"
@@ -285,6 +341,12 @@ fn vlc_command(
             .arg(format!("--height={height}"));
     }
     command.arg("--play-and-exit");
+
+    if let Some(start) = resume_seconds {
+        if start > 0 {
+            command.arg(format!("--start-time={start}"));
+        }
+    }
 
     for (name, value) in headers {
         if name.eq_ignore_ascii_case("referer") {

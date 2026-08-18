@@ -34,6 +34,9 @@ src/
   player.rs          Player detection (OnceLock) and command construction for
                      mpv / VLC / IINA / Android intent, subtitle args, headers,
                      terminal-sized window.
+  player/
+    tracker.rs       Injected Lua tracker script (`moviebox_tracker.lua`) and
+                     periodic 5-second playback state auto-saving.
 
   providers/
     mod.rs           Module declarations.

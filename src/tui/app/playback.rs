@@ -4,6 +4,63 @@ use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 pub(crate) use crate::service::extract_cover_url;
 
+fn parse_duration_seconds(d: &str) -> Option<u64> {
+    let s = d.trim();
+    if s.is_empty() || s.eq_ignore_ascii_case("n/a") {
+        return None;
+    }
+    if s.contains(':') {
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() == 2 {
+            let m: u64 = parts[0].trim().parse().ok()?;
+            let s: u64 = parts[1].trim().parse().ok()?;
+            return Some(m * 60 + s);
+        } else if parts.len() == 3 {
+            let h: u64 = parts[0].trim().parse().ok()?;
+            let m: u64 = parts[1].trim().parse().ok()?;
+            let s: u64 = parts[2].trim().parse().ok()?;
+            return Some(h * 3600 + m * 60 + s);
+        }
+    }
+    let mut total = 0u64;
+    let mut current_num = String::new();
+    let mut found_any = false;
+    for c in s.chars() {
+        if c.is_ascii_digit() {
+            current_num.push(c);
+        } else if c == 'h' || c == 'H' {
+            if let Ok(n) = current_num.parse::<u64>() {
+                total += n * 3600;
+                found_any = true;
+            }
+            current_num.clear();
+        } else if c == 'm' || c == 'M' {
+            if let Ok(n) = current_num.parse::<u64>() {
+                total += n * 60;
+                found_any = true;
+            }
+            current_num.clear();
+        } else if c == 's' || c == 'S' {
+            if let Ok(n) = current_num.parse::<u64>() {
+                total += n;
+                found_any = true;
+            }
+            current_num.clear();
+        }
+    }
+    if !current_num.is_empty() && !found_any {
+        if let Ok(n) = current_num.parse::<u64>() {
+            total += n * 60;
+            found_any = true;
+        }
+    }
+    if found_any && total > 0 {
+        Some(total)
+    } else {
+        None
+    }
+}
+
 impl App {
     fn preferred_playback_player(
         &self,
@@ -25,6 +82,7 @@ impl App {
         let mut cover_url = None;
         let mut stype = 1;
         let mut release_year = "Unknown".to_string();
+        let mut duration_seconds = None;
 
         if let Some(details) = &self.state.selected_details {
             if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
@@ -41,6 +99,9 @@ impl App {
             } else if let Some(y) = details.get("year").and_then(|y| y.as_i64()) {
                 release_year = y.to_string();
             }
+            if let Some(d) = details.get("duration").and_then(|v| v.as_str()) {
+                duration_seconds = parse_duration_seconds(d);
+            }
         }
 
         if cover_url.is_none() {
@@ -55,6 +116,11 @@ impl App {
         if cover_url.is_none() {
             if let Some(preview) = &self.state.search_preview {
                 cover_url = extract_cover_url(preview);
+                if duration_seconds.is_none() {
+                    if let Some(d) = preview.get("duration").and_then(|v| v.as_str()) {
+                        duration_seconds = parse_duration_seconds(d);
+                    }
+                }
             }
         }
 
@@ -88,6 +154,9 @@ impl App {
             season,
             episode,
             timestamp,
+            duration_seconds,
+            progress_seconds: 0,
+            completed: false,
         })
     }
 
@@ -99,6 +168,30 @@ impl App {
         headers: Vec<(String, String)>,
     ) {
         let history_item = self.build_watch_history_item();
+        let resume_seconds = if let Some(item) = &history_item {
+            self.state
+                .history
+                .get_item(
+                    &item.provider,
+                    &item.subject_id,
+                    item.season,
+                    item.episode,
+                    Some(&item.title),
+                )
+                .filter(|existing| existing.is_in_progress())
+                .map(|existing| existing.progress_seconds)
+        } else {
+            None
+        };
+
+        let tracker_opts = history_item.as_ref().map(|item| {
+            (
+                item.provider.clone(),
+                item.subject_id.clone(),
+                item.season,
+                item.episode,
+            )
+        });
 
         let sender = self.action_sender.clone();
         let cell_size = self
@@ -145,12 +238,18 @@ impl App {
                 }
             }
 
+            let tracker_ref = tracker_opts
+                .as_ref()
+                .map(|(p, s, se, ep)| (p.as_str(), s.as_str(), *se, *ep));
+
             let mut command = crate::tui::player::command(
                 kind,
                 &link,
                 local_subtitle.as_deref(),
                 &headers,
                 window,
+                resume_seconds,
+                tracker_ref,
             );
             command.stdin(std::process::Stdio::null());
             command.stdout(std::process::Stdio::null());
@@ -169,9 +268,6 @@ impl App {
 
             match command.spawn() {
                 Ok(mut child) => {
-                    if let Some(item) = history_item {
-                        sender.send(Action::MarkWatched(item)).ok();
-                    }
                     let start_time = std::time::Instant::now();
                     let stderr_stream = child.stderr.take();
 
@@ -193,6 +289,31 @@ impl App {
                                 sender
                                     .send(Action::PlayerCrashed(status.code(), clean_error))
                                     .ok();
+                            } else {
+                                sender.send(Action::ReconcileHistory).ok();
+
+                                if let Some(item) = history_item {
+                                    let elapsed = start_time.elapsed().as_secs();
+                                    if elapsed >= 30 {
+                                        let duration = item.duration_seconds;
+                                        let completed = duration.is_some_and(|d| {
+                                            d > 0 && elapsed >= (d as f64 * 0.90) as u64
+                                        });
+                                        let progress = if let Some(d) = duration {
+                                            elapsed.min(d)
+                                        } else {
+                                            elapsed
+                                        };
+                                        sender
+                                            .send(Action::UpdateProgress {
+                                                item,
+                                                progress,
+                                                duration,
+                                                completed,
+                                            })
+                                            .ok();
+                                    }
+                                }
                             }
                         }
 
@@ -545,6 +666,19 @@ impl App {
                 self.state.history.mark_watched(item);
                 let history = self.state.history.clone();
                 tokio::task::spawn_blocking(move || history.save());
+            }
+            Action::UpdateProgress {
+                item,
+                progress,
+                duration,
+                completed,
+            } => {
+                self.state
+                    .history
+                    .update_progress(item, progress, duration, completed);
+            }
+            Action::ReconcileHistory => {
+                self.state.history.reconcile_pending_playback_states();
             }
             Action::PlayerCrashed(code, error_msg) => {
                 let code_str = code

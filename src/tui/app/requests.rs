@@ -175,6 +175,7 @@ impl App {
                             "No watch history found.",
                         );
                     } else {
+                        self.state.search_query = "/history".to_string();
                         recent.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
 
                         for item in recent {

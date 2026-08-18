@@ -224,6 +224,8 @@ impl App {
             | Action::LaunchPlayback(..)
             | Action::LaunchPlayer(..)
             | Action::MarkWatched(..)
+            | Action::UpdateProgress { .. }
+            | Action::ReconcileHistory
             | Action::PlayerCrashed(..) => {
                 self.handle_playback(action).await;
             }

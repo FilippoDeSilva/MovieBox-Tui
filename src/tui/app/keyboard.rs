@@ -210,7 +210,9 @@ impl App {
                     };
 
                     if !query.is_empty() {
-                        if query.starts_with('/') {
+                        if query.trim().eq_ignore_ascii_case("/history") {
+                            self.state.search_query = "/history".to_string();
+                        } else if query.starts_with('/') {
                             self.state.search_query.clear();
                         } else {
                             self.state.search_query = query.clone();

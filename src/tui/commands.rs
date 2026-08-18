@@ -89,12 +89,18 @@ impl SlashCommand {
         }
     }
 
-    pub fn description(self, _state: &AppState) -> &'static str {
+    pub fn description(self, state: &AppState) -> &'static str {
         match self {
             Self::Browse => "Curated, rated & most-watched views",
             Self::History => "Watch history",
             Self::List => "Show all TV channels",
-            Self::Config => "Configure IPTV playlists",
+            Self::Config => {
+                if state.is_addon_mode {
+                    "Configure HTTP addons"
+                } else {
+                    "Configure IPTV playlists"
+                }
+            }
             Self::DownloadDir => "View or change download folder",
             Self::Theme => "Theme picker",
             Self::Update => "Check for newer release",
@@ -119,7 +125,11 @@ impl SlashCommand {
                     || (state.addons_enabled && state.is_addon_mode)
             }
             Self::History => state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode,
-            Self::List | Self::Config => state.tv_enabled && state.is_tv_mode,
+            Self::List => state.tv_enabled && state.is_tv_mode,
+            Self::Config => {
+                (state.tv_enabled && state.is_tv_mode)
+                    || (state.addons_enabled && state.is_addon_mode)
+            }
             Self::EnableBdix => {
                 state.streaming_enabled
                     && !state.is_tv_mode

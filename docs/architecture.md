@@ -111,6 +111,8 @@ interval, forwarding them into the action channel (capacity 128).
 - `addons_config.json` — installed HTTP community addons in the config dir.
 - `tv_config.json` — user M3U playlist sources (URLs or file paths) in the config dir.
 - `history.json` — watch history in the system data dir.
+- `playback/` — temporary playback states for session crash/kill reconciliation in the system data dir.
+- `scripts/` — bundled player scripts (`moviebox_tracker.lua`) in the system data dir.
 - Cache lives under the system cache dir, keyed per provider.
 - Logs live under the system data dir with rotation.
 

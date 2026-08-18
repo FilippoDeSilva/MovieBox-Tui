@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Playback Tracking & Watch History Progress**:
+  - Added real-time playback position tracking for `mpv` with injected tracker script (`moviebox_tracker.lua`) and 5-second periodic state auto-save to disk.
+  - Added automatic startup state reconciliation (`reconcile_pending_playback_states`) ensuring watched progress is preserved even when closing the terminal or killing tmux mid-playback.
+  - Added two-tone smooth scrub line progress bars (`━─────── 1% (2h 18m left) • Watched 11h ago`) and completion status badges (`[✓ Completed]`, `[✓ Watched]`) in `/history` and Details screens.
+  - Added cross-provider title-based history deduplication and auto-resume from the last watched position.
 - **Addon Mode (Community HTTP Addons)**:
   - Added full support for community HTTP addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`) with dedicated `Ctrl+A` mode switching.
   - Pre-installed and locked Cinemeta out-of-the-box as the default core metadata provider with zero API keys required.
