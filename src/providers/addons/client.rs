@@ -28,7 +28,7 @@ impl AddonClient {
         let mut url = raw.trim().to_string();
         if url.starts_with("stremio://") {
             url = format!("https://{}", &url["stremio://".len()..]);
-        } else if !url.starts_with("http://") && !url.starts_with("https://") {
+        } else if !crate::tui::text::is_http_url(&url) {
             url = format!("https://{url}");
         }
         if !url.ends_with("/manifest.json") && !url.contains("/manifest.json?") {
