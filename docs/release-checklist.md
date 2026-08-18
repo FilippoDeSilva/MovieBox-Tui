@@ -10,15 +10,14 @@ Run the repository checks first:
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets --locked -- -D warnings
+cargo clippy --all-targets --all-features --locked -- -D warnings
 cargo check --locked
+cargo test --locked
 cargo audit
 cargo package --locked
 ```
 
-CI currently runs `cargo test --locked`, but the suite still contains no meaningful
-tests. Keep the static gates above green and treat runtime verification as the main
-release gate until regression coverage is added.
+Confirm the entire unit and integration test suite passes cleanly across all targets (`docs/testing.md`).
 
 Confirm the main GitHub Actions workflows are green:
 

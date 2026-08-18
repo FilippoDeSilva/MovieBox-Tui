@@ -21,6 +21,7 @@ layout, runtime behavior, and operational workflows in prose tied to the source 
 | [downloads.md](downloads.md)                 | Download engine: resume, ranges, segments, retry, cancel                        | current |
 | [cross-platform.md](cross-platform.md)       | OS support, terminal protocols, Termux, focus handling                          | current |
 | [release-checklist.md](release-checklist.md) | Static gates plus required real-environment release verification                | current |
+| [testing.md](testing.md)                     | Test architecture, unit/integration tests, fixtures, and QA guidelines           | current |
 | [debugging.md](debugging.md)                 | Reproducing issues and what to include in GitHub reports                        | current |
 | [known-issues.md](known-issues.md)           | Known limitations and how they are tracked                                      | current |
 

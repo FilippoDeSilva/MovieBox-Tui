@@ -1,0 +1,114 @@
+# Testing & QA Architecture
+
+This document describes the testing architecture, quality assurance procedures, and validation guidelines for MovieBox-TUI.
+
+## 1. Test Architecture
+
+The MovieBox-TUI test architecture follows a strict separation of concerns:
+
+```text
+MovieBox-TUI/
+├── src/
+│   └── **/*.rs              # Pure algorithms & inline unit tests (#[cfg(test)])
+└── tests/
+    ├── common/
+    │   └── mod.rs           # Shared test utilities & temporary directory helpers
+    ├── fixtures/
+    │   ├── m3u/
+    │   │   └── sample_playlist.m3u
+    │   └── addons/
+    │       └── manifest.json
+    ├── history_reconciliation.rs  # History identity & background state reconciliation
+    ├── cache_lifecycle.rs         # Disk cache hashing & atomic writes
+    ├── player_integration.rs      # Cross-platform player command & path arguments
+    ├── m3u_integration.rs         # Offline M3U playlist parsing
+    ├── download_integration.rs    # File stem sanitization & folder structure
+    ├── url_security.rs            # URL validation & device stem protection
+    └── addons_manifest.rs         # Addon manifest deserialization & catalog checks
+```
+
+### A. Inline Unit Tests (`src/**/*.rs`)
+Inline unit tests live inside `#[cfg(test)] mod tests` blocks within their respective modules. They verify:
+- Title normalization (`clean_moviebox_title`)
+- HMAC-MD5 cryptographic signing and token generation (`generate_x_client_token`, `generate_x_tr_signature`)
+- Segment partitioning math and byte range calculations
+- Internal helper logic and parsing functions
+
+### B. Subsystem Integration Tests (`tests/*.rs`)
+Integration tests live in the `tests/` directory and test externally observable behaviors without mocking internal types:
+- **`history_reconciliation.rs`**: Validates `HistoryManager::is_same_show`, media type separation (Movies vs TV Series), remake year distinction, and state file reconciliation (MISS-01).
+- **`cache_lifecycle.rs`**: Validates atomic file writing (both sync and async) and deterministic MD5 cache key generation.
+- **`player_integration.rs`**: Validates MPV script options path sanitization on Windows (`\` $\rightarrow$ `/`) and Unix.
+- **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
+- **`addons_manifest.rs`**: Validates deserialization of Cinemeta / Stremio-style addon manifest structures.
+- **`url_security.rs`**: Validates HTTP/HTTPS URL detection and Windows reserved device stem sanitization (`CON`, `AUX`, `PRN`, `NUL`, `COM1-9`, `LPT1-9`).
+
+---
+
+## 2. Running Automated Tests
+
+Run the full test suite (all unit and integration tests):
+
+```bash
+cargo test
+```
+
+Run only unit tests:
+
+```bash
+cargo test --lib
+```
+
+Run a specific integration test:
+
+```bash
+cargo test --test history_reconciliation
+cargo test --test player_integration
+cargo test --test m3u_integration
+```
+
+---
+
+## 3. Code Hygiene and Static Analysis
+
+Every commit and pull request must pass all hygiene checks:
+
+```bash
+# Check formatting
+cargo fmt -- --check
+
+# Compiler check
+cargo check
+
+# Clippy linter with warnings treated as errors
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Security vulnerability scan
+cargo audit
+```
+
+---
+
+## 4. Manual QA Matrix
+
+Because TUI and media player interactions depend on terminal capabilities and external processes, manual QA testing covers:
+
+### Terminal Emulators
+- **Ghostty** (Primary testing terminal)
+- **macOS Terminal.app**
+- **iTerm2**
+- **Windows Terminal**
+- **Linux VTE / Alacritty / Kitty**
+- **tmux** session & pane switching
+
+### Supported Media Players
+- **mpv** (Full IPC tracking, script options, state reconciliation)
+- **VLC** (Local playback and stream forwarding)
+- **IINA** (macOS native player integration)
+- **termux-open / Android Intents** (Android Termux)
+
+### Key Flows to Verify
+1. **Search & Browse**: Type queries, switch between MovieBox, 4KHDHub, BDIX, Addons, and Live TV.
+2. **Playback Launch & Return**: Launch stream in player, exit player, verify terminal state is cleanly restored without residual escape sequences.
+3. **History & State**: Verify playback progress and watched checkmarks update accurately.
+4. **Downloads**: Test single episode and batch season download queuing.

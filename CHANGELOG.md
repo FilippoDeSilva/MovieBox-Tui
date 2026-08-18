@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **Comprehensive QA & Regression Test Architecture**:
+  - Introduced a 31-test automated suite covering critical algorithmic boundaries, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
+  - Added structured integration tests in `tests/` (`history_reconciliation.rs`, `cache_lifecycle.rs`, `player_integration.rs`, `m3u_integration.rs`, `addons_manifest.rs`, `download_integration.rs`, `url_security.rs`) and test fixtures (`tests/fixtures/`).
+  - Added [`docs/testing.md`](docs/testing.md) detailing test architecture, command references, and manual QA procedures.
 - **Playback Tracking & Watch History Progress**:
   - Added real-time playback position tracking for `mpv` with injected tracker script (`moviebox_tracker.lua`) and 5-second periodic state auto-save to disk.
   - Added automatic startup state reconciliation (`reconcile_pending_playback_states`) ensuring watched progress is preserved even when closing the terminal or killing tmux mid-playback.
@@ -61,6 +65,22 @@
   - Added complete mouse click support for Addon Manager modal and browse popups.
 
 ### Fixed
+- **MovieBox Title Sanitization (DEF-02)**:
+  - Fixed destructive title truncation where leading bracket tags (`[Dub]`, `[1080p]`, `[RAW]`) and titles starting with parentheses (e.g. `(500) Days of Summer`) were stripped down to empty strings.
+  - Preserved release years in parentheses (`Inception (2010)`) and added a fallback safeguard returning the trimmed original title if sanitization ever results in an empty string.
+- **Watch History Identity & Deduplication Collisions (DEF-03)**:
+  - Enforced `stype` separation in `HistoryManager::is_same_show` so Movies and TV Series sharing identical titles (e.g. `Home`) never overwrite one another.
+  - Enforced strict canonical identity (`provider + subject_id`), preventing cross-provider conflicts and ensuring remakes with differing release years remain distinct entries.
+- **Background Episode Playback State Reconciliation (MISS-01)**:
+  - Fixed a state loss bug in `reconcile_pending_playback_states` where a completed episode's watched status was discarded if the user had already advanced to a subsequent episode before the state file was processed.
+- **Windows MPV Script Options Path Escaping (DEF-04)**:
+  - Fixed path corruption in MPV's `--script-opts` on Windows by normalizing backslashes (`\`) to forward slashes (`/`), preventing MPV escape sequence parsing from corrupting `state_file` paths in `moviebox_tracker.lua`.
+- **M3U Single-Quoted Attribute Support (DEF-07)**:
+  - Extended `M3UParser` attribute extraction to support both single-quoted (`tvg-id='...'`) and double-quoted attributes, preserving channel IDs, logos, and groups across varied IPTV playlists.
+- **Continuous OS-Level SIGINT Handling (DEF-05)**:
+  - Wrapped `tokio::signal::ctrl_c()` in a continuous background loop to ensure repeated non-interactive OS signals are reliably handled.
+- **Subtitle Prefetch Fallback (DEF-08)**:
+  - Reduced subtitle download timeout from 30s to 8s to prevent unnecessary startup delays when launching external players if a subtitle mirror hangs.
 - **Addon Stream Sorting & Rendering**:
   - Fixed addon streams randomly scrambling on UI hover when sizes are tied by adding a secondary stable sort based on the mirror label.
   - Fixed misleading `0MB` stream sizes for community addons that omit video sizes by cleanly rendering `--` instead.

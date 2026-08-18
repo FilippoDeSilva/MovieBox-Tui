@@ -112,6 +112,7 @@ All in-depth guides and technical details are available in the [`docs/`](docs/) 
 - [Configuration Reference](docs/config.md) — Config files and environment variables
 - [Providers](docs/providers.md) — Supported content sources and protocols
 - [Troubleshooting & Debugging](docs/debugging.md) — Fixing common issues and reporting bugs
+- [Testing & QA Architecture](docs/testing.md) — Testing philosophy, unit/integration suites, and QA guidelines
 - [Contributing Guide](CONTRIBUTING.md) — How to contribute code and submit PRs
 
 ## Roadmap
