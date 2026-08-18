@@ -10,6 +10,12 @@
   - Added cross-provider title-based history deduplication and auto-resume from the last watched position.
 - **Addon Mode Watch History Parity**:
   - Added full watch history support (`/history`) in Addon Mode matching Streaming Mode, enabling seamless watch progress tracking, scrub bars, and completion badges for community HTTP addon content.
+- **Theme System Expansion & Official Color Calibration**:
+  - Added official **Dracula**, **Gruvbox**, and **Rosé Pine** themes to the `/theme` picker alongside Catppuccin and Nord.
+  - Added alias parsing support for `"dracula"`, `"gruvbox"`, `"rose-pine"`, and `"catppuccin"`.
+  - Guaranteed 100% transparent terminal compatibility across all themes with zero background opacity overrides.
+  - Fixed modal backdrop rendering by removing fullscreen screen clearing when opening `/theme`.
+  - Optimized live preview navigation to eliminate unnecessary disk I/O on arrow key navigation.
 - **Universal Multi-OS Player Detection & Flathub/Snap Compatibility**:
   - Added sub-millisecond, filesystem-backed player probing across Linux (Flathub, Flatpak exports, Snap, and Native), macOS (Homebrew, MacPorts, App Bundles), Windows (Program Files, WinApps, Scoop, Chocolatey, WinGet), and Android (Termux).
   - Fixed Flathub/Flatpak VLC detection failure by adding direct probes for `~/.local/share/flatpak/exports/bin/org.videolan.VLC` and `/var/lib/flatpak/exports/bin/org.videolan.VLC`.

@@ -1,12 +1,15 @@
 use ratatui::style::{Color, Modifier, Style};
 
-pub const AVAILABLE_THEMES: [&str; 6] = [
+pub const AVAILABLE_THEMES: [&str; 9] = [
     "Mocha",
     "Latte",
     "Macchiato",
     "Frappe",
     "Nord",
     "TokyoNight",
+    "Dracula",
+    "Gruvbox",
+    "RosePine",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,16 +20,23 @@ pub enum ThemeKind {
     Frappe,
     Nord,
     TokyoNight,
+    Dracula,
+    Gruvbox,
+    RosePine,
 }
 
 impl ThemeKind {
     pub fn parse(s: &str) -> Self {
-        match s.to_ascii_lowercase().as_str() {
+        match s.to_ascii_lowercase().replace(['-', '_'], "").as_str() {
             "latte" | "light" => ThemeKind::Latte,
             "macchiato" => ThemeKind::Macchiato,
             "frappe" => ThemeKind::Frappe,
             "nord" => ThemeKind::Nord,
-            "tokyonight" | "tokyo_night" => ThemeKind::TokyoNight,
+            "tokyonight" => ThemeKind::TokyoNight,
+            "dracula" => ThemeKind::Dracula,
+            "gruvbox" | "gruvboxdark" => ThemeKind::Gruvbox,
+            "rosepine" => ThemeKind::RosePine,
+            "catppuccin" | "mocha" => ThemeKind::Mocha,
             _ => ThemeKind::Mocha,
         }
     }
@@ -39,6 +49,9 @@ impl ThemeKind {
             ThemeKind::Frappe => "Frappe",
             ThemeKind::Nord => "Nord",
             ThemeKind::TokyoNight => "TokyoNight",
+            ThemeKind::Dracula => "Dracula",
+            ThemeKind::Gruvbox => "Gruvbox",
+            ThemeKind::RosePine => "RosePine",
         }
     }
 }
@@ -183,6 +196,9 @@ impl Theme {
             ThemeKind::Frappe => Self::frappe(),
             ThemeKind::Nord => Self::nord(),
             ThemeKind::TokyoNight => Self::tokyo_night(),
+            ThemeKind::Dracula => Self::dracula(),
+            ThemeKind::Gruvbox => Self::gruvbox(),
+            ThemeKind::RosePine => Self::rose_pine(),
             ThemeKind::Mocha => Self::mocha(),
         }
     }
@@ -509,6 +525,141 @@ impl Theme {
             overlay2: Style::default().fg(cp(86, 95, 137)),
             mantle: Style::default().fg(cp(22, 22, 30)),
             crust: Style::default().fg(cp(22, 22, 30)),
+            is_light: false,
+        }
+    }
+
+    pub fn dracula() -> Self {
+        Self {
+            border: Style::default().fg(cp(98, 114, 164)),
+            border_focus: Style::default().fg(cp(189, 147, 249)),
+            text: Style::default().fg(cp(248, 248, 242)),
+            text_dim: Style::default().fg(cp(158, 164, 186)),
+            title: Style::default()
+                .fg(cp(189, 147, 249))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(139, 233, 253))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(255, 121, 198))
+                .add_modifier(Modifier::BOLD),
+            error: Style::default().fg(cp(255, 85, 85)),
+            success: Style::default().fg(cp(80, 250, 123)),
+            shortcut: Style::default().fg(cp(255, 184, 108)),
+            overlay: Style::default().fg(cp(98, 114, 164)),
+            rating: Style::default().fg(cp(241, 250, 140)),
+            accent: Style::default()
+                .fg(cp(139, 233, 253))
+                .add_modifier(Modifier::BOLD),
+            muted: Style::default().fg(cp(98, 114, 164)),
+            teal: Style::default().fg(cp(139, 233, 253)),
+            lavender: Style::default().fg(cp(189, 147, 249)),
+            sapphire: Style::default().fg(cp(139, 233, 253)),
+            subtext1: Style::default().fg(cp(248, 248, 242)),
+            base: cp(40, 42, 54),
+            bg: Style::default(),
+            rosewater: Style::default().fg(cp(248, 248, 242)),
+            flamingo: Style::default().fg(cp(255, 121, 198)),
+            maroon: Style::default().fg(cp(255, 85, 85)),
+            surface0: Style::default().fg(cp(68, 71, 90)),
+            surface1: Style::default().fg(cp(80, 84, 106)),
+            surface2: Style::default().fg(cp(98, 114, 164)),
+            overlay0: Style::default().fg(cp(98, 114, 164)),
+            overlay1: Style::default().fg(cp(110, 126, 176)),
+            overlay2: Style::default().fg(cp(130, 146, 196)),
+            mantle: Style::default().fg(cp(33, 34, 44)),
+            crust: Style::default().fg(cp(25, 26, 34)),
+            is_light: false,
+        }
+    }
+
+    pub fn gruvbox() -> Self {
+        Self {
+            border: Style::default().fg(cp(102, 92, 84)),
+            border_focus: Style::default().fg(cp(250, 189, 47)),
+            text: Style::default().fg(cp(235, 219, 178)),
+            text_dim: Style::default().fg(cp(168, 153, 132)),
+            title: Style::default()
+                .fg(cp(211, 134, 155))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(142, 192, 124))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(254, 128, 25))
+                .add_modifier(Modifier::BOLD),
+            error: Style::default().fg(cp(251, 73, 52)),
+            success: Style::default().fg(cp(184, 187, 38)),
+            shortcut: Style::default().fg(cp(250, 189, 47)),
+            overlay: Style::default().fg(cp(146, 131, 116)),
+            rating: Style::default().fg(cp(250, 189, 47)),
+            accent: Style::default()
+                .fg(cp(142, 192, 124))
+                .add_modifier(Modifier::BOLD),
+            muted: Style::default().fg(cp(102, 92, 84)),
+            teal: Style::default().fg(cp(142, 192, 124)),
+            lavender: Style::default().fg(cp(211, 134, 155)),
+            sapphire: Style::default().fg(cp(131, 165, 152)),
+            subtext1: Style::default().fg(cp(235, 219, 178)),
+            base: cp(40, 40, 40),
+            bg: Style::default(),
+            rosewater: Style::default().fg(cp(235, 219, 178)),
+            flamingo: Style::default().fg(cp(211, 134, 155)),
+            maroon: Style::default().fg(cp(251, 73, 52)),
+            surface0: Style::default().fg(cp(60, 56, 54)),
+            surface1: Style::default().fg(cp(80, 73, 69)),
+            surface2: Style::default().fg(cp(102, 92, 84)),
+            overlay0: Style::default().fg(cp(124, 111, 100)),
+            overlay1: Style::default().fg(cp(146, 131, 116)),
+            overlay2: Style::default().fg(cp(168, 153, 132)),
+            mantle: Style::default().fg(cp(29, 32, 33)),
+            crust: Style::default().fg(cp(20, 22, 23)),
+            is_light: false,
+        }
+    }
+
+    pub fn rose_pine() -> Self {
+        Self {
+            border: Style::default().fg(cp(110, 106, 134)),
+            border_focus: Style::default().fg(cp(196, 167, 231)),
+            text: Style::default().fg(cp(224, 222, 244)),
+            text_dim: Style::default().fg(cp(144, 140, 170)),
+            title: Style::default()
+                .fg(cp(196, 167, 231))
+                .add_modifier(Modifier::BOLD),
+            highlight: Style::default()
+                .fg(cp(156, 207, 216))
+                .add_modifier(Modifier::BOLD),
+            header: Style::default()
+                .fg(cp(235, 188, 186))
+                .add_modifier(Modifier::BOLD),
+            error: Style::default().fg(cp(235, 111, 146)),
+            success: Style::default().fg(cp(156, 207, 216)),
+            shortcut: Style::default().fg(cp(246, 193, 119)),
+            overlay: Style::default().fg(cp(110, 106, 134)),
+            rating: Style::default().fg(cp(246, 193, 119)),
+            accent: Style::default()
+                .fg(cp(49, 116, 143))
+                .add_modifier(Modifier::BOLD),
+            muted: Style::default().fg(cp(110, 106, 134)),
+            teal: Style::default().fg(cp(49, 116, 143)),
+            lavender: Style::default().fg(cp(196, 167, 231)),
+            sapphire: Style::default().fg(cp(156, 207, 216)),
+            subtext1: Style::default().fg(cp(224, 222, 244)),
+            base: cp(25, 23, 36),
+            bg: Style::default(),
+            rosewater: Style::default().fg(cp(224, 222, 244)),
+            flamingo: Style::default().fg(cp(235, 188, 186)),
+            maroon: Style::default().fg(cp(235, 111, 146)),
+            surface0: Style::default().fg(cp(31, 29, 46)),
+            surface1: Style::default().fg(cp(38, 35, 58)),
+            surface2: Style::default().fg(cp(110, 106, 134)),
+            overlay0: Style::default().fg(cp(110, 106, 134)),
+            overlay1: Style::default().fg(cp(144, 140, 170)),
+            overlay2: Style::default().fg(cp(144, 140, 170)),
+            mantle: Style::default().fg(cp(25, 23, 36)),
+            crust: Style::default().fg(cp(21, 19, 30)),
             is_light: false,
         }
     }

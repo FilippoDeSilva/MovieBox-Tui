@@ -319,7 +319,9 @@ impl App {
                 let kind = crate::tui::theme::ThemeKind::parse(&theme_name);
                 self.state.active_theme_kind = kind.as_str().to_string();
                 self.theme = crate::tui::theme::Theme::from_kind(kind);
-                self.persist_config();
+                if !self.state.show_theme_popup {
+                    self.persist_config();
+                }
                 self.state.dirty = true;
             }
 
