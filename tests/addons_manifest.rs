@@ -426,3 +426,26 @@ fn test_installed_addon_cinemeta_protection() {
     };
     assert!(!community_addon.is_core());
 }
+
+#[tokio::test]
+async fn test_invalid_addon_manifest_url_shows_actionable_error_and_preserves_state() {
+    let client = moviebox_tui::providers::addons::client::AddonClient::new();
+    let err = client
+        .fetch_manifest("https://invalid-nonexistent-domain.test/manifest.json")
+        .await
+        .unwrap_err();
+    assert!(err.contains("Failed to reach manifest") || err.contains("Manifest returned HTTP"));
+
+    let mut app = moviebox_tui::tui::app::App::new();
+    let initial_addons_count = app.state().installed_addons.len();
+
+    app.handle_action(moviebox_tui::tui::action::Action::SetStatus(format!(
+        "Error: Addon install failed: {err}"
+    )))
+    .await;
+
+    assert!(!app.state().notifications.is_empty());
+    let notif = app.state().notifications.back().unwrap();
+    assert_eq!(notif.kind, moviebox_tui::models::NotificationKind::Error);
+    assert_eq!(app.state().installed_addons.len(), initial_addons_count);
+}

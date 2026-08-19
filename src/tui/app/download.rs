@@ -344,7 +344,9 @@ impl App {
                                 Err(error) => {
                                     log::error!("stream resolve failed: {error}");
                                     sender
-                                        .send(Action::SetStatus(format!("Resolve failed: {error}")))
+                                        .send(Action::SetStatus(format!(
+                                            "Error: Resolve failed: {error}"
+                                        )))
                                         .ok();
                                 }
                             }

@@ -90,7 +90,9 @@ impl App {
                         }
                         Err(err) => {
                             sender
-                                .send(Action::SetStatus(format!("Addon install failed: {err}")))
+                                .send(Action::SetStatus(format!(
+                                    "Error: Addon install failed: {err}"
+                                )))
                                 .ok();
                         }
                     }
