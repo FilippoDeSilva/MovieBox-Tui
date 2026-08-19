@@ -40,7 +40,7 @@ Integration tests live in the `tests/` directory and test externally observable 
 - **`cache_lifecycle.rs`**: Validates atomic file writing (both sync and async) and deterministic MD5 cache key generation.
 - **`player_integration.rs`**: Validates MPV script options path sanitization on Windows (`\` $\rightarrow$ `/`) and Unix.
 - **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
-- **`addons_manifest.rs`**: Validates deserialization of Cinemeta / Stremio-style addon manifest structures.
+- **`addons_manifest.rs`**: Validates deserialization of Cinemeta/Stremio addon manifests, series vs movie metadata classification, multi-season episode decomposition, episode stream isolation (`parse_season_episode`), token and codec parsing, and movie stream regressions.
 - **`url_security.rs`**: Validates HTTP/HTTPS URL detection and Windows reserved device stem sanitization (`CON`, `AUX`, `PRN`, `NUL`, `COM1-9`, `LPT1-9`).
 
 ---

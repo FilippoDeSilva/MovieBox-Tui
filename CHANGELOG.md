@@ -106,6 +106,12 @@
 - **Rate-Limiting & Concurrency Hardening**:
   - Added HTTP 429 `Retry-After` header parsing with bounded exponential backoff in `MovieBoxClient`.
   - Added semaphore concurrency limiting (`Semaphore::new(2)`) during parallel episode page resolution to prevent burst requests from tripping provider rate limiters.
+- **Addon Mode Series Hierarchy & Episode Stream Isolation**:
+  - Fixed series misclassification as movies in Addon Mode when metadata omitted the `videos` array by ensuring canonical season structures and series-first metadata endpoint prioritization.
+  - Added regex and token-based episode stream isolation (`parse_season_episode`) in `stream_item_to_release`, preventing cross-episode stream pollution (e.g. S01E06 streams appearing when viewing S01E08).
+  - Added preservation of `episodeNumbers` arrays from addon metadata in the season list state.
+- **Direct Addon & BDIX Playback & Download Dispatch**:
+  - Fixed Addon and BDIX playback and download routing in `handle_playback` and `handle_download` to dispatch directly to external media players and the chunk downloader, preserving custom HTTP headers (`behaviorHints.headers`) and source labels without unnecessary Moviebox API subtitle timeouts.
 - **Selector Tab Preservation in Standard Displays**:
   - Maintained visibility of Audio Languages, Seasons, and Episodes selector tabs side-by-side in standard ~80-column terminals when focusing Streams, preventing tabs from disappearing when 0 streams are available.
 
