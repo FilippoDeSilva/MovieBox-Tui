@@ -17,7 +17,7 @@ impl App {
                         crate::tui::commands::SlashCommand::suggest(&self.state, &query);
                     let suggestions: Vec<serde_json::Value> = matching_commands
                         .into_iter()
-                        .map(|cmd| serde_json::json!({ "title": cmd.name() }))
+                        .map(|cmd_name| serde_json::json!({ "title": cmd_name }))
                         .collect();
                     if !suggestions.is_empty() {
                         let fake_payload = serde_json::json!({

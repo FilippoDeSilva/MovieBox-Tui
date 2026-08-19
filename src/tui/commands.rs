@@ -160,21 +160,44 @@ impl SlashCommand {
         }
     }
 
-    pub fn suggest(state: &AppState, query: &str) -> Vec<Self> {
+    pub fn suggest(state: &AppState, query: &str) -> Vec<String> {
         let lower = query.to_ascii_lowercase();
-        Self::ALL
-            .iter()
-            .copied()
-            .filter(|cmd| cmd.is_available(state) && cmd.name().starts_with(&lower))
-            .collect()
+        let mut results = Vec::new();
+
+        for cmd in Self::ALL {
+            if !cmd.is_available(state) {
+                continue;
+            }
+            let name = cmd.name();
+            if name.starts_with(&lower) {
+                results.push(name.to_string());
+                if cmd == Self::DownloadDir
+                    && state.download_dir.is_some()
+                    && "/download-dir reset".starts_with(&lower)
+                {
+                    results.push("/download-dir reset".to_string());
+                }
+            } else if cmd == Self::DownloadDir
+                && state.download_dir.is_some()
+                && "/download-dir reset".starts_with(&lower)
+            {
+                results.push("/download-dir reset".to_string());
+            }
+        }
+
+        results
     }
 
     pub fn description_for(suggestion: &str, state: &AppState) -> Option<&'static str> {
         let trimmed = if suggestion.starts_with('/') {
-            suggestion
+            suggestion.trim()
         } else {
             return None;
         };
+
+        if trimmed == "/download-dir reset" {
+            return Some("Reset download folder to default");
+        }
 
         for cmd in Self::ALL {
             if cmd.name() == trimmed {
@@ -215,5 +238,90 @@ impl SlashCommand {
             "/disable-addons" => Some(ParsedCommand::DisableAddons),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_download_dir_suggest_default_state() {
+        let state = AppState::default();
+        assert!(state.download_dir.is_none());
+
+        let suggestions = SlashCommand::suggest(&state, "/download-dir");
+        assert!(suggestions.contains(&"/download-dir".to_string()));
+        assert!(!suggestions.contains(&"/download-dir reset".to_string()));
+    }
+
+    #[test]
+    fn test_download_dir_suggest_custom_state() {
+        let state = AppState {
+            download_dir: Some(PathBuf::from("/custom/downloads")),
+            ..Default::default()
+        };
+
+        let suggestions = SlashCommand::suggest(&state, "/download-dir");
+        assert!(suggestions.contains(&"/download-dir".to_string()));
+        assert!(suggestions.contains(&"/download-dir reset".to_string()));
+
+        let d_suggestions = SlashCommand::suggest(&state, "/d");
+        assert!(d_suggestions.contains(&"/download-dir".to_string()));
+        assert!(d_suggestions.contains(&"/download-dir reset".to_string()));
+    }
+
+    #[test]
+    fn test_download_dir_suggest_subcommand_prefix() {
+        let state = AppState {
+            download_dir: Some(PathBuf::from("/custom/downloads")),
+            ..Default::default()
+        };
+
+        let suggestions = SlashCommand::suggest(&state, "/download-dir r");
+        assert_eq!(suggestions, vec!["/download-dir reset".to_string()]);
+
+        let suggestions_space = SlashCommand::suggest(&state, "/download-dir ");
+        assert_eq!(suggestions_space, vec!["/download-dir reset".to_string()]);
+    }
+
+    #[test]
+    fn test_download_dir_suggest_mode_parity() {
+        let mut state = AppState {
+            download_dir: Some(PathBuf::from("/custom/downloads")),
+            ..Default::default()
+        };
+
+        // 1. Streaming Mode
+        state.is_addon_mode = false;
+        state.is_tv_mode = false;
+        let stream_sug = SlashCommand::suggest(&state, "/download-dir");
+        assert!(stream_sug.contains(&"/download-dir reset".to_string()));
+
+        // 2. Addon Mode
+        state.is_addon_mode = true;
+        state.is_tv_mode = false;
+        let addon_sug = SlashCommand::suggest(&state, "/download-dir");
+        assert!(addon_sug.contains(&"/download-dir reset".to_string()));
+
+        // 3. TV Mode
+        state.is_addon_mode = false;
+        state.is_tv_mode = true;
+        let tv_sug = SlashCommand::suggest(&state, "/download-dir");
+        assert!(tv_sug.contains(&"/download-dir reset".to_string()));
+    }
+
+    #[test]
+    fn test_download_dir_reset_description() {
+        let state = AppState::default();
+        assert_eq!(
+            SlashCommand::description_for("/download-dir reset", &state),
+            Some("Reset download folder to default")
+        );
+        assert_eq!(
+            SlashCommand::description_for("/download-dir", &state),
+            Some("View or change download folder")
+        );
     }
 }

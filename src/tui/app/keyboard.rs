@@ -213,7 +213,7 @@ impl App {
                         let suggestions =
                             crate::tui::commands::SlashCommand::suggest(&self.state, &query);
                         if suggestions.len() == 1 {
-                            query = suggestions[0].name().to_string();
+                            query = suggestions[0].clone();
                         }
                     }
 
@@ -241,10 +241,19 @@ impl App {
                 KeyCode::Tab => {
                     let trimmed = self.state.search_query.trim();
                     if trimmed.starts_with('/') {
-                        let suggestions =
-                            crate::tui::commands::SlashCommand::suggest(&self.state, trimmed);
-                        if let Some(first) = suggestions.first() {
-                            self.state.search_query = first.name().to_string();
+                        let selected_or_first = self
+                            .state
+                            .suggest_index
+                            .and_then(|idx| self.state.search_suggestions.get(idx).cloned())
+                            .or_else(|| {
+                                let suggestions = crate::tui::commands::SlashCommand::suggest(
+                                    &self.state,
+                                    trimmed,
+                                );
+                                suggestions.first().cloned()
+                            });
+                        if let Some(sug) = selected_or_first {
+                            self.state.search_query = sug;
                             self.state.last_search_edit = std::time::Instant::now();
                         }
                     }

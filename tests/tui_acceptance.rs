@@ -147,3 +147,23 @@ async fn test_full_user_journey_mode_switching_and_theme_selection() {
         .await;
     assert_eq!(app.state().active_theme_kind, "TokyoNight");
 }
+
+#[tokio::test]
+async fn test_download_dir_reset_user_journey() {
+    let mut app = App::new();
+    let custom_path = std::path::PathBuf::from("/custom/moviebox/downloads");
+    app.state_mut().download_dir = Some(custom_path.clone());
+    assert_eq!(app.state().download_dir, Some(custom_path));
+
+    app.handle_action(Action::Search {
+        query: "/download-dir reset".to_string(),
+        force_refresh: false,
+    })
+    .await;
+
+    assert!(app.state().download_dir.is_none());
+    assert!(!app.state().notifications.is_empty());
+    let notif = app.state().notifications.back().unwrap();
+    assert_eq!(notif.title, "Download Directory");
+    assert!(notif.message.contains("Reset to default"));
+}

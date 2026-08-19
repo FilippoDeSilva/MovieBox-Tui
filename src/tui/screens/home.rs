@@ -948,7 +948,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             if let Some(description) = desc {
                 let name_len = crate::tui::text::width(display_name);
-                let pad = 22usize.saturating_sub(name_len).max(2);
+                let pad = 24usize.saturating_sub(name_len).max(2);
                 spans.push(Span::raw(" ".repeat(pad)));
                 spans.push(Span::styled(description, desc_style));
             }
