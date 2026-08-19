@@ -25,6 +25,7 @@ MovieBox-TUI/
     ├── download_integration.rs    # File stem sanitization & folder structure
     ├── url_security.rs            # URL validation & device stem protection
     ├── error_handling.rs          # Failure state cleanup, error toasts, and recovery
+    ├── content_pipeline.rs        # Content/metadata pipeline, stale request isolation, & cache keys
     ├── tui_acceptance.rs          # Headless TUI rendering, theme rendering, and resize matrix
     └── addons_manifest.rs         # Addon manifest deserialization & catalog checks
 ```
@@ -38,6 +39,7 @@ Inline unit tests live inside `#[cfg(test)] mod tests` blocks within their respe
 
 ### B. Subsystem Integration Tests (`tests/*.rs`)
 Integration tests live in the `tests/` directory and test externally observable behaviors without mocking internal types:
+- **`content_pipeline.rs`**: Validates search result identity, ambiguous title isolation, stale metadata response protection (`request_id` validation), cache key dimensional isolation, addon metadata mapping & partial degradation, search failure vs empty result status distinction, and mode-switch stale response isolation.
 - **`error_handling.rs`**: Validates active player session lifecycle, playback debounce guards, search failure cleanup, addon manifest error toasts, stream and download resolution failure notifications, malformed M3U recovery, and URL scheme rejection.
 - **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, end-to-end user journeys (search, details, navigation, mode switching), mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.
 - **`history_reconciliation.rs`**: Validates `HistoryManager::is_same_show`, media type separation (Movies vs TV Series), remake year distinction, and state file reconciliation (MISS-01).
