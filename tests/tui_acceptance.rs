@@ -1,6 +1,8 @@
+use moviebox_tui::models::SearchResult;
+use moviebox_tui::providers::models::ProviderKind;
 use moviebox_tui::tui::action::Action;
 use moviebox_tui::tui::app::App;
-use moviebox_tui::tui::state::InputMode;
+use moviebox_tui::tui::state::{InputMode, Screen};
 use moviebox_tui::tui::theme::ThemeKind;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -96,4 +98,52 @@ async fn test_mouse_scroll_maps_to_key_actions() {
     app.handle_action(Action::Key(down_key)).await;
     app.handle_action(Action::Key(up_key)).await;
     assert_eq!(app.state().search_query, "");
+}
+
+#[tokio::test]
+async fn test_full_user_journey_movie_search_details_and_back_navigation() {
+    let mut app = App::new();
+    app.state_mut().is_tv_mode = false;
+    app.state_mut().is_addon_mode = false;
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().last_search_edit =
+        std::time::Instant::now() - std::time::Duration::from_millis(600);
+
+    let sample_item = SearchResult {
+        id: "12345".to_string(),
+        title: "Inception".to_string(),
+        stype: 1,
+        release_year: "2010".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::MovieBox,
+    };
+
+    app.state_mut().search_results.push(sample_item);
+    app.state_mut().search_list_state.select(Some(0));
+
+    app.handle_action(Action::Submit).await;
+    assert_eq!(app.state().active_screen, Screen::Details);
+    assert_eq!(app.state().active_subject_id.as_deref(), Some("12345"));
+
+    app.handle_action(Action::GoBack).await;
+    assert_eq!(app.state().active_screen, Screen::Home);
+}
+
+#[tokio::test]
+async fn test_full_user_journey_mode_switching_and_theme_selection() {
+    let mut app = App::new();
+    app.state_mut().is_addon_mode = false;
+    app.state_mut().is_tv_mode = false;
+
+    app.handle_action(Action::ToggleAddonMode).await;
+    assert!(app.state().is_addon_mode);
+
+    app.handle_action(Action::SwitchToStreamingMode).await;
+    assert!(!app.state().is_addon_mode);
+
+    app.handle_action(Action::SelectTheme("TokyoNight".to_string()))
+        .await;
+    assert_eq!(app.state().active_theme_kind, "TokyoNight");
 }

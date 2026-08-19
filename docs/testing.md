@@ -39,7 +39,7 @@ Inline unit tests live inside `#[cfg(test)] mod tests` blocks within their respe
 ### B. Subsystem Integration Tests (`tests/*.rs`)
 Integration tests live in the `tests/` directory and test externally observable behaviors without mocking internal types:
 - **`error_handling.rs`**: Validates search failure cleanup, addon manifest error toasts, stream and download resolution failure notifications, malformed M3U recovery, and URL scheme rejection.
-- **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.
+- **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, end-to-end user journeys (search, details, navigation, mode switching), mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.
 - **`history_reconciliation.rs`**: Validates `HistoryManager::is_same_show`, media type separation (Movies vs TV Series), remake year distinction, and state file reconciliation (MISS-01).
 - **`cache_lifecycle.rs`**: Validates atomic file writing (both sync and async) and deterministic MD5 cache key generation.
 - **`player_integration.rs`**: Validates MPV script options path sanitization on Windows (`\` $\rightarrow$ `/`) and Unix.
