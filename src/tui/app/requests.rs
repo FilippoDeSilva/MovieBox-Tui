@@ -1092,6 +1092,7 @@ impl App {
                     .get("seasons")
                     .and_then(|s| s.get("seasons"))
                     .and_then(|s| s.as_array())
+                    .filter(|a| !a.is_empty())
                 {
                     self.state.available_seasons = seasons_arr.clone();
                 } else if stype == 2 {
@@ -1119,6 +1120,12 @@ impl App {
                         all_ep_str
                             .split(',')
                             .filter_map(|s| s.trim().parse().ok())
+                            .collect()
+                    } else if let Some(arr) =
+                        season.get("episodeNumbers").and_then(|e| e.as_array())
+                    {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as usize))
                             .collect()
                     } else {
                         let max_ep =
@@ -1862,6 +1869,9 @@ impl App {
                             if target_se == 0 && target_ep == 0 {
                                 se = 0;
                                 ep = 0;
+                            } else if se == 0 && ep == 0 {
+                                se = target_se;
+                                ep = target_ep;
                             }
 
                             let entry = pool.episode_index.entry((se, ep)).or_insert_with(Vec::new);

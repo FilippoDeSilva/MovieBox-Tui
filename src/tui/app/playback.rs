@@ -295,7 +295,10 @@ impl App {
                     return None;
                 }
                 self.state.is_resolving_playback = true;
-                if self.current_subject_provider() == ProviderKind::FourKHdHub {
+                if self.current_subject_provider() == ProviderKind::FourKHdHub
+                    || self.current_subject_provider() == ProviderKind::Addons
+                    || self.current_subject_provider().is_bdix()
+                {
                     if let Some(release) = self.get_selected_release() {
                         let Some(first_mirror) = release.mirrors.first().cloned() else {
                             self.state.is_resolving_playback = false;
@@ -311,41 +314,27 @@ impl App {
                             "Preparing playback",
                             "Resolving the selected mirror.",
                         );
-                        let default_player = self.preferred_playback_player(
-                            &crate::providers::models::PlaybackSource::bare(
-                                release.provider,
-                                first_mirror.resolver_url.clone(),
-                                None,
-                            ),
-                        );
+                        let direct_source = crate::providers::models::PlaybackSource {
+                            provider: release.provider,
+                            url: first_mirror.resolver_url.clone(),
+                            headers: first_mirror.headers.clone(),
+                            subtitle: None,
+                            source_label: first_mirror.label.clone(),
+                        };
+                        let default_player = self.preferred_playback_player(&direct_source);
                         let available_players = self.state.available_players.clone();
-                        let client = if release.provider == ProviderKind::Addons {
+                        let client = if release.provider == ProviderKind::Addons
+                            || release.provider == ProviderKind::BdixCircleFtp
+                            || release.provider == ProviderKind::BdixDhakaFlix
+                        {
                             let sender_clone = self.action_sender.clone();
-                            let source = crate::providers::models::PlaybackSource::bare(
-                                ProviderKind::Addons,
-                                first_mirror.resolver_url.clone(),
-                                None,
-                            );
                             if open_with || default_player.is_none() {
-                                sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
-                            } else if let Some(player) = default_player {
                                 sender_clone
-                                    .send(Action::LaunchPlayback(player, source))
+                                    .send(Action::ShowPlaybackPicker(direct_source))
                                     .ok();
-                            }
-                            return None;
-                        } else if release.provider == ProviderKind::BdixCircleFtp {
-                            let sender_clone = self.action_sender.clone();
-                            let source = crate::providers::models::PlaybackSource::bare(
-                                ProviderKind::BdixCircleFtp,
-                                first_mirror.resolver_url.clone(),
-                                None,
-                            );
-                            if open_with || default_player.is_none() {
-                                sender_clone.send(Action::ShowPlaybackPicker(source)).ok();
                             } else if let Some(player) = default_player {
                                 sender_clone
-                                    .send(Action::LaunchPlayback(player, source))
+                                    .send(Action::LaunchPlayback(player, direct_source))
                                     .ok();
                             }
                             return None;

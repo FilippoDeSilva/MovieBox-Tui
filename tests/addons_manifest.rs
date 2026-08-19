@@ -1,4 +1,11 @@
-use moviebox_tui::providers::addons::models::AddonManifest;
+use moviebox_tui::providers::addons::adapter::{
+    meta_detail_to_moviebox_json, metas_to_moviebox_search_json, parse_audio_tracks, parse_codec,
+    parse_quality, parse_season_episode, parse_size_bytes_from_text, stream_item_to_release,
+};
+use moviebox_tui::providers::addons::models::{
+    AddonManifest, InstalledAddon, MetaDetail, MetaItem, MetaVideo, StreamBehaviorHints, StreamItem,
+};
+use std::collections::HashMap;
 
 #[test]
 fn test_addon_manifest_fixture_deserialization() {
@@ -20,4 +27,402 @@ fn test_addon_manifest_fixture_deserialization() {
     assert_eq!(manifest.catalogs[0].name.as_deref(), Some("Popular Movies"));
     assert_eq!(manifest.catalogs[0].extra.len(), 1);
     assert_eq!(manifest.catalogs[0].extra[0].name, "genre");
+
+    assert!(manifest.provides_catalog());
+    assert!(manifest.provides_meta());
+    assert!(manifest.provides_stream());
+}
+
+#[test]
+fn test_addon_meta_item_and_search_mapping() {
+    let meta_item = MetaItem {
+        id: "tt0111161".to_string(),
+        r#type: "movie".to_string(),
+        name: "The Shawshank Redemption".to_string(),
+        title: None,
+        poster: Some("https://images.metahub.space/poster/medium/tt0111161/img.jpg".to_string()),
+        cover: None,
+        description: Some("Two imprisoned men bond over a number of years...".to_string()),
+        overview: None,
+        synopsis: None,
+        release_info: Some("1994".to_string()),
+        year: None,
+        released: None,
+        imdb_rating: Some("9.3".to_string()),
+        rating: None,
+        genres: vec!["Drama".to_string(), "Crime".to_string()],
+        genre: vec![],
+    };
+
+    let search_json = metas_to_moviebox_search_json(vec![meta_item]);
+    let subjects = search_json["results"][0]["subjects"]
+        .as_array()
+        .expect("subjects array");
+    assert_eq!(subjects.len(), 1);
+    let subject = &subjects[0];
+    assert_eq!(subject["subjectId"], "tt0111161");
+    assert_eq!(subject["title"], "The Shawshank Redemption");
+    assert_eq!(subject["subjectType"], 1);
+    assert_eq!(subject["releaseDate"], "1994");
+    assert_eq!(subject["imdbRatingValue"], "9.3");
+    assert_eq!(
+        subject["cover"]["url"],
+        "https://images.metahub.space/poster/medium/tt0111161/img.jpg"
+    );
+}
+
+#[test]
+fn test_addon_series_metadata_and_episodes_decomposition() {
+    let series_detail = MetaDetail {
+        id: "tt0903747".to_string(),
+        r#type: "series".to_string(),
+        name: "Breaking Bad".to_string(),
+        title: None,
+        poster: Some("https://images.metahub.space/poster/medium/tt0903747/img.jpg".to_string()),
+        cover: None,
+        background: None,
+        logo: None,
+        description: Some(
+            "A chemistry teacher diagnosed with inoperable lung cancer...".to_string(),
+        ),
+        overview: None,
+        synopsis: None,
+        release_info: Some("2008-2013".to_string()),
+        year: Some("2008".to_string()),
+        released: None,
+        imdb_rating: Some("9.5".to_string()),
+        rating: None,
+        genres: vec![
+            "Crime".to_string(),
+            "Drama".to_string(),
+            "Thriller".to_string(),
+        ],
+        genre: vec![],
+        runtime: Some("49 min".to_string()),
+        cast: vec!["Bryan Cranston".to_string(), "Aaron Paul".to_string()],
+        director: vec!["Vince Gilligan".to_string()],
+        videos: vec![
+            MetaVideo {
+                id: Some("tt0903747:1:1".to_string()),
+                title: Some("Pilot".to_string()),
+                name: None,
+                season: Some(1),
+                episode: Some(1),
+                number: None,
+                released: Some("2008-01-20".to_string()),
+                thumbnail: None,
+            },
+            MetaVideo {
+                id: Some("tt0903747:1:2".to_string()),
+                title: Some("Cat's in the Bag...".to_string()),
+                name: None,
+                season: Some(1),
+                episode: Some(2),
+                number: None,
+                released: Some("2008-01-27".to_string()),
+                thumbnail: None,
+            },
+            MetaVideo {
+                id: Some("tt0903747:2:1".to_string()),
+                title: Some("Seven Thirty-Seven".to_string()),
+                name: None,
+                season: Some(2),
+                episode: Some(1),
+                number: None,
+                released: Some("2009-03-08".to_string()),
+                thumbnail: None,
+            },
+        ],
+    };
+
+    let mb_json = meta_detail_to_moviebox_json(&series_detail);
+    assert_eq!(mb_json["id"], "tt0903747");
+    assert_eq!(mb_json["subjectType"], 2);
+    assert_eq!(mb_json["releaseDate"], "2008");
+    assert_eq!(mb_json["imdbRatingValue"], "9.5");
+    assert_eq!(mb_json["duration"], "49 min");
+    assert_eq!(mb_json["stars"], "Bryan Cranston, Aaron Paul");
+    assert_eq!(mb_json["director"], "Vince Gilligan");
+
+    let seasons = mb_json["seasons"]["seasons"]
+        .as_array()
+        .expect("seasons array");
+    assert_eq!(seasons.len(), 2);
+    assert_eq!(seasons[0]["se"], 1);
+    assert_eq!(seasons[0]["maxEp"], 2);
+    assert_eq!(seasons[0]["episodeNumbers"], serde_json::json!([1, 2]));
+
+    assert_eq!(seasons[1]["se"], 2);
+    assert_eq!(seasons[1]["maxEp"], 1);
+    assert_eq!(seasons[1]["episodeNumbers"], serde_json::json!([1]));
+}
+
+#[test]
+fn test_addon_series_classification_and_default_season_structure() {
+    let off_campus_series = MetaDetail {
+        id: "tt32034988".to_string(),
+        r#type: "series".to_string(),
+        name: "Off Campus".to_string(),
+        title: None,
+        poster: Some("https://images.metahub.space/poster/medium/tt32034988/img.jpg".to_string()),
+        cover: None,
+        background: None,
+        logo: None,
+        description: Some("College drama series".to_string()),
+        overview: None,
+        synopsis: None,
+        release_info: Some("2026".to_string()),
+        year: Some("2026".to_string()),
+        released: None,
+        imdb_rating: Some("7.8".to_string()),
+        rating: None,
+        genres: vec!["Drama".to_string(), "Romance".to_string()],
+        genre: vec![],
+        runtime: Some("45 min".to_string()),
+        cast: vec![],
+        director: vec![],
+        videos: vec![], // Empty videos array from metadata provider
+    };
+
+    let mb_json = meta_detail_to_moviebox_json(&off_campus_series);
+    assert_eq!(mb_json["id"], "tt32034988");
+    assert_eq!(mb_json["title"], "Off Campus");
+    assert_eq!(mb_json["subjectType"], 2); // Identified as Series, not Movie!
+    assert_eq!(mb_json["releaseDate"], "2026");
+
+    let seasons = mb_json["seasons"]["seasons"]
+        .as_array()
+        .expect("seasons array");
+    assert_eq!(seasons.len(), 1);
+    assert_eq!(seasons[0]["se"], 1);
+    assert_eq!(seasons[0]["maxEp"], 1);
+    assert_eq!(seasons[0]["episodeNumbers"], serde_json::json!([1]));
+}
+
+#[test]
+fn test_addon_season_episode_token_parsing() {
+    assert_eq!(
+        parse_season_episode("Off.Campus.S01E08.1080p.mkv"),
+        Some((1, 8))
+    );
+    assert_eq!(
+        parse_season_episode("Off.Campus.s1e8.720p.mkv"),
+        Some((1, 8))
+    );
+    assert_eq!(
+        parse_season_episode("Off.Campus.S01.E06.1080p.mkv"),
+        Some((1, 6))
+    );
+    assert_eq!(
+        parse_season_episode("Off_Campus_S02_E05_HDR.mkv"),
+        Some((2, 5))
+    );
+    assert_eq!(
+        parse_season_episode("Breaking.Bad.1x02.720p.mkv"),
+        Some((1, 2))
+    );
+    assert_eq!(
+        parse_season_episode("Stranger Things Season 3 Episode 4"),
+        Some((3, 4))
+    );
+    assert_eq!(
+        parse_season_episode("Attack on Titan Episode 15 1080p"),
+        Some((1, 15))
+    );
+    assert_eq!(parse_season_episode("Inception 2010 1080p BluRay"), None);
+}
+
+#[test]
+fn test_addon_episode_stream_filtering_and_isolation() {
+    let raw_streams = [
+        StreamItem {
+            name: Some("HdHub\n1080p".to_string()),
+            title: Some("Off.Campus.S01E08.1080p.BluRay.x265.mkv\n1.2 GB".to_string()),
+            description: None,
+            url: Some("https://cdn.example.com/s01e08_1080p.mp4".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("HdHub\n1080p".to_string()),
+            title: Some("Off.Campus.S01E06.1080p.BluRay.x265.mkv\n1.1 GB".to_string()),
+            description: None,
+            url: Some("https://cdn.example.com/s01e06_1080p.mp4".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("HdHub\n720p".to_string()),
+            title: Some("Off.Campus.S01E08.720p.HD.mkv\n700 MB".to_string()),
+            description: None,
+            url: Some("https://cdn.example.com/s01e08_720p.mp4".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("HdHub\n720p".to_string()),
+            title: Some("Off.Campus.S01E07.720p.HD.mkv\n680 MB".to_string()),
+            description: None,
+            url: Some("https://cdn.example.com/s01e07_720p.mp4".to_string()),
+            behavior_hints: None,
+        },
+    ];
+
+    // Requesting S01E08: Must only return streams for S01E08!
+    let s01e08_releases: Vec<_> = raw_streams
+        .iter()
+        .filter_map(|s| stream_item_to_release("HdHub", s, 1, 8))
+        .collect();
+    assert_eq!(s01e08_releases.len(), 2);
+    assert_eq!(
+        s01e08_releases[0].mirrors[0].resolver_url,
+        "https://cdn.example.com/s01e08_1080p.mp4"
+    );
+    assert_eq!(
+        s01e08_releases[1].mirrors[0].resolver_url,
+        "https://cdn.example.com/s01e08_720p.mp4"
+    );
+
+    // Requesting S01E06: Must only return streams for S01E06!
+    let s01e06_releases: Vec<_> = raw_streams
+        .iter()
+        .filter_map(|s| stream_item_to_release("HdHub", s, 1, 6))
+        .collect();
+    assert_eq!(s01e06_releases.len(), 1);
+    assert_eq!(
+        s01e06_releases[0].mirrors[0].resolver_url,
+        "https://cdn.example.com/s01e06_1080p.mp4"
+    );
+
+    // Requesting S01E07: Must only return streams for S01E07!
+    let s01e07_releases: Vec<_> = raw_streams
+        .iter()
+        .filter_map(|s| stream_item_to_release("HdHub", s, 1, 7))
+        .collect();
+    assert_eq!(s01e07_releases.len(), 1);
+    assert_eq!(
+        s01e07_releases[0].mirrors[0].resolver_url,
+        "https://cdn.example.com/s01e07_720p.mp4"
+    );
+}
+
+#[test]
+fn test_addon_movie_stream_resolution_remains_unaffected() {
+    let movie_stream = StreamItem {
+        name: Some("Cinemeta\n1080p".to_string()),
+        title: Some("Inception.2010.1080p.BluRay.x264.mkv\n2.4 GB".to_string()),
+        description: None,
+        url: Some("https://cdn.example.com/inception_1080p.mp4".to_string()),
+        behavior_hints: None,
+    };
+
+    let release = stream_item_to_release("Cinemeta", &movie_stream, 0, 0)
+        .expect("movie release should parse");
+    assert_eq!(release.quality.as_deref(), Some("1080p"));
+    assert_eq!(release.season, None);
+    assert_eq!(release.episode, None);
+    assert_eq!(
+        release.mirrors[0].resolver_url,
+        "https://cdn.example.com/inception_1080p.mp4"
+    );
+}
+
+#[test]
+fn test_addon_stream_parsing_and_release_mapping() {
+    let mut headers = HashMap::new();
+    headers.insert("User-Agent".to_string(), "Mozilla/5.0 (Custom)".to_string());
+    headers.insert("Referer".to_string(), "https://hubcloud.club/".to_string());
+
+    let stream = StreamItem {
+        name: Some("HdHub\n1080p".to_string()),
+        title: Some(
+            "Breaking.Bad.S01E01.1080p.BluRay.x265.HEVC.Hindi.English-FSL.mkv\n1.15 GB".to_string(),
+        ),
+        description: None,
+        url: Some("https://cdn.hubcloud.club/stream/breakingbad_s01e01.mp4".to_string()),
+        behavior_hints: Some(StreamBehaviorHints {
+            not_web_ready: false,
+            headers: Some(headers),
+            video_size: Some(1_234_567_890),
+            filename: Some("Breaking.Bad.S01E01.1080p.mkv".to_string()),
+        }),
+    };
+
+    let release = stream_item_to_release("HdHub", &stream, 1, 1).expect("valid release");
+    assert_eq!(release.quality.as_deref(), Some("1080p"));
+    assert_eq!(release.codec.as_deref(), Some("HEVC/x265"));
+    assert_eq!(release.language.as_deref(), Some("Hindi + English"));
+    assert_eq!(release.size_bytes, Some(1_234_567_890));
+    assert_eq!(release.season, Some(1));
+    assert_eq!(release.episode, Some(1));
+
+    let mirror = &release.mirrors[0];
+    assert_eq!(
+        mirror.resolver_url,
+        "https://cdn.hubcloud.club/stream/breakingbad_s01e01.mp4"
+    );
+    assert_eq!(mirror.headers.len(), 2);
+    assert!(
+        mirror
+            .headers
+            .iter()
+            .any(|(k, v)| k == "Referer" && v == "https://hubcloud.club/")
+    );
+}
+
+#[test]
+fn test_addon_token_and_audio_parsers() {
+    assert_eq!(
+        parse_quality("Movie.2024.2160p.UHD.HDR"),
+        Some("2160p".to_string())
+    );
+    assert_eq!(parse_quality("Movie.1080p.FHD"), Some("1080p".to_string()));
+    assert_eq!(parse_quality("Movie.720p.HD"), Some("720p".to_string()));
+    assert_eq!(parse_quality("Movie.480p.SD"), Some("480p".to_string()));
+
+    assert_eq!(
+        parse_codec("x265 HEVC 10bit"),
+        Some("HEVC/x265".to_string())
+    );
+    assert_eq!(parse_codec("H.264 AVC"), Some("AVC/x264".to_string()));
+    assert_eq!(parse_codec("Movie AV1 HDR"), Some("AV1".to_string()));
+
+    assert_eq!(
+        parse_size_bytes_from_text("Size: 1.15 GB"),
+        Some(1_234_803_097)
+    );
+    assert_eq!(
+        parse_size_bytes_from_text("File size: 850 MB"),
+        Some(891_289_600)
+    );
+
+    assert_eq!(
+        parse_audio_tracks("Hindi + English Dual Audio"),
+        Some("Hindi + English + Dual Audio".to_string())
+    );
+    assert_eq!(
+        parse_audio_tracks("Japanese Audio [Eng Sub]"),
+        Some("English + Japanese".to_string())
+    );
+}
+
+#[test]
+fn test_installed_addon_cinemeta_protection() {
+    let cinemeta = InstalledAddon::cinemeta_default();
+    assert!(cinemeta.is_core());
+    assert!(cinemeta.enabled);
+    assert!(cinemeta.provides_catalog);
+    assert!(cinemeta.provides_meta);
+    assert!(!cinemeta.provides_stream);
+
+    let community_addon = InstalledAddon {
+        manifest_url: "https://addon.example.com/manifest.json".to_string(),
+        name: "Community Streams".to_string(),
+        version: Some("1.0.0".to_string()),
+        description: Some("Direct HTTP Streams".to_string()),
+        enabled: true,
+        provides_catalog: false,
+        provides_meta: false,
+        provides_stream: true,
+        id_prefixes: vec!["tt".to_string()],
+        types: vec!["movie".to_string(), "series".to_string()],
+    };
+    assert!(!community_addon.is_core());
 }

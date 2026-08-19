@@ -111,7 +111,7 @@ pub fn meta_detail_to_moviebox_json(detail: &MetaDetail) -> serde_json::Value {
         eps.sort_unstable();
     }
 
-    let seasons_json = season_map
+    let mut seasons_json = season_map
         .into_iter()
         .map(|(season_num, eps)| {
             serde_json::json!({
@@ -121,6 +121,14 @@ pub fn meta_detail_to_moviebox_json(detail: &MetaDetail) -> serde_json::Value {
             })
         })
         .collect::<Vec<_>>();
+
+    if is_series && seasons_json.is_empty() {
+        seasons_json = vec![serde_json::json!({
+            "se": 1,
+            "maxEp": 1,
+            "episodeNumbers": vec![1]
+        })];
+    }
 
     let year_raw = detail
         .release_info
@@ -375,6 +383,120 @@ pub fn detect_stream_host(
     }
 }
 
+pub fn parse_season_episode(text: &str) -> Option<(usize, usize)> {
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+
+    let mut i = 0;
+    while i < len {
+        if (bytes[i] == b'S' || bytes[i] == b's') && i + 1 < len && bytes[i + 1].is_ascii_digit() {
+            if i == 0 || !bytes[i - 1].is_ascii_alphanumeric() {
+                let s_start = i + 1;
+                let mut s_end = s_start;
+                while s_end < len && bytes[s_end].is_ascii_digit() {
+                    s_end += 1;
+                }
+                if s_end < len && (s_end - s_start) <= 3 {
+                    if let Ok(s_num) = text[s_start..s_end].parse::<usize>() {
+                        let mut e_idx = s_end;
+                        while e_idx < len
+                            && (bytes[e_idx] == b'.'
+                                || bytes[e_idx] == b' '
+                                || bytes[e_idx] == b'_'
+                                || bytes[e_idx] == b'-')
+                        {
+                            e_idx += 1;
+                        }
+                        if e_idx < len
+                            && (bytes[e_idx] == b'E' || bytes[e_idx] == b'e')
+                            && e_idx + 1 < len
+                            && bytes[e_idx + 1].is_ascii_digit()
+                        {
+                            let e_start = e_idx + 1;
+                            let mut e_end = e_start;
+                            while e_end < len && bytes[e_end].is_ascii_digit() {
+                                e_end += 1;
+                            }
+                            if (e_end - e_start) <= 4 {
+                                if let Ok(e_num) = text[e_start..e_end].parse::<usize>() {
+                                    return Some((s_num, e_num));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (bytes[i] == b'x' || bytes[i] == b'X')
+            && i > 0
+            && bytes[i - 1].is_ascii_digit()
+            && i + 1 < len
+            && bytes[i + 1].is_ascii_digit()
+        {
+            let mut s_start = i - 1;
+            while s_start > 0 && bytes[s_start - 1].is_ascii_digit() {
+                s_start -= 1;
+            }
+            if s_start == 0 || !bytes[s_start - 1].is_ascii_alphanumeric() {
+                let s_str = &text[s_start..i];
+                let mut e_end = i + 1;
+                while e_end < len && bytes[e_end].is_ascii_digit() {
+                    e_end += 1;
+                }
+                let e_str = &text[i + 1..e_end];
+                if s_str.len() <= 3 && e_str.len() <= 4 {
+                    if let (Ok(s_num), Ok(e_num)) = (s_str.parse::<usize>(), e_str.parse::<usize>())
+                    {
+                        if s_num > 0 && s_num < 100 && e_num > 0 && e_num < 10000 {
+                            return Some((s_num, e_num));
+                        }
+                    }
+                }
+            }
+        }
+
+        i += 1;
+    }
+
+    let upper = text.to_ascii_uppercase();
+    if let Some(season_pos) = upper.find("SEASON ") {
+        let after_season = &upper[season_pos + 7..];
+        let s_digits: String = after_season
+            .chars()
+            .skip_while(|c| *c == ' ')
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if let Ok(s_num) = s_digits.parse::<usize>() {
+            if let Some(ep_pos) = upper.find("EPISODE ") {
+                let after_ep = &upper[ep_pos + 8..];
+                let e_digits: String = after_ep
+                    .chars()
+                    .skip_while(|c| *c == ' ')
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                if let Ok(e_num) = e_digits.parse::<usize>() {
+                    return Some((s_num, e_num));
+                }
+            }
+        }
+    }
+
+    if let Some(ep_pos) = upper.find("EPISODE ") {
+        let after = &upper[ep_pos + 8..];
+        let digits: String = after
+            .chars()
+            .skip_while(|c| *c == ' ')
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if let Ok(e_num) = digits.parse::<usize>() {
+            return Some((1, e_num));
+        }
+    }
+
+    None
+}
+
 pub fn stream_item_to_release(
     addon_name: &str,
     stream: &StreamItem,
@@ -391,6 +513,14 @@ pub fn stream_item_to_release(
     let desc_str = stream.description.as_deref().unwrap_or_default();
 
     let combined_text = format!("{stream_name_str} {title_str} {desc_str}");
+
+    if season > 0 && episode > 0 {
+        if let Some((stream_s, stream_e)) = parse_season_episode(&combined_text) {
+            if stream_s != season || stream_e != episode {
+                return None;
+            }
+        }
+    }
 
     let quality = parse_quality(&combined_text);
     let codec = parse_codec(&combined_text);

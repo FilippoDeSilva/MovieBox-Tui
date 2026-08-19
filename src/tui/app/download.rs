@@ -288,7 +288,10 @@ impl App {
                     return None;
                 }
                 self.state.is_resolving_playback = true;
-                if self.current_subject_provider() == ProviderKind::FourKHdHub {
+                if self.current_subject_provider() == ProviderKind::FourKHdHub
+                    || self.current_subject_provider() == ProviderKind::Addons
+                    || self.current_subject_provider().is_bdix()
+                {
                     if let Some(release) = self.get_selected_release() {
                         let Some(first_mirror) = release.mirrors.first().cloned() else {
                             self.state.is_resolving_playback = false;
@@ -304,15 +307,16 @@ impl App {
                             "Preparing download",
                             "Resolving the selected mirror.",
                         );
-                        let client = if release.provider == ProviderKind::BdixCircleFtp {
+                        let client = if release.provider == ProviderKind::Addons
+                            || release.provider == ProviderKind::BdixCircleFtp
+                            || release.provider == ProviderKind::BdixDhakaFlix
+                        {
                             let sender_clone = self.action_sender.clone();
-                            let source = crate::providers::models::PlaybackSource::bare(
-                                ProviderKind::BdixCircleFtp,
-                                first_mirror.resolver_url.clone(),
-                                None,
-                            );
                             sender_clone
-                                .send(Action::StartDownload(subtitle_url, Some(source.url)))
+                                .send(Action::StartDownload(
+                                    subtitle_url,
+                                    Some(first_mirror.resolver_url.clone()),
+                                ))
                                 .ok();
                             return None;
                         } else {

@@ -202,16 +202,28 @@ impl MovieBoxService {
                     .filter(|a| a.enabled && a.provides_meta)
                     .collect();
 
-                let types_to_try = ["movie", "series", "anime", "tv", "other"];
+                let types_to_try = ["series", "tv", "anime", "movie", "other"];
+                let mut best_detail: Option<crate::providers::addons::models::MetaDetail> = None;
+
                 for addon in &meta_addons {
                     let base_url =
                         crate::providers::addons::AddonClient::base_addon_url(&addon.manifest_url);
                     for t in types_to_try {
                         if let Ok(d) = self.addon_client.fetch_meta(&base_url, t, subject_id).await
                         {
-                            return Ok(
-                                crate::providers::addons::adapter::meta_detail_to_moviebox_json(&d),
-                            );
+                            if !d.videos.is_empty()
+                                || d.r#type.eq_ignore_ascii_case("series")
+                                || d.r#type.eq_ignore_ascii_case("tv")
+                            {
+                                return Ok(
+                                    crate::providers::addons::adapter::meta_detail_to_moviebox_json(
+                                        &d,
+                                    ),
+                                );
+                            }
+                            if best_detail.is_none() {
+                                best_detail = Some(d);
+                            }
                         }
                     }
                 }
@@ -229,14 +241,24 @@ impl MovieBoxService {
                             if let Ok(d) =
                                 self.addon_client.fetch_meta(&base_url, t, subject_id).await
                             {
-                                return Ok(
-                                    crate::providers::addons::adapter::meta_detail_to_moviebox_json(
-                                        &d,
-                                    ),
-                                );
+                                if !d.videos.is_empty()
+                                    || d.r#type.eq_ignore_ascii_case("series")
+                                    || d.r#type.eq_ignore_ascii_case("tv")
+                                {
+                                    return Ok(
+                                        crate::providers::addons::adapter::meta_detail_to_moviebox_json(&d),
+                                    );
+                                }
+                                if best_detail.is_none() {
+                                    best_detail = Some(d);
+                                }
                             }
                         }
                     }
+                }
+
+                if let Some(d) = best_detail {
+                    return Ok(crate::providers::addons::adapter::meta_detail_to_moviebox_json(&d));
                 }
 
                 Err(format!("Could not fetch metadata for ID '{subject_id}'."))
