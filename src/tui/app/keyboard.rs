@@ -195,6 +195,11 @@ impl App {
                     self.state.input_mode = InputMode::Normal;
                     self.state.suggest_index = None;
                     self.state.search_suggestions.clear();
+                    if self.state.search_query.starts_with('/')
+                        || self.state.search_results.is_empty()
+                    {
+                        self.state.search_query.clear();
+                    }
                     self.state.set_status(String::new(), 150);
                 }
                 KeyCode::Enter => {

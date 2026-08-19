@@ -167,3 +167,42 @@ async fn test_download_dir_reset_user_journey() {
     assert_eq!(notif.title, "Download Directory");
     assert!(notif.message.contains("Reset to default"));
 }
+
+#[tokio::test]
+async fn test_esc_key_cancels_slash_command_and_clears_search_bar() {
+    let mut app = App::new();
+    app.state_mut().update_available = None;
+    app.state_mut().show_theme_popup = false;
+    app.state_mut().show_browse_popup = false;
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query = "/download-dir".to_string();
+
+    let esc_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Esc,
+        crossterm::event::KeyModifiers::empty(),
+    );
+    app.handle_action(Action::Key(esc_key)).await;
+
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+    assert_eq!(app.state().search_query, "");
+}
+
+#[tokio::test]
+async fn test_esc_key_cancels_unsubmitted_search_query() {
+    let mut app = App::new();
+    app.state_mut().update_available = None;
+    app.state_mut().show_theme_popup = false;
+    app.state_mut().show_browse_popup = false;
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query = "batman".to_string();
+    assert!(app.state().search_results.is_empty());
+
+    let esc_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Esc,
+        crossterm::event::KeyModifiers::empty(),
+    );
+    app.handle_action(Action::Key(esc_key)).await;
+
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+    assert_eq!(app.state().search_query, "");
+}
