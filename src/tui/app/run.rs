@@ -120,7 +120,7 @@ impl App {
         }
     }
 
-    async fn handle_action(&mut self, action: Action) -> Option<()> {
+    pub async fn handle_action(&mut self, action: Action) -> Option<()> {
         if self.state.last_resize_time.is_some()
             || !matches!(action, Action::Tick | Action::UpdateDownload(..))
         {

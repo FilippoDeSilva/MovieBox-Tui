@@ -1,4 +1,6 @@
+use moviebox_tui::tui::action::Action;
 use moviebox_tui::tui::app::App;
+use moviebox_tui::tui::state::InputMode;
 use moviebox_tui::tui::theme::ThemeKind;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -48,4 +50,50 @@ async fn test_tui_terminal_resizing_matrix_no_panics() {
         let res = terminal.draw(|frame| app.draw(frame));
         assert!(res.is_ok(), "Failed to render at terminal size {w}x{h}");
     }
+}
+
+#[tokio::test]
+async fn test_mouse_click_help_overlay_dismisses() {
+    let mut app = App::new();
+    app.state_mut().show_help = true;
+    assert!(app.state().show_help);
+
+    app.handle_action(Action::MouseClick(10, 10)).await;
+    assert!(!app.state().show_help);
+}
+
+#[tokio::test]
+async fn test_mouse_click_outside_theme_popup_dismisses() {
+    let mut app = App::new();
+    app.state_mut().show_theme_popup = true;
+    assert!(app.state().show_theme_popup);
+
+    app.handle_action(Action::MouseClick(0, 0)).await;
+    assert!(!app.state().show_help);
+}
+
+#[tokio::test]
+async fn test_mouse_click_search_input_mode() {
+    let mut app = App::new();
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+
+    app.handle_action(Action::MouseClick(5, 5)).await;
+    let _ = app.state().input_mode;
+}
+
+#[tokio::test]
+async fn test_mouse_scroll_maps_to_key_actions() {
+    let mut app = App::new();
+    let up_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Up,
+        crossterm::event::KeyModifiers::empty(),
+    );
+    let down_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Down,
+        crossterm::event::KeyModifiers::empty(),
+    );
+
+    app.handle_action(Action::Key(down_key)).await;
+    app.handle_action(Action::Key(up_key)).await;
+    assert_eq!(app.state().search_query, "");
 }

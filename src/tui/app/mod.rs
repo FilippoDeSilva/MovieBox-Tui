@@ -113,6 +113,14 @@ impl App {
         app
     }
 
+    pub fn state(&self) -> &AppState {
+        &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut AppState {
+        &mut self.state
+    }
+
     fn request_context(&self) -> RequestContext {
         RequestContext {
             provider: self.state.active_provider,
