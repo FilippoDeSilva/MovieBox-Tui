@@ -140,4 +140,5 @@ pub enum Action {
     },
     ReconcileHistory,
     PlayerCrashed(Option<i32>, String),
+    PlayerExited,
 }

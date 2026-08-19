@@ -128,6 +128,9 @@ impl App {
             None
         };
 
+        self.state.is_playing = true;
+        self.state.is_resolving_playback = false;
+
         let tracker_opts = history_item.as_ref().map(|item| {
             (
                 item.provider.clone(),
@@ -264,6 +267,7 @@ impl App {
                         if let Some(path) = temporary_subtitle {
                             let _ = std::fs::remove_file(path);
                         }
+                        sender.send(Action::PlayerExited).ok();
                     });
                 }
                 Err(error) => {
@@ -281,6 +285,7 @@ impl App {
                             format!("Failed to spawn player executable: {error}"),
                         ))
                         .ok();
+                    sender.send(Action::PlayerExited).ok();
                 }
             }
         });
@@ -291,6 +296,14 @@ impl App {
     pub(super) async fn handle_playback(&mut self, action: Action) -> Option<()> {
         match action {
             Action::PlayStream(open_with) => {
+                if self.state.is_playing {
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Playback already active",
+                        "Stop the current player before starting another.",
+                    );
+                    return None;
+                }
                 if self.state.is_resolving_playback
                     || self.state.last_playback_launch.elapsed().as_millis() < 500
                 {
@@ -511,6 +524,14 @@ impl App {
                 }
             }
             Action::LaunchMpv(link, subtitle_url) => {
+                if self.state.is_playing {
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Playback already active",
+                        "Stop the current player before starting another.",
+                    );
+                    return None;
+                }
                 if self.state.last_playback_launch.elapsed().as_millis() < 500 {
                     return None;
                 }
@@ -622,7 +643,13 @@ impl App {
             Action::ReconcileHistory => {
                 self.state.history.reconcile_pending_playback_states();
             }
+            Action::PlayerExited => {
+                self.state.is_playing = false;
+                self.state.is_resolving_playback = false;
+            }
             Action::PlayerCrashed(code, error_msg) => {
+                self.state.is_playing = false;
+                self.state.is_resolving_playback = false;
                 let code_str = code
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "unknown".into());

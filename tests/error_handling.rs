@@ -128,3 +128,20 @@ async fn test_rapid_playback_invocations_debounced_and_single_flight() {
     assert_eq!(res, None);
     assert!(!app.state().is_resolving_playback);
 }
+
+#[tokio::test]
+async fn test_active_player_session_blocks_duplicate_playback_and_recovers_on_exit() {
+    let mut app = App::new();
+    app.state_mut().is_playing = true;
+
+    let res = app.handle_action(Action::PlayStream(false)).await;
+    assert_eq!(res, None);
+    assert!(!app.state().notifications.is_empty());
+    let notif = app.state().notifications.back().unwrap();
+    assert_eq!(notif.kind, NotificationKind::Warning);
+    assert_eq!(notif.title, "Playback already active");
+
+    app.handle_action(Action::PlayerExited).await;
+    assert!(!app.state().is_playing);
+    assert!(!app.state().is_resolving_playback);
+}
