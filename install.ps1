@@ -177,6 +177,7 @@ try {
     Write-Step "[2/4] Downloading $ArchiveName..."
     Invoke-WebRequest -Uri $Url -OutFile $ZipFile -UseBasicParsing
     Invoke-WebRequest -Uri "$BaseUrl/SHA256SUMS" -OutFile $ChecksumFile -UseBasicParsing
+    try { Unblock-File -Path $ZipFile -ErrorAction SilentlyContinue } catch {}
     Write-Success "[2/4] Downloaded $ArchiveName"
 
     Write-Step "[3/4] Verifying SHA256 checksum..."
@@ -208,7 +209,9 @@ try {
         throw "Binary not found in archive."
     }
 
+    try { Unblock-File -Path $ExtractedExe -ErrorAction SilentlyContinue } catch {}
     Move-Item -Path $ExtractedExe -Destination $ExePath -Force
+    try { Unblock-File -Path $ExePath -ErrorAction SilentlyContinue } catch {}
     Write-Success "[4/4] Binary installed to $ExePath"
 } catch {
     Remove-Item $TempDir -Recurse -Force -ErrorAction SilentlyContinue

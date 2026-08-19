@@ -87,6 +87,8 @@ Or manual installation:
 1. Download `MovieBox_Windows_x64.zip` (or `MovieBox_Windows_arm64.zip`) from [GitHub Releases](https://github.com/mesamirh/MovieBox-Tui/releases/latest).
 2. Extract the archive and place `moviebox-tui.exe` in your PATH (e.g. `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin`).
 
+*(Note: If Windows SmartScreen displays an "Unknown Publisher" prompt on first launch, click **More info** → **Run anyway**)*
+
 ---
 
 ### Android (Termux)
