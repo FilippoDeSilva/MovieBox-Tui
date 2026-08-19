@@ -25,6 +25,7 @@ if ($Help) {
 MovieBox-TUI Installer (Windows PowerShell)
 
 USAGE:
+    irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 -OutFile install.ps1; .\install.ps1 [OPTIONS]
     irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
     .\install.ps1 [OPTIONS]
 

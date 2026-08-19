@@ -41,48 +41,88 @@ Searching and watching media through web browsers often means dealing with heavy
 
 ## Installation
 
-### Cargo
+A media player (**[mpv](https://mpv.io)**, **[VLC](https://www.videolan.org/vlc/)**, or **[IINA](https://iina.io)**) is recommended for video playback.
 
-```bash
-cargo install moviebox-tui --locked
-```
+### macOS
 
-### Homebrew (macOS & Linux)
-
+Using **Homebrew**:
 ```bash
 brew tap mesamirh/moviebox-tui https://github.com/mesamirh/MovieBox-Tui
 brew install mesamirh/moviebox-tui/moviebox-tui
 ```
 
-### Install Script (macOS & Linux)
-
+Or using the automated installer:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 ```
+
+*(Or download the prebuilt `MovieBox_macOS_Universal.tar.gz` from [GitHub Releases](https://github.com/mesamirh/MovieBox-Tui/releases/latest))*
+
+---
+
+### Linux
+
+Using the automated installer (installs prebuilt static binary to `~/.local/bin`):
+```bash
+curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
+```
+
+Or manual installation:
+```bash
+curl -LO https://github.com/mesamirh/MovieBox-Tui/releases/latest/download/MovieBox_Linux_x64.tar.gz
+tar -xzf MovieBox_Linux_x64.tar.gz
+mkdir -p ~/.local/bin && mv moviebox-tui ~/.local/bin/
+```
+
+---
 
 ### Windows
 
-```cmd
-powershell -Command "irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex"
+Using **PowerShell**:
+```powershell
+irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 -OutFile install.ps1; .\install.ps1
 ```
+
+Or manual installation:
+1. Download `MovieBox_Windows_x64.zip` (or `MovieBox_Windows_arm64.zip`) from [GitHub Releases](https://github.com/mesamirh/MovieBox-Tui/releases/latest).
+2. Extract the archive and place `moviebox-tui.exe` in your PATH (e.g. `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin`).
+
+---
 
 ### Android (Termux)
 
+Using the automated installer (installs prebuilt ARM64 binary into `$PREFIX/bin`):
 ```bash
-pkg install rust
-cargo install moviebox-tui --locked
-echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
 ```
 
+---
+
 <details>
-<summary><b>Build from source</b></summary>
+<summary><b>From Source / Cargo (Developers)</b></summary>
+
+```bash
+cargo install moviebox-tui --locked
+```
 
 ```bash
 git clone https://github.com/mesamirh/MovieBox-Tui.git
 cd MovieBox-Tui
 cargo build --release --locked
+```
+
+</details>
+
+<details>
+<summary><b>Verify Release Integrity & Provenance</b></summary>
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+```bash
+gh attestation verify <archive-file> -R mesamirh/MovieBox-Tui
 ```
 
 </details>

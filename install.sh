@@ -13,33 +13,39 @@ DRY_RUN=0
 NO_MODIFY_PATH=0
 UNINSTALL=0
 
-for arg in "$@"; do
-    case "$arg" in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --version=*|-v=*)
-            VERSION="${arg#*=}"
+            VERSION="${1#*=}"
+            shift
             ;;
         --version|-v)
-            shift
-            VERSION="${1:-}"
+            VERSION="${2:-}"
+            shift 2
             ;;
         --dir=*)
-            CUSTOM_DIR="${arg#*=}"
+            CUSTOM_DIR="${1#*=}"
+            shift
             ;;
         --dir)
-            shift
-            CUSTOM_DIR="${1:-}"
+            CUSTOM_DIR="${2:-}"
+            shift 2
             ;;
         --force|-f)
             FORCE=1
+            shift
             ;;
         --dry-run)
             DRY_RUN=1
+            shift
             ;;
         --no-modify-path)
             NO_MODIFY_PATH=1
+            shift
             ;;
         --uninstall)
             UNINSTALL=1
+            shift
             ;;
         --help|-h)
             cat << 'EOF'
@@ -59,6 +65,9 @@ OPTIONS:
     -h, --help             Show this help message
 EOF
             exit 0
+            ;;
+        *)
+            shift
             ;;
     esac
 done
@@ -297,7 +306,7 @@ if [ "$OS" = "Darwin" ]; then
     PLATFORM_NAME="macOS (Universal)"
 elif [ "$IS_TERMUX" -eq 1 ]; then
     if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-        FILE="MovieBox_Termux_arm64.tar.gz"
+        FILE="MovieBox_Linux_arm64.tar.gz"
         PLATFORM_NAME="Android Termux (arm64)"
     else
         log_error "Unsupported Termux architecture ($ARCH). Only arm64/aarch64 is hosted. Use 'cargo install moviebox-tui'."
