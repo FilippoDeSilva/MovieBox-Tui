@@ -117,3 +117,14 @@ async fn test_invalid_url_schemes_rejected_by_security_filter() {
     assert!(is_http_url("http://example.com"));
     assert!(is_http_url("https://example.com/manifest.json"));
 }
+
+#[tokio::test]
+async fn test_rapid_playback_invocations_debounced_and_single_flight() {
+    let mut app = App::new();
+    app.state_mut().last_playback_launch = std::time::Instant::now();
+    app.state_mut().is_resolving_playback = false;
+
+    let res = app.handle_action(Action::PlayStream(false)).await;
+    assert_eq!(res, None);
+    assert!(!app.state().is_resolving_playback);
+}

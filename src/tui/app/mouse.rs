@@ -708,7 +708,10 @@ impl App {
                 let prev_selected = self.state.resource_list_state.selected();
                 self.state.resource_list_state.select(Some(target_idx));
 
-                if prev_selected == Some(target_idx) {
+                if prev_selected == Some(target_idx)
+                    && !self.state.is_resolving_playback
+                    && self.state.last_playback_launch.elapsed().as_millis() >= 500
+                {
                     self.action_sender.send(Action::PlayStream(false)).ok();
                 }
             }

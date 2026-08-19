@@ -291,9 +291,12 @@ impl App {
     pub(super) async fn handle_playback(&mut self, action: Action) -> Option<()> {
         match action {
             Action::PlayStream(open_with) => {
-                if self.state.is_resolving_playback {
+                if self.state.is_resolving_playback
+                    || self.state.last_playback_launch.elapsed().as_millis() < 500
+                {
                     return None;
                 }
+                self.state.last_playback_launch = std::time::Instant::now();
                 self.state.is_resolving_playback = true;
                 if self.current_subject_provider() == ProviderKind::FourKHdHub
                     || self.current_subject_provider() == ProviderKind::Addons
@@ -508,6 +511,10 @@ impl App {
                 }
             }
             Action::LaunchMpv(link, subtitle_url) => {
+                if self.state.last_playback_launch.elapsed().as_millis() < 500 {
+                    return None;
+                }
+                self.state.last_playback_launch = std::time::Instant::now();
                 self.state.is_resolving_playback = false;
                 let player = self.state.available_players.first().cloned();
                 match player {
@@ -578,11 +585,13 @@ impl App {
             Action::LaunchPlayer(kind, link, sub) => {
                 self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
+                self.state.last_playback_launch = std::time::Instant::now();
                 self.launch_player(kind, link, sub, Vec::new());
             }
             Action::LaunchPlayback(kind, source) => {
                 self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
+                self.state.last_playback_launch = std::time::Instant::now();
                 if !crate::tui::player::supports_headers(kind, &source.headers) {
                     self.state.set_status(
                         format!(

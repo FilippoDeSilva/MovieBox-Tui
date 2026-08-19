@@ -128,6 +128,7 @@ pub struct AppState {
     pub default_player: Option<String>,
     pub is_loading: bool,
     pub is_resolving_playback: bool,
+    pub last_playback_launch: std::time::Instant,
     pub status_message: String,
     pub status_timer: usize,
     pub notifications: std::collections::VecDeque<crate::tui::overlay::Notification>,
@@ -266,6 +267,9 @@ impl Default for AppState {
             dirty: true,
             is_loading: false,
             is_resolving_playback: false,
+            last_playback_launch: std::time::Instant::now()
+                .checked_sub(std::time::Duration::from_secs(5))
+                .unwrap_or_else(std::time::Instant::now),
             status_message: String::new(),
             status_timer: 0,
             notifications: std::collections::VecDeque::new(),
