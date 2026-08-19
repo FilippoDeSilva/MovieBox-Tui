@@ -4,7 +4,7 @@
 
 ### Added
 - **Comprehensive QA & Regression Test Architecture**:
-  - Introduced a 31-test automated suite covering critical algorithmic boundaries, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
+  - Introduced a 45-test automated suite covering critical algorithmic boundaries, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
   - Added structured integration tests in `tests/` (`history_reconciliation.rs`, `cache_lifecycle.rs`, `player_integration.rs`, `m3u_integration.rs`, `addons_manifest.rs`, `download_integration.rs`, `url_security.rs`) and test fixtures (`tests/fixtures/`).
   - Added [`docs/testing.md`](docs/testing.md) detailing test architecture, command references, and manual QA procedures.
 - **Playback Tracking & Watch History Progress**:

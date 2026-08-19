@@ -224,6 +224,23 @@ jobs:
             echo "has_notes=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Validate all expected release artifacts exist
+        run: |
+          EXPECTED=(
+            "MovieBox_Linux_x64.tar.gz"
+            "MovieBox_Linux_arm64.tar.gz"
+            "MovieBox_macOS_Universal.tar.gz"
+            "MovieBox_Windows_x64.zip"
+            "MovieBox_Windows_arm64.zip"
+          )
+          for asset in "${EXPECTED[@]}"; do
+            if ! find artifacts -type f -name "$asset" | grep -q .; then
+              echo "::error::Required release artifact '$asset' was not produced."
+              exit 1
+            fi
+            echo "✔ Found required artifact: $asset"
+          done
+
       - name: Generate checksums
         run: |
           find artifacts -type f \( -name 'MovieBox_*.tar.gz' -o -name 'MovieBox_*.zip' \) -print0 |

@@ -91,11 +91,13 @@ Or manual installation:
 
 ### Android (Termux)
 
-Using the automated installer (installs prebuilt ARM64 binary into `$PREFIX/bin`):
+Using the automated installer (installs prebuilt static ARM64 binary into `$PREFIX/bin`):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
 ```
+
+*(Or compile natively via Cargo: `pkg install rust && cargo install moviebox-tui --locked`)*
 
 ---
 

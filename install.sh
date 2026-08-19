@@ -301,10 +301,7 @@ if [ -n "${PREFIX:-}" ] && [[ "$PREFIX" == *com.termux* ]]; then
     IS_TERMUX=1
 fi
 
-if [ "$OS" = "Darwin" ]; then
-    FILE="MovieBox_macOS_Universal.tar.gz"
-    PLATFORM_NAME="macOS (Universal)"
-elif [ "$IS_TERMUX" -eq 1 ]; then
+if [ "$IS_TERMUX" -eq 1 ]; then
     if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
         FILE="MovieBox_Linux_arm64.tar.gz"
         PLATFORM_NAME="Android Termux (arm64)"
@@ -312,6 +309,9 @@ elif [ "$IS_TERMUX" -eq 1 ]; then
         log_error "Unsupported Termux architecture ($ARCH). Only arm64/aarch64 is hosted. Use 'cargo install moviebox-tui'."
         exit 1
     fi
+elif [ "$OS" = "Darwin" ]; then
+    FILE="MovieBox_macOS_Universal.tar.gz"
+    PLATFORM_NAME="macOS (Universal)"
 elif [ "$OS" = "Linux" ]; then
     if [ "$ARCH" = "x86_64" ]; then
         FILE="MovieBox_Linux_x64.tar.gz"
@@ -350,7 +350,7 @@ resolve_version() {
     printf "%s" "$tag" > "$TMP_VER_FILE"
 }
 
-run_spinner "[1/4] Checking environment & resolving version" resolve_version
+run_spinner "[1/4] Checking environment & resolving version" resolve_version || exit 1
 TARGET_VERSION=$(cat "$TMP_VER_FILE" 2>/dev/null || true)
 rm -f "$TMP_VER_FILE"
 
@@ -421,7 +421,7 @@ download_files() {
     curl -fsSL "$CHECKSUM_URL" -o "$TMP_DIR/SHA256SUMS"
 }
 
-run_spinner "[2/4] Downloading $FILE" download_files
+run_spinner "[2/4] Downloading $FILE" download_files || exit 1
 log_success "[2/4] Downloaded $FILE"
 
 verify_checksum() {
@@ -445,7 +445,7 @@ verify_checksum() {
     [ "$actual_sha" = "$expected_sha" ]
 }
 
-run_spinner "[3/4] Verifying SHA256 checksum" verify_checksum
+run_spinner "[3/4] Verifying SHA256 checksum" verify_checksum || exit 1
 log_success "[3/4] Cryptographic checksum verified"
 
 install_binary() {
@@ -465,7 +465,7 @@ install_binary() {
     chmod 755 "$APP_PATH"
 }
 
-run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary
+run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary || exit 1
 log_success "[4/4] Binary installed to $APP_PATH"
 
 SHELL_MODIFIED=""
