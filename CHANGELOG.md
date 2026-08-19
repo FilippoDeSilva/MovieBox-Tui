@@ -4,8 +4,8 @@
 
 ### Added
 - **Comprehensive QA & Regression Test Architecture**:
-  - Introduced a 53-test automated suite covering critical algorithmic boundaries, addon manifest validation, mouse interactions, modal dismissals, TUI rendering across terminal size matrices, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
-  - Added structured integration tests in `tests/` (`tui_acceptance.rs`, `history_reconciliation.rs`, `cache_lifecycle.rs`, `player_integration.rs`, `m3u_integration.rs`, `addons_manifest.rs`, `download_integration.rs`, `url_security.rs`) and test fixtures (`tests/fixtures/`).
+  - Introduced a 59-test automated suite covering critical algorithmic boundaries, error handling, addon manifest validation, mouse interactions, modal dismissals, TUI rendering across terminal size matrices, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
+  - Added structured integration tests in `tests/` (`error_handling.rs`, `tui_acceptance.rs`, `history_reconciliation.rs`, `cache_lifecycle.rs`, `player_integration.rs`, `m3u_integration.rs`, `addons_manifest.rs`, `download_integration.rs`, `url_security.rs`) and test fixtures (`tests/fixtures/`).
   - Added [`docs/testing.md`](docs/testing.md) detailing test architecture, command references, and manual QA procedures.
 - **Playback Tracking & Watch History Progress**:
   - Added real-time playback position tracking for `mpv` with injected tracker script (`moviebox_tracker.lua`) and 5-second periodic state auto-save to disk.
