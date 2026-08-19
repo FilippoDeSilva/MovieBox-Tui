@@ -249,7 +249,7 @@ impl App {
         None
     }
 
-    fn draw(&mut self, frame: &mut Frame) {
+    pub fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
 
         if let Some((_, w, h)) = self.state.last_resize_time {
