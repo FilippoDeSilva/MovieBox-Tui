@@ -9,9 +9,9 @@ exclude = [
     "install.sh",
     "install.ps1",
 ]
-version = "0.1.12"
+version = "0.1.13"
 edition = "2024"
-description = "A terminal client for finding and streaming movies, TV shows, and anime from the MovieBox catalog."
+description = "Terminal interface to find, download, and stream movies, TV shows, and live TV using local media players."
 repository = "https://github.com/mesamirh/MovieBox-Tui"
 homepage = "https://github.com/mesamirh/MovieBox-Tui"
 license = "MIT OR Apache-2.0"

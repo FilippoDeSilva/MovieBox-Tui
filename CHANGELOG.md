@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.13] - 2026-08-20
 
 ### Added
 - **Production-Grade In-App Self-Update Engine**:
