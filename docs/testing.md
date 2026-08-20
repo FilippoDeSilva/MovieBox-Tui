@@ -28,6 +28,7 @@ MovieBox-TUI/
     ├── error_handling.rs          # Failure state cleanup, error toasts, and recovery
     ├── content_pipeline.rs        # Content/metadata pipeline, stale request isolation, & cache keys
     ├── tui_acceptance.rs          # Headless TUI rendering, theme rendering, and resize matrix
+    ├── update_lifecycle.rs        # Update single-flight checks, modal hitboxes, & platform assets
     └── addons_manifest.rs         # Addon manifest deserialization & catalog checks
 ```
 
@@ -36,10 +37,12 @@ Inline unit tests live inside `#[cfg(test)] mod tests` blocks within their respe
 - Title normalization (`clean_moviebox_title`)
 - HMAC-MD5 cryptographic signing and token generation (`generate_x_client_token`, `generate_x_tr_signature`)
 - Segment partitioning math and byte range calculations
-- Internal helper logic and parsing functions
+- Internal helper logic, parsing functions, and release asset matching
+- Update modal layout geometry calculations and semver comparisons
 
 ### B. Subsystem Integration Tests (`tests/*.rs`)
 Integration tests live in the `tests/` directory and test externally observable behaviors without mocking internal types:
+- **`update_lifecycle.rs`**: Validates update single-flight concurrency barriers, error recovery on network failure, 1:1 mouse hit-test synchronization with rendered popup geometry, and deterministic platform asset filtering.
 - **`content_pipeline.rs`**: Validates search result identity, ambiguous title isolation, stale metadata response protection (`request_id` validation), cache key dimensional isolation, addon metadata mapping & partial degradation, search failure vs empty result status distinction, and mode-switch stale response isolation.
 - **`error_handling.rs`**: Validates active player session lifecycle, playback debounce guards, search failure cleanup, addon manifest error toasts, stream and download resolution failure notifications, malformed M3U recovery, and URL scheme rejection.
 - **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, end-to-end user journeys (search, details, navigation, mode switching), mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.

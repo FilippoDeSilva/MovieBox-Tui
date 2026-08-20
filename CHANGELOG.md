@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Update System Concurrency & Platform Compatibility Architecture**:
+  - Added single-flight guard (`is_checking_updates`) ensuring manual (`/update`) and automatic startup checks never spawn duplicate concurrent network requests.
+  - Added shared geometry calculation (`UpdateModalLayout`, `update_modal_layout`) guaranteeing 1:1 synchronization between popup rendering and mouse hit testing.
+  - Added release asset data modeling (`Release`, `ReleaseAsset`, `TargetPlatform`) with deterministic platform compatibility detection across macOS Universal, Linux x64/arm64, Windows x64/arm64, and Android Termux ARM64.
+  - Added dedicated integration test suite `tests/update_lifecycle.rs` testing update single-flighting, error recovery, mouse hit testing, and asset filtering.
 - **Comprehensive QA & Regression Test Architecture**:
   - Introduced an 83-test automated suite covering critical algorithmic boundaries, end-to-end user journeys, watch history reconciliation & precision progress tracking, content & metadata loading pipelines, stale request isolation, active player session lifecycle & duplicate launch protection, dynamic slash command autocomplete (`/download-dir reset`), search/command draft cancellation via `Esc`, error handling, addon manifest validation, mouse interactions, modal dismissals, TUI rendering across terminal size matrices, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
   - Added structured integration tests in `tests/` (`content_pipeline.rs`, `error_handling.rs`, `tui_acceptance.rs`, `history_reconciliation.rs`, `cache_lifecycle.rs`, `player_integration.rs`, `m3u_integration.rs`, `addons_manifest.rs`, `download_integration.rs`, `url_security.rs`) and test fixtures (`tests/fixtures/`).
