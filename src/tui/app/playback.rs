@@ -111,6 +111,17 @@ impl App {
         subtitle: Option<String>,
         headers: Vec<(String, String)>,
     ) {
+        if !crate::tui::text::is_http_url(&link) {
+            self.state.is_playing = false;
+            self.state.is_resolving_playback = false;
+            self.state.notify(
+                NotificationKind::Error,
+                "Unsupported stream",
+                "Only HTTP and HTTPS stream protocols are supported for playback.",
+            );
+            return;
+        }
+
         let history_item = self.build_watch_history_item();
         let resume_seconds = if let Some(item) = &history_item {
             self.state

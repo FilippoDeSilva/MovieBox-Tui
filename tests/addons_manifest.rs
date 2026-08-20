@@ -449,3 +449,149 @@ async fn test_invalid_addon_manifest_url_shows_actionable_error_and_preserves_st
     assert_eq!(notif.kind, moviebox_tui::models::NotificationKind::Error);
     assert_eq!(app.state().installed_addons.len(), initial_addons_count);
 }
+
+#[test]
+fn test_addon_mixed_stream_filtering_and_magnet_rejection() {
+    let raw_streams = vec![
+        StreamItem {
+            name: Some("HTTP 1080p Stream".to_string()),
+            title: Some("Direct Video Stream".to_string()),
+            description: None,
+            url: Some("https://example.test/stream1.mp4".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("HTTP 720p Stream".to_string()),
+            title: Some("Direct Video Stream".to_string()),
+            description: None,
+            url: Some("http://example.test/stream2.mp4".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("Magnet Link".to_string()),
+            title: Some("Torrent Stream".to_string()),
+            description: None,
+            url: Some("magnet:?xt=urn:btih:d08244124e9f0863014f56947ab51404ec102770".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("Local File".to_string()),
+            title: Some("File Protocol".to_string()),
+            description: None,
+            url: Some("file:///etc/passwd".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("FTP Stream".to_string()),
+            title: Some("FTP Protocol".to_string()),
+            description: None,
+            url: Some("ftp://example.test/video.mkv".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("Invalid".to_string()),
+            title: Some("Invalid URL".to_string()),
+            description: None,
+            url: Some("not-a-valid-url-string".to_string()),
+            behavior_hints: None,
+        },
+        StreamItem {
+            name: Some("Empty".to_string()),
+            title: Some("Empty URL".to_string()),
+            description: None,
+            url: None,
+            behavior_hints: None,
+        },
+    ];
+
+    let mut accepted_releases = Vec::new();
+    for stream in &raw_streams {
+        if let Some(release) = stream_item_to_release("Torrentio", stream, 0, 0) {
+            accepted_releases.push(release);
+        }
+    }
+
+    assert_eq!(accepted_releases.len(), 2);
+    assert_eq!(
+        accepted_releases[0].mirrors[0].resolver_url,
+        "https://example.test/stream1.mp4"
+    );
+    assert_eq!(
+        accepted_releases[1].mirrors[0].resolver_url,
+        "http://example.test/stream2.mp4"
+    );
+}
+
+#[tokio::test]
+async fn test_authoritative_launch_player_blocks_bypass_attempts() {
+    let mut app = moviebox_tui::tui::app::App::new();
+    app.state_mut().update_available = None;
+    app.state_mut().is_playing = false;
+
+    app.handle_action(moviebox_tui::tui::action::Action::LaunchPlayer(
+        moviebox_tui::tui::state::PlayerKind::Mpv,
+        "magnet:?xt=urn:btih:d08244124e9f0863014f56947ab51404ec102770".to_string(),
+        None,
+    ))
+    .await;
+
+    assert!(!app.state().is_playing);
+    let notif = app
+        .state()
+        .notifications
+        .back()
+        .expect("Notification must be present");
+    assert_eq!(notif.kind, moviebox_tui::models::NotificationKind::Error);
+    assert_eq!(notif.title, "Unsupported stream");
+
+    app.handle_action(moviebox_tui::tui::action::Action::LaunchPlayer(
+        moviebox_tui::tui::state::PlayerKind::Mpv,
+        "file:///etc/shadow".to_string(),
+        None,
+    ))
+    .await;
+
+    assert!(!app.state().is_playing);
+    let notif = app
+        .state()
+        .notifications
+        .back()
+        .expect("Notification must be present");
+    assert_eq!(notif.kind, moviebox_tui::models::NotificationKind::Error);
+    assert_eq!(notif.title, "Unsupported stream");
+}
+
+#[tokio::test]
+async fn test_addon_enable_disable_and_removal_lifecycle() {
+    let mut app = moviebox_tui::tui::app::App::new();
+    let initial_count = app.state().installed_addons.len();
+
+    let custom_manifest = serde_json::json!({
+        "id": "community.streams.test",
+        "version": "1.0.0",
+        "name": "Community Direct Streams",
+        "description": "Test HTTP streams",
+        "resources": ["stream"],
+        "types": ["movie"],
+        "catalogs": []
+    });
+    let manifest: AddonManifest = serde_json::from_value(custom_manifest).unwrap();
+    let installed =
+        InstalledAddon::from_manifest("https://example.test/manifest.json".to_string(), &manifest);
+
+    app.state_mut().installed_addons.push(installed);
+    assert_eq!(app.state().installed_addons.len(), initial_count + 1);
+
+    let idx = initial_count;
+    app.handle_action(moviebox_tui::tui::action::Action::AddonToggleEnabled(idx))
+        .await;
+    assert!(!app.state().installed_addons[idx].enabled);
+
+    app.handle_action(moviebox_tui::tui::action::Action::AddonToggleEnabled(idx))
+        .await;
+    assert!(app.state().installed_addons[idx].enabled);
+
+    app.handle_action(moviebox_tui::tui::action::Action::AddonRemove(idx))
+        .await;
+    assert_eq!(app.state().installed_addons.len(), initial_count);
+}
