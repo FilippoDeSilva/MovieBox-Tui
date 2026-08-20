@@ -19,6 +19,7 @@ MovieBox-TUI/
     │   └── addons/
     │       └── manifest.json
     ├── history_reconciliation.rs  # History identity & background state reconciliation
+    ├── grand_user_journey.rs      # End-to-end full multi-phase user lifecycle verification
     ├── cache_lifecycle.rs         # Disk cache hashing & atomic writes
     ├── player_integration.rs      # Cross-platform player command & path arguments
     ├── m3u_integration.rs         # Offline M3U playlist parsing
