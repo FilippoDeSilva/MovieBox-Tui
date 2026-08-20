@@ -19,6 +19,7 @@ MovieBox-TUI/
     │   └── addons/
     │       └── manifest.json
     ├── history_reconciliation.rs  # History identity & background state reconciliation
+    ├── history_audit.rs           # Cross-mode watch progress, series advancement, & boundary audit
     ├── grand_user_journey.rs      # End-to-end full multi-phase user lifecycle verification
     ├── cache_lifecycle.rs         # Disk cache hashing & atomic writes
     ├── player_integration.rs      # Cross-platform player command & path arguments
@@ -51,6 +52,7 @@ Integration tests live in the `tests/` directory and test externally observable 
 - **`error_handling.rs`**: Validates active player session lifecycle, playback debounce guards, search failure cleanup, addon manifest error toasts, stream and download resolution failure notifications, malformed M3U recovery, and URL scheme rejection.
 - **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, end-to-end user journeys (search, details, navigation, mode switching), mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.
 - **`history_reconciliation.rs`**: Validates `HistoryManager::is_same_show`, media type separation (Movies vs TV Series), remake year distinction, and state file reconciliation (MISS-01).
+- **`history_audit.rs`**: Validates cross-mode watch progress, series advancement and completion tracking, threshold boundaries for in-progress states, history disk persistence roundtrips, Lua tracker reconciliation, and `/history` search list integration.
 - **`cache_lifecycle.rs`**: Validates atomic file writing (both sync and async) and deterministic MD5 cache key generation.
 - **`player_integration.rs`**: Validates MPV script options path sanitization on Windows (`\` $\rightarrow$ `/`) and Unix.
 - **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
