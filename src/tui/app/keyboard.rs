@@ -77,8 +77,8 @@ impl App {
 
         if let Some((version, _)) = &self.state.update_available {
             match key.code {
-                KeyCode::Enter | KeyCode::Esc => {
-                    self.state.update_available = None;
+                KeyCode::Char('u') | KeyCode::Char('U') => {
+                    self.action_sender.send(Action::StartSelfUpdate).ok();
                 }
                 KeyCode::Char('o') | KeyCode::Char('O') => {
                     let url = format!(
@@ -86,6 +86,9 @@ impl App {
                         version
                     );
                     let _ = open::that(&url);
+                    self.state.update_available = None;
+                }
+                KeyCode::Esc => {
                     self.state.update_available = None;
                 }
                 _ => {}

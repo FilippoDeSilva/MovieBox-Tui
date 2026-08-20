@@ -374,6 +374,8 @@ pub struct UpdateModalLayout {
     pub display_count: usize,
     pub has_more: bool,
     pub button_row_y: u16,
+    pub update_btn_end_x: u16,
+    pub open_btn_end_x: u16,
     pub open_button_midpoint_x: u16,
 }
 
@@ -402,6 +404,8 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
 
     let popup_area = centered(area, desired_w, desired_h, min_w, max_w);
     let button_row_y = popup_area.y + popup_area.height.saturating_sub(2);
+    let update_btn_end_x = popup_area.x + popup_area.width / 3;
+    let open_btn_end_x = popup_area.x + (popup_area.width * 2) / 3;
     let open_button_midpoint_x = popup_area.x + popup_area.width / 2;
 
     UpdateModalLayout {
@@ -409,6 +413,8 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
         display_count,
         has_more,
         button_row_y,
+        update_btn_end_x,
+        open_btn_end_x,
         open_button_midpoint_x,
     }
 }

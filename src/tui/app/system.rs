@@ -346,7 +346,7 @@ impl App {
                 self.state.is_checking_updates = true;
                 let update_sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    let task = tokio::spawn(crate::tui::updater::check(env!("CARGO_PKG_VERSION")));
+                    let task = tokio::spawn(crate::updater::check(env!("CARGO_PKG_VERSION")));
                     let result = match task.await {
                         Ok(res) => res,
                         Err(join_err) => Err(format!("update check task error: {join_err}")),
@@ -397,6 +397,114 @@ impl App {
                         self.state.manual_update_check = false;
                         self.reset_transient_overlays();
                         self.state.update_available = Some((version, notes));
+                    }
+                }
+            }
+
+            Action::StartSelfUpdate => {
+                if self.state.is_updating {
+                    return None;
+                }
+                if self.state.download_progress.is_some() {
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Update Deferred",
+                        "Cannot perform in-app update while a download is active.",
+                    );
+                    return None;
+                }
+                if self.state.is_playing {
+                    self.state.notify(
+                        NotificationKind::Warning,
+                        "Update Deferred",
+                        "Cannot perform in-app update while playback is active.",
+                    );
+                    return None;
+                }
+
+                self.state.is_updating = true;
+                self.state.update_available = None;
+                self.state
+                    .set_status("Starting self-update...".to_string(), 180);
+                self.state.notify(
+                    NotificationKind::Info,
+                    "Self-Update",
+                    "Downloading release artifact and verifying checksum...",
+                );
+
+                let update_sender = self.action_sender.clone();
+                tokio::spawn(async move {
+                    let release =
+                        match crate::updater::check_release(env!("CARGO_PKG_VERSION")).await {
+                            Ok(Some(r)) => r,
+                            Ok(None) => {
+                                update_sender
+                                    .send(Action::SelfUpdateComplete(Err(
+                                        "Already on the latest version.".to_string(),
+                                    )))
+                                    .ok();
+                                return;
+                            }
+                            Err(e) => {
+                                update_sender.send(Action::SelfUpdateComplete(Err(e))).ok();
+                                return;
+                            }
+                        };
+
+                    let (progress_tx, mut progress_rx) =
+                        tokio::sync::mpsc::unbounded_channel::<String>();
+                    let fwd_sender = update_sender.clone();
+                    tokio::spawn(async move {
+                        while let Some(msg) = progress_rx.recv().await {
+                            fwd_sender.send(Action::SelfUpdateProgress(msg)).ok();
+                        }
+                    });
+
+                    let outcome =
+                        crate::updater::perform_self_update(&release, Some(&progress_tx)).await;
+                    update_sender.send(Action::SelfUpdateComplete(outcome)).ok();
+                });
+            }
+
+            Action::SelfUpdateProgress(msg) => {
+                self.state.set_status(msg, 180);
+            }
+
+            Action::SelfUpdateComplete(result) => {
+                self.state.is_updating = false;
+                match result {
+                    Ok(crate::updater::SelfUpdateOutcome::Success) => {
+                        self.state
+                            .set_status("Update successful! Restarting...".to_string(), 180);
+                        self.state.notify(
+                            NotificationKind::Success,
+                            "Update Installed",
+                            "MovieBox-Tui was updated successfully. Restarting process...",
+                        );
+
+                        crossterm::terminal::disable_raw_mode().ok();
+                        crossterm::execute!(
+                            std::io::stdout(),
+                            crossterm::terminal::LeaveAlternateScreen,
+                            crossterm::event::DisableMouseCapture,
+                            crossterm::cursor::Show
+                        )
+                        .ok();
+
+                        if let Ok(exe_path) = std::env::current_exe() {
+                            let _ = crate::updater::restart_process(&exe_path);
+                        }
+                        std::process::exit(0);
+                    }
+                    Ok(crate::updater::SelfUpdateOutcome::RequiresManualUpgrade(msg)) => {
+                        self.state.set_status(msg.clone(), 300);
+                        self.state
+                            .notify(NotificationKind::Warning, "Manual Update Required", msg);
+                    }
+                    Err(err) => {
+                        self.state.set_status(format!("Update failed: {err}"), 240);
+                        self.state
+                            .notify(NotificationKind::Error, "Update Failed", err);
                     }
                 }
             }

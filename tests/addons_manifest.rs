@@ -181,13 +181,13 @@ fn test_addon_series_classification_and_default_season_structure() {
         runtime: Some("45 min".to_string()),
         cast: vec![],
         director: vec![],
-        videos: vec![], // Empty videos array from metadata provider
+        videos: vec![],
     };
 
     let mb_json = meta_detail_to_moviebox_json(&off_campus_series);
     assert_eq!(mb_json["id"], "tt32034988");
     assert_eq!(mb_json["title"], "Off Campus");
-    assert_eq!(mb_json["subjectType"], 2); // Identified as Series, not Movie!
+    assert_eq!(mb_json["subjectType"], 2);
     assert_eq!(mb_json["releaseDate"], "2026");
 
     let seasons = mb_json["seasons"]["seasons"]
@@ -265,7 +265,6 @@ fn test_addon_episode_stream_filtering_and_isolation() {
         },
     ];
 
-    // Requesting S01E08: Must only return streams for S01E08!
     let s01e08_releases: Vec<_> = raw_streams
         .iter()
         .filter_map(|s| stream_item_to_release("HdHub", s, 1, 8))
@@ -280,7 +279,6 @@ fn test_addon_episode_stream_filtering_and_isolation() {
         "https://cdn.example.com/s01e08_720p.mp4"
     );
 
-    // Requesting S01E06: Must only return streams for S01E06!
     let s01e06_releases: Vec<_> = raw_streams
         .iter()
         .filter_map(|s| stream_item_to_release("HdHub", s, 1, 6))
@@ -291,7 +289,6 @@ fn test_addon_episode_stream_filtering_and_isolation() {
         "https://cdn.example.com/s01e06_1080p.mp4"
     );
 
-    // Requesting S01E07: Must only return streams for S01E07!
     let s01e07_releases: Vec<_> = raw_streams
         .iter()
         .filter_map(|s| stream_item_to_release("HdHub", s, 1, 7))

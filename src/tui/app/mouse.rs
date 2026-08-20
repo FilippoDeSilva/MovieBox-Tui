@@ -95,7 +95,9 @@ impl App {
                 .contains(ratatui::layout::Position::new(col, row))
             {
                 if row == layout.button_row_y {
-                    if col < layout.open_button_midpoint_x {
+                    if col < layout.update_btn_end_x {
+                        self.action_sender.send(Action::StartSelfUpdate).ok();
+                    } else if col < layout.open_btn_end_x {
                         let url =
                             format!("https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{ver}");
                         let _ = open::that(&url);

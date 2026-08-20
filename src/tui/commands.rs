@@ -293,19 +293,16 @@ mod tests {
             ..Default::default()
         };
 
-        // 1. Streaming Mode
         state.is_addon_mode = false;
         state.is_tv_mode = false;
         let stream_sug = SlashCommand::suggest(&state, "/download-dir");
         assert!(stream_sug.contains(&"/download-dir reset".to_string()));
 
-        // 2. Addon Mode
         state.is_addon_mode = true;
         state.is_tv_mode = false;
         let addon_sug = SlashCommand::suggest(&state, "/download-dir");
         assert!(addon_sug.contains(&"/download-dir reset".to_string()));
 
-        // 3. TV Mode
         state.is_addon_mode = false;
         state.is_tv_mode = true;
         let tv_sug = SlashCommand::suggest(&state, "/download-dir");

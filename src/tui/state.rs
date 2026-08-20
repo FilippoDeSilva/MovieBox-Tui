@@ -138,6 +138,8 @@ pub struct AppState {
     pub last_update_check: u64,
     pub manual_update_check: bool,
     pub is_checking_updates: bool,
+    pub is_updating: bool,
+    pub update_release: Option<crate::updater::Release>,
 
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
@@ -281,6 +283,8 @@ impl Default for AppState {
             last_update_check: 0,
             manual_update_check: false,
             is_checking_updates: false,
+            is_updating: false,
+            update_release: None,
 
             download_progress: None,
             download_status: None,

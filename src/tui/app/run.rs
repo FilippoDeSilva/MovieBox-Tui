@@ -152,7 +152,10 @@ impl App {
             | Action::ShowBrowseMenu
             | Action::SetStatus(..)
             | Action::CheckForUpdates
-            | Action::UpdateAvailable(..) => {
+            | Action::UpdateAvailable(..)
+            | Action::StartSelfUpdate
+            | Action::SelfUpdateProgress(..)
+            | Action::SelfUpdateComplete(..) => {
                 self.handle_system(action).await;
             }
 
@@ -501,9 +504,11 @@ impl App {
             text.push(Line::from(""));
             text.push(
                 Line::from(vec![
+                    Span::styled("[u]", self.theme.shortcut),
+                    Span::styled(" Update Now    ", self.theme.text),
                     Span::styled("[o]", self.theme.shortcut),
                     Span::styled(" Open Release Page    ", self.theme.text),
-                    Span::styled("[Esc / Enter]", self.theme.shortcut),
+                    Span::styled("[Esc]", self.theme.shortcut),
                     Span::styled(" Dismiss", self.theme.text),
                 ])
                 .alignment(Alignment::Center),

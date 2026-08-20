@@ -15,14 +15,12 @@ fn test_is_http_url_validation() {
 
 #[test]
 fn test_safe_file_stem_sanitization() {
-    // Path traversal and separators
     assert_eq!(safe_file_stem("../../../etc/passwd"), "etc_passwd");
     assert_eq!(
         safe_file_stem("C:\\Windows\\System32\\calc.exe"),
         "C__Windows_System32_calc.exe"
     );
 
-    // Dangerous Windows reserved names
     assert_eq!(safe_file_stem("CON"), "CON_");
     assert_eq!(safe_file_stem("con"), "con_");
     assert_eq!(safe_file_stem("PRN"), "PRN_");
@@ -31,7 +29,6 @@ fn test_safe_file_stem_sanitization() {
     assert_eq!(safe_file_stem("COM1"), "COM1_");
     assert_eq!(safe_file_stem("LPT9"), "LPT9_");
 
-    // Characters forbidden on NTFS/FAT
     assert_eq!(
         safe_file_stem("Movie: The <Ultimate> Edition *?|"),
         "Movie_ The _Ultimate_ Edition"

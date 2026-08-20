@@ -1,208 +1,91 @@
-const OWNER: &str = "mesamirh";
-const REPOSITORY: &str = "MovieBox-Tui";
+pub mod apply;
+pub mod artifact;
+pub mod check;
+pub mod download;
+pub mod extract;
+pub mod verify;
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ReleaseAsset {
-    pub name: String,
-    pub download_url: String,
-    pub size: Option<u64>,
-}
+pub use apply::{
+    InstallationEnvironment, SelfUpdateOutcome, apply_staged_binary, detect_environment,
+    is_homebrew_managed, is_writable, restart_process,
+};
+pub use artifact::{Release, ReleaseAsset, TargetPlatform, is_termux_environment};
+pub use check::{check, check_release, is_newer};
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Release {
-    pub version: String,
-    pub tag_name: String,
-    pub notes: String,
-    pub assets: Vec<ReleaseAsset>,
-}
+pub async fn perform_self_update(
+    release: &Release,
+    progress_sender: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
+) -> Result<SelfUpdateOutcome, String> {
+    let platform = TargetPlatform::current().ok_or_else(|| {
+        "current operating system or architecture is not supported for in-app self-update"
+            .to_string()
+    })?;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TargetPlatform {
-    MacosUniversal,
-    LinuxX64,
-    LinuxArm64,
-    WindowsX64,
-    WindowsArm64,
-}
-
-impl TargetPlatform {
-    pub fn current() -> Option<Self> {
-        Self::detect(
-            std::env::consts::OS,
-            std::env::consts::ARCH,
-            is_termux_environment(),
+    let asset = release.find_compatible_asset(platform).ok_or_else(|| {
+        format!(
+            "no compatible release asset found for platform {:?}",
+            platform
         )
+    })?;
+
+    let checksum_asset = release
+        .find_checksum_asset()
+        .ok_or_else(|| "no SHA256SUMS checksum file found in GitHub release".to_string())?;
+
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("failed to get current executable path: {e}"))?;
+
+    let env = detect_environment(&current_exe);
+    if env == InstallationEnvironment::Homebrew {
+        return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
+            "This installation is managed by Homebrew. Run: brew upgrade moviebox-tui".to_string(),
+        ));
+    }
+    if env == InstallationEnvironment::ReadOnly {
+        return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
+            "MovieBox-Tui binary is not user-writable. Please update via your system package manager.".to_string(),
+        ));
     }
 
-    pub fn detect(os: &str, arch: &str, is_termux: bool) -> Option<Self> {
-        if is_termux {
-            if arch == "aarch64" || arch == "arm64" {
-                return Some(Self::LinuxArm64);
-            } else {
-                return None;
-            }
-        }
+    let temp_dir = tempfile::Builder::new()
+        .prefix("moviebox_update_")
+        .tempdir()
+        .map_err(|e| format!("failed to create temporary update directory: {e}"))?;
 
-        match os {
-            "macos" | "darwin" => Some(Self::MacosUniversal),
-            "linux" => match arch {
-                "x86_64" | "x86-64" | "x64" | "amd64" => Some(Self::LinuxX64),
-                "aarch64" | "arm64" => Some(Self::LinuxArm64),
-                _ => None,
-            },
-            "windows" => match arch {
-                "x86_64" | "x86-64" | "x64" | "amd64" => Some(Self::WindowsX64),
-                "aarch64" | "arm64" => Some(Self::WindowsArm64),
-                _ => None,
-            },
-            _ => None,
-        }
+    let archive_path = temp_dir.path().join(&asset.name);
+    let staged_binary_path = temp_dir.path().join(platform.expected_binary_name());
+
+    if let Some(tx) = progress_sender {
+        let _ = tx.send(format!("Downloading {}...", asset.name));
     }
+    download::download_file(&asset.download_url, &archive_path).await?;
 
-    pub fn expected_asset_name(self) -> &'static str {
-        match self {
-            Self::MacosUniversal => "MovieBox_macOS_Universal.tar.gz",
-            Self::LinuxX64 => "MovieBox_Linux_x64.tar.gz",
-            Self::LinuxArm64 => "MovieBox_Linux_arm64.tar.gz",
-            Self::WindowsX64 => "MovieBox_Windows_x64.zip",
-            Self::WindowsArm64 => "MovieBox_Windows_arm64.zip",
-        }
+    if let Some(tx) = progress_sender {
+        let _ = tx.send("Downloading SHA256SUMS...".to_string());
     }
-}
+    let sha256sums_content = download::download_text(&checksum_asset.download_url).await?;
 
-pub fn is_termux_environment() -> bool {
-    std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
-}
-
-impl Release {
-    pub fn find_compatible_asset(&self, platform: TargetPlatform) -> Option<&ReleaseAsset> {
-        let expected = platform.expected_asset_name();
-        self.assets.iter().find(|a| a.name == expected)
+    if let Some(tx) = progress_sender {
+        let _ = tx.send("Verifying SHA-256 integrity...".to_string());
     }
+    verify::verify_checksum(&archive_path, &sha256sums_content, &asset.name)?;
 
-    pub fn find_checksum_asset(&self) -> Option<&ReleaseAsset> {
-        self.assets.iter().find(|a| a.name == "SHA256SUMS")
+    if let Some(tx) = progress_sender {
+        let _ = tx.send("Extracting binary from release archive...".to_string());
     }
+    extract::extract_binary(
+        &archive_path,
+        &asset.name,
+        platform.expected_binary_name(),
+        &staged_binary_path,
+    )?;
 
-    pub fn is_compatible_with_current_platform(&self) -> bool {
-        TargetPlatform::current()
-            .and_then(|p| self.find_compatible_asset(p))
-            .is_some()
+    if let Some(tx) = progress_sender {
+        let _ = tx.send("Applying update to executable...".to_string());
     }
-}
+    let outcome = apply_staged_binary(&staged_binary_path, &current_exe)?;
 
-pub async fn check_release(current: &str) -> Result<Option<Release>, String> {
-    let release = match fetch_release().await {
-        Ok(release) => release,
-        Err(error) => {
-            log::warn!("update check via API failed ({error}); falling back to release page");
-            let tag = fetch_latest_tag().await?;
-            log::info!("resolved latest release via redirect: {tag}");
-            Release {
-                version: tag.trim_start_matches('v').to_string(),
-                tag_name: tag,
-                notes: String::new(),
-                assets: Vec::new(),
-            }
-        }
-    };
-
-    if !is_newer(current, &release.version) {
-        return Ok(None);
-    }
-
-    Ok(Some(release))
-}
-
-pub async fn check(current: &str) -> Result<Option<(String, String)>, String> {
-    let release = check_release(current).await?;
-    Ok(release.map(|r| (r.version, r.notes)))
-}
-
-fn is_newer(current: &str, other: &str) -> bool {
-    let parse = |v: &str| semver::Version::parse(v.trim_start_matches('v'));
-    match (parse(current), parse(other)) {
-        (Ok(cur), Ok(o)) => o > cur,
-        _ => other != current,
-    }
-}
-
-async fn fetch_release() -> Result<Release, String> {
-    let url = format!("https://api.github.com/repos/{OWNER}/{REPOSITORY}/releases/latest");
-    let client = http_client()?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("GitHub request failed: {e}"))?;
-    let status = resp.status();
-    if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS
-    {
-        return Err(format!("GitHub API rate limited ({status})"));
-    }
-    if !status.is_success() {
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("GitHub API {status}: {body}"));
-    }
-
-    let item: serde_json::Value = resp.json().await.map_err(|e| format!("bad JSON: {e}"))?;
-    let tag = item["tag_name"].as_str().ok_or("missing tag_name")?;
-    let notes = item["body"].as_str().unwrap_or("").to_string();
-    let assets = if let Some(arr) = item["assets"].as_array() {
-        arr.iter()
-            .filter_map(|a| {
-                let name = a["name"].as_str()?.to_string();
-                let download_url = a["browser_download_url"].as_str()?.to_string();
-                let size = a["size"].as_u64();
-                Some(ReleaseAsset {
-                    name,
-                    download_url,
-                    size,
-                })
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-
-    Ok(Release {
-        version: tag.trim_start_matches('v').to_string(),
-        tag_name: tag.to_string(),
-        notes,
-        assets,
-    })
-}
-
-async fn fetch_latest_tag() -> Result<String, String> {
-    let url = format!("https://github.com/{OWNER}/{REPOSITORY}/releases/latest");
-    let client = http_client()?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("GitHub release page failed: {e}"))?;
-    let status = resp.status();
-    if !status.is_success() {
-        return Err(format!("GitHub release page {status}"));
-    }
-
-    let path = resp.url().path();
-    let tag = path.rsplit('/').next().unwrap_or("");
-    if tag.is_empty() || tag == "latest" {
-        return Err("could not resolve the latest release tag".into());
-    }
-    Ok(tag.to_string())
-}
-
-fn http_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .user_agent("MovieBox-Tui")
-        .timeout(std::time::Duration::from_secs(30))
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| format!("HTTP client: {e}"))
+    Ok(outcome)
 }
 
 #[cfg(test)]
