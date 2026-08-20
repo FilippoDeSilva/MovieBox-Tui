@@ -137,6 +137,7 @@ pub struct AppState {
     pub auto_update: bool,
     pub last_update_check: u64,
     pub manual_update_check: bool,
+    pub is_checking_updates: bool,
 
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
@@ -279,6 +280,7 @@ impl Default for AppState {
             auto_update: true,
             last_update_check: 0,
             manual_update_check: false,
+            is_checking_updates: false,
 
             download_progress: None,
             download_status: None,

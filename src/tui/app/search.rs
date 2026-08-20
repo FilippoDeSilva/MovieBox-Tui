@@ -143,11 +143,16 @@ impl App {
             crate::tui::commands::ParsedCommand::Update => {
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
-                self.state.update_available = None;
-                self.state.manual_update_check = true;
-                self.state
-                    .set_status("Checking GitHub for updates...".to_string(), 180);
-                self.action_sender.send(Action::CheckForUpdates).ok();
+                if !self.state.is_checking_updates {
+                    self.state.update_available = None;
+                    self.state.manual_update_check = true;
+                    self.state
+                        .set_status("Checking GitHub for updates...".to_string(), 180);
+                    self.action_sender.send(Action::CheckForUpdates).ok();
+                } else {
+                    self.state
+                        .set_status("Checking GitHub for updates...".to_string(), 180);
+                }
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::ToggleUpdate => {

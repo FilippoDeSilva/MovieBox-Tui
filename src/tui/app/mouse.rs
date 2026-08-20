@@ -88,18 +88,17 @@ impl App {
             return true;
         }
 
-        if self.state.update_available.is_some() {
-            let popup = crate::tui::overlay::centered(area, 46, 7, 36, 60);
-            if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let dismiss_y = popup.y + popup.height.saturating_sub(2);
-                if row == dismiss_y {
-                    if col < popup.x + popup.width / 2 {
-                        if let Some((ver, _)) = &self.state.update_available {
-                            let url = format!(
-                                "https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{ver}"
-                            );
-                            let _ = open::that(&url);
-                        }
+        if let Some((ver, notes)) = &self.state.update_available {
+            let layout = crate::tui::overlay::update_modal_layout(area, notes);
+            if layout
+                .popup_area
+                .contains(ratatui::layout::Position::new(col, row))
+            {
+                if row == layout.button_row_y {
+                    if col < layout.open_button_midpoint_x {
+                        let url =
+                            format!("https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{ver}");
+                        let _ = open::that(&url);
                     }
                     self.state.update_available = None;
                 }

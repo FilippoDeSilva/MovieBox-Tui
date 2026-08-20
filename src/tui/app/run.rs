@@ -411,30 +411,17 @@ impl App {
             use ratatui::text::{Line, Span};
             use ratatui::widgets::{Block, Borders, Paragraph};
 
+            let layout = crate::tui::overlay::update_modal_layout(area, notes);
+            let popup_area = layout.popup_area;
+            let display_count = layout.display_count;
+            let has_more = layout.has_more;
+
             let note_lines: Vec<&str> = notes
                 .lines()
                 .map(|l| l.trim())
                 .filter(|l| !l.is_empty())
                 .collect();
 
-            let min_w: u16 = 46;
-            let max_w: u16 = 72;
-            let desired_w = max_w.min(area.width.saturating_sub(4)).max(min_w);
-
-            let header_rows: u16 = 5;
-            let footer_rows: u16 = 3;
-            let available_height = area.height.saturating_sub(4);
-            let available_note_rows =
-                (available_height.saturating_sub(header_rows + footer_rows) as usize).clamp(2, 10);
-
-            let display_count = note_lines.len().min(available_note_rows);
-            let has_more = note_lines.len() > display_count;
-            let total_rows =
-                header_rows + (display_count as u16) + (if has_more { 1 } else { 0 }) + footer_rows;
-            let desired_h = total_rows.clamp(10, available_height.max(10));
-
-            let popup_area =
-                crate::tui::overlay::centered(area, desired_w, desired_h, min_w, max_w);
             crate::tui::clear_area(frame, area, &self.theme);
 
             let mut text = vec![

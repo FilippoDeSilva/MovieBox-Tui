@@ -367,3 +367,128 @@ fn notification_style(
         NotificationKind::Error => ("ERROR", theme.error),
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateModalLayout {
+    pub popup_area: Rect,
+    pub display_count: usize,
+    pub has_more: bool,
+    pub button_row_y: u16,
+    pub open_button_midpoint_x: u16,
+}
+
+pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
+    let note_lines_count = notes
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .count();
+
+    let min_w: u16 = 46;
+    let max_w: u16 = 72;
+    let desired_w = max_w.min(area.width.saturating_sub(4)).max(min_w);
+
+    let header_rows: u16 = 5;
+    let footer_rows: u16 = 3;
+    let available_height = area.height.saturating_sub(4);
+    let available_note_rows =
+        (available_height.saturating_sub(header_rows + footer_rows) as usize).clamp(2, 10);
+
+    let display_count = note_lines_count.min(available_note_rows);
+    let has_more = note_lines_count > display_count;
+    let total_rows =
+        header_rows + (display_count as u16) + (if has_more { 1 } else { 0 }) + footer_rows;
+    let desired_h = total_rows.clamp(10, available_height.max(10));
+
+    let popup_area = centered(area, desired_w, desired_h, min_w, max_w);
+    let button_row_y = popup_area.y + popup_area.height.saturating_sub(2);
+    let open_button_midpoint_x = popup_area.x + popup_area.width / 2;
+
+    UpdateModalLayout {
+        popup_area,
+        display_count,
+        has_more,
+        button_row_y,
+        open_button_midpoint_x,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_modal_mouse_hitbox_matches_rendered_geometry() {
+        let area = Rect::new(0, 0, 80, 24);
+        let notes = "Line 1\nLine 2\nLine 3\nLine 4";
+        let layout = update_modal_layout(area, notes);
+
+        assert_eq!(layout.popup_area.width, 72);
+        assert_eq!(layout.display_count, 4);
+        assert!(!layout.has_more);
+        assert_eq!(layout.popup_area.height, 12);
+        assert_eq!(layout.popup_area.x, (80 - 72) / 2);
+        assert_eq!(layout.popup_area.y, (24 - 12) / 2);
+        assert_eq!(layout.button_row_y, layout.popup_area.y + 10);
+        assert_eq!(layout.open_button_midpoint_x, layout.popup_area.x + 36);
+    }
+
+    #[test]
+    fn test_update_modal_open_release_click() {
+        let area = Rect::new(0, 0, 80, 24);
+        let notes = "### Highlights\n- Feature A\n- Feature B";
+        let layout = update_modal_layout(area, notes);
+
+        let click_x = layout.popup_area.x + 5;
+        let click_y = layout.button_row_y;
+
+        assert!(
+            layout
+                .popup_area
+                .contains(ratatui::layout::Position::new(click_x, click_y))
+        );
+        assert_eq!(click_y, layout.button_row_y);
+        assert!(click_x < layout.open_button_midpoint_x);
+    }
+
+    #[test]
+    fn test_update_modal_dismiss_click() {
+        let area = Rect::new(0, 0, 80, 24);
+        let notes = "Feature A";
+        let layout = update_modal_layout(area, notes);
+
+        let dismiss_x = layout.open_button_midpoint_x + 5;
+        let dismiss_y = layout.button_row_y;
+
+        assert!(
+            layout
+                .popup_area
+                .contains(ratatui::layout::Position::new(dismiss_x, dismiss_y))
+        );
+        assert_eq!(dismiss_y, layout.button_row_y);
+        assert!(dismiss_x >= layout.open_button_midpoint_x);
+
+        let outside_x = layout.popup_area.x.saturating_sub(2);
+        let outside_y = layout.popup_area.y.saturating_sub(2);
+        assert!(
+            !layout
+                .popup_area
+                .contains(ratatui::layout::Position::new(outside_x, outside_y))
+        );
+    }
+
+    #[test]
+    fn test_update_modal_geometry_bounds_various_screens() {
+        let notes = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11";
+
+        let compact = update_modal_layout(Rect::new(0, 0, 40, 15), notes);
+        assert!(compact.popup_area.width <= 38);
+        assert!(compact.popup_area.height <= 13);
+        assert!(compact.has_more);
+
+        let large = update_modal_layout(Rect::new(0, 0, 160, 50), notes);
+        assert_eq!(large.popup_area.width, 72);
+        assert_eq!(large.display_count, 10);
+        assert!(large.has_more);
+    }
+}

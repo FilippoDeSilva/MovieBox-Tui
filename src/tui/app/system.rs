@@ -340,14 +340,23 @@ impl App {
             }
 
             Action::CheckForUpdates => {
+                if self.state.is_checking_updates {
+                    return None;
+                }
+                self.state.is_checking_updates = true;
                 let update_sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    let result = crate::tui::updater::check(env!("CARGO_PKG_VERSION")).await;
+                    let task = tokio::spawn(crate::tui::updater::check(env!("CARGO_PKG_VERSION")));
+                    let result = match task.await {
+                        Ok(res) => res,
+                        Err(join_err) => Err(format!("update check task error: {join_err}")),
+                    };
                     update_sender.send(Action::UpdateAvailable(result)).ok();
                 });
             }
 
             Action::UpdateAvailable(result) => {
+                self.state.is_checking_updates = false;
                 self.state.last_update_check = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
