@@ -26,7 +26,7 @@ fn dummy_history_item(
         release_year: release_year.to_string(),
         season,
         episode,
-        timestamp: 1700000000,
+        timestamp: 1000,
         duration_seconds: duration,
         progress_seconds: progress,
         completed,
@@ -309,7 +309,7 @@ fn test_reconciliation_from_lua_tracker_state_files() {
         progress_seconds: 3600,
         duration_seconds: Some(3600),
         completed: true,
-        timestamp: 1000,
+        timestamp: 1100,
     };
     let state_file_1 = temp_dir.path().join("moviebox_show_alpha_1_1.json");
     std::fs::write(&state_file_1, serde_json::to_string(&state1).unwrap()).unwrap();

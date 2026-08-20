@@ -454,94 +454,99 @@ impl HistoryManager {
             return false;
         };
 
-        let mut modified = false;
+        let mut pending_files = Vec::new();
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("json") {
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(state) = serde_json::from_str::<PendingPlaybackState>(&content) {
-                        let key = Self::key(
-                            &state.provider,
-                            &state.subject_id,
-                            state.season,
-                            state.episode,
-                        );
-
-                        if state.completed {
-                            if self.watched.insert(key.clone()) {
-                                modified = true;
-                            }
-                        }
-
-                        if let Some(existing) = self.recent.iter_mut().find(|i| {
-                            let same_provider =
-                                crate::providers::models::ProviderKind::parse(&i.provider)
-                                    .zip(crate::providers::models::ProviderKind::parse(
-                                        &state.provider,
-                                    ))
-                                    .map_or_else(
-                                        || {
-                                            i.provider
-                                                .trim()
-                                                .eq_ignore_ascii_case(state.provider.trim())
-                                        },
-                                        |(p1, p2)| p1 == p2,
-                                    );
-                            if !same_provider {
-                                return false;
-                            }
-                            if i.subject_id == state.subject_id {
-                                if i.stype == 1 {
-                                    return true;
-                                }
-                                return i.season == state.season && i.episode == state.episode;
-                            }
-                            false
-                        }) {
-                            existing.progress_seconds = state.progress_seconds;
-                            existing.duration_seconds = state.duration_seconds;
-                            existing.completed = state.completed;
-                            existing.timestamp = state.timestamp;
-                            if !existing.completed {
-                                self.watched.remove(&key);
-                            }
-                            modified = true;
-                        } else if let Some(existing_series) = self.recent.iter_mut().find(|i| {
-                            let same_provider =
-                                crate::providers::models::ProviderKind::parse(&i.provider)
-                                    .zip(crate::providers::models::ProviderKind::parse(
-                                        &state.provider,
-                                    ))
-                                    .map_or_else(
-                                        || {
-                                            i.provider
-                                                .trim()
-                                                .eq_ignore_ascii_case(state.provider.trim())
-                                        },
-                                        |(p1, p2)| p1 == p2,
-                                    );
-                            same_provider && i.stype == 2 && i.subject_id == state.subject_id
-                        }) {
-                            if (state.season, state.episode)
-                                >= (existing_series.season, existing_series.episode)
-                                && state.timestamp >= existing_series.timestamp
-                            {
-                                existing_series.season = state.season;
-                                existing_series.episode = state.episode;
-                                existing_series.progress_seconds = state.progress_seconds;
-                                existing_series.duration_seconds = state.duration_seconds;
-                                existing_series.completed = state.completed;
-                                existing_series.timestamp = state.timestamp;
-                                if !existing_series.completed {
-                                    self.watched.remove(&key);
-                                }
-                                modified = true;
-                            }
-                        }
+                        pending_files.push((path, state));
                     }
                 }
-                let _ = fs::remove_file(&path);
             }
+        }
+
+        pending_files.sort_by_key(|(_, s)| s.timestamp);
+
+        let mut modified = false;
+        for (path, state) in pending_files {
+            let key = Self::key(
+                &state.provider,
+                &state.subject_id,
+                state.season,
+                state.episode,
+            );
+
+            if state.completed {
+                if self.watched.insert(key.clone()) {
+                    modified = true;
+                }
+            }
+
+            if let Some(existing) = self.recent.iter_mut().find(|i| {
+                let same_provider = crate::providers::models::ProviderKind::parse(&i.provider)
+                    .zip(crate::providers::models::ProviderKind::parse(
+                        &state.provider,
+                    ))
+                    .map_or_else(
+                        || {
+                            i.provider
+                                .trim()
+                                .eq_ignore_ascii_case(state.provider.trim())
+                        },
+                        |(p1, p2)| p1 == p2,
+                    );
+                if !same_provider {
+                    return false;
+                }
+                if i.subject_id == state.subject_id {
+                    if i.stype == 1 {
+                        return true;
+                    }
+                    return i.season == state.season && i.episode == state.episode;
+                }
+                false
+            }) {
+                existing.progress_seconds = state.progress_seconds;
+                existing.duration_seconds = state.duration_seconds;
+                existing.completed = state.completed;
+                existing.timestamp = state.timestamp;
+                if !existing.completed {
+                    self.watched.remove(&key);
+                }
+                modified = true;
+            } else if let Some(existing_series) = self.recent.iter_mut().find(|i| {
+                let same_provider = crate::providers::models::ProviderKind::parse(&i.provider)
+                    .zip(crate::providers::models::ProviderKind::parse(
+                        &state.provider,
+                    ))
+                    .map_or_else(
+                        || {
+                            i.provider
+                                .trim()
+                                .eq_ignore_ascii_case(state.provider.trim())
+                        },
+                        |(p1, p2)| p1 == p2,
+                    );
+                same_provider && i.stype == 2 && i.subject_id == state.subject_id
+            }) {
+                if (state.season, state.episode)
+                    >= (existing_series.season, existing_series.episode)
+                    && state.timestamp >= existing_series.timestamp
+                {
+                    existing_series.season = state.season;
+                    existing_series.episode = state.episode;
+                    existing_series.progress_seconds = state.progress_seconds;
+                    existing_series.duration_seconds = state.duration_seconds;
+                    existing_series.completed = state.completed;
+                    existing_series.timestamp = state.timestamp;
+                    if !existing_series.completed {
+                        self.watched.remove(&key);
+                    }
+                    modified = true;
+                }
+            }
+            let _ = fs::remove_file(&path);
         }
 
         modified
