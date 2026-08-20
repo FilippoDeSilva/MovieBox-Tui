@@ -4,7 +4,7 @@
 
 ### Added
 - **Comprehensive QA & Regression Test Architecture**:
-  - Introduced a 78-test automated suite covering critical algorithmic boundaries, end-to-end user journeys, content & metadata loading pipelines, stale request isolation, active player session lifecycle & duplicate launch protection, dynamic slash command autocomplete (`/download-dir reset`), search/command draft cancellation via `Esc`, error handling, addon manifest validation, mouse interactions, modal dismissals, TUI rendering across terminal size matrices, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
+  - Introduced an 83-test automated suite covering critical algorithmic boundaries, end-to-end user journeys, watch history reconciliation & precision progress tracking, content & metadata loading pipelines, stale request isolation, active player session lifecycle & duplicate launch protection, dynamic slash command autocomplete (`/download-dir reset`), search/command draft cancellation via `Esc`, error handling, addon manifest validation, mouse interactions, modal dismissals, TUI rendering across terminal size matrices, state reconciliation, crypto HMAC signing, download chunk arithmetic, and URL/stem security.
   - Added structured integration tests in `tests/` (`content_pipeline.rs`, `error_handling.rs`, `tui_acceptance.rs`, `history_reconciliation.rs`, `cache_lifecycle.rs`, `player_integration.rs`, `m3u_integration.rs`, `addons_manifest.rs`, `download_integration.rs`, `url_security.rs`) and test fixtures (`tests/fixtures/`).
   - Added [`docs/testing.md`](docs/testing.md) detailing test architecture, command references, and manual QA procedures.
 - **Playback Tracking & Watch History Progress**:

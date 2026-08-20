@@ -89,19 +89,16 @@ fn test_search_result_identity_and_similar_title_isolation() {
 
     assert_eq!(subjects.len(), 3);
 
-    // Verify item 1 (Batman 1989)
     assert_eq!(subjects[0]["subjectId"], "tt0096895");
     assert_eq!(subjects[0]["title"], "Batman");
     assert_eq!(subjects[0]["subjectType"], 1);
     assert_eq!(subjects[0]["releaseDate"], "1989");
 
-    // Verify item 2 (The Batman 2022)
     assert_eq!(subjects[1]["subjectId"], "tt1877830");
     assert_eq!(subjects[1]["title"], "The Batman");
     assert_eq!(subjects[1]["subjectType"], 1);
     assert_eq!(subjects[1]["releaseDate"], "2022");
 
-    // Verify item 3 (Batman: The Animated Series - Series stype=2)
     assert_eq!(subjects[2]["subjectId"], "tt0103359");
     assert_eq!(subjects[2]["title"], "Batman: The Animated Series");
     assert_eq!(subjects[2]["subjectType"], 2);
@@ -115,7 +112,6 @@ async fn test_stale_details_response_protection() {
     app.state_mut().active_provider = ProviderKind::MovieBox;
     app.state_mut().active_screen = Screen::Details;
 
-    // Simulate opening Movie A (id = "movie_a", request_id = 1)
     let context_a = RequestContext {
         provider: ProviderKind::MovieBox,
         generation: app.state().provider_generation,
@@ -127,7 +123,6 @@ async fn test_stale_details_response_protection() {
         "title": "Movie A",
     }));
 
-    // Immediately user opens Movie B (id = "movie_b", request_id = 2)
     let context_b = RequestContext {
         provider: ProviderKind::MovieBox,
         generation: app.state().provider_generation,
@@ -139,7 +134,6 @@ async fn test_stale_details_response_protection() {
         "title": "Movie B Draft",
     }));
 
-    // Now Movie A's stale response arrives with request_id = 1
     let stale_payload = serde_json::json!({
         "id": "movie_a",
         "title": "Movie A Full Metadata",
@@ -147,20 +141,18 @@ async fn test_stale_details_response_protection() {
     });
     app.handle_action(Action::DetailsSuccess(
         context_a,
-        1, // Stale request ID
+        1,
         "movie_a".to_string(),
         stale_payload,
     ))
     .await;
 
-    // Verify Movie A was REJECTED and did NOT overwrite Movie B
     assert_eq!(app.state().active_subject_id.as_deref(), Some("movie_b"));
     assert_eq!(
         app.state().selected_details.as_ref().unwrap()["title"],
         "Movie B Draft"
     );
 
-    // Now Movie B's legitimate response arrives with request_id = 2
     let valid_payload = serde_json::json!({
         "id": "movie_b",
         "title": "Movie B Full Metadata",
@@ -168,13 +160,12 @@ async fn test_stale_details_response_protection() {
     });
     app.handle_action(Action::DetailsSuccess(
         context_b,
-        2, // Current request ID
+        2,
         "movie_b".to_string(),
         valid_payload,
     ))
     .await;
 
-    // Verify Movie B was ACCEPTED
     assert_eq!(app.state().active_subject_id.as_deref(), Some("movie_b"));
     assert_eq!(
         app.state().selected_details.as_ref().unwrap()["title"],
@@ -192,7 +183,6 @@ fn test_cache_key_isolation_across_providers_queries_and_dimensions() {
         get_provider_details_path, get_provider_search_path, get_provider_stream_path,
     };
 
-    // 1. Search paths isolation across providers, queries, and pages
     let search_mb_batman_p1 = get_provider_search_path(ProviderKind::MovieBox, "batman", 1);
     let search_mb_batman_p2 = get_provider_search_path(ProviderKind::MovieBox, "batman", 2);
     let search_mb_superman_p1 = get_provider_search_path(ProviderKind::MovieBox, "superman", 1);
@@ -202,7 +192,6 @@ fn test_cache_key_isolation_across_providers_queries_and_dimensions() {
     assert_ne!(search_mb_batman_p1, search_mb_superman_p1);
     assert_ne!(search_mb_batman_p1, search_addon_batman_p1);
 
-    // 2. Details paths isolation across providers and IDs
     let details_mb_1 = get_provider_details_path(ProviderKind::MovieBox, "1001");
     let details_mb_2 = get_provider_details_path(ProviderKind::MovieBox, "1002");
     let details_4k_1 = get_provider_details_path(ProviderKind::FourKHdHub, "1001");
@@ -210,7 +199,6 @@ fn test_cache_key_isolation_across_providers_queries_and_dimensions() {
     assert_ne!(details_mb_1, details_mb_2);
     assert_ne!(details_mb_1, details_4k_1);
 
-    // 3. Stream paths isolation across seasons and episodes
     let stream_s1_e1 = get_provider_stream_path(ProviderKind::MovieBox, "series_1", 1, 1);
     let stream_s1_e2 = get_provider_stream_path(ProviderKind::MovieBox, "series_1", 1, 2);
     let stream_s2_e1 = get_provider_stream_path(ProviderKind::MovieBox, "series_1", 2, 1);
@@ -221,7 +209,6 @@ fn test_cache_key_isolation_across_providers_queries_and_dimensions() {
 
 #[test]
 fn test_addon_metadata_mapping_and_partial_data_degradation() {
-    // Minimal MetaDetail with missing optional fields
     let minimal = MetaDetail {
         id: "tt9999999".to_string(),
         r#type: "movie".to_string(),
@@ -257,7 +244,6 @@ fn test_addon_metadata_mapping_and_partial_data_degradation() {
     assert!(json_output["director"].is_null());
     assert!(json_output["stars"].is_null());
 
-    // Series with decomposed multi-season video records
     let series_detail = MetaDetail {
         id: "tt8888888".to_string(),
         r#type: "series".to_string(),
@@ -344,7 +330,6 @@ async fn test_search_failure_vs_empty_result_distinction() {
         generation: app.state().provider_generation,
     };
 
-    // Case 1: Search succeeds with 0 results
     app.handle_action(Action::SearchSuccess {
         context,
         request_id: app.state().active_search_request,
@@ -362,7 +347,6 @@ async fn test_search_failure_vs_empty_result_distinction() {
     assert!(app.state().search_error.is_none());
     assert!(!app.state().is_loading);
 
-    // Case 2: Search fails due to network outage
     app.handle_action(Action::SearchFailure(
         context,
         app.state().active_search_request,
@@ -393,12 +377,10 @@ async fn test_mode_switch_stale_response_protection() {
     app.state_mut().active_search_request = 1;
     app.state_mut().search_query = "avatar".to_string();
 
-    // User switches mode to Addon Mode while MovieBox search is in-flight
     app.handle_action(Action::ToggleAddonMode).await;
     assert_eq!(app.state().mode(), AppMode::Addon);
     assert_ne!(app.state().provider_generation, streaming_generation);
 
-    // Now MovieBox search response arrives with previous generation context
     let moviebox_payload = serde_json::json!({
         "results": [{
             "subjects": [{
@@ -420,7 +402,6 @@ async fn test_mode_switch_stale_response_protection() {
     })
     .await;
 
-    // Stale streaming search MUST NOT leak into Addon Mode
     assert!(app.state().search_results.is_empty());
 }
 
@@ -434,23 +415,19 @@ async fn test_poster_identity_isolation() {
 
     let dynamic_img = std::sync::Arc::new(image::DynamicImage::new_rgb8(10, 10));
 
-    // Stale poster for a different movie arrives
     app.handle_action(Action::PosterSuccess(
         "other_movie_id".to_string(),
         dynamic_img.clone(),
     ))
     .await;
 
-    // Target movie's poster remains untouched (None)
     assert!(app.state().poster_image.is_none());
 
-    // Legitimate poster for target movie arrives
     app.handle_action(Action::PosterSuccess(
         "target_movie_id".to_string(),
         dynamic_img.clone(),
     ))
     .await;
 
-    // Poster is now populated
     assert!(app.state().poster_image.is_some());
 }

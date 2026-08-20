@@ -71,3 +71,90 @@ fn test_history_reconciliation_multi_episode_flow() {
     assert!(!state_file_ep1.exists());
     assert!(!state_file_ep2.exists());
 }
+
+#[test]
+fn test_movie_resume_progress_and_completion() {
+    let mut movie = make_history_item("moviebox", "mb_m1", "Inception", 1, "2010", 0, 0);
+    movie.duration_seconds = Some(8880);
+    movie.progress_seconds = 20;
+    assert!(!movie.is_in_progress());
+
+    movie.progress_seconds = 4440;
+    assert!(movie.is_in_progress());
+    assert_eq!(movie.progress_percentage(), Some(50.0));
+    assert_eq!(movie.formatted_progress(), "1:14:00 / 2:28:00");
+    assert_eq!(movie.formatted_remaining(), Some("1h 14m left".to_string()));
+
+    movie.progress_seconds = 8000;
+    assert!(!movie.is_in_progress());
+}
+
+#[test]
+fn test_episode_progress_isolation() {
+    let mut manager = HistoryManager::default();
+    let ep1 = make_history_item("moviebox", "show_x", "Severance", 2, "2022", 1, 1);
+    let ep2 = make_history_item("moviebox", "show_x", "Severance", 2, "2022", 1, 2);
+    let ep3 = make_history_item("moviebox", "show_x", "Severance", 2, "2022", 2, 1);
+
+    manager.update_progress(ep1.clone(), 3000, Some(3000), true);
+    assert!(manager.is_watched("moviebox", "show_x", 1, 1));
+    assert!(!manager.is_watched("moviebox", "show_x", 1, 2));
+    assert!(!manager.is_watched("moviebox", "show_x", 2, 1));
+
+    manager.update_progress(ep2.clone(), 1500, Some(3000), false);
+    assert!(manager.is_watched("moviebox", "show_x", 1, 1));
+    assert!(!manager.is_watched("moviebox", "show_x", 1, 2));
+
+    manager.update_progress(ep3.clone(), 3200, Some(3200), true);
+    assert!(manager.is_watched("moviebox", "show_x", 1, 1));
+    assert!(manager.is_watched("moviebox", "show_x", 2, 1));
+    assert!(!manager.is_watched("moviebox", "show_x", 1, 2));
+
+    assert_eq!(manager.recent.len(), 1);
+    assert_eq!(manager.recent.first().unwrap().season, 2);
+    assert_eq!(manager.recent.first().unwrap().episode, 1);
+}
+
+#[test]
+fn test_update_progress_precision_preservation() {
+    let mut manager = HistoryManager::default();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut item = make_history_item("moviebox", "mb_m2", "Interstellar", 1, "2014", 0, 0);
+    item.duration_seconds = Some(10140);
+    item.progress_seconds = 5000;
+    item.timestamp = now;
+
+    manager.recent.push(item.clone());
+
+    let lower_item = item.clone();
+    manager.update_progress(lower_item, 3000, Some(10140), false);
+
+    assert_eq!(manager.recent.first().unwrap().progress_seconds, 5000);
+}
+
+#[test]
+fn test_duplicate_history_prevention_on_repeated_play() {
+    let mut manager = HistoryManager::default();
+    let item = make_history_item("moviebox", "mb_m3", "The Matrix", 1, "1999", 0, 0);
+
+    manager.update_progress(item.clone(), 1200, Some(8160), false);
+    manager.update_progress(item.clone(), 2400, Some(8160), false);
+    manager.update_progress(item.clone(), 3600, Some(8160), false);
+
+    assert_eq!(manager.recent.len(), 1);
+    assert_eq!(manager.recent.first().unwrap().progress_seconds, 3600);
+}
+
+#[test]
+fn test_corrupted_history_deserialization_recovery() {
+    let malformed_json = "{ \"watched\": [\"corrupt\"], \"recent\": \"invalid_shape\" }";
+    let deserialized = serde_json::from_str::<HistoryManager>(malformed_json);
+    assert!(deserialized.is_err());
+
+    let empty_json = "{}";
+    let empty_manager = serde_json::from_str::<HistoryManager>(empty_json).unwrap();
+    assert!(empty_manager.recent.is_empty());
+}

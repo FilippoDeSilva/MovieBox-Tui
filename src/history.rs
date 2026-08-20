@@ -363,14 +363,17 @@ impl HistoryManager {
             self.watched.remove(&key);
         }
 
-        if item.cover_url.is_none() {
-            if let Some(existing) = self
-                .recent
-                .iter()
-                .find(|i| Self::is_same_show(i, &item))
-                .and_then(|i| i.cover_url.clone())
+        if let Some(existing) = self.recent.iter().find(|i| Self::is_same_show(i, &item)) {
+            if item.cover_url.is_none() {
+                item.cover_url = existing.cover_url.clone();
+            }
+            if existing.season == item.season
+                && existing.episode == item.episode
+                && existing.progress_seconds >= progress
+                && (existing.timestamp >= item.timestamp
+                    || item.timestamp.saturating_sub(existing.timestamp) < 60)
             {
-                item.cover_url = Some(existing);
+                return;
             }
         }
 
@@ -503,6 +506,37 @@ impl HistoryManager {
                                 self.watched.remove(&key);
                             }
                             modified = true;
+                        } else if let Some(existing_series) = self.recent.iter_mut().find(|i| {
+                            let same_provider =
+                                crate::providers::models::ProviderKind::parse(&i.provider)
+                                    .zip(crate::providers::models::ProviderKind::parse(
+                                        &state.provider,
+                                    ))
+                                    .map_or_else(
+                                        || {
+                                            i.provider
+                                                .trim()
+                                                .eq_ignore_ascii_case(state.provider.trim())
+                                        },
+                                        |(p1, p2)| p1 == p2,
+                                    );
+                            same_provider && i.stype == 2 && i.subject_id == state.subject_id
+                        }) {
+                            if (state.season, state.episode)
+                                >= (existing_series.season, existing_series.episode)
+                                && state.timestamp >= existing_series.timestamp
+                            {
+                                existing_series.season = state.season;
+                                existing_series.episode = state.episode;
+                                existing_series.progress_seconds = state.progress_seconds;
+                                existing_series.duration_seconds = state.duration_seconds;
+                                existing_series.completed = state.completed;
+                                existing_series.timestamp = state.timestamp;
+                                if !existing_series.completed {
+                                    self.watched.remove(&key);
+                                }
+                                modified = true;
+                            }
                         }
                     }
                 }

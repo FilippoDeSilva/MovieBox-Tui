@@ -243,14 +243,16 @@ impl App {
                                     let elapsed = start_time.elapsed().as_secs();
                                     if elapsed >= 30 {
                                         let duration = item.duration_seconds;
-                                        let completed = duration.is_some_and(|d| {
-                                            d > 0 && elapsed >= (d as f64 * 0.90) as u64
-                                        });
+                                        let start_pos = resume_seconds.unwrap_or(0);
+                                        let total_pos = start_pos.saturating_add(elapsed);
                                         let progress = if let Some(d) = duration {
-                                            elapsed.min(d)
+                                            total_pos.min(d)
                                         } else {
-                                            elapsed
+                                            total_pos
                                         };
+                                        let completed = duration.is_some_and(|d| {
+                                            d > 0 && progress >= (d as f64 * 0.90) as u64
+                                        });
                                         sender
                                             .send(Action::UpdateProgress {
                                                 item,

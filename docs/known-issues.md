@@ -26,6 +26,6 @@ Tracked here so future work and issue reports reference the same facts.
 
 ## Verification
  
-- Automated testing is enforced via `cargo test --locked` covering 78 unit and integration tests across 11 test suites (see [`docs/testing.md`](testing.md)).
+- Automated testing is enforced via `cargo test --locked` covering 83 unit and integration tests across 11 test suites (see [`docs/testing.md`](testing.md)).
 - Static correctness is enforced by strict compiler type checking, the lint gate (`cargo clippy --all-targets --all-features -- -D warnings`), formatting (`cargo fmt --check`), dependency vulnerability scanning (`cargo audit`), and packaging verification (`cargo package --locked`).
 - Runtime and platform-specific behavior (terminal resize, focus handling, external player launch, and Termux chooser) are verified through the release checklist in [`release-checklist.md`](release-checklist.md).
