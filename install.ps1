@@ -25,7 +25,6 @@ if ($Help) {
 MovieBox-TUI Installer (Windows PowerShell)
 
 USAGE:
-    irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 -OutFile install.ps1; .\install.ps1 [OPTIONS]
     irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
     .\install.ps1 [OPTIONS]
 
@@ -227,6 +226,9 @@ if (-not $NoModifyPath) {
         $NewPath = if ($UserPath) { "$UserPath;$EffectiveInstallDir" } else { $EffectiveInstallDir }
         [Environment]::SetEnvironmentVariable("PATH", $NewPath, "User")
         $PathModified = $true
+    }
+    if ($env:PATH -notmatch [regex]::Escape($EffectiveInstallDir)) {
+        $env:PATH = "$env:PATH;$EffectiveInstallDir"
     }
 }
 

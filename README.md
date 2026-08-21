@@ -80,7 +80,7 @@ mkdir -p ~/.local/bin && mv moviebox-tui ~/.local/bin/
 
 Using **PowerShell**:
 ```powershell
-irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 -OutFile install.ps1; .\install.ps1
+irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
 ```
 
 Or manual installation:
