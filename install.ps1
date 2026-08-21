@@ -48,14 +48,14 @@ function Write-Err { param([string]$Message) Write-Host "  x " -ForegroundColor 
 function Print-Header {
     try { [Console]::Clear() } catch { Clear-Host }
     $Header = @"
- __  __            _      ____             _____       _ 
-|  \/  | _____   _(_) ___| __ )  _____  __|_   _|   _ (_)
-| |\/| |/ _ \ \ / / |/ _ \  _ \ / _ \ \/ /  | | | | | | |
-| |  | | (_) \ V /| |  __/ |_) | (_) >  <   | | |_| | | |
-|_|  |_|\___/ \_/ |_|\___|____/ \___/_/\_\  |_|  \__,_|_|
+ __  __            _      ____              _____ _   _ ___ 
+|  \/  | _____   _(_) ___| __ )  _____  __ |_   _| | | |_ _|
+| |\/| |/ _ \ \ / / |/ _ \  _ \ / _ \ \/ /   | | | | | || | 
+| |  | | (_) \ V /| |  __/ |_) | (_) >  <    | | | |_| || | 
+|_|  |_|\___/ \_/ |_|\___|____/ \___/_/\_\   |_|  \___/|___|
 "@
     Write-Host $Header -ForegroundColor Magenta
-    Write-Host "                           Official Installer`n" -ForegroundColor Cyan
+    Write-Host "                     Official Installer`n" -ForegroundColor Cyan
 }
 
 function Do-Uninstall {
