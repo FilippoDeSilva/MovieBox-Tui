@@ -53,13 +53,16 @@ async fn test_real_github_release_artifact_download_and_integrity() {
     let binary_meta = std::fs::metadata(&staged_binary).unwrap();
     assert!(binary_meta.len() > 1_000_000);
 
-    let output = Command::new(&staged_binary)
-        .arg("--version")
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let version_str = String::from_utf8_lossy(&output.stdout);
-    assert!(version_str.contains("moviebox-tui 0.1.12"));
+    #[cfg(target_os = "macos")]
+    {
+        let output = Command::new(&staged_binary)
+            .arg("--version")
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        assert!(version_str.contains("moviebox-tui 0.1.12"));
+    }
 }
 
 #[tokio::test]
@@ -75,6 +78,7 @@ async fn test_real_checksum_mismatch_rejection_and_cleanup() {
     assert!(res.unwrap_err().contains("checksum mismatch"));
 }
 
+#[cfg(unix)]
 #[test]
 fn test_real_binary_staging_replacement_and_version_switch() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -89,6 +93,7 @@ fn test_real_binary_staging_replacement_and_version_switch() {
     assert_eq!(std::fs::read(&current_exe).unwrap(), b"v0.1.12 new binary");
 }
 
+#[cfg(unix)]
 #[test]
 fn test_real_rollback_on_write_failure() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -106,6 +111,7 @@ fn test_real_rollback_on_write_failure() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn test_real_homebrew_detection_refusal() {
     let brew_path_1 =
@@ -125,6 +131,7 @@ fn test_real_homebrew_detection_refusal() {
     assert!(!is_homebrew_managed(user_path));
 }
 
+#[cfg(unix)]
 #[test]
 fn test_real_readonly_directory_refusal() {
     let readonly_path = std::path::Path::new("/System/Applications/moviebox-tui");
@@ -267,4 +274,17 @@ fn test_configuration_and_history_preservation() {
         std::fs::read_to_string(&history_file).unwrap(),
         original_history
     );
+}
+
+#[cfg(windows)]
+#[test]
+fn test_real_windows_update_environment() {
+    let temp = tempfile::tempdir().unwrap();
+    let current_exe = temp.path().join("moviebox-tui.exe");
+    let staged_exe = temp.path().join("moviebox_staged.exe");
+    std::fs::write(&current_exe, b"v1").unwrap();
+    std::fs::write(&staged_exe, b"v2").unwrap();
+
+    let env = detect_environment(&current_exe);
+    assert_eq!(env, InstallationEnvironment::WindowsHelper);
 }
