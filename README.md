@@ -9,7 +9,7 @@ Watch and download movies, TV shows, anime, and live TV right in your terminal â
 [![CI](https://github.com/mesamirh/MovieBox-Tui/actions/workflows/ci.yml/badge.svg)](https://github.com/mesamirh/MovieBox-Tui/actions/workflows/ci.yml)
 [![License](https://img.shields.io/crates/l/moviebox-tui.svg)](#license)
 
-<video src="https://github.com/user-attachments/assets/ebb81eaf-1788-4898-895f-575195f92ea5" alt="MovieBox-TUI" width="85%" autoplay loop muted playsinline></video>
+<video src="https://github.com/user-attachments/assets/32f0dbf5-9e1e-4218-b7c1-b63564b1b433" alt="MovieBox-TUI" width="85%" autoplay loop muted playsinline></video>
 
 </div>
 
