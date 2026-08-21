@@ -78,6 +78,14 @@
   - Added complete mouse click support for Addon Manager modal and browse popups.
 
 ### Fixed
+- **Windows MSVC Static CRT Linking (`+crt-static`)**:
+  - Configured `target-feature=+crt-static` in `.cargo/config.toml` for `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`, statically embedding the C runtime to eliminate external `VCRUNTIME140.dll` dependency and resolve `0xC0000135` (`STATUS_DLL_NOT_FOUND`) on clean Windows installations.
+- **Cross-Platform Installer Polish & Windows In-Memory Execution**:
+  - Replaced file-based execution commands in Windows documentation with the in-memory stream pipeline (`irm ... | iex`) to eliminate `PSSecurityException` execution policy blocks.
+  - Added immediate active process `$env:PATH` update in `install.ps1` so the command is recognized in the current shell session without terminal restart.
+  - Replaced rigid fixed-width boxed summary tables with responsive, borderless hero layouts across both `install.ps1` and `install.sh`, preventing broken box-drawing characters and layout overflow on narrow screens.
+- **Pending History Reconciliation Order**:
+  - Sorted pending Lua tracker state files chronologically during startup reconciliation to guarantee correct playback state replay order.
 - **MovieBox Title Sanitization (DEF-02)**:
   - Fixed destructive title truncation where leading bracket tags (`[Dub]`, `[1080p]`, `[RAW]`) and titles starting with parentheses (e.g. `(500) Days of Summer`) were stripped down to empty strings.
   - Preserved release years in parentheses (`Inception (2010)`) and added a fallback safeguard returning the trimmed original title if sanitization ever results in an empty string.

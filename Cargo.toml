@@ -2,12 +2,15 @@
 name = "moviebox-tui"
 exclude = [
     "assets/",
+    "docs/",
+    "Formula/",
     ".github/",
     ".githooks/",
-    "Formula/",
     ".cargo/",
     "install.sh",
     "install.ps1",
+    "CONTRIBUTING.md",
+    ".gitignore",
 ]
 version = "0.1.13"
 edition = "2024"
