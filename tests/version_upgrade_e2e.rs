@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use std::process::Command;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

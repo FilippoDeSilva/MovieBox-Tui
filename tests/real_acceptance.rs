@@ -1,14 +1,16 @@
 use moviebox_tui::models::NotificationKind;
 use moviebox_tui::tui::action::Action;
 use moviebox_tui::tui::app::App;
+#[cfg(unix)]
+use moviebox_tui::updater::apply::is_homebrew_managed;
 use moviebox_tui::updater::apply::{
     InstallationEnvironment, SelfUpdateOutcome, apply_staged_binary, detect_environment,
-    is_homebrew_managed,
 };
 use moviebox_tui::updater::download::{download_file, download_text};
 use moviebox_tui::updater::extract::extract_binary;
 use moviebox_tui::updater::verify::{parse_sha256sums, verify_checksum};
 use std::io::Write;
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 #[tokio::test]
