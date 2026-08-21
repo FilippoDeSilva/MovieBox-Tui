@@ -517,27 +517,22 @@ elif command -v vlc >/dev/null 2>&1; then
 fi
 
 printf "\n"
-printf "%b┌────────────────────────────────────────────────────────────┐%b\n" "$C_MUTED" "$C_RESET"
-printf "%b│%b  %b✔ MovieBox-Tui %s successfully installed!%b%*s%b│%b\n" \
-    "$C_MUTED" "$C_RESET" "$C_GREEN" "$TARGET_VERSION" "$C_RESET" \
-    $(( 28 - ${#TARGET_VERSION} )) "" "$C_MUTED" "$C_RESET"
-printf "%b│%b                                                            %b│%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET"
-printf "%b│%b  • Binary:   %b%-45s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_TEXT" "$APP_PATH" "$C_RESET" "$C_MUTED" "$C_RESET"
+printf "  %b✔ MovieBox-Tui %s successfully installed!%b\n\n" "$C_GREEN" "$TARGET_VERSION" "$C_RESET"
+printf "  %b•%b %bBinary:%b  %b%s%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_TEXT" "$APP_PATH" "$C_RESET"
 
 if [ -n "$PLAYER_DETECTED" ]; then
-    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED (ready)" "$C_RESET" "$C_MUTED" "$C_RESET"
+    printf "  %b•%b %bPlayer:%b  %b%s (ready)%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED" "$C_RESET"
 else
-    printf "%b│%b  • Player:   %b%-45s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "None detected (mpv, VLC, or IINA recommended)" "$C_RESET" "$C_MUTED" "$C_RESET"
+    printf "  %b•%b %bPlayer:%b  %bNone detected (mpv, VLC, or IINA recommended)%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "$C_RESET"
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then
-    printf "%b│%b  • Shell:    %bPATH added to %-31s%b %b│%b\n" "$C_MUTED" "$C_RESET" "$C_LAVENDER" "$SHELL_MODIFIED" "$C_RESET" "$C_MUTED" "$C_RESET"
+    printf "  %b•%b %bShell:%b   %bPATH added to %s%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_LAVENDER" "$SHELL_MODIFIED" "$C_RESET"
 fi
 
-printf "%b│%b                                                            %b│%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET"
-printf "%b│%b  To start streaming:                                       %b│%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET"
-printf "%b│%b    %b$ moviebox-tui%b                                         %b│%b\n" "$C_MUTED" "$C_RESET" "$C_GREEN" "$C_RESET" "$C_MUTED" "$C_RESET"
-printf "%b└────────────────────────────────────────────────────────────┘%b\n\n" "$C_MUTED" "$C_RESET"
+printf "\n"
+printf "  %bTo start streaming:%b\n" "$C_TEXT" "$C_RESET"
+printf "    %b$ moviebox-tui%b\n\n" "$C_GREEN" "$C_RESET"
 
 if [ -z "$PLAYER_DETECTED" ]; then
     printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_SAPPHIRE" "$C_RESET"

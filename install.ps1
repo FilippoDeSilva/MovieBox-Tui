@@ -240,34 +240,27 @@ if (Get-Command "mpv" -ErrorAction SilentlyContinue) {
 }
 
 Write-Host ""
-Write-Host "┌────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
-Write-Host "│  " -ForegroundColor DarkGray -NoNewline
-Write-Host "✔ MovieBox-Tui $TargetVersion successfully installed!" -ForegroundColor Green -NoNewline
-$PadLen = 58 - 36 - $TargetVersion.Length
-if ($PadLen -gt 0) { Write-Host (" " * $PadLen) -NoNewline }
-Write-Host "│" -ForegroundColor DarkGray
-Write-Host "│                                                            │" -ForegroundColor DarkGray
-Write-Host "│  • Binary:   " -ForegroundColor DarkGray -NoNewline
+Write-Host "  ✔ MovieBox-Tui $TargetVersion successfully installed!" -ForegroundColor Green
+Write-Host ""
+Write-Host "  • Binary:  " -ForegroundColor DarkGray -NoNewline
 Write-Host $ExePath -ForegroundColor White
 
 if ($PlayerDetected) {
-    Write-Host "│  • Player:   " -ForegroundColor DarkGray -NoNewline
+    Write-Host "  • Player:  " -ForegroundColor DarkGray -NoNewline
     Write-Host "$PlayerDetected (ready)" -ForegroundColor Green
 } else {
-    Write-Host "│  • Player:   " -ForegroundColor DarkGray -NoNewline
+    Write-Host "  • Player:  " -ForegroundColor DarkGray -NoNewline
     Write-Host "None detected (mpv or VLC recommended)" -ForegroundColor Cyan
 }
 
 if ($PathModified) {
-    Write-Host "│  • Shell:    " -ForegroundColor DarkGray -NoNewline
+    Write-Host "  • Shell:   " -ForegroundColor DarkGray -NoNewline
     Write-Host "PATH updated in User Environment" -ForegroundColor Magenta
 }
 
-Write-Host "│                                                            │" -ForegroundColor DarkGray
-Write-Host "│  To start streaming:                                       │" -ForegroundColor DarkGray
-Write-Host "│    " -ForegroundColor DarkGray -NoNewline
-Write-Host "$ moviebox-tui" -ForegroundColor Green
-Write-Host "└────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  To start streaming:" -ForegroundColor White
+Write-Host "    $ moviebox-tui" -ForegroundColor Green
 Write-Host ""
 
 if (-not $PlayerDetected) {
@@ -275,5 +268,6 @@ if (-not $PlayerDetected) {
 }
 
 if ($PathModified) {
-    Write-Host "  ℹ Restart your terminal window for the updated PATH to take effect.`n" -ForegroundColor Cyan
+    Write-Host "  ℹ Restart your terminal window for the updated PATH to take effect in other sessions.`n" -ForegroundColor Cyan
 }
+
