@@ -5,6 +5,7 @@ exclude = [
     ".github/",
     ".githooks/",
     "Formula/",
+    ".cargo/",
     "install.sh",
     "install.ps1",
 ]
