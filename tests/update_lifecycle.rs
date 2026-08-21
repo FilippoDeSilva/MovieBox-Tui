@@ -331,12 +331,14 @@ fn test_environment_detection() {
         InstallationEnvironment::DirectReplace
             | InstallationEnvironment::Homebrew
             | InstallationEnvironment::ReadOnly
+            | InstallationEnvironment::WindowsHelper
     ));
     let writable = is_writable(&current_exe);
     assert!(
         writable
             || env == InstallationEnvironment::ReadOnly
             || env == InstallationEnvironment::Homebrew
+            || env == InstallationEnvironment::WindowsHelper
     );
 }
 
@@ -350,7 +352,9 @@ fn test_binary_replacement_and_rollback_on_failure() {
     std::fs::write(&staged_exe, b"new v2").unwrap();
 
     let outcome = apply_staged_binary(&staged_exe, &current_exe).unwrap();
-    if outcome == SelfUpdateOutcome::Success {
+    assert_eq!(outcome, SelfUpdateOutcome::Success);
+    #[cfg(unix)]
+    {
         assert_eq!(std::fs::read(&current_exe).unwrap(), b"new v2");
     }
 }

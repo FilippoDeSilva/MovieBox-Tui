@@ -123,20 +123,20 @@ async fn test_genuine_end_to_end_version_upgrade_0_1_12_to_0_1_13() {
     let v0_1_13_binary_source = temp_dir.path().join("moviebox_v0_1_13_source");
     create_versioned_mock_executable(&v0_1_13_binary_source, "0.1.13");
 
-    let v0_1_13_archive = temp_dir.path().join("MovieBox_macOS_Universal.tar.gz");
+    let target_platform = TargetPlatform::current().unwrap();
+    let asset_name = target_platform.expected_asset_name();
+
+    let v0_1_13_archive = temp_dir.path().join(asset_name);
     package_mock_archive(&v0_1_13_binary_source, &v0_1_13_archive);
 
     let archive_bytes = std::fs::read(&v0_1_13_archive).unwrap();
     let archive_sha256 = compute_sha256(&v0_1_13_archive).unwrap();
-    let checksum_content = format!("{}  MovieBox_macOS_Universal.tar.gz\n", archive_sha256);
+    let checksum_content = format!("{}  {}\n", archive_sha256, asset_name);
     let checksum_bytes = checksum_content.as_bytes().to_vec();
 
     let shutdown_notify = Arc::new(Notify::new());
     let port =
         spawn_mock_release_server(archive_bytes, checksum_bytes, shutdown_notify.clone()).await;
-
-    let target_platform = TargetPlatform::current().unwrap();
-    let asset_name = target_platform.expected_asset_name();
 
     let release = Release {
         version: "0.1.13".to_string(),
@@ -223,9 +223,12 @@ async fn test_corrupted_upgrade_artifact_leaves_current_version_intact() {
         "moviebox-tui 0.1.12"
     );
 
+    let target_platform = TargetPlatform::current().unwrap();
+    let asset_name = target_platform.expected_asset_name();
+
     let corrupted_archive_bytes = b"CORRUPTED BYTES IN TRANSIT".to_vec();
     let valid_checksum = "43b226c381c1644e5d62ed3e40e8da0a8fb270f297ddefe31b337b9992851e6a";
-    let checksum_content = format!("{}  MovieBox_macOS_Universal.tar.gz\n", valid_checksum);
+    let checksum_content = format!("{}  {}\n", valid_checksum, asset_name);
     let checksum_bytes = checksum_content.as_bytes().to_vec();
 
     let shutdown_notify = Arc::new(Notify::new());
@@ -235,9 +238,6 @@ async fn test_corrupted_upgrade_artifact_leaves_current_version_intact() {
         shutdown_notify.clone(),
     )
     .await;
-
-    let target_platform = TargetPlatform::current().unwrap();
-    let asset_name = target_platform.expected_asset_name();
 
     let downloaded_archive = temp_dir.path().join("downloaded_corrupted.tar.gz");
     download_file(
