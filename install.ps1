@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "",
     [string]$InstallDir = "",
     [switch]$Force,
@@ -8,8 +8,8 @@ param(
     [switch]$Help
 )
 
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
 } catch {}
@@ -29,7 +29,7 @@ USAGE:
     .\install.ps1 [OPTIONS]
 
 OPTIONS:
-    -Version <tag>       Install a specific version (e.g. v0.1.12)
+    -Version <tag>       Install a specific version (e.g. v0.1.13)
     -InstallDir <path>   Install binary to a custom directory
     -Force               Reinstall even if already at the latest version
     -DryRun              Perform preflight checks without writing files
@@ -40,10 +40,10 @@ OPTIONS:
     exit 0
 }
 
-function Write-Step { param([string]$Message) Write-Host "  → " -ForegroundColor Cyan -NoNewline; Write-Host $Message }
-function Write-Success { param([string]$Message) Write-Host "  ✔ " -ForegroundColor Green -NoNewline; Write-Host $Message }
-function Write-Warn { param([string]$Message) Write-Host "  ⚠ " -ForegroundColor Yellow -NoNewline; Write-Host $Message }
-function Write-Err { param([string]$Message) Write-Host "  ✖ " -ForegroundColor Red -NoNewline; Write-Host $Message; exit 1 }
+function Write-Step { param([string]$Message) Write-Host "  > " -ForegroundColor Cyan -NoNewline; Write-Host $Message }
+function Write-Success { param([string]$Message) Write-Host "  + " -ForegroundColor Green -NoNewline; Write-Host $Message }
+function Write-Warn { param([string]$Message) Write-Host "  ! " -ForegroundColor Yellow -NoNewline; Write-Host $Message }
+function Write-Err { param([string]$Message) Write-Host "  x " -ForegroundColor Red -NoNewline; Write-Host $Message; exit 1 }
 
 function Print-Header {
     try { [Console]::Clear() } catch { Clear-Host }
@@ -122,7 +122,7 @@ if (-not $TargetVersion) {
         $Response = $Request.GetResponse()
         $Location = $Response.Headers["Location"]
         if ($Location) {
-            $TargetVersion = $Location.Split('/')[-1].Trim()
+            $TargetVersion = $Location.Split("/")[-1].Trim()
         }
         $Response.Close()
     } catch {
@@ -139,7 +139,7 @@ if (-not $TargetVersion) {
     Write-Err "Could not resolve latest release version from GitHub."
 }
 
-Write-Success "[1/4] Environment ready ($PlatformName • $TargetVersion)"
+Write-Success "[1/4] Environment ready ($PlatformName - $TargetVersion)"
 
 $EffectiveInstallDir = if ($InstallDir) { $InstallDir } else { $DefaultInstallDir }
 $ExePath = Join-Path $EffectiveInstallDir $BinName
@@ -184,7 +184,7 @@ try {
     if (-not $ChecksumLine) {
         throw "Release checksum is missing for $ArchiveName."
     }
-    $ExpectedHash = ($ChecksumLine -split '\s+')[0].Trim().ToUpper()
+    $ExpectedHash = ($ChecksumLine -split "\s+")[0].Trim().ToUpper()
     $ActualHash = (Get-FileHash -Path $ZipFile -Algorithm SHA256).Hash.Trim().ToUpper()
     if ($ActualHash -ne $ExpectedHash) {
         throw "Checksum verification failed."
@@ -240,21 +240,21 @@ if (Get-Command "mpv" -ErrorAction SilentlyContinue) {
 }
 
 Write-Host ""
-Write-Host "  ✔ MovieBox-Tui $TargetVersion successfully installed!" -ForegroundColor Green
+Write-Host "  + MovieBox-Tui $TargetVersion successfully installed!" -ForegroundColor Green
 Write-Host ""
-Write-Host "  • Binary:  " -ForegroundColor DarkGray -NoNewline
+Write-Host "  - Binary:  " -ForegroundColor DarkGray -NoNewline
 Write-Host $ExePath -ForegroundColor White
 
 if ($PlayerDetected) {
-    Write-Host "  • Player:  " -ForegroundColor DarkGray -NoNewline
+    Write-Host "  - Player:  " -ForegroundColor DarkGray -NoNewline
     Write-Host "$PlayerDetected (ready)" -ForegroundColor Green
 } else {
-    Write-Host "  • Player:  " -ForegroundColor DarkGray -NoNewline
+    Write-Host "  - Player:  " -ForegroundColor DarkGray -NoNewline
     Write-Host "None detected (mpv or VLC recommended)" -ForegroundColor Cyan
 }
 
 if ($PathModified) {
-    Write-Host "  • Shell:   " -ForegroundColor DarkGray -NoNewline
+    Write-Host "  - Shell:   " -ForegroundColor DarkGray -NoNewline
     Write-Host "PATH updated in User Environment" -ForegroundColor Magenta
 }
 
@@ -264,10 +264,9 @@ Write-Host "    $ moviebox-tui" -ForegroundColor Green
 Write-Host ""
 
 if (-not $PlayerDetected) {
-    Write-Host "  ℹ Note: A media player (mpv, VLC, or IINA) is recommended for video playback.`n" -ForegroundColor Cyan
+    Write-Host "  [i] Note: A media player (mpv, VLC, or IINA) is recommended for video playback.`n" -ForegroundColor Cyan
 }
 
 if ($PathModified) {
-    Write-Host "  ℹ Restart your terminal window for the updated PATH to take effect in other sessions.`n" -ForegroundColor Cyan
+    Write-Host "  [i] Restart your terminal window for the updated PATH to take effect in other sessions.`n" -ForegroundColor Cyan
 }
-
