@@ -32,7 +32,8 @@ MovieBox-TUI/
     ├── update_lifecycle.rs        # Update single-flight checks, modal hitboxes, & platform assets
     ├── real_acceptance.rs         # Real artifact downloads, live SHA256 integrity, & version verify
     ├── version_upgrade_e2e.rs     # Genuine 0.1.12 -> 0.1.13 end-to-end upgrade execution
-    └── addons_manifest.rs         # Addon manifest deserialization & catalog checks
+    ├── addons_manifest.rs         # Addon manifest deserialization & catalog checks
+    └── favorites_lifecycle.rs     # Favorites persistence, identity, and navigation lifecycle
 ```
 
 ### A. Inline Unit Tests (`src/**/*.rs`)
@@ -53,6 +54,7 @@ Integration tests live in the `tests/` directory and test externally observable 
 - **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, end-to-end user journeys (search, details, navigation, mode switching), mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.
 - **`history_reconciliation.rs`**: Validates `HistoryManager::is_same_show`, media type separation (Movies vs TV Series), remake year distinction, and state file reconciliation (MISS-01).
 - **`history_audit.rs`**: Validates cross-mode watch progress, series advancement and completion tracking, threshold boundaries for in-progress states, history disk persistence roundtrips, Lua tracker reconciliation, and `/history` search list integration.
+- **`favorites_lifecycle.rs`**: Validates Favorites persistence boundaries, identity deduplication, `/favorites` loading, landing-row navigation, and independence from watch-history clearing.
 - **`cache_lifecycle.rs`**: Validates atomic file writing (both sync and async) and deterministic MD5 cache key generation.
 - **`player_integration.rs`**: Validates MPV script options path sanitization on Windows (`\` $\rightarrow$ `/`) and Unix.
 - **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
