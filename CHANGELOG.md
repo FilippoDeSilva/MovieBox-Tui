@@ -20,8 +20,6 @@
 - **Release artifact smoke tests**: Execute each native release target's produced binary on its CI runner before archiving.
 - **Documentation accuracy**: Document Android intent limitations, the actual Termux binary model, macOS-only IINA support, native runtime verification requirements, and the current automated test count.
 - **Termux dependency path**: Remove the Android platform-verifier dependency path that caused the v0.1.12 startup panic; real-device confirmation remains required.
-- **Installer checksum handling**: Compare SHA-256 values case-insensitively on macOS, Linux, and Termux shells.
-- **Windows installer guidance**: Make the inspectable downloaded PowerShell script the documented path instead of direct remote code execution.
 
 ## [0.1.13] - 2026-08-21
 

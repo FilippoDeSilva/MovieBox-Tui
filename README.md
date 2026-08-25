@@ -79,18 +79,16 @@ mkdir -p ~/.local/bin && mv moviebox-tui ~/.local/bin/
 
 ### Windows
 
-Using **PowerShell** (download the script first so you can inspect it):
+Using **PowerShell**:
 ```powershell
-Invoke-WebRequest https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 -OutFile install.ps1
-Get-Content .\install.ps1
-powershell -ExecutionPolicy Bypass -File .\install.ps1
+irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
 ```
 
 Or manual installation:
 1. Download `MovieBox_Windows_x64.zip` (or `MovieBox_Windows_arm64.zip`) from [GitHub Releases](https://github.com/mesamirh/MovieBox-Tui/releases/latest).
 2. Extract the archive and place `moviebox-tui.exe` in your PATH (e.g. `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin`).
 
-*(The Windows binaries are currently unsigned, so SmartScreen may show an "Unknown Publisher" warning. Verify the release archive against `SHA256SUMS` before running it.)*
+*(Note: If Windows SmartScreen displays an "Unknown Publisher" prompt on first launch, click **More info** → **Run anyway**)*
 
 ---
 
@@ -127,11 +125,6 @@ cargo build --release --locked
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
 ```
-
-On macOS, use `shasum -a 256 <archive-file>` and compare it with the matching
-entry in `SHA256SUMS`. On Windows PowerShell, use
-`(Get-FileHash .\MovieBox_Windows_x64.zip -Algorithm SHA256).Hash` and compare
-the result with the release entry.
 
 ```bash
 gh attestation verify <archive-file> -R mesamirh/MovieBox-Tui

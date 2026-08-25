@@ -34,9 +34,6 @@ The app probes the terminal at startup via `ratatui_image`:
 
 - Player launch on each OS (mpv/VLC/IINA/Android intent) — window sizing, subtitles,
   headers.
-- Release integrity: use `sha256sum` on Linux/Termux, `shasum -a 256` on macOS,
-  or `Get-FileHash -Algorithm SHA256` in Windows PowerShell; compare against
-  `SHA256SUMS` before executing a downloaded binary.
 - Poster rendering across Sixel (Windows Terminal, foot), Kitty, iTerm2, and basic
   non-graphics terminals.
 - TV mode with a sample M3U playlist (URL and local file).
