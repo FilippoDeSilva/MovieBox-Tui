@@ -84,6 +84,7 @@ Confirm:
 Verify on a real Termux device before calling the desktop release production-ready:
 
 - app starts normally
+- app does not reproduce the historical `rustls-platform-verifier` initialization panic
 - `Play` opens the Android chooser through `termux-open` or `/system/bin/am`
 - chosen player starts playback
 - downloads still go where the docs describe

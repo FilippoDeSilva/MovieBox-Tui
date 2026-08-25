@@ -26,7 +26,10 @@ Tracked here so future work and issue reports reference the same facts.
   are "probe trap" workers (which refuse real streaming ranges) reports
   `no playable mirrors` with the reason in the log. Not fixable in-app.
 - **Termux playback needs the device confirmed** on each release: `termux-open` /
-  `am` availability and the Android chooser behavior.
+  `am` availability and the Android chooser behavior. The historical
+  `rustls-platform-verifier` initialization panic reported for v0.1.12 is not in
+  the v0.1.13 dependency graph, but the upstream report remains open until a real
+  Termux launch is observed.
 
 ## Verification
  
