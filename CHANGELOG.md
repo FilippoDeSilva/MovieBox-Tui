@@ -17,6 +17,7 @@
 - **Season subtitles**: Remember an explicit subtitle or no-subtitle choice for every episode in a season download.
 - **Playback state safety**: Sanitize provider and subject identifiers before using them in tracker state filenames.
 - **Cross-platform release validation**: Run all-feature locked builds/tests, binary startup smoke tests, Unix and Windows installer syntax checks, and release-target builds in CI.
+- **Release artifact smoke tests**: Execute each native release target's produced binary on its CI runner before archiving.
 - **Documentation accuracy**: Document Android intent limitations, the actual Termux binary model, macOS-only IINA support, native runtime verification requirements, and the current automated test count.
 - **Installer checksum handling**: Compare SHA-256 values case-insensitively on macOS, Linux, and Termux shells.
 - **Windows installer guidance**: Make the inspectable downloaded PowerShell script the documented path instead of direct remote code execution.

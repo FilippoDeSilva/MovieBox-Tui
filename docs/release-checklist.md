@@ -19,9 +19,9 @@ cargo package --locked
 
 Confirm the entire unit and integration test suite passes on the CI host matrix
 (`docs/testing.md`). Release targets that are cross-compiled must at least build
-cleanly on the release runners; they still require native runtime checks before
-release certification. A local host without the target C/linker toolchain cannot
-substitute for that runner result.
+cleanly and pass the release workflow's target-binary `--version` smoke test; they
+still require native player/runtime checks before release certification. A local
+host without the target C/linker toolchain cannot substitute for that runner result.
 
 Confirm the main GitHub Actions workflows are green:
 
