@@ -14,6 +14,7 @@
 ### Fixed
 - **External player failure reporting**: Treat every non-zero player exit, including exits after several seconds or without stderr output, as a playback error instead of reconciling false watch progress.
 - **Search focus**: Restore Backspace on the Home screen as a reliable way to focus the search input from results or Favorites.
+- **Season subtitles**: Remember an explicit subtitle or no-subtitle choice for every episode in a season download.
 - **Playback state safety**: Sanitize provider and subject identifiers before using them in tracker state filenames.
 - **Cross-platform release validation**: Run all-feature locked builds/tests, binary startup smoke tests, Unix and Windows installer syntax checks, and release-target builds in CI.
 - **Documentation accuracy**: Document Android intent limitations, the actual Termux binary model, macOS-only IINA support, native runtime verification requirements, and the current automated test count.

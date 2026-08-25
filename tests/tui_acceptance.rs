@@ -25,6 +25,21 @@ async fn test_backspace_from_home_focuses_search_input() {
 }
 
 #[tokio::test]
+async fn test_season_download_remembers_explicit_no_subtitle_choice() {
+    let mut app = App::new();
+    app.state_mut().is_download_subtitle_popup = true;
+    app.state_mut().subtitle_list = vec![("None".to_string(), String::new())];
+    app.state_mut().subtitle_list_state.select(Some(0));
+    app.state_mut().download_queue_total = 4;
+    app.state_mut().last_search_edit =
+        std::time::Instant::now() - std::time::Duration::from_secs(1);
+
+    app.handle_action(Action::Submit).await;
+
+    assert_eq!(app.state().season_subtitle_preference, Some(None));
+}
+
+#[tokio::test]
 async fn test_tui_startup_and_home_screen_rendering() {
     let backend = TestBackend::new(100, 30);
     let mut terminal = Terminal::new(backend).unwrap();

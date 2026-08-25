@@ -108,7 +108,7 @@ impl App {
             .state
             .last_download_subtitle_language
             .take()
-            .or_else(|| self.state.season_subtitle_preference.clone());
+            .or_else(|| self.state.season_subtitle_preference.clone().flatten());
 
         self.state.is_waiting_for_download_stream = false;
         self.state.download_status = Some("Preparing download...".into());

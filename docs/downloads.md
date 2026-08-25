@@ -32,6 +32,7 @@ and length is capped.
 - **Contextual trigger**: Pressing `d` (or clicking `[Download]`) while focused on the **Seasons** pane prompts to download all episodes of the selected season. Triggering download while on the **Episodes** or **Streams** pane prompts to download only that single episode.
 - **Duplication prevention**: When starting a download or processing a season batch queue, the engine checks if the target media file is already completed on disk. Existing completed episodes are skipped.
 - A season download enqueues every episode (`download_queue`) and processes them one at a time, each resolving its stream and subtitle. Progress is reported through `Action::UpdateDownload` and the status bar; failures pause and preserve partial data.
+- Season downloads ask for the subtitle policy once per batch. The selected language, including an explicit `None` choice, is reused for every queued episode.
 
 Selected subtitle sidecars are saved next to the video using ISO 639-1 language codes (e.g. `.en.srt`, `.hi.srt`) and supported subtitle extensions (`.srt`, `.vtt`, `.ass`, `.ssa`, `.sub`).
 

@@ -153,7 +153,10 @@ pub struct AppState {
 
     pub subtitle_popup: bool,
     pub is_download_subtitle_popup: bool,
-    pub season_subtitle_preference: Option<String>,
+    /// None means the season has not chosen a subtitle policy; Some(None)
+    /// records an explicit no-subtitles choice, and Some(Some(language))
+    /// records the selected language.
+    pub season_subtitle_preference: Option<Option<String>>,
     pub last_download_subtitle_language: Option<String>,
     pub subtitle_list: Vec<(String, String)>,
     pub subtitle_list_state: ListState,

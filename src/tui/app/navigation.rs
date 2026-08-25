@@ -785,11 +785,10 @@ impl App {
                     let sub_url = self.state.subtitle_list.get(idx).map(|(_, u)| u.clone());
                     let sub_url_final = sub_url.filter(|s| !s.is_empty());
 
-                    if let Some(name) = sub_name.filter(|n| n != "None") {
-                        self.state.last_download_subtitle_language = Some(name.clone());
-                        if self.state.download_queue_total > 0 {
-                            self.state.season_subtitle_preference = Some(name);
-                        }
+                    let selected_language = sub_name.filter(|n| n != "None");
+                    self.state.last_download_subtitle_language = selected_language.clone();
+                    if self.state.download_queue_total > 0 {
+                        self.state.season_subtitle_preference = Some(selected_language);
                     }
 
                     self.action_sender

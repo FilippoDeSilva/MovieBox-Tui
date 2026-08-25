@@ -1990,16 +1990,17 @@ impl App {
                             let service = self.service.clone();
                             let sender = self.action_sender.clone();
                             let pref = self.state.season_subtitle_preference.clone();
-                            let no_pref = pref.is_none();
 
                             tokio::spawn(async move {
                                 if let Ok(res) = service.get_ext_captions(&subject_id, &rid).await {
-                                    if no_pref {
+                                    if pref.is_none() {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
-                                    } else if let Some(pref_lang) = pref {
+                                    } else if let Some(pref_lang) = pref.flatten() {
                                         let sub_url =
                                             crate::tui::state::caption_url_for(&res, &pref_lang);
                                         sender.send(Action::DownloadStream(sub_url)).ok();
+                                    } else {
+                                        sender.send(Action::DownloadStream(None)).ok();
                                     }
                                 } else {
                                     sender.send(Action::DownloadStream(None)).ok();
