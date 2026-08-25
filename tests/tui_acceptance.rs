@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use moviebox_tui::models::SearchResult;
 use moviebox_tui::providers::models::ProviderKind;
 use moviebox_tui::tui::action::Action;
@@ -6,6 +7,22 @@ use moviebox_tui::tui::state::{InputMode, Screen};
 use moviebox_tui::tui::theme::ThemeKind;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+
+#[tokio::test]
+async fn test_backspace_from_home_focuses_search_input() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().search_query = "Inception".to_string();
+    app.state_mut().favorites_focus = true;
+
+    let key = KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty());
+    app.handle_action(Action::Key(key)).await;
+
+    assert_eq!(app.state().input_mode, InputMode::Editing);
+    assert!(!app.state().favorites_focus);
+    assert_eq!(app.state().search_query, "Inception");
+}
 
 #[tokio::test]
 async fn test_tui_startup_and_home_screen_rendering() {

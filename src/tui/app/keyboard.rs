@@ -192,6 +192,22 @@ impl App {
             return None;
         }
 
+        if self.state.input_mode == InputMode::Normal
+            && self.state.active_screen == Screen::Home
+            && key.code == KeyCode::Backspace
+            && !self.state.addon_manager_popup
+            && !self.state.tv_config_popup
+        {
+            self.state.input_mode = InputMode::Editing;
+            self.state.favorites_focus = false;
+            self.state.favorites_landing_state.select(None);
+            self.state.search_suggestions.clear();
+            self.state.suggest_index = None;
+            self.state.set_status(String::new(), 150);
+            self.state.last_search_edit = std::time::Instant::now();
+            return None;
+        }
+
         match self.state.input_mode {
             InputMode::Editing => match key.code {
                 KeyCode::Esc => {
