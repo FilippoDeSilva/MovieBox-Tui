@@ -19,6 +19,7 @@
 - **Cross-platform release validation**: Run all-feature locked builds/tests, binary startup smoke tests, Unix and Windows installer syntax checks, and release-target builds in CI.
 - **Documentation accuracy**: Document Android intent limitations, the actual Termux binary model, macOS-only IINA support, native runtime verification requirements, and the current automated test count.
 - **Installer checksum handling**: Compare SHA-256 values case-insensitively on macOS, Linux, and Termux shells.
+- **Windows installer guidance**: Make the inspectable downloaded PowerShell script the documented path instead of direct remote code execution.
 
 ## [0.1.13] - 2026-08-21
 

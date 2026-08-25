@@ -79,16 +79,18 @@ mkdir -p ~/.local/bin && mv moviebox-tui ~/.local/bin/
 
 ### Windows
 
-Using **PowerShell**:
+Using **PowerShell** (download the script first so you can inspect it):
 ```powershell
-irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
+Invoke-WebRequest https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 -OutFile install.ps1
+Get-Content .\install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 Or manual installation:
 1. Download `MovieBox_Windows_x64.zip` (or `MovieBox_Windows_arm64.zip`) from [GitHub Releases](https://github.com/mesamirh/MovieBox-Tui/releases/latest).
 2. Extract the archive and place `moviebox-tui.exe` in your PATH (e.g. `%LOCALAPPDATA%\Programs\MovieBox-Tui\bin`).
 
-*(Note: If Windows SmartScreen displays an "Unknown Publisher" prompt on first launch, click **More info** → **Run anyway**)*
+*(The Windows binaries are currently unsigned, so SmartScreen may show an "Unknown Publisher" warning. Verify the release archive against `SHA256SUMS` before running it.)*
 
 ---
 

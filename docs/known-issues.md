@@ -18,6 +18,10 @@ Tracked here so future work and issue reports reference the same facts.
 
 ## Environment-dependent
 
+- **Windows release binaries are currently unsigned.** SmartScreen may show an
+  `Unknown Publisher` warning. Download the archive manually, verify its entry in
+  `SHA256SUMS`, and inspect `install.ps1` before running it; Authenticode signing
+  remains a release-infrastructure task.
 - **4KHDHub mirrors rotate and can be region/rate limited.** A file whose only mirrors
   are "probe trap" workers (which refuse real streaming ranges) reports
   `no playable mirrors` with the reason in the log. Not fixable in-app.

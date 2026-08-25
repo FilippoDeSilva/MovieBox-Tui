@@ -102,6 +102,10 @@ Spot-check:
 
 - `install.sh`
 - `install.ps1`
+- Windows installation uses the inspectable downloaded-script flow; do not publish
+  documentation that recommends `irm ... | iex`.
+- Verify the Windows archive against `SHA256SUMS` before running the binary. If
+  Authenticode signing is added, verify the signature and certificate chain too.
 - Homebrew formula install path
 
 ## Exit criteria
