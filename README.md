@@ -11,7 +11,7 @@ Watch and download movies, TV shows, anime, and live TV right in your terminal â
 
 </div>
 
-https://github.com/user-attachments/assets/60b5fab9-cf7a-4a59-9bbf-b2357c345091
+[moviebox-tui demo.mp4](https://github.com/user-attachments/assets/60b5fab9-cf7a-4a59-9bbf-b2357c345091)
 
 ## Why MovieBox-TUI?
 
