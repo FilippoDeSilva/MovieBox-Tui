@@ -94,11 +94,13 @@ Or manual installation:
 
 ### Android (Termux)
 
-Using the automated installer (installs prebuilt static ARM64 binary into `$PREFIX/bin`):
+Install Termux tools and run the automated installer:
 ```bash
+pkg update && pkg install termux-tools
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
 ```
+*(Installing `termux-tools` provides `termux-open`, allowing MovieBox-TUI to automatically launch your preferred Android video player app like VLC, MX Player, or Nova).*
 
 *(Or compile natively via Cargo: `pkg install rust && cargo install moviebox-tui --locked`)*
 

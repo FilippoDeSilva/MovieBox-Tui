@@ -19,6 +19,7 @@
 - **Cross-platform release validation**: Run all-feature locked builds/tests, binary startup smoke tests, Unix and Windows installer syntax checks, and release-target builds in CI.
 - **Release artifact smoke tests**: Execute each native release target's produced binary on its CI runner before archiving.
 - **Documentation accuracy**: Document Android intent limitations, the actual Termux binary model, macOS-only IINA support, native runtime verification requirements, and the current automated test count.
+- **Termux player opener resolution**: Resolve `termux-open`, `termux-open-url`, and `termux-am` directly in `$PREFIX/bin` and static Termux paths; remove broken `/system/bin/am` fallback in unrooted Termux that crashed with Permission Denied (exit code 126).
 - **Termux dependency path**: Remove the Android platform-verifier dependency path that caused the v0.1.12 startup panic; real-device confirmation remains required.
 
 ## [0.1.13] - 2026-08-21

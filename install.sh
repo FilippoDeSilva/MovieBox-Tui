@@ -514,6 +514,8 @@ elif command -v iina >/dev/null 2>&1 || command -v iina-cli >/dev/null 2>&1; the
     PLAYER_DETECTED="IINA"
 elif command -v vlc >/dev/null 2>&1; then
     PLAYER_DETECTED="VLC"
+elif command -v termux-open >/dev/null 2>&1; then
+    PLAYER_DETECTED="Android Player (termux-open)"
 fi
 
 printf "\n"
@@ -522,6 +524,8 @@ printf "  %b•%b %bBinary:%b  %b%s%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RE
 
 if [ -n "$PLAYER_DETECTED" ]; then
     printf "  %b•%b %bPlayer:%b  %b%s (ready)%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED" "$C_RESET"
+elif [ "$IS_TERMUX" -eq 1 ]; then
+    printf "  %b•%b %bPlayer:%b  %bNone detected (run 'pkg install termux-tools')%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "$C_RESET"
 else
     printf "  %b•%b %bPlayer:%b  %bNone detected (mpv, VLC, or IINA recommended)%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "$C_RESET"
 fi
@@ -535,7 +539,11 @@ printf "  %bTo start streaming:%b\n" "$C_TEXT" "$C_RESET"
 printf "    %b$ moviebox-tui%b\n\n" "$C_GREEN" "$C_RESET"
 
 if [ -z "$PLAYER_DETECTED" ]; then
-    printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_SAPPHIRE" "$C_RESET"
+    if [ "$IS_TERMUX" -eq 1 ]; then
+        printf "  %bℹ%b Note: Run %b'pkg install termux-tools'%b to enable video playback on Termux.\n\n" "$C_SAPPHIRE" "$C_RESET" "$C_BOLD" "$C_RESET"
+    else
+        printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_SAPPHIRE" "$C_RESET"
+    fi
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then

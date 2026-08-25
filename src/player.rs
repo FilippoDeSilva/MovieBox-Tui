@@ -56,12 +56,7 @@ pub fn detect() -> Vec<PlayerKind> {
         players.push(PlayerKind::Vlc);
     }
 
-    let is_android = cfg!(target_os = "android")
-        || std::path::Path::new("/system/bin/am").exists()
-        || executable_on_path("termux-open")
-        || executable_on_path("am");
-
-    if is_android {
+    if android_opener().is_some() {
         players.push(PlayerKind::AndroidIntent);
     }
 
@@ -124,33 +119,139 @@ fn build_player_process_command(executable: &str) -> Command {
     }
 }
 
-fn android_intent_command(url: &str) -> Command {
-    let mut command;
-    if executable_on_path("termux-open") {
-        command = Command::new("termux-open");
-        command
-            .arg("--chooser")
-            .arg("--content-type")
-            .arg("video/*")
-            .arg(url);
-    } else {
-        let am_path = if std::path::Path::new("/system/bin/am").exists() {
-            "/system/bin/am"
+enum AndroidOpener {
+    TermuxOpen(String),
+    TermuxOpenUrl(String),
+    TermuxAm(String),
+    SystemAm(String),
+}
+
+fn is_termux_env() -> bool {
+    std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
+        || Path::new("/data/data/com.termux/files/usr").exists()
+}
+
+fn android_opener() -> Option<AndroidOpener> {
+    if let Some(custom) = configured_executable("MOVIEBOX_ANDROID_PLAYER_PATH") {
+        if custom.ends_with("termux-open-url") {
+            return Some(AndroidOpener::TermuxOpenUrl(custom));
+        } else if custom.ends_with("termux-am") || custom.ends_with("/am") {
+            return Some(AndroidOpener::TermuxAm(custom));
         } else {
-            "am"
-        };
-        command = Command::new(am_path);
-        command
-            .arg("start")
-            .arg("--user")
-            .arg("0")
-            .arg("-a")
-            .arg("android.intent.action.VIEW")
-            .arg("-d")
-            .arg(url)
-            .arg("-t")
-            .arg("video/*");
+            return Some(AndroidOpener::TermuxOpen(custom));
+        }
     }
+
+    let is_termux = is_termux_env();
+
+    if let Ok(prefix) = std::env::var("PREFIX") {
+        let termux_open = format!("{prefix}/bin/termux-open");
+        if Path::new(&termux_open).is_file() {
+            return Some(AndroidOpener::TermuxOpen(termux_open));
+        }
+        let termux_open_url = format!("{prefix}/bin/termux-open-url");
+        if Path::new(&termux_open_url).is_file() {
+            return Some(AndroidOpener::TermuxOpenUrl(termux_open_url));
+        }
+        let termux_am = format!("{prefix}/bin/termux-am");
+        if Path::new(&termux_am).is_file() {
+            return Some(AndroidOpener::TermuxAm(termux_am));
+        }
+        let am_bin = format!("{prefix}/bin/am");
+        if Path::new(&am_bin).is_file() {
+            return Some(AndroidOpener::TermuxAm(am_bin));
+        }
+    }
+
+    let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
+    if Path::new(termux_open_static).is_file() {
+        return Some(AndroidOpener::TermuxOpen(termux_open_static.to_string()));
+    }
+    let termux_open_url_static = "/data/data/com.termux/files/usr/bin/termux-open-url";
+    if Path::new(termux_open_url_static).is_file() {
+        return Some(AndroidOpener::TermuxOpenUrl(
+            termux_open_url_static.to_string(),
+        ));
+    }
+    let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
+    if Path::new(termux_am_static).is_file() {
+        return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
+    }
+    let termux_am_bin_static = "/data/data/com.termux/files/usr/bin/am";
+    if Path::new(termux_am_bin_static).is_file() {
+        return Some(AndroidOpener::TermuxAm(termux_am_bin_static.to_string()));
+    }
+
+    if let Some(path) = find_in_path("termux-open") {
+        return Some(AndroidOpener::TermuxOpen(path));
+    }
+    if let Some(path) = find_in_path("termux-open-url") {
+        return Some(AndroidOpener::TermuxOpenUrl(path));
+    }
+    if let Some(path) = find_in_path("termux-am") {
+        return Some(AndroidOpener::TermuxAm(path));
+    }
+
+    if !is_termux {
+        if Path::new("/system/bin/am").is_file() {
+            return Some(AndroidOpener::SystemAm("/system/bin/am".to_string()));
+        }
+        if let Some(path) = find_in_path("am") {
+            return Some(AndroidOpener::SystemAm(path));
+        }
+    }
+
+    None
+}
+
+fn android_intent_command(url: &str) -> Command {
+    let mut command = match android_opener() {
+        Some(AndroidOpener::TermuxOpen(path)) => {
+            let mut cmd = Command::new(path);
+            cmd.arg("--chooser")
+                .arg("--content-type")
+                .arg("video/*")
+                .arg(url);
+            cmd
+        }
+        Some(AndroidOpener::TermuxOpenUrl(path)) => {
+            let mut cmd = Command::new(path);
+            cmd.arg(url);
+            cmd
+        }
+        Some(AndroidOpener::TermuxAm(path)) => {
+            let mut cmd = Command::new(path);
+            cmd.arg("start")
+                .arg("-a")
+                .arg("android.intent.action.VIEW")
+                .arg("-d")
+                .arg(url)
+                .arg("-t")
+                .arg("video/*");
+            cmd
+        }
+        Some(AndroidOpener::SystemAm(path)) => {
+            let mut cmd = Command::new(path);
+            cmd.arg("start")
+                .arg("--user")
+                .arg("0")
+                .arg("-a")
+                .arg("android.intent.action.VIEW")
+                .arg("-d")
+                .arg(url)
+                .arg("-t")
+                .arg("video/*");
+            cmd
+        }
+        None => {
+            let mut cmd = Command::new("termux-open");
+            cmd.arg("--chooser")
+                .arg("--content-type")
+                .arg("video/*")
+                .arg(url);
+            cmd
+        }
+    };
 
     command.env_remove("LD_LIBRARY_PATH");
     command.env_remove("LD_PRELOAD");
@@ -384,6 +485,10 @@ fn mpv_executable() -> Option<String> {
 
             #[cfg(target_os = "linux")]
             {
+                if let Ok(prefix) = std::env::var("PREFIX") {
+                    candidates.push(format!("{prefix}/bin/mpv"));
+                }
+                candidates.push("/data/data/com.termux/files/usr/bin/mpv".to_string());
                 if let Some(home) = dirs::home_dir() {
                     candidates.push(
                         home.join(".local/share/flatpak/exports/bin/io.mpv.Mpv")
@@ -469,6 +574,10 @@ fn vlc_executable() -> Option<String> {
 
             #[cfg(target_os = "linux")]
             {
+                if let Ok(prefix) = std::env::var("PREFIX") {
+                    candidates.push(format!("{prefix}/bin/vlc"));
+                }
+                candidates.push("/data/data/com.termux/files/usr/bin/vlc".to_string());
                 if let Some(home) = dirs::home_dir() {
                     candidates.push(
                         home.join(".local/share/flatpak/exports/bin/org.videolan.VLC")
@@ -710,5 +819,15 @@ mod tests {
             PlayerKind::Vlc,
             &[("referer".into(), "https://example.test/".into())]
         ));
+    }
+
+    #[test]
+    fn test_android_intent_command_structure() {
+        let cmd = android_intent_command("https://example.test/video.mp4");
+        let args = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(args.contains(&"https://example.test/video.mp4".to_string()));
     }
 }
