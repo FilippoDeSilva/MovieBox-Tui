@@ -463,6 +463,13 @@ install_binary() {
 
     cp "$TMP_DIR/$BIN_NAME" "$APP_PATH"
     chmod 755 "$APP_PATH"
+
+    if [ "$IS_TERMUX" -eq 1 ]; then
+        if [ -n "$PREFIX" ] && [ ! -s "$PREFIX/etc/resolv.conf" ]; then
+            mkdir -p "$PREFIX/etc" 2>/dev/null || true
+            printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > "$PREFIX/etc/resolv.conf" 2>/dev/null || true
+        fi
+    fi
 }
 
 run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary || exit 1
