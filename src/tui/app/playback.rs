@@ -184,6 +184,7 @@ impl App {
                         temporary_subtitle = Some(path);
                     }
                     Err(_) => {
+                        local_subtitle = None;
                         log::warn!(
                             "subtitle download failed for {:?} player, playing without subtitles (url was {})",
                             kind,
@@ -217,11 +218,6 @@ impl App {
             {
                 use std::os::unix::process::CommandExt;
                 command.process_group(0);
-            }
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                command.creation_flags(0x08000000);
             }
 
             match command.spawn() {

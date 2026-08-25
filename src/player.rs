@@ -320,7 +320,8 @@ fn mpv_command(
         } else {
             "--sub-file"
         };
-        command.arg(format!("{opt}={subtitle}"));
+        let sub_path = subtitle.replace('\\', "/");
+        command.arg(format!("{opt}={sub_path}"));
     }
 
     command.arg(url);
@@ -432,7 +433,8 @@ fn vlc_command(
         }
     }
     if let Some(subtitle) = subtitle {
-        command.arg(format!("--sub-file={subtitle}"));
+        let sub_path = subtitle.replace('\\', "/");
+        command.arg(format!("--sub-file={sub_path}"));
     }
 
     command.arg(url);
@@ -807,6 +809,26 @@ mod tests {
         assert_eq!(
             args.last().map(String::as_str),
             Some("https://example.test/video.m3u8")
+        );
+    }
+
+    #[test]
+    fn vlc_command_normalizes_windows_subtitle_paths() {
+        let command = vlc_command(
+            "https://example.test/video.mp4",
+            Some(r"C:\Users\User\AppData\Local\MovieBox-Tui\subs\sub.srt"),
+            &[],
+            None,
+            None,
+        );
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(
+            args.contains(
+                &"--sub-file=C:/Users/User/AppData/Local/MovieBox-Tui/subs/sub.srt".into()
+            )
         );
     }
 
