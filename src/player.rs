@@ -483,7 +483,7 @@ fn mpv_executable() -> Option<String> {
                 candidates.push("/usr/local/bin/mpv".to_string());
             }
 
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             {
                 if let Ok(prefix) = std::env::var("PREFIX") {
                     candidates.push(format!("{prefix}/bin/mpv"));
@@ -572,7 +572,7 @@ fn vlc_executable() -> Option<String> {
                 candidates.push("/usr/local/bin/vlc".to_string());
             }
 
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             {
                 if let Ok(prefix) = std::env::var("PREFIX") {
                     candidates.push(format!("{prefix}/bin/vlc"));
