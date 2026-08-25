@@ -40,14 +40,6 @@ impl Default for Config {
 
 pub const APP_NAME: &str = "moviebox-tui";
 
-/// Test-only escape hatch: several tests exercise `HistoryManager`/
-/// `FavoritesManager`/`Config` save paths directly, which write to whatever
-/// these functions return with no other isolation. Without this override
-/// those saves land on the real, shared config/data directories — on a
-/// machine where the app is also installed for actual use, that silently
-/// overwrites real user data with test fixtures. Set `MOVIEBOX_CONFIG_DIR`
-/// / `MOVIEBOX_DATA_DIR` to a throwaway directory before running `cargo
-/// test` to avoid this; production behavior (unset) is unchanged.
 pub fn config_dir() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("MOVIEBOX_CONFIG_DIR") {
         return Some(PathBuf::from(dir));

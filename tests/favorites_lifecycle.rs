@@ -26,8 +26,6 @@ fn dummy_favorite(
 
 #[test]
 fn test_favorites_path_is_outside_clear_cache_scope() {
-    // /clear-cache (crate::cache::clear_all_cache) only removes cache_dir()
-    // and data_dir()/iptv_cache. favorites.json must live outside both.
     let favorites_path = moviebox_tui::config::favorites_path().expect("favorites path");
     let cache_dir = moviebox_tui::config::cache_dir();
     let data_dir = moviebox_tui::config::data_dir().expect("data dir");

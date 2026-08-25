@@ -153,9 +153,6 @@ pub struct AppState {
 
     pub subtitle_popup: bool,
     pub is_download_subtitle_popup: bool,
-    /// None means the season has not chosen a subtitle policy; Some(None)
-    /// records an explicit no-subtitles choice, and Some(Some(language))
-    /// records the selected language.
     pub season_subtitle_preference: Option<Option<String>>,
     pub last_download_subtitle_language: Option<String>,
     pub subtitle_list: Vec<(String, String)>,
@@ -437,8 +434,6 @@ impl AppState {
         self.details_pane = DetailsPane::Streams;
     }
 
-    /// Same availability predicate `/history` and `/browse` already use:
-    /// Streaming and Addon modes only.
     pub fn favorites_available(&self) -> bool {
         (self.streaming_enabled && !self.is_tv_mode && !self.is_addon_mode)
             || (self.addons_enabled && self.is_addon_mode)
@@ -448,9 +443,6 @@ impl AppState {
         self.favorites_available() && !self.favorites.items.is_empty()
     }
 
-    /// Up to 5 most-recently-favorited titles, newest first. This is the
-    /// fixed set the landing row navigates over; the rest are reachable via
-    /// `/favorites`.
     pub fn favorites_landing_items(&self) -> Vec<&crate::favorites::FavoriteItem> {
         let mut items: Vec<&crate::favorites::FavoriteItem> = self.favorites.items.iter().collect();
         items.sort_by_key(|item| std::cmp::Reverse(item.added_at));

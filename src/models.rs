@@ -3,9 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-/// Cross-provider identity rules shared by watch history and favorites: same
-/// `stype`, same provider (canonicalized via `ProviderKind::parse`), then
-/// `subject_id` if both are non-empty, else cleaned title plus release year.
 #[derive(Debug, Clone, Copy)]
 pub struct SubjectIdentity<'a> {
     pub provider: &'a str,

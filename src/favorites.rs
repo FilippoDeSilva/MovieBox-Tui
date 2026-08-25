@@ -75,8 +75,6 @@ impl FavoritesManager {
             .any(|item| item.identity().matches(identity))
     }
 
-    /// Toggles the given item and returns `true` if it is now favorited,
-    /// `false` if it was just removed.
     pub fn toggle(&mut self, item: FavoriteItem) -> bool {
         let now_favorited = if let Some(pos) = self
             .items

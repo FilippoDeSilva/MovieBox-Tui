@@ -405,9 +405,6 @@ impl App {
         None
     }
 
-    /// Mirrors the layout math in `screens::home::render_favorites_landing`
-    /// so hitboxes stay in sync with what's drawn. Returns `true` if the
-    /// click landed inside the favorites card (handled either way).
     fn handle_favorites_landing_click(&mut self, col: u16, row: u16, area: Rect) -> bool {
         let row_count = self.state.favorites_landing_items().len() as u16;
         if row_count == 0 || area.height < 2 || area.width < 20 {
@@ -434,7 +431,6 @@ impl App {
 
         let rel_row = row - card.y;
         if rel_row == 0 {
-            // Header row; no action.
         } else if rel_row <= row_count {
             let idx = (rel_row - 1) as usize;
             let prev_selected = if self.state.favorites_focus {

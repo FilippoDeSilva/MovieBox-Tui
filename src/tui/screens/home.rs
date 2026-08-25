@@ -771,8 +771,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .split(text_area);
 
                 let title_style = if is_selected { theme.title } else { theme.text };
-                // TV channels are never favoritable (see current_favorite_candidate), so
-                // this is always false for TV mode's channel list, keeping it byte-identical.
                 let is_favorited = res.stype != 3
                     && state
                         .favorites
