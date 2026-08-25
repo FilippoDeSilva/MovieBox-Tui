@@ -128,6 +128,11 @@ cargo build --release --locked
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
+On macOS, use `shasum -a 256 <archive-file>` and compare it with the matching
+entry in `SHA256SUMS`. On Windows PowerShell, use
+`(Get-FileHash .\MovieBox_Windows_x64.zip -Algorithm SHA256).Hash` and compare
+the result with the release entry.
+
 ```bash
 gh attestation verify <archive-file> -R mesamirh/MovieBox-Tui
 ```
