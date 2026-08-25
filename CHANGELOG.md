@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Pure-Rust Async DNS Engine**: Enabled `hickory-dns` in the HTTP client so the prebuilt `musl` Linux binary resolves DNS hostnames automatically without requiring `/etc/resolv.conf`, enabling zero-configuration out-of-the-box networking on Android/Termux and minimal container environments.
+- **Termux Installer DNS Helper**: Automatically populate `$PREFIX/etc/resolv.conf` with fallback nameservers (`1.1.1.1` and `8.8.8.8`) during Termux installation.
+
 ## [0.1.14] - 2026-08-26
 
 ### Added
