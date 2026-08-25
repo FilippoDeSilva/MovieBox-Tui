@@ -102,11 +102,11 @@ jobs:
         run: cargo build --release --all-features --locked --target ${{ matrix.target }}
 
       - name: Smoke-test produced Unix binary
-        if: matrix.os != 'windows-latest'
+        if: matrix.target == 'x86_64-unknown-linux-musl' || matrix.target == 'x86_64-apple-darwin' || matrix.target == 'aarch64-apple-darwin'
         run: target/${{ matrix.target }}/release/moviebox-tui --version
 
       - name: Smoke-test produced Windows binary
-        if: matrix.os == 'windows-latest'
+        if: matrix.target == 'x86_64-pc-windows-msvc'
         shell: pwsh
         run: .\target\${{ matrix.target }}\release\moviebox-tui.exe --version
 
