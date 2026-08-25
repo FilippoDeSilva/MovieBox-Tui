@@ -56,7 +56,7 @@ USAGE:
     ./install.sh [OPTIONS]
 
 OPTIONS:
-    -v, --version <tag>    Install a specific version (e.g. v0.1.12)
+    -v, --version <tag>    Install a specific version (e.g. v0.1.13)
         --dir <path>       Install binary to a custom directory
     -f, --force            Reinstall even if already at the latest version
         --dry-run          Perform preflight checks without writing files
@@ -442,7 +442,8 @@ verify_checksum() {
         return 1
     fi
 
-    [ "$actual_sha" = "$expected_sha" ]
+    [ "$(printf '%s' "$actual_sha" | tr '[:upper:]' '[:lower:]')" = \
+        "$(printf '%s' "$expected_sha" | tr '[:upper:]' '[:lower:]')" ]
 }
 
 run_spinner "[3/4] Verifying SHA256 checksum" verify_checksum || exit 1

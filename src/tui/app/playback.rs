@@ -238,16 +238,8 @@ impl App {
 
                         let result = child.wait();
 
-                        if let Ok(status) = result {
-                            let clean_error = error_output.trim().to_string();
-                            if !status.success()
-                                && start_time.elapsed().as_secs() < 3
-                                && !clean_error.is_empty()
-                            {
-                                sender
-                                    .send(Action::PlayerCrashed(status.code(), clean_error))
-                                    .ok();
-                            } else {
+                        match result {
+                            Ok(status) if status.success() => {
                                 sender.send(Action::ReconcileHistory).ok();
 
                                 if let Some(item) = history_item {
@@ -274,6 +266,21 @@ impl App {
                                             .ok();
                                     }
                                 }
+                            }
+                            Ok(status) => {
+                                let clean_error =
+                                    clean_player_error(status.code(), error_output.trim());
+                                sender
+                                    .send(Action::PlayerCrashed(status.code(), clean_error))
+                                    .ok();
+                            }
+                            Err(error) => {
+                                sender
+                                    .send(Action::PlayerCrashed(
+                                        None,
+                                        format!("Failed waiting for player process: {error}"),
+                                    ))
+                                    .ok();
                             }
                         }
 
@@ -303,6 +310,15 @@ impl App {
             }
         });
     }
+}
+
+fn clean_player_error(code: Option<i32>, stderr: &str) -> String {
+    if !stderr.is_empty() {
+        return stderr.to_string();
+    }
+
+    code.map(|value| format!("Player exited with status code {value}."))
+        .unwrap_or_else(|| "Player exited unsuccessfully without error output.".to_string())
 }
 
 impl App {
@@ -688,5 +704,30 @@ impl App {
             _ => return None,
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_player_error;
+
+    #[test]
+    fn failed_player_with_stderr_keeps_diagnostic() {
+        assert_eq!(
+            clean_player_error(Some(1), "VLC failed to open the stream"),
+            "VLC failed to open the stream"
+        );
+    }
+
+    #[test]
+    fn failed_player_without_stderr_still_reports_failure() {
+        assert_eq!(
+            clean_player_error(Some(1), ""),
+            "Player exited with status code 1."
+        );
+        assert_eq!(
+            clean_player_error(None, ""),
+            "Player exited unsuccessfully without error output."
+        );
     }
 }

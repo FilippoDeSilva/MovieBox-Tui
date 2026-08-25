@@ -94,7 +94,29 @@ pub fn state_file_path(
     if !dir.exists() {
         let _ = fs::create_dir_all(&dir);
     }
-    let sanitized_id = subject_id.replace(['/', '\\', ':', ' '], "_");
-    let filename = format!("{provider}_{sanitized_id}_{season}_{episode}.json");
+    let sanitized_provider = sanitize_component(provider);
+    let sanitized_id = sanitize_component(subject_id);
+    let filename = format!("{sanitized_provider}_{sanitized_id}_{season}_{episode}.json");
     Some(dir.join(filename))
+}
+
+fn sanitize_component(value: &str) -> String {
+    value.replace(['/', '\\', ':', ' '], "_")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_component;
+
+    #[test]
+    fn state_file_components_are_safe_for_filenames() {
+        assert_eq!(
+            sanitize_component("provider/with\\separators"),
+            "provider_with_separators"
+        );
+        assert_eq!(
+            sanitize_component("subject:with space"),
+            "subject_with_space"
+        );
+    }
 }

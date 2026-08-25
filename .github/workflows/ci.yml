@@ -26,7 +26,10 @@ jobs:
         with:
           prefix-key: "ci-hygiene"
       - run: cargo fmt --check
-      - run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Validate Unix installer syntax
+        run: bash -n install.sh
+      - run: cargo check --all-targets --all-features --locked
+      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
       - name: Audit dependencies
         uses: taiki-e/install-action@v2
         with:
@@ -50,5 +53,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "ci-build-test-${{ matrix.os }}"
-      - run: cargo build --locked
-      - run: cargo test --locked
+      - run: cargo build --all-features --locked
+      - run: cargo test --all-features --locked
+      - name: Smoke-test binary startup
+        run: cargo run --all-features --locked -- --version
+      - name: Validate Windows installer syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }

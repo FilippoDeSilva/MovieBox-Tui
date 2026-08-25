@@ -66,21 +66,21 @@ Integration tests live in the `tests/` directory and test externally observable 
 Run the full test suite (all unit and integration tests):
 
 ```bash
-cargo test
+cargo test --all-features --locked
 ```
 
 Run only unit tests:
 
 ```bash
-cargo test --lib
+cargo test --lib --all-features --locked
 ```
 
 Run a specific integration test:
 
 ```bash
-cargo test --test history_reconciliation
-cargo test --test player_integration
-cargo test --test m3u_integration
+cargo test --test history_reconciliation --all-features --locked
+cargo test --test player_integration --all-features --locked
+cargo test --test m3u_integration --all-features --locked
 ```
 
 ---
@@ -94,10 +94,10 @@ Every commit and pull request must pass all hygiene checks:
 cargo fmt -- --check
 
 # Compiler check
-cargo check
+cargo check --all-targets --all-features --locked
 
 # Clippy linter with warnings treated as errors
-cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets --all-features --locked -- -D warnings
 
 # Security vulnerability scan
 cargo audit

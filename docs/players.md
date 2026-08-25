@@ -24,7 +24,7 @@ detected player and saves the chosen player as the next default unless
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | mpv             | `mpv --autofit=WxH --geometry=50%:50% --idle=no --keep-open=no [--start=..] [--script=..] [--script-opts=..] [--http-header-fields=..] [--sub-file=..] <url>` | Window sized to the terminal. Injects `moviebox_tracker.lua` for position tracking and resume. Flatpak mpv is launched via `flatpak run`. |
 | VLC             | `vlc --width=W --height=H --play-and-exit [--start-time=..] [--http-referrer=..] [--http-user-agent=..] [--sub-file=..] <url>`            | Supports start time resume via `--start-time`.                                                         |
-| IINA            | `iina-cli --keep-running --no-stdin --mpv-autofit=.. [--mpv-start=..] --mpv-http-header-fields=.. --mpv-sub-files=.. <url>`               | Uses the bundled `iina-cli`; falls back to `open -a IINA <url>` only if the CLI is absent.             |
+| IINA            | `iina-cli --keep-running --no-stdin --mpv-autofit=.. [--mpv-start=..] --mpv-http-header-fields=.. --mpv-sub-files=.. <url>`               | Uses the installed IINA `iina-cli`; falls back to `open -a IINA <url>` only if the CLI is absent.      |
 | Android / Proot | `termux-open --chooser --content-type video/* <url>` (or absolute `/system/bin/am start` fallback, ensuring `.so` injections are dropped) | Opens an app chooser on the device. Device-specific chooser behavior should be confirmed for each release. |
 
 Window size is derived from the live terminal size times the font cell size reported
@@ -60,4 +60,5 @@ reconciled into `history.json`.
 
 `launch_player` spawns the player with null stdin/stdout, piped stderr, and its own
 process group (Unix) or no-console flag (Windows). A blocking task reads stderr and
-reports a crash if the process exits non-zero within a few seconds with output.
+reports every non-zero process exit as a player error, including failures with no
+diagnostic output. Watch progress is reconciled only after a successful exit.

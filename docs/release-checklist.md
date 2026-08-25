@@ -11,13 +11,17 @@ Run the repository checks first:
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --all-features --locked -- -D warnings
-cargo check --locked
-cargo test --locked
+cargo check --all-targets --all-features --locked
+cargo test --all-features --locked
 cargo audit
 cargo package --locked
 ```
 
-Confirm the entire unit and integration test suite passes cleanly across all targets (`docs/testing.md`).
+Confirm the entire unit and integration test suite passes on the CI host matrix
+(`docs/testing.md`). Release targets that are cross-compiled must at least build
+cleanly on the release runners; they still require native runtime checks before
+release certification. A local host without the target C/linker toolchain cannot
+substitute for that runner result.
 
 Confirm the main GitHub Actions workflows are green:
 

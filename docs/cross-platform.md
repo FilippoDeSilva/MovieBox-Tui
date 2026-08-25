@@ -1,16 +1,21 @@
 # Cross-platform
 
-Supported: macOS, Linux, Windows, and Android (Termux). The codebase uses
+Build targets: macOS, Linux, Windows, and Android (Termux via the Linux ARM64
+binary). The codebase uses
 `crossterm` (all platforms), `ratatui`, and a couple of small per-OS branches.
+
+"Build target" does not mean every runtime integration is verified on every
+device. Desktop builds are covered by CI; external players and Termux require
+the release checks in [`release-checklist.md`](release-checklist.md).
 
 ## OS notes
 
 | Platform         | Notes                                                                                                                                                                                                                                                                                                |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS            | IINA preferred player (via bundled `iina-cli`); VLC/mpv `.app` paths detected. `process_group(0)` on spawn.                                                                                                                                                                                          |
+| macOS            | IINA preferred player (via the installed IINA `iina-cli`); VLC/mpv `.app` paths detected. `process_group(0)` on spawn.                                                                                                                                                                                |
 | Windows          | mpv/VLC detected via Program Files + `%LOCALAPPDATA%`; players spawned with `CREATE_NO_WINDOW`; path-safe file stems; static MSVC CRT linking (`+crt-static`) for zero-dependency standalone binaries. |
 | Linux            | Flatpak mpv/VLC supported (`flatpak run …`); xdg data/cache dirs.                                                                                                                                                                                                                                    |
-| Android (Termux) | Dynamic filesystem checks for `/system/bin/am` or `termux-open`; playback strips `LD_LIBRARY_PATH` and `LD_PRELOAD` before launching the chooser. Real-device chooser behavior should be confirmed separately because the release pipeline is desktop-focused; Proot/Termux X11 behavior is environment-dependent. |
+| Android (Termux) | Uses the Linux ARM64 binary and dynamically checks for `/system/bin/am` or `termux-open`; playback strips `LD_LIBRARY_PATH` and `LD_PRELOAD` before launching the chooser. Android intent playback cannot forward stream headers or attach subtitles. Real-device chooser behavior is a release prerequisite; Proot/Termux X11 behavior is unsupported unless separately tested. |
 
 ## Terminal capabilities
 
@@ -22,7 +27,7 @@ The app probes the terminal at startup via `ratatui_image`:
 
 ## Network & TLS portability
 
-- **TLS Engine**: Uses pure-Rust `rustls` with embedded Mozilla roots (`webpki-roots`) across all targets (macOS, Linux, Windows, Android/Termux), eliminating external C dependencies on OpenSSL and avoiding platform verifier crashes in Android/Termux CLI environments.
+- **TLS Engine**: Uses `rustls` with embedded Mozilla roots (`webpki-roots`) across all targets (macOS, Linux, Windows, Android/Termux). The release binary has no OpenSSL runtime dependency; the `ring` cryptography backend is compiled into the binary by the platform build toolchain.
 - **DNS Resolution**: Uses standard POSIX/WinSock system DNS (`getaddrinfo`) on all platforms, without requiring JNI or `ndk-context`.
 
 ## Things to verify per release

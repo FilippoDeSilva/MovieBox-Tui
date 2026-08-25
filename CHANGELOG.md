@@ -11,6 +11,13 @@
   - Added mouse support for the landing Favorites row (select/open rows, open the full list via the overflow line).
   - Extracted cross-provider title-identity matching into `SubjectIdentity` (`src/models.rs`), now shared by watch history and Favorites so remakes, cross-provider duplicates, and movie/series title collisions are deduplicated identically.
 
+### Fixed
+- **External player failure reporting**: Treat every non-zero player exit, including exits after several seconds or without stderr output, as a playback error instead of reconciling false watch progress.
+- **Playback state safety**: Sanitize provider and subject identifiers before using them in tracker state filenames.
+- **Cross-platform release validation**: Run all-feature locked builds/tests, binary startup smoke tests, Unix and Windows installer syntax checks, and release-target builds in CI.
+- **Documentation accuracy**: Document Android intent limitations, the actual Termux binary model, macOS-only IINA support, native runtime verification requirements, and the current automated test count.
+- **Installer checksum handling**: Compare SHA-256 values case-insensitively on macOS, Linux, and Termux shells.
+
 ## [0.1.13] - 2026-08-21
 
 ### Added

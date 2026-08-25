@@ -668,4 +668,47 @@ mod tests {
         let opts = format_mpv_script_opts("moviebox", "123", 1, 1, &unix_path);
         assert!(opts.contains("moviebox-state_file=/home/user/.local/share/moviebox-tui/playback/moviebox_123_1_1.json"));
     }
+
+    #[test]
+    fn vlc_command_preserves_supported_playback_options() {
+        let command = vlc_command(
+            "https://example.test/video.m3u8",
+            Some("/tmp/subtitle.srt"),
+            &[
+                ("Referer".into(), "https://example.test/".into()),
+                ("User-Agent".into(), "MovieBox-Test".into()),
+                ("Cookie".into(), "ignored=by-vlc-filter".into()),
+            ],
+            Some((1280, 720)),
+            Some(42),
+        );
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert!(args.contains(&"--width=1280".into()));
+        assert!(args.contains(&"--height=720".into()));
+        assert!(args.contains(&"--play-and-exit".into()));
+        assert!(args.contains(&"--start-time=42".into()));
+        assert!(args.contains(&"--http-referrer=https://example.test/".into()));
+        assert!(args.contains(&"--http-user-agent=MovieBox-Test".into()));
+        assert!(args.contains(&"--sub-file=/tmp/subtitle.srt".into()));
+        assert!(!args.iter().any(|arg| arg.starts_with("--http-cookie")));
+        assert_eq!(
+            args.last().map(String::as_str),
+            Some("https://example.test/video.m3u8")
+        );
+    }
+
+    #[test]
+    fn header_support_rejects_android_and_unsupported_vlc_headers() {
+        let headers = vec![("Cookie".into(), "session=secret".into())];
+        assert!(!supports_headers(PlayerKind::AndroidIntent, &headers));
+        assert!(!supports_headers(PlayerKind::Vlc, &headers));
+        assert!(supports_headers(
+            PlayerKind::Vlc,
+            &[("referer".into(), "https://example.test/".into())]
+        ));
+    }
 }

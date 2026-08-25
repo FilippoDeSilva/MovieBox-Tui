@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/60b5fab9-cf7a-4a59-9bbf-b2357c345091
 
 Searching and watching media through web browsers often means dealing with heavy memory usage from multiple open tabs, intrusive popups, tracking scripts, and clunky web players.
 
-**MovieBox-TUI replaces the web browser workflow with a lightweight terminal interface.** It extracts stream links directly and launches them in your preferred local media player (`mpv`, `VLC`, or `IINA`), with no ads or popups inside the application.
+**MovieBox-TUI replaces the web browser workflow with a lightweight terminal interface.** It extracts stream links directly and launches them in your preferred local media player (`mpv`, `VLC`, or macOS `IINA`), with no ads or popups inside the application.
 
 ### Quick Comparison
 
@@ -35,14 +35,14 @@ Searching and watching media through web browsers often means dealing with heavy
 
 - **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, community HTTP addons, and custom IPTV playlists).
 - **Addon Mode:** Install community HTTP addon manifests for custom catalog metadata (Cinemeta, Anime Kitsu) and direct stream resolution.
-- **Smooth Video Playback:** Plays directly in **mpv**, **VLC**, or **IINA** using your computer's hardware for smooth video.
+- **Smooth Video Playback:** Plays directly in **mpv** or **VLC**, with **IINA** available on macOS, using your computer's hardware for smooth video.
 - **Easy Downloads:** Download single episodes or entire seasons with one keypress. Completed episodes are skipped automatically.
 - **Favorites:** Star any movie or series with `*` (or `f` on the details screen) and reach it instantly from a dedicated row on the home screen, or view the full list with `/favorites`.
 - **Simple Terminal Interface:** Full keyboard and mouse support, beautiful color themes, and movie poster art.
 
 ## Installation
 
-A media player (**[mpv](https://mpv.io)**, **[VLC](https://www.videolan.org/vlc/)**, or **[IINA](https://iina.io)**) is recommended for video playback.
+A media player (**[mpv](https://mpv.io)** or **[VLC](https://www.videolan.org/vlc/)**; **[IINA](https://iina.io)** on macOS) is recommended for video playback.
 
 ### macOS
 

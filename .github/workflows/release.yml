@@ -95,11 +95,11 @@ jobs:
 
       - name: Build Linux binary
         if: matrix.os == 'ubuntu-latest'
-        run: cross build --release --locked --target ${{ matrix.target }}
+        run: cross build --release --all-features --locked --target ${{ matrix.target }}
 
       - name: Build macOS or Windows binary
         if: matrix.os != 'ubuntu-latest'
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: cargo build --release --all-features --locked --target ${{ matrix.target }}
 
       - name: Archive Unix
         if: matrix.os != 'windows-latest'
