@@ -12,7 +12,7 @@ exclude = [
     "CONTRIBUTING.md",
     ".gitignore",
 ]
-version = "0.1.13"
+version = "0.1.14"
 edition = "2024"
 description = "Terminal interface to find, download, and stream movies, TV shows, and live TV using local media players."
 repository = "https://github.com/mesamirh/MovieBox-Tui"
