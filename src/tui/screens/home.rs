@@ -1102,25 +1102,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if state.tv_config_popup {
         let rows = state.tv_manager_rows();
         let total_rows = rows.len();
-        let content_width = state
+        let longest_source_width = state
             .tv_playlists
             .iter()
             .map(|source| crate::tui::text::width(source))
             .max()
-            .unwrap_or(28)
-            .max(48)
-            .max(crate::tui::text::width(
-                "[ Add URL ] [ Add file ] [ Reload ] [ Done ]",
-            ));
-        let popup_width = 68u16
-            .max(content_width.saturating_add(6) as u16)
-            .min(area.width.saturating_sub(4));
-        let popup_height = if state.tv_input_active {
-            7u16
-        } else {
-            total_rows.min(10).saturating_add(6) as u16
-        };
-        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 74);
+            .unwrap_or(28);
+        let popup_area = crate::tui::overlay::tv_config_layout(
+            area,
+            longest_source_width,
+            total_rows,
+            state.tv_input_active,
+        );
         crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
 
         let title = format!(
@@ -1262,16 +1255,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if state.addon_manager_popup {
         let addons_count = state.installed_addons.len();
         let total_rows = state.addon_manager_rows().len();
-        let popup_width = 76u16.min(area.width.saturating_sub(4)).max(56);
-        let popup_height = if state.addon_input_active {
-            7u16
-        } else {
-            (addons_count as u16)
-                .saturating_add(6)
-                .min(area.height.saturating_sub(4))
-                .max(7)
-        };
-        let popup_area = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 80);
+        let popup_area =
+            crate::tui::overlay::addon_manager_layout(area, addons_count, state.addon_input_active);
         crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
 
         let title = format!(

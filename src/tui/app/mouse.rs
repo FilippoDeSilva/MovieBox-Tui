@@ -23,8 +23,17 @@ impl App {
 
     fn handle_overlay_mouse(&mut self, col: u16, row: u16, area: Rect) -> bool {
         if self.state.show_theme_popup {
-            let items = crate::tui::theme::AVAILABLE_THEMES;
-            match hit_test_centered_picker(area, col, row, 40, items.len(), 30, 60) {
+            let items: Vec<String> = crate::tui::theme::AVAILABLE_THEMES
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            match click_in_picker(
+                crate::tui::overlay::picker_layout(area, &items, "Apply", 32),
+                col,
+                row,
+                &self.state.theme_list_state,
+                items.len(),
+            ) {
                 Some(Some(clicked_idx)) => {
                     self.state.theme_list_state.select(Some(clicked_idx));
                     if let Some(theme_name) = items.get(clicked_idx) {
@@ -48,15 +57,26 @@ impl App {
 
         if self.state.show_browse_popup {
             let is_addon = self.state.mode() == crate::tui::state::AppMode::Addon;
-            let total_count = if is_addon {
+            let browse_items: Vec<String> = if is_addon {
                 crate::providers::addons::models::curated_catalog_presets(
                     &self.state.installed_addons,
                 )
-                .len()
+                .into_iter()
+                .map(|target| target.label)
+                .collect()
             } else {
-                BrowsePreset::ALL.len()
+                BrowsePreset::ALL
+                    .iter()
+                    .map(|preset| preset.label().to_string())
+                    .collect()
             };
-            match hit_test_centered_picker(area, col, row, 40, total_count, 30, 60) {
+            match click_in_picker(
+                crate::tui::overlay::picker_layout(area, &browse_items, "Open", 36),
+                col,
+                row,
+                &self.state.browse_list_state,
+                browse_items.len(),
+            ) {
                 Some(Some(clicked_idx)) => {
                     self.state.browse_list_state.select(Some(clicked_idx));
                     self.state.show_browse_popup = false;
@@ -111,8 +131,19 @@ impl App {
         }
 
         if self.state.player_picker_popup {
-            let count = self.state.available_players.len();
-            match hit_test_centered_picker(area, col, row, 40, count, 24, 60) {
+            let items = self
+                .state
+                .available_players
+                .iter()
+                .map(|k| k.label().to_string())
+                .collect::<Vec<_>>();
+            match click_in_picker(
+                crate::tui::overlay::picker_layout(area, &items, "Open", 24),
+                col,
+                row,
+                &self.state.player_picker_state,
+                items.len(),
+            ) {
                 Some(Some(clicked_idx)) => {
                     self.state.player_picker_state.select(Some(clicked_idx));
                     self.action_sender.send(Action::Submit).ok();
@@ -126,8 +157,30 @@ impl App {
         }
 
         if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
-            let count = self.state.subtitle_list.len().min(8);
-            match hit_test_centered_picker(area, col, row, 44, count, 30, 60) {
+            let items = self
+                .state
+                .subtitle_list
+                .iter()
+                .map(|(name, _)| {
+                    if name == "None" {
+                        "No subtitles".to_string()
+                    } else {
+                        crate::tui::text::sanitize_language_label(name)
+                    }
+                })
+                .collect::<Vec<_>>();
+            let confirm_label = if self.state.is_download_subtitle_popup {
+                "Download"
+            } else {
+                "Use"
+            };
+            match click_in_picker(
+                crate::tui::overlay::picker_layout(area, &items, confirm_label, 32),
+                col,
+                row,
+                &self.state.subtitle_list_state,
+                items.len(),
+            ) {
                 Some(Some(clicked_idx)) => {
                     self.state.subtitle_list_state.select(Some(clicked_idx));
                     self.action_sender.send(Action::Submit).ok();
@@ -142,9 +195,16 @@ impl App {
         }
 
         if self.state.show_season_download_confirm {
-            let popup = crate::tui::overlay::centered(area, 40, 6, 36, 64);
+            let summary = crate::tui::screens::details::season_confirm_summary(&self.state);
+            let longest = summary
+                .iter()
+                .map(|line| crate::tui::text::width(line))
+                .max()
+                .unwrap_or(36);
+            let popup = crate::tui::overlay::download_confirm_layout(area, summary.len(), longest);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let action_y = popup.y + 3;
+                let action_y =
+                    crate::tui::overlay::download_confirm_action_row(popup, summary.len());
                 if row == action_y {
                     let mid_x = popup.x + popup.width / 2;
                     if col < mid_x {
@@ -160,9 +220,16 @@ impl App {
         }
 
         if self.state.show_episode_download_confirm {
-            let popup = crate::tui::overlay::centered(area, 40, 6, 36, 64);
+            let summary = crate::tui::screens::details::episode_confirm_summary(&self.state);
+            let longest = summary
+                .iter()
+                .map(|line| crate::tui::text::width(line))
+                .max()
+                .unwrap_or(36);
+            let popup = crate::tui::overlay::download_confirm_layout(area, summary.len(), longest);
             if popup.contains(ratatui::layout::Position::new(col, row)) {
-                let action_y = popup.y + 3;
+                let action_y =
+                    crate::tui::overlay::download_confirm_action_row(popup, summary.len());
                 if row == action_y {
                     let mid_x = popup.x + popup.width / 2;
                     if col < mid_x {
@@ -180,26 +247,19 @@ impl App {
         if self.state.tv_config_popup {
             let rows = self.state.tv_manager_rows();
             let total_rows = rows.len();
-            let content_width = self
+            let longest_source_width = self
                 .state
                 .tv_playlists
                 .iter()
                 .map(|source| crate::tui::text::width(source))
                 .max()
-                .unwrap_or(28)
-                .max(40)
-                .max(crate::tui::text::width(
-                    "[ Add URL ] [ Add file ] [ Reload ] [ Done ]",
-                ));
-            let (popup_width, popup_height) = if self.state.tv_input_active {
-                (content_width.saturating_add(6) as u16, 6)
-            } else {
-                (
-                    content_width.saturating_add(6) as u16,
-                    total_rows.min(10).saturating_add(5) as u16,
-                )
-            };
-            let popup = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 70);
+                .unwrap_or(28);
+            let popup = crate::tui::overlay::tv_config_layout(
+                area,
+                longest_source_width,
+                total_rows,
+                self.state.tv_input_active,
+            );
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 if !self.state.tv_input_active {
                     let item_start_y = popup.y + 1;
@@ -234,16 +294,11 @@ impl App {
 
         if self.state.addon_manager_popup {
             let addons_count = self.state.installed_addons.len();
-            let popup_width = 76u16.min(area.width.saturating_sub(4)).max(56);
-            let popup_height = if self.state.addon_input_active {
-                7u16
-            } else {
-                (addons_count as u16)
-                    .saturating_add(6)
-                    .min(area.height.saturating_sub(4))
-                    .max(7)
-            };
-            let popup = crate::tui::overlay::centered(area, popup_width, popup_height, 36, 80);
+            let popup = crate::tui::overlay::addon_manager_layout(
+                area,
+                addons_count,
+                self.state.addon_input_active,
+            );
             if popup.contains(ratatui::layout::Position::new(col, row)) {
                 if !self.state.addon_input_active {
                     let list_start_y = popup.y + 1;
@@ -898,25 +953,22 @@ fn centered_width_rect(area: Rect, width: u16) -> Rect {
     }
 }
 
-fn hit_test_centered_picker(
-    area: Rect,
+fn click_in_picker(
+    popup: Rect,
     col: u16,
     row: u16,
-    width_pct: u16,
+    state: &ratatui::widgets::ListState,
     total_items: usize,
-    min_w: u16,
-    max_w: u16,
 ) -> Option<Option<usize>> {
-    let popup =
-        crate::tui::overlay::centered(area, width_pct, total_items as u16 + 4, min_w, max_w);
-    if popup.contains(ratatui::layout::Position::new(col, row)) {
-        let item_y = popup.y.saturating_add(1);
-        if row >= item_y && (row - item_y) < total_items as u16 {
-            Some(Some((row - item_y) as usize))
-        } else {
-            Some(None)
-        }
+    if !popup.contains(ratatui::layout::Position::new(col, row)) {
+        return None;
+    }
+    let visible_rows = total_items.clamp(1, 8);
+    let offset = state.offset();
+    let item_y = popup.y.saturating_add(1);
+    if row >= item_y && (row - item_y) < visible_rows as u16 {
+        Some(Some(offset + (row - item_y) as usize))
     } else {
-        None
+        Some(None)
     }
 }

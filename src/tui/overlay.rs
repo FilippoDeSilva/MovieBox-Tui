@@ -21,6 +21,83 @@ pub struct PickerSpec<'a> {
     pub minimum_width: u16,
 }
 
+pub fn picker_layout(
+    area: Rect,
+    items: &[String],
+    confirm_label: &str,
+    minimum_width: u16,
+) -> Rect {
+    let visible_rows = items.len().clamp(1, MAX_PICKER_ROWS);
+    let footer_str = format!("[↑↓] Move  [Enter] {confirm_label}  [Esc] Back");
+    let footer_width = crate::tui::text::width(&footer_str);
+    let content_width = items
+        .iter()
+        .map(|item| crate::tui::text::width(item))
+        .max()
+        .unwrap_or(0)
+        .max(footer_width)
+        .saturating_add(4);
+    centered(
+        area,
+        content_width as u16,
+        visible_rows as u16 + 4,
+        minimum_width,
+        64,
+    )
+}
+
+pub fn tv_config_layout(
+    area: Rect,
+    longest_source_width: usize,
+    total_rows: usize,
+    input_active: bool,
+) -> Rect {
+    let content_width = longest_source_width.max(48).max(crate::tui::text::width(
+        "[ Add URL ] [ Add file ] [ Reload ] [ Done ]",
+    ));
+    let popup_width = 68u16
+        .max(content_width.saturating_add(6) as u16)
+        .min(area.width.saturating_sub(4));
+    let popup_height = if input_active {
+        7u16
+    } else {
+        total_rows.min(10).saturating_add(6) as u16
+    };
+    centered(area, popup_width, popup_height, 36, 74)
+}
+
+pub fn addon_manager_layout(area: Rect, addons_count: usize, input_active: bool) -> Rect {
+    let popup_width = 76u16.min(area.width.saturating_sub(4)).max(56);
+    let popup_height = if input_active {
+        7u16
+    } else {
+        (addons_count as u16)
+            .saturating_add(6)
+            .min(area.height.saturating_sub(4))
+            .max(7)
+    };
+    centered(area, popup_width, popup_height, 36, 80)
+}
+
+pub fn download_confirm_layout(
+    area: Rect,
+    summary_lines: usize,
+    longest_line_width: usize,
+) -> Rect {
+    let content_width = longest_line_width.max(36);
+    centered(
+        area,
+        content_width.saturating_add(4) as u16,
+        summary_lines as u16 + 4,
+        36,
+        64,
+    )
+}
+
+pub fn download_confirm_action_row(popup: Rect, summary_lines: usize) -> u16 {
+    popup.y + summary_lines as u16 + 2
+}
+
 pub fn picker(
     frame: &mut Frame,
     area: Rect,
@@ -35,22 +112,7 @@ pub fn picker(
         .unwrap_or(0)
         .min(items.len().saturating_sub(1));
     let visible_rows = items.len().clamp(1, MAX_PICKER_ROWS);
-    let footer_str = format!("[↑↓] Move  [Enter] {}  [Esc] Back", spec.confirm_label);
-    let footer_width = crate::tui::text::width(&footer_str);
-    let content_width = items
-        .iter()
-        .map(|item| crate::tui::text::width(item))
-        .max()
-        .unwrap_or(0)
-        .max(footer_width)
-        .saturating_add(4);
-    let popup = centered(
-        area,
-        content_width as u16,
-        visible_rows as u16 + 4,
-        spec.minimum_width,
-        64,
-    );
+    let popup = picker_layout(area, items, spec.confirm_label, spec.minimum_width);
     clear_modal_area(frame, area, popup, theme);
 
     let title = format!(
@@ -230,7 +292,7 @@ pub fn notifications(
         let target_card_width = title_w
             .max(badge_w)
             .max(raw_msg_w)
-            .clamp(36, max_card_width) as u16;
+            .clamp(20, max_card_width.max(20)) as u16;
 
         let inner_width = (target_card_width.saturating_sub(4) as usize).max(1);
 

@@ -1230,51 +1230,72 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     if state.show_season_download_confirm {
-        let season_idx = state.selected_season;
-        let eps_count = if season_idx > 0 && season_idx <= state.available_episode_numbers.len() {
-            state.available_episode_numbers[season_idx - 1].len()
-        } else {
-            0
-        };
+        let summary = season_confirm_summary(state);
+        let lines: Vec<Line<'_>> = summary
+            .iter()
+            .map(|text| Line::from(text.clone()))
+            .collect();
         crate::tui::overlay::confirmation(
             frame,
             area,
             "Download season",
-            &[
-                Line::from(format!("Season {season_idx}")),
-                Line::from(format!("{eps_count} episodes")),
-            ],
+            &lines,
             state.season_download_confirm_yes_selected,
             theme,
             state.basic_terminal,
         );
     } else if state.show_episode_download_confirm {
-        let season_idx = state.selected_season;
-        let ep_idx = state.selected_episode;
-        let mut summary = if type_val == 2 {
-            vec![Line::from(format!(
-                "Season {season_idx} · Episode {ep_idx}"
-            ))]
-        } else {
-            vec![Line::from("Download this movie")]
-        };
-        if let Some(stream) = selected_stream_summary(state) {
-            summary.push(Line::from(stream));
-        }
+        let summary = episode_confirm_summary(state);
+        let lines: Vec<Line<'_>> = summary
+            .iter()
+            .map(|text| Line::from(text.clone()))
+            .collect();
         crate::tui::overlay::confirmation(
             frame,
             area,
-            if type_val == 2 {
+            if crate::tui::state::stype(details_json) == 2 {
                 "Download episode"
             } else {
                 "Download movie"
             },
-            &summary,
+            &lines,
             state.episode_download_confirm_yes_selected,
             theme,
             state.basic_terminal,
         );
     }
+}
+
+pub(crate) fn season_confirm_summary(state: &AppState) -> Vec<String> {
+    let season_idx = state.selected_season;
+    let eps_count = if season_idx > 0 && season_idx <= state.available_episode_numbers.len() {
+        state.available_episode_numbers[season_idx - 1].len()
+    } else {
+        0
+    };
+    vec![
+        format!("Season {season_idx}"),
+        format!("{eps_count} episodes"),
+    ]
+}
+
+pub(crate) fn episode_confirm_summary(state: &AppState) -> Vec<String> {
+    let season_idx = state.selected_season;
+    let ep_idx = state.selected_episode;
+    let type_val = state
+        .selected_details
+        .as_ref()
+        .map(crate::tui::state::stype)
+        .unwrap_or(1);
+    let mut summary = if type_val == 2 {
+        vec![format!("Season {season_idx} · Episode {ep_idx}")]
+    } else {
+        vec!["Download this movie".to_string()]
+    };
+    if let Some(stream) = selected_stream_summary(state) {
+        summary.push(stream);
+    }
+    summary
 }
 
 fn selected_stream_summary(state: &AppState) -> Option<String> {
