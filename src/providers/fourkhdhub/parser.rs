@@ -368,16 +368,21 @@ fn is_genre(value: &str) -> bool {
 
 fn strip_trailing_year(value: &str) -> String {
     let trimmed = value.trim();
-    if trimmed.len() >= 6 {
-        let suffix = &trimmed[trimmed.len() - 6..];
-        if suffix.starts_with('(')
-            && suffix.ends_with(')')
-            && suffix[1..5].bytes().all(|byte| byte.is_ascii_digit())
-        {
-            return trimmed[..trimmed.len() - 6].trim_end().to_string();
-        }
+    let bytes = trimmed.as_bytes();
+    let start = match bytes.len().checked_sub(6) {
+        Some(index) if trimmed.is_char_boundary(index) => index,
+        _ => return trimmed.to_string(),
+    };
+    let is_parenthesized_year = bytes[start] == b'('
+        && bytes[bytes.len() - 1] == b')'
+        && bytes[start + 1..bytes.len() - 1]
+            .iter()
+            .all(|byte| byte.is_ascii_digit());
+    if is_parenthesized_year {
+        trimmed[..start].trim_end().to_string()
+    } else {
+        trimmed.to_string()
     }
-    trimmed.to_string()
 }
 
 fn parse_season_count(value: &str) -> Option<usize> {
@@ -589,4 +594,44 @@ fn normalize_filename(value: &str) -> String {
         .chars()
         .filter(|character| character.is_ascii_alphanumeric())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_trailing_year;
+
+    #[test]
+    fn strips_parenthesized_year() {
+        assert_eq!(strip_trailing_year("Movie Name (2024)"), "Movie Name");
+        assert_eq!(strip_trailing_year("  X (1999)  "), "X");
+    }
+
+    #[test]
+    fn keeps_non_year_suffixes() {
+        assert_eq!(
+            strip_trailing_year("Not A Year (20x4)"),
+            "Not A Year (20x4)"
+        );
+        assert_eq!(strip_trailing_year("Season (Part 2)"), "Season (Part 2)");
+        assert_eq!(strip_trailing_year("Short"), "Short");
+    }
+
+    #[test]
+    fn never_panics_on_multibyte_titles() {
+        assert_eq!(strip_trailing_year("英雄éé"), "英雄éé");
+        assert_eq!(strip_trailing_year("英雄éé(2020)"), "英雄éé");
+        assert_eq!(strip_trailing_year("Ünïcödé 🎬"), "Ünïcödé 🎬");
+        assert_eq!(
+            strip_trailing_year("アニメ タイトル (2023)"),
+            "アニメ タイトル"
+        );
+    }
+
+    #[test]
+    fn handles_short_and_empty_input() {
+        assert_eq!(strip_trailing_year(""), "");
+        assert_eq!(strip_trailing_year("(2024)"), "");
+        assert_eq!(strip_trailing_year("12345"), "12345");
+        assert_eq!(strip_trailing_year("123456"), "123456");
+    }
 }
