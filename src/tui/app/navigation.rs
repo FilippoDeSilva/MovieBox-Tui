@@ -52,13 +52,8 @@ impl App {
         self.state.search_list_state.select(None);
         self.state.resource_list_state.select(None);
         self.state.dirty = true;
-        self.state.set_status(
-            format!(
-                "{} selected. Search uses only this provider.",
-                provider.label()
-            ),
-            180,
-        );
+        self.state
+            .set_status(format!("Provider: {}", provider.label()), 150);
         self.persist_config();
         if provider == ProviderKind::MovieBox {
             let client = self.service.client.clone();

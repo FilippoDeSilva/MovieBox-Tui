@@ -34,6 +34,8 @@ impl App {
             if let KeyCode::Char('t') = key.code {
                 if self.state.tv_enabled {
                     self.action_sender.send(Action::ToggleTvMode).ok();
+                    self.state
+                        .set_status("Switched to TV Mode.".to_string(), 120);
                 } else {
                     self.state.set_status(
                         "TV Mode is disabled. Use /enable-tv to enable.".to_string(),
@@ -45,6 +47,8 @@ impl App {
             if let KeyCode::Char('a') = key.code {
                 if self.state.addons_enabled {
                     self.action_sender.send(Action::ToggleAddonMode).ok();
+                    self.state
+                        .set_status("Switched to Addon Mode.".to_string(), 120);
                 } else {
                     self.state.set_status(
                         "Addon Mode is disabled. Use /enable-addons to enable.".to_string(),
@@ -64,6 +68,8 @@ impl App {
                         .set_status("Already in Streaming Mode.".to_string(), 120);
                 } else {
                     self.action_sender.send(Action::SwitchToStreamingMode).ok();
+                    self.state
+                        .set_status("Switched to Streaming Mode.".to_string(), 120);
                 }
                 return None;
             }
@@ -226,108 +232,136 @@ impl App {
         }
 
         match self.state.input_mode {
-            InputMode::Editing => match key.code {
-                KeyCode::Esc => {
-                    self.state.input_mode = InputMode::Normal;
-                    self.state.suggest_index = None;
-                    self.state.search_suggestions.clear();
-                    if self.state.search_query.starts_with('/')
-                        || self.state.search_results.is_empty()
-                    {
+            InputMode::Editing => {
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    if let KeyCode::Char('u') = key.code {
                         self.state.search_query.clear();
-                    }
-                    self.state.set_status(String::new(), 150);
-                }
-                KeyCode::Enter => {
-                    let selected_opt = self
-                        .state
-                        .suggest_index
-                        .and_then(|idx| self.state.search_suggestions.get(idx).cloned());
-
-                    let mut query = if let Some(sug) = selected_opt {
-                        sug
-                    } else {
-                        self.state.search_query.trim().to_string()
-                    };
-
-                    if query.starts_with('/') {
-                        let suggestions =
-                            crate::tui::commands::SlashCommand::suggest(&self.state, &query);
-                        if suggestions.len() == 1 {
-                            query = suggestions[0].clone();
-                        }
-                    }
-
-                    if !query.is_empty() {
-                        if query.trim().eq_ignore_ascii_case("/history") {
-                            self.state.search_query = "/history".to_string();
-                        } else if query.starts_with('/') {
-                            self.state.search_query.clear();
-                        } else {
-                            self.state.search_query = query.clone();
-                        }
-                        self.state.input_mode = InputMode::Normal;
-                        self.state.search_suggestions.clear();
                         self.state.suggest_index = None;
-                        self.state.search_list_state.select(None);
+                        self.state.search_suggestions.clear();
                         self.state.last_search_edit = std::time::Instant::now();
-                        self.action_sender
-                            .send(Action::Search {
-                                query,
-                                force_refresh: false,
-                            })
-                            .ok();
+                        return None;
+                    }
+                    if let KeyCode::Char('w') = key.code {
+                        let trimmed = self.state.search_query.trim_end();
+                        if let Some(last_space) = trimmed
+                            .rfind(|c: char| c.is_whitespace() || c == '/' || c == '-' || c == '_')
+                        {
+                            self.state.search_query.truncate(last_space);
+                        } else {
+                            self.state.search_query.clear();
+                        }
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                        return None;
                     }
                 }
-                KeyCode::Tab => {
-                    let trimmed = self.state.search_query.trim();
-                    if trimmed.starts_with('/') {
-                        let selected_or_first = self
+                match key.code {
+                    KeyCode::Esc => {
+                        self.state.input_mode = InputMode::Normal;
+                        self.state.suggest_index = None;
+                        self.state.search_suggestions.clear();
+                        if self.state.search_query.starts_with('/')
+                            || self.state.search_results.is_empty()
+                        {
+                            self.state.search_query.clear();
+                        }
+                        self.state.set_status(String::new(), 150);
+                    }
+                    KeyCode::Enter => {
+                        let selected_opt = self
                             .state
                             .suggest_index
-                            .and_then(|idx| self.state.search_suggestions.get(idx).cloned())
-                            .or_else(|| {
-                                let suggestions = crate::tui::commands::SlashCommand::suggest(
-                                    &self.state,
-                                    trimmed,
-                                );
-                                suggestions.first().cloned()
-                            });
+                            .and_then(|idx| self.state.search_suggestions.get(idx).cloned());
+
+                        let mut query = if let Some(sug) = selected_opt {
+                            sug
+                        } else {
+                            self.state.search_query.trim().to_string()
+                        };
+
+                        if query.starts_with('/') {
+                            let suggestions =
+                                crate::tui::commands::SlashCommand::suggest(&self.state, &query);
+                            if suggestions.len() == 1 {
+                                query = suggestions[0].clone();
+                            }
+                        }
+
+                        if !query.is_empty() {
+                            if query.trim().eq_ignore_ascii_case("/history") {
+                                self.state.search_query = "/history".to_string();
+                            } else if query.starts_with('/') {
+                                self.state.search_query.clear();
+                            } else {
+                                self.state.search_query = query.clone();
+                            }
+                            self.state.input_mode = InputMode::Normal;
+                            self.state.search_suggestions.clear();
+                            self.state.suggest_index = None;
+                            self.state.search_list_state.select(None);
+                            self.state.last_search_edit = std::time::Instant::now();
+                            self.action_sender
+                                .send(Action::Search {
+                                    query,
+                                    force_refresh: false,
+                                })
+                                .ok();
+                        }
+                    }
+                    KeyCode::Tab => {
+                        let trimmed = self.state.search_query.trim();
+                        let selected_or_first = if trimmed.starts_with('/') {
+                            self.state
+                                .suggest_index
+                                .and_then(|idx| self.state.search_suggestions.get(idx).cloned())
+                                .or_else(|| {
+                                    let suggestions = crate::tui::commands::SlashCommand::suggest(
+                                        &self.state,
+                                        trimmed,
+                                    );
+                                    suggestions.first().cloned()
+                                })
+                        } else {
+                            self.state
+                                .suggest_index
+                                .and_then(|idx| self.state.search_suggestions.get(idx).cloned())
+                                .or_else(|| self.state.search_suggestions.first().cloned())
+                        };
                         if let Some(sug) = selected_or_first {
                             self.state.search_query = sug;
                             self.state.last_search_edit = std::time::Instant::now();
                         }
                     }
+                    KeyCode::Backspace => {
+                        crate::tui::text::remove_last_grapheme(&mut self.state.search_query);
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
+                    KeyCode::Char(c) => {
+                        self.state.search_query.push(c);
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
+                    KeyCode::Up if !self.state.search_suggestions.is_empty() => {
+                        let max_idx = self.state.search_suggestions.len() - 1;
+                        let next_idx = match self.state.suggest_index {
+                            Some(0) | None => max_idx,
+                            Some(i) => i - 1,
+                        };
+                        self.state.suggest_index = Some(next_idx);
+                    }
+                    KeyCode::Down if !self.state.search_suggestions.is_empty() => {
+                        let max_idx = self.state.search_suggestions.len() - 1;
+                        let next_idx = match self.state.suggest_index {
+                            None => 0,
+                            Some(i) if i == max_idx => 0,
+                            Some(i) => i + 1,
+                        };
+                        self.state.suggest_index = Some(next_idx);
+                    }
+                    _ => {}
                 }
-                KeyCode::Backspace => {
-                    crate::tui::text::remove_last_grapheme(&mut self.state.search_query);
-                    self.state.suggest_index = None;
-                    self.state.last_search_edit = std::time::Instant::now();
-                }
-                KeyCode::Char(c) => {
-                    self.state.search_query.push(c);
-                    self.state.suggest_index = None;
-                    self.state.last_search_edit = std::time::Instant::now();
-                }
-                KeyCode::Up if !self.state.search_suggestions.is_empty() => {
-                    let max_idx = self.state.search_suggestions.len() - 1;
-                    let next_idx = match self.state.suggest_index {
-                        Some(0) | None => max_idx,
-                        Some(i) => i - 1,
-                    };
-                    self.state.suggest_index = Some(next_idx);
-                }
-                KeyCode::Down if !self.state.search_suggestions.is_empty() => {
-                    let max_idx = self.state.search_suggestions.len() - 1;
-                    let next_idx = match self.state.suggest_index {
-                        None => 0,
-                        Some(i) if i == max_idx => 0,
-                        Some(i) => i + 1,
-                    };
-                    self.state.suggest_index = Some(next_idx);
-                }
-                _ => {}
-            },
+            }
             InputMode::Normal => match self.state.active_screen {
                 Screen::Home => {
                     if self.state.addon_manager_popup {

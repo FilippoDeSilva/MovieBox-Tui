@@ -911,7 +911,7 @@ impl App {
         }
         secondary.push((FooterAction::Back, 5 + 1 + 4));
 
-        let active_buttons = if width >= 70 {
+        let active_buttons = if width >= 86 {
             if line_idx > 0 {
                 return;
             }

@@ -340,3 +340,52 @@ async fn test_esc_key_cancels_unsubmitted_search_query() {
     assert_eq!(app.state().input_mode, InputMode::Normal);
     assert_eq!(app.state().search_query, "");
 }
+
+#[tokio::test]
+async fn test_tab_key_completes_regular_search_suggestions() {
+    let mut app = App::new();
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query = "inter".to_string();
+    app.state_mut().search_suggestions =
+        vec!["Interstellar".to_string(), "Interstellar 2".to_string()];
+
+    let tab_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Tab,
+        crossterm::event::KeyModifiers::empty(),
+    );
+    app.handle_action(Action::Key(tab_key)).await;
+
+    assert_eq!(app.state().search_query, "Interstellar");
+}
+
+#[tokio::test]
+async fn test_ctrl_u_clears_search_input() {
+    let mut app = App::new();
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query = "hello world".to_string();
+
+    let ctrl_u = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('u'),
+        crossterm::event::KeyModifiers::CONTROL,
+    );
+    app.handle_action(Action::Key(ctrl_u)).await;
+
+    assert_eq!(app.state().search_query, "");
+}
+
+#[tokio::test]
+async fn test_ctrl_w_deletes_backward_word() {
+    let mut app = App::new();
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query = "the dark knight".to_string();
+
+    let ctrl_w = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('w'),
+        crossterm::event::KeyModifiers::CONTROL,
+    );
+    app.handle_action(Action::Key(ctrl_w)).await;
+    assert_eq!(app.state().search_query, "the dark");
+
+    app.handle_action(Action::Key(ctrl_w)).await;
+    assert_eq!(app.state().search_query, "the");
+}

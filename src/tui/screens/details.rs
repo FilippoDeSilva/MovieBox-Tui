@@ -75,7 +75,7 @@ impl DetailsLayoutTier {
     }
 
     pub(crate) fn footer_height(self, width: u16) -> u16 {
-        if width >= 70 { 1 } else { 2 }
+        if width >= 86 { 1 } else { 2 }
     }
 }
 
