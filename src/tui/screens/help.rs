@@ -52,15 +52,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![
             Span::styled("    [←] / [→]      ", theme.header),
-            Span::styled("Jump Page of Results", theme.text),
+            Span::styled("Jump Page / Move Input Cursor", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [Home] / [End] ", theme.header),
+            Span::styled("Jump Start / End of List or Line", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [PgUp] / [PgDn]", theme.header),
+            Span::styled("Page Up / Down in Lists", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Tab]          ", theme.header),
-            Span::styled("Auto-complete Suggestion / Command", theme.text),
+            Span::styled("Auto-complete / Toggle Dialog Button", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Ctrl+U]       ", theme.header),
-            Span::styled("Clear Search Input Line", theme.text),
+            Span::styled("Clear Search / Input Line", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Ctrl+W]       ", theme.header),
@@ -68,7 +76,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![
             Span::styled("    [Esc]          ", theme.header),
-            Span::styled("Go Back / Clear Input", theme.text),
+            Span::styled("Go Back / Clear Input / Dismiss", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [?]            ", theme.header),

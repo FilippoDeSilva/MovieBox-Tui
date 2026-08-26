@@ -3,6 +3,20 @@
 ## [Unreleased]
 
 ### Added
+- **Centralized grapheme-safe text input engine (`TextInputBuffer`)**: unified text
+  editing across TV Playlist and Addon managers with full grapheme-cluster awareness,
+  horizontal cursor navigation (`Left`/`Right`, `Home`/`End`), forward deletion (`Delete`),
+  backward deletion (`Backspace`), word deletion (`Ctrl+W`), whole-line clearing (`Ctrl+U`),
+  and active cursor rendering matching the main search bar.
+- **Harmonized modal & picker navigation**: `Home` (jump to first), `End` (jump to last),
+  `PageUp` (step -5), and `PageDown` (step +5) support across Browse categories, Theme
+  picker, TV Playlist manager, and Addon manager dialogs.
+- **Download confirmation dialog key navigation**: `Tab` and `BackTab` (`Shift+Tab`) support
+  for toggling between `[ Download ]` and `[ Cancel ]` action buttons in addition to
+  `Left`/`Right`.
+- **Standardized status durations & helpers**: semantic tick duration constants
+  (`STATUS_TICKS_SHORT`, `STATUS_TICKS_DEFAULT`, `STATUS_TICKS_LONG`) and ergonomic
+  `AppState` status helper methods replacing magic number literals across all TUI subsystems.
 - **Terminal-aware rendering overhaul**:
   - Theme autodetection now actually runs when no explicit theme is configured:
     `NO_COLOR` forces monochrome, truecolor terminals get full RGB palettes,

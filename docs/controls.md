@@ -6,18 +6,52 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 
 | Key | Action |
 | :--- | :--- |
-| **Arrow keys** | Navigate lists, search results, tabs, and modal dialogs |
+| **Arrow keys** | Navigate lists, search results, tabs, and move cursor in input fields |
+| **`Home` / `End`** | Jump to start / end of list, results grid, or text input line |
+| **`PageUp` / `PageDown`** | Scroll lists and modal pickers by 5 items (or scroll help overlay) |
 | **Enter** | Open, play, or confirm the selected item |
 | **Esc** | Go back, dismiss popup dialog, or clear active search |
-| **`Tab`** | Auto-complete active search suggestion / slash command in input mode |
-| **`Ctrl+U`** | Clear entire search input line in input mode |
-| **`Ctrl+W`** | Delete backward word in search input |
+| **`Tab` / `Shift+Tab`** | Auto-complete suggestion / command; switch details panes; toggle dialog buttons |
+| **`Backspace`** | Delete character before cursor, or return focus to search bar from results |
+| **`Delete`** | Delete character at cursor in text inputs, or remove entry in TV/Addon managers |
+| **`Ctrl+U`** | Clear entire input line (Search, TV URL, Addon URL) |
+| **`Ctrl+W`** | Delete backward word in text inputs |
 | **`Ctrl+S`** | Switch to standard **Streaming Mode** |
 | **`Ctrl+T`** | Toggle / switch to **TV Mode** |
 | **`Ctrl+A`** | Toggle / switch to **Addon Mode** |
 | **`?`** | Open interactive in-app help menu |
 | **`Ctrl+C` / `q`** | Quit application and restore terminal |
 
+## Text Input & Cursor Editing
+
+Text editing across Search, TV Playlist Manager, and Addon Manager uses a unified grapheme-safe input engine:
+
+| Key | Action |
+| :--- | :--- |
+| **`Left` / `Right`** | Move text cursor one grapheme cluster left or right |
+| **`Home` / `End`** | Jump cursor directly to the beginning or end of the input line |
+| **`Backspace`** | Delete the grapheme cluster immediately before the cursor |
+| **`Delete`** | Delete the grapheme cluster at the cursor position |
+| **`Ctrl+W`** | Delete the preceding word (up to space or punctuation delimiter) |
+| **`Ctrl+U`** | Clear the entire input buffer |
+| **`Tab`** | Auto-complete active search suggestion or slash command |
+| **`Enter`** | Submit search query, save TV playlist URL/path, or verify and install Addon manifest |
+| **`Esc`** | Cancel input, dismiss input prompt, or clear search buffer |
+
+## Modal Dialogs & Pickers
+
+All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, Addon Manager, Download Confirmation) support standard keyboard controls:
+
+- **`↑` / `↓`**: Move selection up / down by one item.
+- **`Home` / `End`**: Jump immediately to the first or last item in the list.
+- **`PageUp` / `PageDown`**: Step up or down by 5 items.
+- **`Enter`**: Confirm selection, activate entry, or submit dialog.
+- **`Esc`**: Dismiss popup dialog without applying changes.
+- **Download Confirmation Dialog**:
+  - **`Tab` / `Shift+Tab` / `BackTab`**: Toggle active selection between `[ Download ]` and `[ Cancel ]`.
+  - **`Left` / `Right`**: Switch between `[ Download ]` and `[ Cancel ]`.
+  - **`Enter`**: Confirm the currently focused action.
+  - **`Esc`**: Cancel and close the confirmation dialog.
 ## Mode-Specific Controls
 
 ### Streaming Mode
