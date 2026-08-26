@@ -138,7 +138,7 @@ impl App {
         let total = self.state.search_results.len();
         let selected = self.state.search_list_state.selected().unwrap_or(0);
         let offset = self.state.search_list_state.offset();
-        let visible = self.state.visible_items.max(6);
+        let visible = self.state.effective_visible_items().max(6);
 
         if selected + 8 >= total || offset + visible + 4 >= total {
             let next_page = self.state.current_page + 1;
@@ -681,7 +681,7 @@ impl App {
             Action::MoveLeft => {
                 if self.state.active_screen == Screen::Home {
                     let current = self.state.search_list_state.selected().unwrap_or(0);
-                    let jump = self.state.visible_items.max(1);
+                    let jump = self.state.effective_visible_items().max(1);
                     if current > jump {
                         self.state.search_list_state.select(Some(current - jump));
                     } else {
@@ -703,7 +703,7 @@ impl App {
             Action::MoveRight => {
                 if self.state.active_screen == Screen::Home {
                     let current = self.state.search_list_state.selected().unwrap_or(0);
-                    let jump = self.state.visible_items.max(1);
+                    let jump = self.state.effective_visible_items().max(1);
                     let total = self.state.search_results.len();
                     if current + jump < total {
                         self.state.search_list_state.select(Some(current + jump));

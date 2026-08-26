@@ -649,8 +649,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let results_area = results_chunk;
             let selected_idx = state.search_list_state.selected();
 
-            let row_height = state.poster_rows.max(3) + 1;
-            state.visible_items = (results_area.height as usize) / (row_height as usize);
+            let metrics = state.result_metrics(results_area.height);
+            state.last_result_metrics = Some(metrics);
+            let row_height = metrics.row_height;
             let rows = state
                 .search_results
                 .iter()
@@ -663,18 +664,22 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let inner_area = results_area;
 
-            let mut current_y = inner_area.y;
-
-            for (i, res) in state.search_results.iter().enumerate().skip(offset) {
-                if current_y + state.poster_rows > inner_area.y + inner_area.height {
-                    break;
-                }
+            for (visible_index, (i, res)) in state
+                .search_results
+                .iter()
+                .enumerate()
+                .skip(offset)
+                .take(metrics.visible_items)
+                .enumerate()
+            {
+                let current_y =
+                    inner_area.y + (visible_index as u16 * row_height).min(inner_area.height);
 
                 let item_area = Rect {
                     x: inner_area.x,
                     y: current_y,
                     width: inner_area.width,
-                    height: state.poster_rows,
+                    height: metrics.poster_rows_eff,
                 };
 
                 let is_selected = Some(i) == selected_idx;
@@ -957,12 +962,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         text_layout[2],
                     );
                 }
-
-                current_y += row_height;
             }
 
             let content_len = state.search_results.len();
-            if content_len > state.visible_items {
+            if content_len > metrics.visible_items {
                 let scrollbar = ratatui::widgets::Scrollbar::default()
                     .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("▲"))
@@ -971,7 +974,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .thumb_symbol(if state.basic_terminal { "|" } else { "█" });
 
                 let mut scrollbar_state = ratatui::widgets::ScrollbarState::default()
-                    .content_length(content_len.saturating_sub(state.visible_items))
+                    .content_length(content_len.saturating_sub(metrics.visible_items))
                     .position(offset);
 
                 let sb_area = results_area;

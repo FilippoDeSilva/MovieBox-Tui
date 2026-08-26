@@ -1054,7 +1054,7 @@ impl App {
         let total = self.state.search_results.len();
         let selected = self.state.search_list_state.selected().unwrap_or(0);
         let offset = self.state.search_list_state.offset();
-        let visible = self.state.visible_items.max(8);
+        let visible = self.state.effective_visible_items().max(6);
 
         let base_start = offset.min(selected);
         let start = base_start.saturating_sub(6);

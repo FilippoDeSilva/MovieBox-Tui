@@ -37,6 +37,13 @@ pub use crate::models::{
 };
 pub use crate::service::{caption_options, caption_url_for, stype, subject_id};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResultMetrics {
+    pub poster_rows_eff: u16,
+    pub row_height: u16,
+    pub visible_items: usize,
+}
+
 pub struct AppState {
     pub active_provider: ProviderKind,
     pub provider_generation: u64,
@@ -113,7 +120,7 @@ pub struct AppState {
     pub image_cache: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
 
     pub show_help: bool,
-    pub visible_items: usize,
+    pub last_result_metrics: Option<ResultMetrics>,
 
     pub active_resource_request: u64,
     pub active_search_request: u64,
@@ -264,7 +271,7 @@ impl Default for AppState {
             poster_rows: 3,
             image_cache: lru::LruCache::new(cache_capacity(10)),
             show_help: false,
-            visible_items: 10,
+            last_result_metrics: None,
             active_resource_request: 0,
             active_search_request: 0,
             active_homepage_request: 0,
@@ -405,6 +412,30 @@ impl AppState {
     pub fn set_status(&mut self, message: impl Into<String>, timer: usize) {
         self.status_message = message.into();
         self.status_timer = timer;
+    }
+
+    pub fn result_metrics(&self, results_height: u16) -> ResultMetrics {
+        let max_rows = results_height.saturating_sub(1).max(3);
+        let poster_rows_eff = self.poster_rows.max(3).min(max_rows);
+        let row_height = poster_rows_eff.saturating_add(1).max(4);
+        let visible_items = (results_height as usize / row_height as usize).max(1);
+        ResultMetrics {
+            poster_rows_eff,
+            row_height,
+            visible_items,
+        }
+    }
+
+    pub fn effective_visible_items(&self) -> usize {
+        self.last_result_metrics
+            .map(|metrics| metrics.visible_items)
+            .unwrap_or(8)
+    }
+
+    pub fn effective_row_height(&self) -> u16 {
+        self.last_result_metrics
+            .map(|metrics| metrics.row_height)
+            .unwrap_or(4)
     }
 
     const FAILED_POSTER_TTL_SECS: u64 = 600;

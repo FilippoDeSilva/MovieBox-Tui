@@ -309,7 +309,7 @@ impl App {
                     && !self.state.search_results.is_empty()
                     && self.state.input_mode != InputMode::Editing
                 {
-                    (self.state.poster_rows.max(3) + 1).min(8)
+                    self.state.effective_row_height().min(8)
                 } else {
                     2
                 };

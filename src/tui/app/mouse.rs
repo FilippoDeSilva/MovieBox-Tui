@@ -371,7 +371,10 @@ impl App {
         if !is_landing {
             let results_y = 2;
             if row >= results_y && row < area.height.saturating_sub(1) {
-                let row_height = self.state.poster_rows.max(3) + 1;
+                let metrics = self
+                    .state
+                    .result_metrics(area.height.saturating_sub(results_y + 1));
+                let row_height = metrics.row_height;
                 let clicked_relative_row = row.saturating_sub(results_y);
                 let clicked_idx = (clicked_relative_row / row_height) as usize;
 
