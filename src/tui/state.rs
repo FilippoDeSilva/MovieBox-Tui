@@ -42,6 +42,19 @@ pub struct ResultMetrics {
     pub poster_rows_eff: u16,
     pub row_height: u16,
     pub visible_items: usize,
+    pub columns: u16,
+    pub col_width: u16,
+}
+
+pub fn result_columns_for(width: u16) -> u16 {
+    let by_width = if width >= 160 {
+        3
+    } else if width >= 110 {
+        2
+    } else {
+        1
+    };
+    by_width.clamp(1, width / 40).max(1)
 }
 
 pub struct AppState {
@@ -121,6 +134,7 @@ pub struct AppState {
 
     pub show_help: bool,
     pub last_result_metrics: Option<ResultMetrics>,
+    pub result_scroll: usize,
 
     pub active_resource_request: u64,
     pub active_search_request: u64,
@@ -272,6 +286,7 @@ impl Default for AppState {
             image_cache: lru::LruCache::new(cache_capacity(10)),
             show_help: false,
             last_result_metrics: None,
+            result_scroll: 0,
             active_resource_request: 0,
             active_search_request: 0,
             active_homepage_request: 0,
@@ -414,16 +429,53 @@ impl AppState {
         self.status_timer = timer;
     }
 
-    pub fn result_metrics(&self, results_height: u16) -> ResultMetrics {
+    pub fn result_metrics(&self, results_height: u16, results_width: u16) -> ResultMetrics {
         let max_rows = results_height.saturating_sub(1).max(3);
         let poster_rows_eff = self.poster_rows.max(3).min(max_rows);
         let row_height = poster_rows_eff.saturating_add(1).max(4);
-        let visible_items = (results_height as usize / row_height as usize).max(1);
+        let columns = crate::tui::state::result_columns_for(results_width);
+        let col_width = results_width / columns;
+        let visible_rows = (results_height as usize / row_height as usize).max(1);
+        let visible_items = visible_rows * columns as usize;
         ResultMetrics {
             poster_rows_eff,
             row_height,
             visible_items,
+            columns,
+            col_width,
         }
+    }
+
+    pub fn normalize_result_view(&mut self) {
+        let total = self.search_results.len();
+        if total == 0 {
+            self.result_scroll = 0;
+            self.search_list_state.select(None);
+            return;
+        }
+        let selected = self
+            .search_list_state
+            .selected()
+            .unwrap_or(0)
+            .min(total - 1);
+        self.search_list_state.select(Some(selected));
+        let (columns, visible_items) = match self.last_result_metrics {
+            Some(metrics) => (metrics.columns as usize, metrics.visible_items),
+            None => (1, 8),
+        };
+        let mut scroll = self.result_scroll;
+        if selected < scroll {
+            scroll = selected;
+        } else if selected >= scroll + visible_items.max(1) {
+            scroll = (selected + 1).saturating_sub(visible_items.max(1));
+        }
+        scroll -= scroll % columns.max(1);
+        let max_scroll = total.saturating_sub(visible_items);
+        if scroll > max_scroll {
+            scroll = max_scroll;
+        }
+        scroll -= scroll % columns.max(1);
+        self.result_scroll = scroll;
     }
 
     pub fn effective_visible_items(&self) -> usize {
@@ -468,6 +520,7 @@ impl AppState {
         self.poster_protocol = None;
         self.failed_posters.clear();
         self.in_flight_posters.clear();
+        self.result_scroll = 0;
         self.search_list_state.select(None);
         self.is_homepage_mode = false;
         self.favorites_focus = false;

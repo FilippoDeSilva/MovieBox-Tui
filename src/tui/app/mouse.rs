@@ -373,14 +373,17 @@ impl App {
             if row >= results_y && row < area.height.saturating_sub(1) {
                 let metrics = self
                     .state
-                    .result_metrics(area.height.saturating_sub(results_y + 1));
+                    .result_metrics(area.height.saturating_sub(results_y + 1), area.width);
                 let row_height = metrics.row_height;
                 let clicked_relative_row = row.saturating_sub(results_y);
-                let clicked_idx = (clicked_relative_row / row_height) as usize;
+                let visual_row = (clicked_relative_row / row_height) as usize;
+                let clicked_column =
+                    ((col.saturating_sub(area.x)) / metrics.col_width.max(1)) as usize;
 
-                let page_start = self.state.search_list_state.offset();
+                let page_start = self.state.result_scroll;
 
-                let target_idx = page_start + clicked_idx;
+                let target_idx =
+                    page_start + visual_row * metrics.columns as usize + clicked_column;
                 if target_idx < self.state.search_results.len() {
                     let prev_selected = self.state.search_list_state.selected();
                     self.state.search_list_state.select(Some(target_idx));

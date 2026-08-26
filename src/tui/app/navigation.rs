@@ -126,6 +126,13 @@ impl App {
             .unwrap_or(self.state.active_provider)
     }
 
+    fn result_grid_columns(&self) -> usize {
+        self.state
+            .last_result_metrics
+            .map(|metrics| metrics.columns as usize)
+            .unwrap_or(1)
+    }
+
     pub(super) fn trigger_next_page_if_needed(&mut self) {
         if self.state.is_tv_mode
             || self.state.is_loading
@@ -137,7 +144,7 @@ impl App {
         }
         let total = self.state.search_results.len();
         let selected = self.state.search_list_state.selected().unwrap_or(0);
-        let offset = self.state.search_list_state.offset();
+        let offset = self.state.result_scroll;
         let visible = self.state.effective_visible_items().max(6);
 
         if selected + 8 >= total || offset + visible + 4 >= total {
@@ -527,9 +534,11 @@ impl App {
                             return None;
                         }
                         let current = self.state.search_list_state.selected().unwrap_or(0);
-                        if current > 0 {
-                            self.state.search_list_state.select(Some(current - 1));
-                            if let Some(res) = self.state.search_results.get(current - 1) {
+                        let up_step = self.result_grid_columns();
+                        let next = current.saturating_sub(up_step);
+                        if next != current {
+                            self.state.search_list_state.select(Some(next));
+                            if let Some(res) = self.state.search_results.get(next) {
                                 self.action_sender
                                     .send(Action::FetchPreview(res.id.clone()))
                                     .ok();
@@ -618,9 +627,11 @@ impl App {
                             return None;
                         }
                         let current = self.state.search_list_state.selected().unwrap_or(0);
-                        if current + 1 < self.state.search_results.len() {
-                            self.state.search_list_state.select(Some(current + 1));
-                            if let Some(res) = self.state.search_results.get(current + 1) {
+                        let down_step = self.result_grid_columns();
+                        let next = (current + down_step).min(self.state.search_results.len() - 1);
+                        if next != current && !self.state.search_results.is_empty() {
+                            self.state.search_list_state.select(Some(next));
+                            if let Some(res) = self.state.search_results.get(next) {
                                 self.action_sender
                                     .send(Action::FetchPreview(res.id.clone()))
                                     .ok();
@@ -681,7 +692,11 @@ impl App {
             Action::MoveLeft => {
                 if self.state.active_screen == Screen::Home {
                     let current = self.state.search_list_state.selected().unwrap_or(0);
-                    let jump = self.state.effective_visible_items().max(1);
+                    let jump = if self.result_grid_columns() > 1 {
+                        1
+                    } else {
+                        self.state.effective_visible_items().max(1)
+                    };
                     if current > jump {
                         self.state.search_list_state.select(Some(current - jump));
                     } else {
@@ -703,7 +718,11 @@ impl App {
             Action::MoveRight => {
                 if self.state.active_screen == Screen::Home {
                     let current = self.state.search_list_state.selected().unwrap_or(0);
-                    let jump = self.state.effective_visible_items().max(1);
+                    let jump = if self.result_grid_columns() > 1 {
+                        1
+                    } else {
+                        self.state.effective_visible_items().max(1)
+                    };
                     let total = self.state.search_results.len();
                     if current + jump < total {
                         self.state.search_list_state.select(Some(current + jump));

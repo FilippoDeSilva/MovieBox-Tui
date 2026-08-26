@@ -67,6 +67,7 @@ impl App {
         }
 
         loop {
+            self.state.normalize_result_view();
             if self.state.clear_terminal_before_draw {
                 if let Err(err) = terminal.clear() {
                     log::debug!("terminal clear warning: {err}");

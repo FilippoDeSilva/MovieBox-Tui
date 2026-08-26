@@ -1053,7 +1053,7 @@ impl App {
         }
         let total = self.state.search_results.len();
         let selected = self.state.search_list_state.selected().unwrap_or(0);
-        let offset = self.state.search_list_state.offset();
+        let offset = self.state.result_scroll;
         let visible = self.state.effective_visible_items().max(6);
 
         let base_start = offset.min(selected);

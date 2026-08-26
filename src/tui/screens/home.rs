@@ -649,7 +649,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let results_area = results_chunk;
             let selected_idx = state.search_list_state.selected();
 
-            let metrics = state.result_metrics(results_area.height);
+            let metrics = state.result_metrics(results_area.height, results_area.width);
+            let poster_width = poster_width
+                .min(metrics.col_width.saturating_sub(18).max(6))
+                .max(6);
             state.last_result_metrics = Some(metrics);
             let row_height = metrics.row_height;
             let rows = state
@@ -660,25 +663,27 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let table = Table::new(rows, [Constraint::Percentage(100)]).block(list_block);
 
             frame.render_stateful_widget(table, results_area, &mut state.search_list_state);
-            let offset = state.search_list_state.offset();
 
             let inner_area = results_area;
 
-            for (visible_index, (i, res)) in state
-                .search_results
-                .iter()
-                .enumerate()
-                .skip(offset)
-                .take(metrics.visible_items)
-                .enumerate()
-            {
+            for slot in 0..metrics.visible_items {
+                let i = state.result_scroll + slot;
+                let Some(res) = state.search_results.get(i) else {
+                    break;
+                };
+                let visible_index = slot / metrics.columns as usize;
+                let column = (slot % metrics.columns as usize) as u16;
                 let current_y =
                     inner_area.y + (visible_index as u16 * row_height).min(inner_area.height);
 
                 let item_area = Rect {
-                    x: inner_area.x,
+                    x: inner_area.x + column * metrics.col_width,
                     y: current_y,
-                    width: inner_area.width,
+                    width: if column + 1 == metrics.columns {
+                        inner_area.width.saturating_sub(column * metrics.col_width)
+                    } else {
+                        metrics.col_width
+                    },
                     height: metrics.poster_rows_eff,
                 };
 
@@ -975,7 +980,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                 let mut scrollbar_state = ratatui::widgets::ScrollbarState::default()
                     .content_length(content_len.saturating_sub(metrics.visible_items))
-                    .position(offset);
+                    .position(state.result_scroll);
 
                 let sb_area = results_area;
 
