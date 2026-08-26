@@ -12,6 +12,7 @@ fn restore_terminal() {
         crossterm::cursor::Show,
         crossterm::event::DisableMouseCapture,
         crossterm::event::DisableFocusChange,
+        crossterm::event::PopKeyboardEnhancementFlags,
         crossterm::terminal::LeaveAlternateScreen
     );
     let _ = crossterm::terminal::disable_raw_mode();
@@ -114,6 +115,13 @@ async fn main() -> std::io::Result<()> {
         crossterm::event::EnableMouseCapture,
         crossterm::event::EnableFocusChange
     )?;
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        crossterm::event::PushKeyboardEnhancementFlags(
+            crossterm::event::KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                | crossterm::event::KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+        )
+    );
 
     moviebox_tui::cache::clean_old_cache_background();
     purge_stale_subtitles();
