@@ -110,7 +110,7 @@ pub struct AppState {
     pub preview_loading: bool,
 
     pub tick_count: u64,
-    pub poster_image: Option<image::DynamicImage>,
+    pub poster_image: Option<std::sync::Arc<image::DynamicImage>>,
 
     pub show_theme_popup: bool,
     pub active_theme_kind: String,
@@ -135,6 +135,7 @@ pub struct AppState {
 
     pub show_help: bool,
     pub help_scroll: usize,
+    pub cursor_beam: bool,
     pub last_result_metrics: Option<ResultMetrics>,
     pub result_scroll: usize,
 
@@ -288,6 +289,7 @@ impl Default for AppState {
             image_cache: lru::LruCache::new(cache_capacity(10)),
             show_help: false,
             help_scroll: 0,
+            cursor_beam: false,
             last_result_metrics: None,
             result_scroll: 0,
             active_resource_request: 0,

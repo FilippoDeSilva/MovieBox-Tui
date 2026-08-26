@@ -9,6 +9,7 @@ struct TerminalGuard;
 fn restore_terminal() {
     let _ = crossterm::execute!(
         std::io::stdout(),
+        crossterm::cursor::SetCursorStyle::DefaultUserShape,
         crossterm::cursor::Show,
         crossterm::event::DisableMouseCapture,
         crossterm::event::DisableFocusChange,

@@ -258,16 +258,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         let p = Paragraph::new(window)
             .block(block)
             .alignment(Alignment::Left);
-        frame.render_widget(
-            p,
-            crate::tui::overlay::centered(
-                area,
-                (content_width + 8).min(area.width.saturating_sub(2)),
-                capacity as u16 + 2,
-                46,
-                120,
-            ),
+        let popup_chunk = crate::tui::overlay::centered(
+            area,
+            (content_width + 8).min(area.width.saturating_sub(2)),
+            capacity as u16 + 2,
+            46,
+            120,
         );
+        crate::tui::overlay::clear_modal_area(frame, area, popup_chunk, theme);
+        frame.render_widget(p, popup_chunk);
         return;
     }
 
@@ -287,7 +286,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
 
     let popup_chunk = crate::tui::overlay::centered(area, desired_width, desired_height, 46, 120);
 
-    crate::tui::clear_area(frame, area, theme);
+    crate::tui::overlay::clear_modal_area(frame, area, popup_chunk, theme);
 
     let title = format!(" Help · {mode_title} ");
     let block = Block::default()

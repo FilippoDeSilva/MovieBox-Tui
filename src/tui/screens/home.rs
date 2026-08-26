@@ -58,9 +58,23 @@ pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&
     crate::tui::commands::SlashCommand::description_for(cmd, state)
 }
 
-pub(crate) fn poster_placeholder_lines(basic: bool) -> &'static str {
+pub(crate) fn poster_placeholder_lines(basic: bool, is_loading: bool, tick: u64) -> &'static str {
     if basic {
-        "[ no poster ]"
+        if is_loading {
+            match (tick / 4) % 3 {
+                0 => "[ . . . . . ]",
+                1 => "[ o o o o o ]",
+                _ => "[ O O O O O ]",
+            }
+        } else {
+            "[ no poster ]"
+        }
+    } else if is_loading {
+        match (tick / 4) % 3 {
+            0 => "┌──────┐\n│ ·  · │\n│  ──  │\n│ ·  · │\n└──────┘",
+            1 => "┌──────┐\n│ ◦  ◦ │\n│  ──  │\n│ ◦  ◦ │\n└──────┘",
+            _ => "┌──────┐\n│ ○  ○ │\n│  ──  │\n│ ○  ○ │\n└──────┘",
+        }
     } else {
         "┌──────┐\n│ ▓  ▓ │\n│  ──  │\n│ ▓  ▓ │\n└──────┘"
     }
@@ -418,9 +432,11 @@ fn search_content(
     view: SearchViewState,
     show_cursor: bool,
     width: u16,
+    real_cursor: bool,
 ) -> String {
     let prefix = if state.basic_terminal { "> " } else { "❯ " };
-    let cursor_width = usize::from(view == SearchViewState::Editing);
+    let editing = view == SearchViewState::Editing;
+    let cursor_width = usize::from(editing && !real_cursor);
     let available = width
         .saturating_sub(4)
         .saturating_sub(crate::tui::text::width(prefix) as u16)
@@ -436,7 +452,7 @@ fn search_content(
     } else {
         crate::tui::text::truncate_width(&state.search_query, available)
     };
-    let cursor = if view == SearchViewState::Editing {
+    let cursor = if editing && !real_cursor {
         if show_cursor { "█" } else { " " }
     } else {
         ""
@@ -473,11 +489,13 @@ fn render_search_bar(
             Constraint::Length(status_width.saturating_add(u16::from(status_width > 0) * 2)),
         ])
         .split(area);
+    let real_cursor = view == SearchViewState::Editing && show_cursor && !state.basic_terminal;
     let mut paragraph = Paragraph::new(search_content(
         state,
         view,
         show_cursor,
         content_row[0].width,
+        real_cursor,
     ))
     .style(if view == SearchViewState::Editing {
         theme.text
@@ -490,6 +508,18 @@ fn render_search_bar(
         paragraph = paragraph.alignment(Alignment::Center);
     }
     frame.render_widget(paragraph, content_row[0]);
+    if real_cursor {
+        let prefix_width = 2u16;
+        let text_width = crate::tui::text::width(&state.search_query) as u16;
+        let shown = text_width.min(content_row[0].width.saturating_sub(6));
+        let line_offset = if centered {
+            (content_row[0].width.saturating_sub(prefix_width + shown)) / 2
+        } else {
+            0
+        };
+        let cursor_x = content_row[0].x + line_offset + prefix_width + shown;
+        frame.set_cursor_position((cursor_x, content_row[0].y));
+    }
     if let Some(status) = result_status {
         frame.render_widget(
             Paragraph::new(status)
@@ -882,10 +912,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             frame.render_widget(ratatui_image::Image::new(proto), p_area);
                         }
                     } else {
-                        let placeholder =
-                            Paragraph::new(poster_placeholder_lines(state.basic_terminal))
-                                .style(theme.text_dim)
-                                .alignment(Alignment::Center);
+                        let is_in_flight = state.in_flight_posters.contains(&res.id);
+                        let placeholder = Paragraph::new(poster_placeholder_lines(
+                            state.basic_terminal,
+                            is_in_flight,
+                            state.tick_count,
+                        ))
+                        .style(if is_in_flight {
+                            theme.lavender
+                        } else {
+                            theme.text_dim
+                        })
+                        .alignment(Alignment::Center);
                         frame.render_widget(placeholder, poster_area);
                     }
                 } else {
@@ -1006,8 +1044,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             ));
                             info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                         } else if hist.completed {
-                            info_spans
-                                .push(ratatui::text::Span::styled("[✓ Completed]", theme.text_dim));
+                            info_spans.push(ratatui::text::Span::styled(
+                                if state.basic_terminal {
+                                    "[Completed]"
+                                } else {
+                                    "[✓ Completed]"
+                                },
+                                theme.text_dim,
+                            ));
                             info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                             info_spans.push(ratatui::text::Span::styled(
                                 format!("Watched {}", hist.formatted_relative_time()),
@@ -1069,8 +1113,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             push_year!();
                             info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                             info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                            info_spans
-                                .push(ratatui::text::Span::styled("Loading...", theme.text_dim));
+                            let dots = match (state.tick_count / 4) % 4 {
+                                0 => "",
+                                1 => ".",
+                                2 => "..",
+                                _ => "...",
+                            };
+                            info_spans.push(ratatui::text::Span::styled(
+                                format!("Loading{dots}"),
+                                theme.text_dim,
+                            ));
                         } else {
                             push_year!();
                             info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
@@ -1095,9 +1147,21 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             if content_len > metrics.visible_items {
                 let scrollbar = ratatui::widgets::Scrollbar::default()
                     .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(Some("▲"))
-                    .end_symbol(Some("▼"))
-                    .track_symbol(Some("│"))
+                    .begin_symbol(if state.basic_terminal {
+                        Some("^")
+                    } else {
+                        Some("▲")
+                    })
+                    .end_symbol(if state.basic_terminal {
+                        Some("v")
+                    } else {
+                        Some("▼")
+                    })
+                    .track_symbol(if state.basic_terminal {
+                        Some("|")
+                    } else {
+                        Some("│")
+                    })
                     .thumb_symbol(if state.basic_terminal { "|" } else { "█" });
 
                 let mut scrollbar_state = ratatui::widgets::ScrollbarState::default()
@@ -1127,7 +1191,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let is_centered = state.search_results.is_empty();
 
         let search_text_len = if is_centered {
-            let content_sample = search_content(state, view, false, search_bar_area.width);
+            let content_sample = search_content(state, view, false, search_bar_area.width, false);
             crate::tui::text::width(&content_sample) as u16
         } else {
             0
@@ -1601,7 +1665,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .map(|preset| preset.label().to_string())
                 .collect()
         };
-        crate::tui::clear_area(frame, area, theme);
         crate::tui::overlay::picker(
             frame,
             area,

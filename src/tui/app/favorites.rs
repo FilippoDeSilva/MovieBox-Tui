@@ -180,7 +180,7 @@ impl App {
             .get(&subject_id)
             .or_else(|| self.state.search_posters.get(&subject_id))
         {
-            self.state.poster_image = Some((**cached).clone());
+            self.state.poster_image = Some(std::sync::Arc::clone(cached));
         } else {
             self.state.poster_image = None;
         }

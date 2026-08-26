@@ -707,7 +707,7 @@ impl App {
                     self.state.poster_image = None;
                     self.state.poster_protocol = None;
                     if let Some(img) = self.state.image_cache.get(&id) {
-                        self.state.poster_image = Some((**img).clone());
+                        self.state.poster_image = Some(std::sync::Arc::clone(img));
                     } else if let Some(url) = cached
                         .get("cover")
                         .and_then(|c| c.get("url"))
@@ -822,7 +822,7 @@ impl App {
                 self.state.poster_image = None;
                 self.state.poster_protocol = None;
                 if let Some(cached_img) = self.state.image_cache.get(&id) {
-                    self.state.poster_image = Some((**cached_img).clone());
+                    self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
                 } else if let Some(url) = crate::tui::app::playback::extract_cover_url(&json) {
                     self.state.history.update_cover_url(&id, &url);
                     let url_clone = url.to_string();
@@ -877,7 +877,7 @@ impl App {
                 };
 
                 if current_id.as_deref() == Some(id.as_str()) {
-                    self.state.poster_image = Some((*img).clone());
+                    self.state.poster_image = Some(img);
                     self.state.poster_protocol = None;
                 }
             }
@@ -1051,7 +1051,7 @@ impl App {
                         .get(&id)
                         .or_else(|| self.state.search_posters.get(&id))
                     {
-                        self.state.poster_image = Some((**cached_img).clone());
+                        self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
                     } else if let Some(url) = crate::tui::app::playback::extract_cover_url(&payload)
                     {
                         self.state.history.update_cover_url(&id, &url);
@@ -1297,7 +1297,7 @@ impl App {
                                 .get(&id)
                                 .or_else(|| self.state.search_posters.get(&id))
                             {
-                                self.state.poster_image = Some((**cached_img).clone());
+                                self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
                             } else if let Some(details) = &self.state.selected_details {
                                 if let Some(url) =
                                     crate::tui::app::playback::extract_cover_url(details)

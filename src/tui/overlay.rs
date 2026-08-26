@@ -13,7 +13,7 @@ use crate::tui::theme::Theme;
 
 const MAX_PICKER_ROWS_CAP: usize = 14;
 
-fn max_picker_rows(area: Rect) -> usize {
+pub(crate) fn max_picker_rows(area: Rect) -> usize {
     (area.height.saturating_sub(6) as usize / 2).clamp(4, MAX_PICKER_ROWS_CAP)
 }
 
@@ -158,8 +158,21 @@ pub fn picker(
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .thumb_style(theme.lavender)
             .track_style(theme.surface1)
-            .begin_symbol(Some("▲"))
-            .end_symbol(Some("▼"));
+            .begin_symbol(if basic_terminal {
+                Some("^")
+            } else {
+                Some("▲")
+            })
+            .end_symbol(if basic_terminal {
+                Some("v")
+            } else {
+                Some("▼")
+            })
+            .track_symbol(if basic_terminal {
+                Some("|")
+            } else {
+                Some("│")
+            });
         frame.render_stateful_widget(scrollbar, sections[0], &mut scrollbar_state);
     }
 
@@ -424,14 +437,102 @@ pub(crate) fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
 fn notification_style(
     kind: NotificationKind,
     theme: &Theme,
-    _basic_terminal: bool,
+    basic_terminal: bool,
 ) -> (&'static str, Style) {
     match kind {
-        NotificationKind::Info => ("INFO", theme.sapphire),
-        NotificationKind::Success => ("SUCCESS", theme.success),
-        NotificationKind::Warning => ("WARNING", theme.rating),
-        NotificationKind::Error => ("ERROR", theme.error),
+        NotificationKind::Info => (
+            if basic_terminal { "i INFO" } else { "ℹ INFO" },
+            theme.sapphire,
+        ),
+        NotificationKind::Success => (
+            if basic_terminal {
+                "+ SUCCESS"
+            } else {
+                "✔ SUCCESS"
+            },
+            theme.success,
+        ),
+        NotificationKind::Warning => (
+            if basic_terminal {
+                "! WARNING"
+            } else {
+                "⚠ WARNING"
+            },
+            theme.rating,
+        ),
+        NotificationKind::Error => (
+            if basic_terminal {
+                "x ERROR"
+            } else {
+                "✖ ERROR"
+            },
+            theme.error,
+        ),
     }
+}
+
+pub fn notification_rects(
+    area: Rect,
+    notifications: &std::collections::VecDeque<Notification>,
+    basic_terminal: bool,
+) -> Vec<(usize, Rect)> {
+    let mut rects = Vec::new();
+    let mut y = area.bottom().saturating_sub(2);
+    let theme_placeholder = Theme::default();
+
+    for (rev_idx, notification) in notifications.iter().rev().take(3).enumerate() {
+        let (badge, _) = notification_style(notification.kind, &theme_placeholder, basic_terminal);
+        let has_message =
+            !notification.message.is_empty() && notification.message != notification.title;
+
+        let max_card_width = (area.width.saturating_sub(4) as usize).min(72);
+        let title_w = crate::tui::text::width(&notification.title).saturating_add(6);
+        let badge_w = badge.len().saturating_add(6);
+        let raw_msg_w = if has_message {
+            crate::tui::text::width(&notification.message).saturating_add(6)
+        } else {
+            0
+        };
+
+        let target_card_width = title_w
+            .max(badge_w)
+            .max(raw_msg_w)
+            .clamp(20, max_card_width.max(20)) as u16;
+
+        let inner_width = (target_card_width.saturating_sub(4) as usize).max(1);
+
+        let msg_lines: Vec<String> = if has_message {
+            crate::tui::text::wrap_text(&notification.message, inner_width)
+                .into_iter()
+                .take(4)
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let height = 2 + 1 + msg_lines.len() as u16;
+
+        if target_card_width < 10 || y < area.y.saturating_add(height) {
+            break;
+        }
+
+        y = y.saturating_sub(height);
+
+        let toast_area = Rect::new(
+            area.right()
+                .saturating_sub(target_card_width)
+                .saturating_sub(2),
+            y,
+            target_card_width,
+            height,
+        );
+
+        let original_idx = notifications.len().saturating_sub(1 + rev_idx);
+        rects.push((original_idx, toast_area));
+
+        y = y.saturating_sub(1);
+    }
+    rects
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

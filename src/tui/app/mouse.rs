@@ -26,6 +26,32 @@ impl App {
     }
 
     fn handle_overlay_mouse(&mut self, col: u16, row: u16, area: Rect) -> bool {
+        if !self.state.notifications.is_empty() {
+            let rects = crate::tui::overlay::notification_rects(
+                area,
+                &self.state.notifications,
+                self.state.basic_terminal,
+            );
+            for (idx, rect) in rects {
+                if rect.contains(ratatui::layout::Position::new(col, row)) {
+                    self.state.notifications.remove(idx);
+                    return true;
+                }
+            }
+        }
+
+        if self.state.download_progress.is_some() {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(3)])
+                .split(area);
+            let dl_area = chunks[1];
+            if dl_area.contains(ratatui::layout::Position::new(col, row)) {
+                self.action_sender.send(Action::CancelDownload).ok();
+                return true;
+            }
+        }
+
         if self.state.show_theme_popup {
             let items: Vec<String> = crate::tui::theme::AVAILABLE_THEMES
                 .iter()
@@ -314,12 +340,7 @@ impl App {
                             self.addon_manager_activate();
                         }
                     } else if row == button_y {
-                        let rel_x = col.saturating_sub(popup.x + 1);
-                        if rel_x <= 25 {
-                            self.state.addon_manager_selected = addons_count + 1;
-                        } else {
-                            self.state.addon_manager_selected = addons_count + 2;
-                        }
+                        self.state.addon_manager_selected = addons_count + 1;
                         self.addon_manager_activate();
                     }
                 }
@@ -974,7 +995,7 @@ fn click_in_picker(
     if !popup.contains(ratatui::layout::Position::new(col, row)) {
         return None;
     }
-    let visible_rows = total_items.clamp(1, 8);
+    let visible_rows = total_items.clamp(1, crate::tui::overlay::max_picker_rows(popup));
     let offset = state.offset();
     let item_y = popup.y.saturating_add(1);
     if row >= item_y && (row - item_y) < visible_rows as u16 {

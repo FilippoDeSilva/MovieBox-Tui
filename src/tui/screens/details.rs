@@ -294,7 +294,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             {
                 let size = ratatui::layout::Size::new(poster_area.width, poster_area.height);
                 if let Ok(proto) =
-                    picker.new_protocol(img.clone(), size, ratatui_image::Resize::Fit(None))
+                    picker.new_protocol((**img).clone(), size, ratatui_image::Resize::Fit(None))
                 {
                     state.poster_protocol = Some((poster_area, proto));
                 }
@@ -375,7 +375,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     ));
     title_spans.push(Span::styled("   ", theme.text));
     title_spans.push(Span::styled(
-        format!("★ IMDb {}", imdb_rating),
+        format!(
+            "{}IMDb {}",
+            if state.basic_terminal { "* " } else { "★ " },
+            imdb_rating
+        ),
         theme.rating,
     ));
     let title_line = Line::from(title_spans);
@@ -415,7 +419,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .unwrap_or_default();
                 metadata.push(format!("{p_bar} {pct}{rem}"));
             } else if hist.completed {
-                metadata.push("[✓ Watched]".to_string());
+                metadata.push(if state.basic_terminal {
+                    "[Watched]".to_string()
+                } else {
+                    "[✓ Watched]".to_string()
+                });
             }
         }
     }
@@ -630,6 +638,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 language_count,
                 state.language_list_state.selected().unwrap_or(0),
                 theme,
+                state.basic_terminal,
             );
         }
     }
@@ -686,6 +695,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 state.available_seasons.len(),
                 state.season_list_state.selected().unwrap_or(0),
                 theme,
+                state.basic_terminal,
             );
         }
 
@@ -703,6 +713,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let subject_id = state.active_subject_id.as_deref().unwrap_or("");
             let provider = subject_provider(state, subject_id).cache_key();
 
+            let check_sym = if state.basic_terminal { "[x] " } else { "✓ " };
+            let play_sym = if state.basic_terminal { "> " } else { "▶ " };
             ep_numbers
                 .iter()
                 .map(|&ep| {
@@ -712,7 +724,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get_item(provider, subject_id, se_num, ep, Some(&title))
                     {
                         if hist.completed {
-                            ListItem::new(format!("✓ Episode {}", ep)).style(theme.text_dim)
+                            ListItem::new(format!("{}Episode {}", check_sym, ep))
+                                .style(theme.text_dim)
                         } else if hist.is_in_progress() {
                             let pct = hist
                                 .progress_percentage()
@@ -722,13 +735,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 .formatted_remaining()
                                 .map(|r| format!(" • {r}"))
                                 .unwrap_or_default();
-                            ListItem::new(format!("▶ Episode {}{pct}{remaining}", ep))
+                            ListItem::new(format!("{}Episode {}{pct}{remaining}", play_sym, ep))
                                 .style(theme.accent)
                         } else {
                             ListItem::new(format!("  Episode {}", ep)).style(theme.text)
                         }
                     } else if state.history.is_watched(provider, subject_id, se_num, ep) {
-                        ListItem::new(format!("✓ Episode {}", ep)).style(theme.text_dim)
+                        ListItem::new(format!("{}Episode {}", check_sym, ep)).style(theme.text_dim)
                     } else {
                         ListItem::new(format!("  Episode {}", ep)).style(theme.text)
                     }
@@ -784,6 +797,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 episode_count,
                 state.episode_list_state.selected().unwrap_or(0),
                 theme,
+                state.basic_terminal,
             );
         }
     }
@@ -1078,6 +1092,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     content_height,
                     rendered_position,
                     theme,
+                    state.basic_terminal,
                 );
             } else {
                 let has_multiple_dubs = state
@@ -1690,6 +1705,7 @@ fn render_scroll_indicator(
     content_length: usize,
     position: usize,
     theme: &Theme,
+    basic_terminal: bool,
 ) {
     let viewport_length = area.height.saturating_sub(2) as usize;
     if content_length <= viewport_length || viewport_length == 0 {
@@ -1704,8 +1720,21 @@ fn render_scroll_indicator(
         .orientation(ScrollbarOrientation::VerticalRight)
         .thumb_style(theme.lavender)
         .track_style(theme.surface1)
-        .begin_symbol(Some("▲"))
-        .end_symbol(Some("▼"));
+        .begin_symbol(if basic_terminal {
+            Some("^")
+        } else {
+            Some("▲")
+        })
+        .end_symbol(if basic_terminal {
+            Some("v")
+        } else {
+            Some("▼")
+        })
+        .track_symbol(if basic_terminal {
+            Some("|")
+        } else {
+            Some("│")
+        });
     frame.render_stateful_widget(
         scrollbar,
         area.inner(ratatui::layout::Margin {

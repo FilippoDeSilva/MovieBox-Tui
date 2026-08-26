@@ -5,7 +5,7 @@ use crate::tui::{
     event::EventHandler,
     state::{InputMode, Screen},
 };
-use ratatui::Frame;
+use ratatui::{Frame, layout::Rect};
 use std::time::Duration;
 
 enum ForcedProtocol {
@@ -67,6 +67,18 @@ impl App {
         }
 
         loop {
+            let want_beam =
+                self.state.input_mode == InputMode::Editing && !self.state.basic_terminal;
+            if want_beam != self.state.cursor_beam {
+                use crossterm::cursor::SetCursorStyle;
+                let style = if want_beam {
+                    SetCursorStyle::SteadyBar
+                } else {
+                    SetCursorStyle::DefaultUserShape
+                };
+                let _ = crossterm::execute!(std::io::stdout(), style);
+                self.state.cursor_beam = want_beam;
+            }
             self.state.normalize_result_view();
             if self.state.clear_terminal_before_draw {
                 if let Err(err) = terminal.clear() {
@@ -450,74 +462,11 @@ impl App {
     pub fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
 
-        if let Some((_, w, h)) = self.state.last_resize_time {
-            let sep = if self.state.basic_terminal { "x" } else { "×" };
-            let label = format!("{} {} {}", w, sep, h);
-            let label_len = label.chars().count() as u16 + 4;
-            let badge_w = label_len.min(area.width);
-            let badge_h = 1_u16;
-            let badge_x = area.x + (area.width.saturating_sub(badge_w)) / 2;
-            let badge_y = area.y + (area.height.saturating_sub(badge_h)) / 2;
-            let badge_area = ratatui::layout::Rect {
-                x: badge_x,
-                y: badge_y,
-                width: badge_w,
-                height: badge_h,
-            };
-            let line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
-                label,
-                self.theme.title,
-            )]);
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(line)
-                    .alignment(ratatui::layout::Alignment::Center),
-                badge_area,
-            );
+        if self.draw_resize_badge(frame, area) {
             return;
         }
 
-        if area.width < 50 || area.height < 14 {
-            use ratatui::layout::Alignment;
-            use ratatui::text::Line;
-            use ratatui::widgets::{Block, Borders, Paragraph};
-
-            if area.width < 4 || area.height < 2 {
-                return;
-            }
-
-            if area.width < 25 || area.height < 5 {
-                let p = Paragraph::new(format!("{}×{} (min 50×14)", area.width, area.height))
-                    .style(self.theme.lavender)
-                    .alignment(Alignment::Center);
-                frame.render_widget(p, area);
-                return;
-            }
-
-            let msg_lines = vec![
-                Line::from(format!(
-                    "Terminal too small ({}×{}).",
-                    area.width, area.height
-                )),
-                Line::from("Minimum required size: 50×14"),
-                Line::from("Please enlarge your terminal window."),
-            ];
-
-            let padding_top = area.height.saturating_sub(2).saturating_sub(3) / 2;
-            let mut msg = Vec::new();
-            for _ in 0..padding_top {
-                msg.push(Line::from(""));
-            }
-            msg.extend(msg_lines);
-
-            let p = Paragraph::new(msg)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(self.theme.border),
-                )
-                .alignment(Alignment::Center);
-
-            frame.render_widget(p, area);
+        if self.draw_too_small_gate(frame, area) {
             return;
         }
 
@@ -556,16 +505,111 @@ impl App {
         if self.state.show_help {
             crate::tui::screens::help::draw(frame, main_area, &self.state, &self.theme);
         }
+
+        self.draw_status_strip(frame, area);
+        self.draw_download_gauge(frame, download_area);
+        self.draw_theme_picker(frame, area);
+        self.draw_update_modal(frame, area);
+
+        crate::tui::overlay::notifications(
+            frame,
+            area,
+            &self.state.notifications,
+            &self.theme,
+            self.state.basic_terminal,
+        );
+    }
+
+    fn draw_resize_badge(&self, frame: &mut Frame, area: Rect) -> bool {
+        if let Some((_, w, h)) = self.state.last_resize_time {
+            let sep = if self.state.basic_terminal { "x" } else { "×" };
+            let label = format!("{} {} {}", w, sep, h);
+            let label_len = label.chars().count() as u16 + 4;
+            let badge_w = label_len.min(area.width);
+            let badge_h = 1_u16;
+            let badge_x = area.x + (area.width.saturating_sub(badge_w)) / 2;
+            let badge_y = area.y + (area.height.saturating_sub(badge_h)) / 2;
+            let badge_area = ratatui::layout::Rect {
+                x: badge_x,
+                y: badge_y,
+                width: badge_w,
+                height: badge_h,
+            };
+            let line = ratatui::text::Line::from(vec![ratatui::text::Span::styled(
+                label,
+                self.theme.title,
+            )]);
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(line)
+                    .alignment(ratatui::layout::Alignment::Center),
+                badge_area,
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    fn draw_too_small_gate(&self, frame: &mut Frame, area: Rect) -> bool {
+        if area.width < 50 || area.height < 14 {
+            use ratatui::layout::Alignment;
+            use ratatui::text::Line;
+            use ratatui::widgets::{Block, Borders, Paragraph};
+
+            if area.width < 4 || area.height < 2 {
+                return true;
+            }
+
+            if area.width < 25 || area.height < 5 {
+                let p = Paragraph::new(format!("{}×{} (min 50×14)", area.width, area.height))
+                    .style(self.theme.lavender)
+                    .alignment(Alignment::Center);
+                frame.render_widget(p, area);
+                return true;
+            }
+
+            let msg_lines = vec![
+                Line::from(format!(
+                    "Terminal too small ({}×{}).",
+                    area.width, area.height
+                )),
+                Line::from("Minimum required size: 50×14"),
+                Line::from("Please enlarge your terminal window."),
+            ];
+
+            let padding_top = area.height.saturating_sub(2).saturating_sub(3) / 2;
+            let mut msg = Vec::new();
+            for _ in 0..padding_top {
+                msg.push(Line::from(""));
+            }
+            msg.extend(msg_lines);
+
+            let p = Paragraph::new(msg)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(self.theme.border),
+                )
+                .alignment(Alignment::Center);
+
+            frame.render_widget(p, area);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn draw_status_strip(&self, frame: &mut Frame, area: Rect) {
         if self.state.status_timer > 0 && !self.state.status_message.is_empty() {
-            let bottom = frame.area().height.saturating_sub(1);
+            let bottom = area.height.saturating_sub(1);
             let message = crate::tui::text::truncate_width(
-                &self.state.status_message.clone(),
-                (frame.area().width as usize).saturating_sub(4),
+                &self.state.status_message,
+                (area.width as usize).saturating_sub(4),
             );
             let strip_area = ratatui::layout::Rect {
                 x: 0,
                 y: bottom,
-                width: frame.area().width,
+                width: area.width,
                 height: 1,
             };
             frame.render_widget(
@@ -575,7 +619,9 @@ impl App {
                 strip_area,
             );
         }
+    }
 
+    fn draw_download_gauge(&self, frame: &mut Frame, download_area: Option<Rect>) {
         if let Some(prog) = self.state.download_progress {
             if let Some(dl_area) = download_area {
                 use ratatui::widgets::{Block, Borders, Gauge};
@@ -614,7 +660,9 @@ impl App {
                 frame.render_widget(gauge, dl_area);
             }
         }
+    }
 
+    fn draw_theme_picker(&mut self, frame: &mut Frame, area: Rect) {
         if self.state.show_theme_popup {
             let items: Vec<String> = crate::tui::theme::AVAILABLE_THEMES
                 .iter()
@@ -634,7 +682,9 @@ impl App {
                 self.state.basic_terminal,
             );
         }
+    }
 
+    fn draw_update_modal(&self, frame: &mut Frame, area: Rect) {
         if let Some((version, notes)) = &self.state.update_available {
             use ratatui::layout::Alignment;
             use ratatui::text::{Line, Span};
@@ -651,7 +701,7 @@ impl App {
                 .filter(|l| !l.is_empty())
                 .collect();
 
-            crate::tui::clear_area(frame, area, &self.theme);
+            crate::tui::overlay::clear_modal_area(frame, area, popup_area, &self.theme);
 
             let mut text = vec![
                 Line::from(vec![Span::styled(
@@ -693,7 +743,14 @@ impl App {
                     || trimmed.starts_with("# ")
                 {
                     let text_start = trimmed.find(' ').unwrap_or(0);
-                    spans.push(Span::styled("▌ ", self.theme.accent));
+                    spans.push(Span::styled(
+                        if self.state.basic_terminal {
+                            "> "
+                        } else {
+                            "▌ "
+                        },
+                        self.theme.accent,
+                    ));
                     spans.push(Span::styled(
                         crate::tui::text::truncate_width(
                             &trimmed[text_start..],
@@ -703,7 +760,14 @@ impl App {
                     ));
                 } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
                     let text_start = trimmed.find(' ').unwrap_or(0) + 1;
-                    spans.push(Span::styled("• ", self.theme.accent));
+                    spans.push(Span::styled(
+                        if self.state.basic_terminal {
+                            "- "
+                        } else {
+                            "• "
+                        },
+                        self.theme.accent,
+                    ));
                     spans.push(Span::raw(crate::tui::text::truncate_width(
                         trimmed[text_start..].trim_start(),
                         line_width.saturating_sub(4),
@@ -751,13 +815,5 @@ impl App {
             let popup = Paragraph::new(text).block(block);
             frame.render_widget(popup, popup_area);
         }
-
-        crate::tui::overlay::notifications(
-            frame,
-            area,
-            &self.state.notifications,
-            &self.theme,
-            self.state.basic_terminal,
-        );
     }
 }

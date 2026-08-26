@@ -871,7 +871,7 @@ impl App {
                             .get(&item.id)
                             .or_else(|| self.state.search_posters.get(&item.id))
                         {
-                            self.state.poster_image = Some((**cached).clone());
+                            self.state.poster_image = Some(std::sync::Arc::clone(cached));
                         } else {
                             self.state.poster_image = None;
                         }
