@@ -85,14 +85,12 @@ impl App {
         if !self.state.search_results.is_empty() {
             self.prefetch_visible_posters();
         }
-        self.state.set_status(
-            if self.state.search_results.is_empty() {
+        self.state
+            .set_status_default(if self.state.search_results.is_empty() {
                 format!("No matches for '{}'.", query)
             } else {
                 format!("Found {} channels.", self.state.search_results.len())
-            },
-            150,
-        );
+            });
     }
 
     pub(super) fn handle_search_command(&mut self, query: &str, lower_query: &str) -> Option<bool> {
@@ -152,12 +150,10 @@ impl App {
                 if !self.state.is_checking_updates {
                     self.state.update_available = None;
                     self.state.manual_update_check = true;
-                    self.state
-                        .set_status("Checking GitHub for updates...".to_string(), 180);
+                    self.state.set_status_long("Checking GitHub for updates...");
                     self.action_sender.send(Action::CheckForUpdates).ok();
                 } else {
-                    self.state
-                        .set_status("Checking GitHub for updates...".to_string(), 180);
+                    self.state.set_status_long("Checking GitHub for updates...");
                 }
                 Some(true)
             }
@@ -541,7 +537,7 @@ impl App {
         self.state.poster_image = None;
         self.state.poster_protocol = None;
         self.state
-            .set_status(format!("Searching for '{}'...", query), 150);
+            .set_status_default(format!("Searching for '{}'...", query));
         self.request_context()
     }
 
@@ -658,8 +654,7 @@ impl App {
             self.state.preview_loading = false;
             self.state.poster_image = None;
             self.state.poster_protocol = None;
-            self.state
-                .set_status("Loading discover tab...".to_string(), 150);
+            self.state.set_status_default("Loading discover tab...");
         }
     }
 
@@ -671,8 +666,7 @@ impl App {
         self.state
             .fetch_cancel
             .store(false, std::sync::atomic::Ordering::Relaxed);
-        self.state
-            .set_status("Fetching details...".to_string(), 150);
+        self.state.set_status_default("Fetching details...");
         self.state.stream_pool.clear();
 
         let provider = self.provider_for_subject(id);

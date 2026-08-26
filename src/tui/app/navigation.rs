@@ -53,7 +53,7 @@ impl App {
         self.state.resource_list_state.select(None);
         self.state.dirty = true;
         self.state
-            .set_status(format!("Provider: {}", provider.label()), 150);
+            .set_status_default(format!("Provider: {}", provider.label()));
         self.persist_config();
         if provider == ProviderKind::MovieBox {
             let client = self.service.client.clone();
@@ -302,7 +302,7 @@ impl App {
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
-                self.state.set_status("Loading streams...".to_string(), 90);
+                self.state.set_status_short("Loading streams...");
                 self.state.pending_episode_fetch = None;
                 let sender = self.action_sender.clone();
                 let context = self.request_context();
@@ -324,7 +324,7 @@ impl App {
                 self.state.selected_resources = None;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
-                self.state.set_status("Loading streams...".to_string(), 90);
+                self.state.set_status_short("Loading streams...");
 
                 self.state.pending_episode_fetch = Some((id.clone(), se, ep));
                 self.state.last_episode_nav = std::time::Instant::now();
@@ -435,7 +435,7 @@ impl App {
                         self.state.poster_image = None;
                         self.state.poster_protocol = None;
                         self.state.search_list_state.select(None);
-                        self.state.set_status("Search cleared.".to_string(), 150);
+                        self.state.set_status_default("Search cleared.");
                     }
                     Screen::Details => {
                         self.state
@@ -462,7 +462,7 @@ impl App {
                         self.state.is_loading = false;
                         self.state.language_chosen = false;
                         self.state
-                            .set_status("Select a movie/series and press Enter".to_string(), 150);
+                            .set_status_default("Select a movie/series and press Enter");
                     }
                 }
             }
@@ -480,7 +480,7 @@ impl App {
                     self.state.language_list_state.select(Some(idx));
                     if self.state.active_subject_id.as_deref() == Some(&next_id) {
                         if !self.state.stream_pool.contains_key(&next_id) {
-                            self.state.set_status("Loading streams...".to_string(), 150);
+                            self.state.set_status_default("Loading streams...");
                             self.action_sender
                                 .send(Action::InitStreamPool(next_id))
                                 .ok();
@@ -488,8 +488,7 @@ impl App {
                             self.trigger_episode_fetch();
                         }
                     } else {
-                        self.state
-                            .set_status("Switching language...".to_string(), 150);
+                        self.state.set_status_default("Switching language...");
                         self.action_sender
                             .send(Action::FetchDetails(next_id, false))
                             .ok();
@@ -753,13 +752,10 @@ impl App {
                     if let Some(player) = self.state.available_players.get(idx).copied() {
                         if let Some(source) = self.state.player_picker_playback.clone() {
                             if !crate::tui::player::supports_headers(player, &source.headers) {
-                                self.state.set_status(
-                                    format!(
-                                        "{} cannot play this source; choose mpv or IINA.",
-                                        player.label()
-                                    ),
-                                    180,
-                                );
+                                self.state.set_status_long(format!(
+                                    "{} cannot play this source; choose mpv or IINA.",
+                                    player.label()
+                                ));
                                 return None;
                             }
                         }
@@ -875,7 +871,7 @@ impl App {
                         }
                         self.state.available_seasons.clear();
                         self.state
-                            .set_status(format!("Loading details for {}...", item.title), 150);
+                            .set_status_default(format!("Loading details for {}...", item.title));
 
                         let sender = self.action_sender.clone();
                         sender

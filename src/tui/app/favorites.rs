@@ -185,7 +185,7 @@ impl App {
             self.state.poster_image = None;
         }
         self.state
-            .set_status(format!("Loading details for {title}..."), 150);
+            .set_status_default(format!("Loading details for {title}..."));
 
         self.action_sender
             .send(Action::FetchDetails(subject_id, false))

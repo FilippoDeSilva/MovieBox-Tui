@@ -85,10 +85,10 @@ impl App {
                                 } else {
                                     None
                                 });
-                                self.state.set_status(
-                                    format!("Resolved {} direct stream sources (cached).", count),
-                                    150,
-                                );
+                                self.state.set_status_default(format!(
+                                    "Resolved {} direct stream sources (cached).",
+                                    count
+                                ));
                             }
                         }
 
@@ -151,13 +151,12 @@ impl App {
                 Screen::Home => {
                     let query = self.state.search_query.trim().to_string();
                     if self.state.is_tv_mode {
-                        self.state
-                            .set_status("Reloading TV playlists...".to_string(), 150);
+                        self.state.set_status_default("Reloading TV playlists...");
                         self.reload_tv_playlists();
                     } else if let Some(preset) = self.state.active_browse_preset {
                         self.state.is_loading = true;
                         self.state
-                            .set_status(format!("Reloading {}...", preset.label()), 150);
+                            .set_status_default(format!("Reloading {}...", preset.label()));
                         let tab_id = if self.state.current_tab_id.is_empty() {
                             "2".to_string()
                         } else {
@@ -257,7 +256,7 @@ impl App {
                     self.state.tv_channels.clear();
                 }
                 self.prepare_image_soft_refresh();
-                self.state.set_status("Clearing cache...".to_string(), 150);
+                self.state.set_status_default("Clearing cache...");
                 self.state.dirty = true;
             }
 
@@ -319,10 +318,8 @@ impl App {
                     && self.state.active_provider
                         != crate::providers::models::ProviderKind::MovieBox
                 {
-                    self.state.set_status(
-                        "Browse is available only with the MovieBox provider.".to_string(),
-                        180,
-                    );
+                    self.state
+                        .set_status_long("Browse is available only with the MovieBox provider.");
                 } else {
                     self.reset_transient_overlays();
                     self.state.show_browse_popup = true;
@@ -356,7 +353,7 @@ impl App {
                         msg.trim_start_matches("Error:").trim(),
                     );
                 } else {
-                    self.state.set_status(msg, 150);
+                    self.state.set_status_default(msg);
                 }
             }
 
@@ -387,13 +384,10 @@ impl App {
                 match result {
                     Ok(None) => {
                         if self.state.manual_update_check {
-                            self.state.set_status(
-                                format!(
-                                    "MovieBox-Tui is up to date (v{}).",
-                                    env!("CARGO_PKG_VERSION")
-                                ),
-                                180,
-                            );
+                            self.state.set_status_long(format!(
+                                "MovieBox-Tui is up to date (v{}).",
+                                env!("CARGO_PKG_VERSION")
+                            ));
                             self.state.notify(
                                 NotificationKind::Success,
                                 "Up to date",
@@ -408,7 +402,7 @@ impl App {
                     Err(err) => {
                         if self.state.manual_update_check {
                             self.state
-                                .set_status(format!("Update check failed: {err}"), 180);
+                                .set_status_long(format!("Update check failed: {err}"));
                             self.state
                                 .notify(NotificationKind::Error, "Update check failed", err);
                         }
@@ -445,8 +439,7 @@ impl App {
 
                 self.state.is_updating = true;
                 self.state.update_available = None;
-                self.state
-                    .set_status("Starting self-update...".to_string(), 180);
+                self.state.set_status_long("Starting self-update...");
                 self.state.notify(
                     NotificationKind::Info,
                     "Self-Update",
@@ -488,7 +481,7 @@ impl App {
             }
 
             Action::SelfUpdateProgress(msg) => {
-                self.state.set_status(msg, 180);
+                self.state.set_status_long(msg);
             }
 
             Action::SelfUpdateComplete(result) => {
@@ -496,7 +489,7 @@ impl App {
                 match result {
                     Ok(crate::updater::SelfUpdateOutcome::Success) => {
                         self.state
-                            .set_status("Update successful! Restarting...".to_string(), 180);
+                            .set_status_long("Update successful! Restarting...");
                         self.state.notify(
                             NotificationKind::Success,
                             "Update Installed",
@@ -523,7 +516,7 @@ impl App {
                             .notify(NotificationKind::Warning, "Manual Update Required", msg);
                     }
                     Err(err) => {
-                        self.state.set_status(format!("Update failed: {err}"), 240);
+                        self.state.set_status_long(format!("Update failed: {err}"));
                         self.state
                             .notify(NotificationKind::Error, "Update Failed", err);
                     }

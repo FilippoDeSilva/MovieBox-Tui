@@ -594,9 +594,8 @@ impl App {
             Action::ShowPlaybackPicker(source) => {
                 self.state.is_resolving_playback = false;
                 if self.state.available_players.is_empty() {
-                    self.state.set_status(
+                    self.state.set_status_default(
                         "No media player found. Install mpv, IINA, VLC, or use Android Player.",
-                        150,
                     );
                     return None;
                 }
@@ -639,13 +638,10 @@ impl App {
                 self.state.player_picker_popup = false;
                 self.state.last_playback_launch = std::time::Instant::now();
                 if !crate::tui::player::supports_headers(kind, &source.headers) {
-                    self.state.set_status(
-                        format!(
-                            "This source needs headers {} cannot provide; use mpv or IINA.",
-                            kind.label()
-                        ),
-                        180,
-                    );
+                    self.state.set_status_long(format!(
+                        "This source needs headers {} cannot provide; use mpv or IINA.",
+                        kind.label()
+                    ));
                     return None;
                 }
                 self.launch_player(kind, source.url, source.subtitle, source.headers);

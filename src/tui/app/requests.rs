@@ -225,9 +225,8 @@ impl App {
                 }
                 if self.state.active_provider != ProviderKind::MovieBox {
                     self.state.is_loading = false;
-                    self.state.set_status(
+                    self.state.set_status_long(
                         "This provider exposes search, not a shared MovieBox homepage.",
-                        180,
                     );
                     return None;
                 }
@@ -237,10 +236,8 @@ impl App {
 
             Action::SelectBrowse(preset) => {
                 if self.state.active_provider != ProviderKind::MovieBox {
-                    self.state.set_status(
-                        "Browse is available only with the MovieBox provider.".to_string(),
-                        180,
-                    );
+                    self.state
+                        .set_status_long("Browse is available only with the MovieBox provider.");
                     return None;
                 }
                 self.state.show_browse_popup = false;
@@ -467,8 +464,8 @@ impl App {
                     self.prepare_image_refresh();
                 }
 
-                self.state.set_status(
-                    if self.state.search_results.is_empty() {
+                self.state
+                    .set_status_default(if self.state.search_results.is_empty() {
                         format!(
                             "No matches for '{}' on {}. Press Ctrl+P to try another provider.",
                             query,
@@ -480,9 +477,7 @@ impl App {
                             self.state.search_results.len(),
                             context.provider.label()
                         )
-                    },
-                    150,
-                );
+                    });
                 if page <= 1 {
                     if let Some(res) = self.state.search_results.first() {
                         self.state.search_list_state.select(Some(0));
@@ -526,7 +521,7 @@ impl App {
                 }
                 self.state.search_error = Some(err.clone());
                 self.state
-                    .set_status(format!("Search failed: {}", err), 150);
+                    .set_status_default(format!("Search failed: {}", err));
             }
 
             Action::HomepageSuccess {
@@ -605,7 +600,7 @@ impl App {
                     .unwrap_or_else(|| {
                         format!("Found {} discover items", self.state.search_results.len())
                     });
-                self.state.set_status(status, 150);
+                self.state.set_status_default(status);
             }
 
             Action::HomepageFailure(request_id, err) => {
@@ -625,7 +620,7 @@ impl App {
                 self.state.search_poster_protocols.clear();
                 self.state.in_flight_posters.clear();
                 self.state
-                    .set_status(format!("Discover failed: {}", err), 150);
+                    .set_status_default(format!("Discover failed: {}", err));
             }
 
             Action::FetchDetails(id, force_refresh) => {
@@ -901,7 +896,7 @@ impl App {
                 }
                 self.state.preview_loading = false;
                 self.state
-                    .set_status(format!("Preview failed: {}", err), 150);
+                    .set_status_default(format!("Preview failed: {}", err));
             }
 
             Action::DetailsSuccess(context, request_id, id, payload) => {
@@ -1238,7 +1233,7 @@ impl App {
                     self.state.details_pane = crate::tui::state::DetailsPane::Languages;
                     self.state.is_loading = false;
                     self.state
-                        .set_status("Please select a language dubbing.".to_string(), 150);
+                        .set_status_default("Please select a language dubbing.");
                 } else {
                     if !self.state.language_chosen {
                         if stype == 2 && !self.state.available_seasons.is_empty() {
@@ -1277,7 +1272,7 @@ impl App {
                 self.state.is_fetching_streams = false;
                 self.state.stream_error = None;
                 self.state
-                    .set_status(format!("Details fetch failed: {}", err), 150);
+                    .set_status_default(format!("Details fetch failed: {}", err));
 
                 if self.state.active_screen == Screen::Details {
                     if let Some(id) = self.state.active_subject_id.clone().or_else(|| {
@@ -1981,7 +1976,7 @@ impl App {
                     .resource_list_state
                     .select(if count > 0 { Some(0) } else { None });
                 self.state
-                    .set_status(format!("{} streams available.", count), 150);
+                    .set_status_default(format!("{} streams available.", count));
 
                 if self.state.is_waiting_for_download_stream {
                     self.state.is_waiting_for_download_stream = false;
@@ -2048,7 +2043,7 @@ impl App {
                     target_ep
                 );
                 self.state.stream_error = Some(err.clone());
-                self.state.set_status(format!("Error: {}", err), 150);
+                self.state.set_status_default(format!("Error: {}", err));
             }
             _ => return None,
         }
