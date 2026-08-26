@@ -320,9 +320,16 @@ impl App {
             }
 
             Action::SelectTheme(theme_name) => {
-                let kind = crate::tui::theme::ThemeKind::parse(&theme_name);
-                self.state.active_theme_kind = kind.as_str().to_string();
-                self.theme = crate::tui::theme::Theme::from_kind(kind);
+                if theme_name.is_empty() && self.state.theme_is_auto {
+                    // Esc from the picker with no explicit theme configured:
+                    // restore the auto-detected theme instead of forcing Mocha.
+                    self.theme = crate::tui::theme::Theme::detect();
+                } else {
+                    let kind = crate::tui::theme::ThemeKind::parse(&theme_name);
+                    self.state.active_theme_kind = kind.as_str().to_string();
+                    self.state.theme_is_auto = false;
+                    self.theme = crate::tui::theme::Theme::from_kind(kind);
+                }
                 if !self.state.show_theme_popup {
                     self.persist_config();
                 }

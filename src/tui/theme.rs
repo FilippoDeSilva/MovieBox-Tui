@@ -110,6 +110,45 @@ impl Default for Theme {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSupport {
+    NoColor,
+    Truecolor,
+    Color256,
+    Basic,
+}
+
+pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str) -> ColorSupport {
+    let colorterm = colorterm.to_lowercase();
+    let term = term.to_lowercase();
+    let truecolor = colorterm == "truecolor"
+        || colorterm == "24bit"
+        || term.contains("truecolor")
+        || term.contains("kitty")
+        || term.contains("ghostty")
+        || std::env::var("WT_SESSION").is_ok()
+        || term_program == "iTerm.app"
+        || term_program == "Hyper"
+        || term_program == "Tabby"
+        || term_program == "WezTerm"
+        || term_program == "WarpTerminal"
+        || term_program == "vscode"
+        || term_program == "ghostty";
+    if truecolor {
+        return ColorSupport::Truecolor;
+    }
+    let basic = term == "dumb" || term == "linux" || term.contains("fbterm");
+    let apple_term = term.contains("apple") || term_program == "Apple_Terminal";
+    let has_256 = term.contains("256") || term.contains("xterm") || term.contains("screen");
+    if basic || (apple_term && !has_256) || term == "xterm" {
+        ColorSupport::Basic
+    } else if has_256 {
+        ColorSupport::Color256
+    } else {
+        ColorSupport::Basic
+    }
+}
+
 impl Theme {
     pub fn mocha() -> Self {
         Self {
@@ -214,57 +253,52 @@ impl Theme {
             ThemeKind::Mocha => Self::mocha(),
         }
     }
+}
 
-    pub fn new() -> Self {
-        let colorterm = std::env::var("COLORTERM")
-            .unwrap_or_default()
-            .to_lowercase();
-        let term = std::env::var("TERM").unwrap_or_default().to_lowercase();
+impl Theme {
+    /// Detects the best theme for the current terminal.
+    ///
+    /// Explicit user choices (`MOVIEBOX_THEME` / saved config) are resolved by
+    /// the caller and take precedence; this path only runs when no explicit
+    /// choice exists.
+    pub fn detect() -> Self {
+        Self::detect_with_light(None)
+    }
+
+    /// Like [`Theme::detect`] but overrides the light/dark decision (for
+    /// example from an OSC 11 background-color query).
+    pub fn detect_with_light(light: Option<bool>) -> Self {
+        let resolved_light = light.unwrap_or_else(crate::tui::terminal::background_is_light);
+        if std::env::var("NO_COLOR").is_ok() {
+            return Self::monochrome(resolved_light);
+        }
+        let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+        let term = std::env::var("TERM").unwrap_or_default();
         let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-        let has_no_color = std::env::var("NO_COLOR").is_ok();
-        let is_light = crate::tui::terminal::background_is_light();
+        Self::detect_from(
+            classify_terminal(&colorterm, &term, &term_program),
+            resolved_light,
+        )
+    }
 
-        if has_no_color {
-            return Self::monochrome(is_light);
-        }
-
-        if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
-            return Self::from_kind(ThemeKind::parse(&theme_env));
-        }
-
-        let truecolor = colorterm == "truecolor"
-            || colorterm == "24bit"
-            || term.contains("truecolor")
-            || term.contains("kitty")
-            || std::env::var("WT_SESSION").is_ok()
-            || term_program == "iTerm.app"
-            || term_program == "Hyper"
-            || term_program == "Tabby"
-            || term_program == "WezTerm"
-            || term_program == "WarpTerminal"
-            || term_program == "vscode"
-            || term_program == "ghostty";
-
-        let basic = term == "dumb" || term == "linux" || term.contains("fbterm");
-        let apple_term = term.contains("apple") || term_program == "Apple_Terminal";
-        let has_256 = term.contains("256") || term.contains("xterm") || term.contains("screen");
-
-        if truecolor {
-            if is_light {
-                Self::latte()
-            } else {
-                Self::mocha()
+    pub(crate) fn detect_from(support: ColorSupport, is_light: bool) -> Self {
+        match support {
+            ColorSupport::NoColor => Self::monochrome(is_light),
+            ColorSupport::Truecolor => {
+                if is_light {
+                    Self::latte()
+                } else {
+                    Self::mocha()
+                }
             }
-        } else if basic || (apple_term && !has_256) || term == "xterm" {
-            Self::fallback(is_light)
-        } else if has_256 {
-            if is_light {
-                Self::latte().quantized_to_256()
-            } else {
-                Self::mocha().quantized_to_256()
+            ColorSupport::Color256 => {
+                if is_light {
+                    Self::latte().quantized_to_256()
+                } else {
+                    Self::mocha().quantized_to_256()
+                }
             }
-        } else {
-            Self::fallback(is_light)
+            ColorSupport::Basic => Self::fallback(is_light),
         }
     }
 
@@ -837,5 +871,56 @@ mod tests {
     fn monochrome_dark_uses_light_foreground() {
         let mono = Theme::monochrome(false);
         assert_eq!(mono.text.fg, Some(Color::White));
+    }
+
+    #[test]
+    fn classify_maps_common_terminals() {
+        use crate::tui::theme::ColorSupport;
+        assert_eq!(
+            classify_terminal("truecolor", "xterm-256color", ""),
+            ColorSupport::Truecolor
+        );
+        assert_eq!(
+            classify_terminal("", "xterm-kitty", ""),
+            ColorSupport::Truecolor
+        );
+        assert_eq!(
+            classify_terminal("", "xterm-ghostty", ""),
+            ColorSupport::Truecolor
+        );
+        assert_eq!(
+            classify_terminal("", "xterm-256color", "ghostty"),
+            ColorSupport::Truecolor
+        );
+        assert_eq!(
+            classify_terminal("", "xterm-256color", ""),
+            ColorSupport::Color256
+        );
+        assert_eq!(
+            classify_terminal("", "screen.xterm-256color", ""),
+            ColorSupport::Color256
+        );
+        assert_eq!(classify_terminal("", "vt100", ""), ColorSupport::Basic);
+        assert_eq!(classify_terminal("", "dumb", ""), ColorSupport::Basic);
+        assert_eq!(
+            classify_terminal("", "xterm", "Apple_Terminal"),
+            ColorSupport::Basic
+        );
+    }
+
+    #[test]
+    fn detect_from_matches_support_matrix() {
+        let quantized = Theme::detect_from(ColorSupport::Color256, false);
+        for style in [quantized.border, quantized.accent, quantized.bg] {
+            assert!(
+                style
+                    .fg
+                    .map(|c| !matches!(c, Color::Rgb(..)))
+                    .unwrap_or(true)
+            );
+        }
+        assert!(!Theme::detect_from(ColorSupport::Truecolor, false).is_light);
+        assert!(Theme::detect_from(ColorSupport::Truecolor, true).is_light);
+        assert!(!Theme::detect_from(ColorSupport::NoColor, false).is_light);
     }
 }

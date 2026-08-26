@@ -21,6 +21,7 @@ impl App {
                 tokio::task::spawn_blocking(|| {
                     let options = ratatui_image::picker::cap_parser::QueryStdioOptions {
                         timeout: Duration::from_millis(400),
+                        terminal_background_color_osc: true,
                         ..Default::default()
                     };
                     ratatui_image::picker::Picker::from_query_stdio_with_options(options).ok()
@@ -30,6 +31,25 @@ impl App {
             } else {
                 None
             };
+            if self.state.theme_is_auto
+                && let Some(background) = picker.as_ref().and_then(|p| {
+                    p.capabilities()
+                        .iter()
+                        .find_map(|capability| match capability {
+                            ratatui_image::picker::Capability::Background(red, green, blue) => {
+                                Some((*red, *green, *blue))
+                            }
+                            _ => None,
+                        })
+                })
+            {
+                let luminance = 0.2126 * f32::from(background.0)
+                    + 0.7152 * f32::from(background.1)
+                    + 0.0722 * f32::from(background.2);
+                let is_light = luminance > 128.0;
+                self.theme = crate::tui::theme::Theme::detect_with_light(Some(is_light));
+                self.state.active_theme_kind = if is_light { "Latte" } else { "Mocha" }.to_string();
+            }
             if let Some(picker) = picker
                 && !matches!(
                     picker.protocol_type(),
