@@ -48,23 +48,70 @@ pub fn md5_hex(value: &str) -> String {
 
 pub fn atomic_write_file(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).ok();
+        fs::create_dir_all(parent).ok();
     }
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
     let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    std::fs::write(&temporary, bytes)?;
-    if std::fs::rename(&temporary, path).is_err() {
-        let _ = std::fs::remove_file(path);
-        if let Err(error) = std::fs::rename(&temporary, path) {
-            let _ = std::fs::remove_file(&temporary);
-            return Err(error);
+    write_durable(&temporary, bytes)?;
+    match durable_replace(&temporary, path, &format!("{stamp}-f")) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            let _ = fs::remove_file(&temporary);
+            Err(error)
         }
     }
-    Ok(())
 }
+
+fn write_durable(target: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut file = fs::File::create(target)?;
+    file.write_all(bytes)?;
+    file.sync_all()
+}
+
+fn durable_replace(
+    temporary: &std::path::Path,
+    path: &std::path::Path,
+    suffix: &str,
+) -> std::io::Result<()> {
+    if fs::rename(temporary, path).is_ok() {
+        sync_parent_dir(path);
+        return Ok(());
+    }
+    let copy_target = path.with_extension(format!("tmp-{}-{suffix}", std::process::id()));
+    let outcome = fs::copy(temporary, &copy_target)
+        .and_then(|_| {
+            let file = fs::File::open(&copy_target)?;
+            file.sync_all()
+        })
+        .and_then(|_| fs::rename(&copy_target, path));
+    let _ = fs::remove_file(&copy_target);
+    match outcome {
+        Ok(()) => {
+            sync_parent_dir(path);
+            Ok(())
+        }
+        Err(_) => Err(std::io::Error::other(format!(
+            "atomic replace failed for {}",
+            crate::logging::sanitize_path(path)
+        ))),
+    }
+}
+
+#[cfg(unix)]
+fn sync_parent_dir(path: &std::path::Path) {
+    if let Some(parent) = path.parent()
+        && let Ok(dir) = fs::File::open(parent)
+    {
+        let _ = dir.sync_all();
+    }
+}
+
+#[cfg(not(unix))]
+fn sync_parent_dir(_path: &std::path::Path) {}
 
 pub async fn atomic_write_file_async(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
@@ -75,15 +122,47 @@ pub async fn atomic_write_file_async(path: &std::path::Path, bytes: &[u8]) -> st
         .unwrap_or_default()
         .as_nanos();
     let temporary = path.with_extension(format!("tmp-{}-{stamp}", std::process::id()));
-    tokio::fs::write(&temporary, bytes).await?;
-    if tokio::fs::rename(&temporary, path).await.is_err() {
-        let _ = tokio::fs::remove_file(path).await;
-        if let Err(error) = tokio::fs::rename(&temporary, path).await {
+    write_durable_async(&temporary, bytes).await?;
+    match durable_replace_async(&temporary, path, &format!("{stamp}-f")).await {
+        Ok(()) => Ok(()),
+        Err(error) => {
             let _ = tokio::fs::remove_file(&temporary).await;
-            return Err(error);
+            Err(error)
         }
     }
-    Ok(())
+}
+
+async fn write_durable_async(target: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let mut file = tokio::fs::File::create(target).await?;
+    file.write_all(bytes).await?;
+    file.sync_all().await
+}
+
+async fn durable_replace_async(
+    temporary: &std::path::Path,
+    path: &std::path::Path,
+    suffix: &str,
+) -> std::io::Result<()> {
+    if tokio::fs::rename(temporary, path).await.is_ok() {
+        return Ok(());
+    }
+    let copy_target = path.with_extension(format!("tmp-{}-{suffix}", std::process::id()));
+    let outcome = async {
+        tokio::fs::copy(temporary, &copy_target).await?;
+        let file = tokio::fs::File::open(&copy_target).await?;
+        file.sync_all().await?;
+        tokio::fs::rename(&copy_target, path).await
+    }
+    .await;
+    let _ = tokio::fs::remove_file(&copy_target).await;
+    match outcome {
+        Ok(()) => Ok(()),
+        Err(_) => Err(std::io::Error::other(format!(
+            "atomic replace failed for {}",
+            crate::logging::sanitize_path(path)
+        ))),
+    }
 }
 
 fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
@@ -452,4 +531,81 @@ pub fn get_captions_cache(subject_id: &str, resource_id: &str) -> Option<serde_j
 
 pub fn set_captions_cache(subject_id: &str, resource_id: &str, data: &serde_json::Value) {
     write_json_cache(&get_captions_path(subject_id, resource_id), data);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unique_dir(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "mbx_cache_{}_{}_{}",
+            label,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).expect("create test dir");
+        dir
+    }
+
+    #[test]
+    fn overwrite_replaces_content_and_leaves_no_temporaries() {
+        let dir = unique_dir("overwrite");
+        let target = dir.join("state.json");
+        atomic_write_file(&target, b"v1").expect("first write");
+        atomic_write_file(&target, b"v2").expect("second write");
+        assert_eq!(fs::read_to_string(&target).unwrap(), "v2");
+        let leftovers: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|name| name.contains("tmp-"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temporaries left behind: {leftovers:?}"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn failed_replace_preserves_existing_destination() {
+        let dir = unique_dir("preserve");
+        let destination = dir.join("not-a-file-target-dir");
+        fs::create_dir_all(&destination).expect("destination directory");
+        atomic_write_file(&destination.parent().unwrap().join("seed"), b"seed").ok();
+        // Renaming a file onto an existing directory always fails; the
+        // destination must survive untouched.
+        let result = atomic_write_file(&destination, b"payload");
+        assert!(result.is_err());
+        assert!(destination.is_dir(), "existing destination was destroyed");
+        let leftovers: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|name| name.contains("tmp-"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temporaries left behind: {leftovers:?}"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn async_overwrite_replaces_content() {
+        let dir = unique_dir("async");
+        let target = dir.join("state.json");
+        atomic_write_file_async(&target, b"one")
+            .await
+            .expect("write");
+        atomic_write_file_async(&target, b"two")
+            .await
+            .expect("write");
+        assert_eq!(tokio::fs::read_to_string(&target).await.unwrap(), "two");
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
