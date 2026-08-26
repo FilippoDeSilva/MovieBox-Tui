@@ -54,9 +54,10 @@ pub struct AppState {
     pub current_tab_id: String,
     pub current_page: usize,
     pub search_posters: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
-    pub failed_posters: lru::LruCache<String, ()>,
+    pub failed_posters: lru::LruCache<String, std::time::Instant>,
     pub search_poster_protocols:
         lru::LruCache<String, ((u16, u16), ratatui_image::protocol::Protocol)>,
+    pub poster_fetch_semaphore: std::sync::Arc<tokio::sync::Semaphore>,
     pub in_flight_posters: std::collections::HashSet<String>,
     pub search_list_state: TableState,
 
@@ -204,9 +205,10 @@ impl Default for AppState {
             is_homepage_mode: false,
             current_tab_id: String::new(),
             current_page: 1,
-            search_posters: lru::LruCache::new(cache_capacity(300)),
+            search_posters: lru::LruCache::new(cache_capacity(96)),
             failed_posters: lru::LruCache::new(cache_capacity(300)),
-            search_poster_protocols: lru::LruCache::new(cache_capacity(300)),
+            search_poster_protocols: lru::LruCache::new(cache_capacity(128)),
+            poster_fetch_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(4)),
             in_flight_posters: std::collections::HashSet::new(),
             search_list_state: TableState::default(),
             basic_terminal: crate::tui::terminal::uses_basic_ui(),
@@ -395,6 +397,21 @@ impl AppState {
     pub fn set_status(&mut self, message: impl Into<String>, timer: usize) {
         self.status_message = message.into();
         self.status_timer = timer;
+    }
+
+    const FAILED_POSTER_TTL_SECS: u64 = 600;
+
+    /// Returns true when this poster failed recently; expired failures are
+    /// evicted so the fetch can be retried.
+    pub fn failed_poster_recently(&mut self, id: &str) -> bool {
+        match self.failed_posters.peek(id) {
+            Some(failed_at) if failed_at.elapsed().as_secs() < Self::FAILED_POSTER_TTL_SECS => true,
+            Some(_) => {
+                self.failed_posters.pop(id);
+                false
+            }
+            None => false,
+        }
     }
 
     pub fn clear_search_state(&mut self) {

@@ -630,7 +630,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let list_block = Block::default();
         if !state.search_results.is_empty() {
             let poster_width = if state.image_supported {
-                state.poster_rows.saturating_mul(4).div_ceil(3).max(6)
+                state
+                    .image_picker
+                    .as_ref()
+                    .map(|picker| {
+                        let font = picker.font_size();
+                        let pixel_height =
+                            u64::from(state.poster_rows.max(3)) * u64::from(font.height.max(1));
+                        let pixel_width = pixel_height * 2 / 3;
+                        u16::try_from(pixel_width.div_ceil(u64::from(font.width.max(1))))
+                            .unwrap_or(u16::MAX)
+                            .max(6)
+                    })
+                    .unwrap_or_else(|| state.poster_rows.saturating_mul(4).div_ceil(3).max(6))
             } else {
                 12
             };

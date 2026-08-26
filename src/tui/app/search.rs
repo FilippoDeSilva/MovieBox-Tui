@@ -1074,7 +1074,7 @@ impl App {
 
         let mut to_fetch = Vec::new();
         for (id, cover_url, provider) in results {
-            if self.state.search_posters.contains(&id) || self.state.failed_posters.contains(&id) {
+            if self.state.search_posters.contains(&id) || self.state.failed_poster_recently(&id) {
                 continue;
             }
             if !self.state.in_flight_posters.insert(id.clone()) {
@@ -1089,9 +1089,10 @@ impl App {
 
         let sender = self.action_sender.clone();
         let service = self.service.clone();
+        let semaphore = self.state.poster_fetch_semaphore.clone();
 
         tokio::spawn(async move {
-            let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
+            let sem = semaphore;
             for (id, cover_url, provider) in to_fetch {
                 let permit = sem.clone().acquire_owned().await.ok();
                 let tx = sender.clone();

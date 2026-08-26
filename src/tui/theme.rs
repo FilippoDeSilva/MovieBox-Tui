@@ -224,12 +224,12 @@ impl Theme {
         let has_no_color = std::env::var("NO_COLOR").is_ok();
         let is_light = crate::tui::terminal::background_is_light();
 
-        if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
-            return Self::from_kind(ThemeKind::parse(&theme_env));
-        }
-
         if has_no_color {
             return Self::monochrome(is_light);
+        }
+
+        if let Ok(theme_env) = std::env::var("MOVIEBOX_THEME") {
+            return Self::from_kind(ThemeKind::parse(&theme_env));
         }
 
         let truecolor = colorterm == "truecolor"
@@ -259,13 +259,50 @@ impl Theme {
             Self::fallback(is_light)
         } else if has_256 {
             if is_light {
-                Self::latte()
+                Self::latte().quantized_to_256()
             } else {
-                Self::mocha()
+                Self::mocha().quantized_to_256()
             }
         } else {
             Self::fallback(is_light)
         }
+    }
+
+    /// Maps every RGB color in the theme to the nearest xterm-256 palette
+    /// entry so strict 256-color terminals never receive RGB sequences.
+    pub fn quantized_to_256(mut self) -> Self {
+        self.border = quantize_style(self.border);
+        self.border_focus = quantize_style(self.border_focus);
+        self.text = quantize_style(self.text);
+        self.text_dim = quantize_style(self.text_dim);
+        self.title = quantize_style(self.title);
+        self.highlight = quantize_style(self.highlight);
+        self.header = quantize_style(self.header);
+        self.error = quantize_style(self.error);
+        self.success = quantize_style(self.success);
+        self.shortcut = quantize_style(self.shortcut);
+        self.overlay = quantize_style(self.overlay);
+        self.rating = quantize_style(self.rating);
+        self.accent = quantize_style(self.accent);
+        self.muted = quantize_style(self.muted);
+        self.teal = quantize_style(self.teal);
+        self.lavender = quantize_style(self.lavender);
+        self.sapphire = quantize_style(self.sapphire);
+        self.subtext1 = quantize_style(self.subtext1);
+        self.base = to_indexed_256(self.base);
+        self.bg = quantize_style(self.bg);
+        self.rosewater = quantize_style(self.rosewater);
+        self.flamingo = quantize_style(self.flamingo);
+        self.maroon = quantize_style(self.maroon);
+        self.surface0 = quantize_style(self.surface0);
+        self.surface1 = quantize_style(self.surface1);
+        self.surface2 = quantize_style(self.surface2);
+        self.overlay0 = quantize_style(self.overlay0);
+        self.overlay1 = quantize_style(self.overlay1);
+        self.overlay2 = quantize_style(self.overlay2);
+        self.mantle = quantize_style(self.mantle);
+        self.crust = quantize_style(self.crust);
+        self
     }
 
     pub fn monochrome(is_light: bool) -> Self {
@@ -679,4 +716,126 @@ impl Theme {
 
 fn cp(r: u8, g: u8, b: u8) -> Color {
     Color::Rgb(r, g, b)
+}
+
+fn quantize_style(style: Style) -> Style {
+    let mut quantized = style;
+    if let Some(fg) = style.fg {
+        quantized.fg = Some(to_indexed_256(fg));
+    }
+    if let Some(bg) = style.bg {
+        quantized.bg = Some(to_indexed_256(bg));
+    }
+    quantized
+}
+
+fn to_indexed_256(color: Color) -> Color {
+    match color {
+        Color::Rgb(red, green, blue) => Color::Indexed(rgb_to_xterm256(red, green, blue)),
+        other => other,
+    }
+}
+
+const CUBE_LEVELS: [u16; 6] = [0, 95, 135, 175, 215, 255];
+
+fn rgb_to_xterm256(red: u8, green: u8, blue: u8) -> u8 {
+    if red == green && green == blue {
+        if red < 8 {
+            return 16;
+        }
+        if red > 248 {
+            return 231;
+        }
+        return 232 + ((u16::from(red) - 8) / 10) as u8;
+    }
+    let nearest = |channel: u8| -> u16 {
+        let channel = u16::from(channel);
+        let mut best_index = 0_u16;
+        let mut best_distance = u16::MAX;
+        for (index, &level) in CUBE_LEVELS.iter().enumerate() {
+            let distance = channel.abs_diff(level);
+            if distance < best_distance {
+                best_distance = distance;
+                best_index = index as u16;
+            }
+        }
+        best_index
+    };
+    (16 + 36 * nearest(red) + 6 * nearest(green) + nearest(blue)) as u8
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn grayscale_maps_to_gray_ramp() {
+        assert_eq!(rgb_to_xterm256(0, 0, 0), 16);
+        assert_eq!(rgb_to_xterm256(255, 255, 255), 231);
+        assert_eq!(rgb_to_xterm256(128, 128, 128), 232 + 12);
+    }
+
+    #[test]
+    fn pure_colors_map_to_cube() {
+        assert_eq!(rgb_to_xterm256(255, 0, 0), 196);
+        assert_eq!(rgb_to_xterm256(0, 255, 0), 46);
+        assert_eq!(rgb_to_xterm256(0, 0, 255), 21);
+    }
+
+    #[test]
+    fn non_rgb_colors_pass_through() {
+        assert_eq!(to_indexed_256(Color::Red), Color::Red);
+        assert_eq!(to_indexed_256(Color::Indexed(42)), Color::Indexed(42));
+        assert_eq!(to_indexed_256(Color::Rgb(255, 0, 0)), Color::Indexed(196));
+    }
+
+    #[test]
+    fn quantized_mocha_contains_no_rgb() {
+        let quantized = Theme::mocha().quantized_to_256();
+        for style in [
+            quantized.border,
+            quantized.text,
+            quantized.accent,
+            quantized.bg,
+            quantized.lavender,
+        ] {
+            assert!(
+                style
+                    .fg
+                    .map(|c| !matches!(c, Color::Rgb(..)))
+                    .unwrap_or(true)
+            );
+            assert!(
+                style
+                    .bg
+                    .map(|c| !matches!(c, Color::Rgb(..)))
+                    .unwrap_or(true)
+            );
+        }
+    }
+
+    #[test]
+    fn quantized_latte_contains_no_rgb() {
+        let quantized = Theme::latte().quantized_to_256();
+        assert!(
+            quantized
+                .border
+                .fg
+                .map(|c| !matches!(c, Color::Rgb(..)))
+                .unwrap_or(true)
+        );
+        assert!(
+            quantized
+                .bg
+                .fg
+                .map(|c| !matches!(c, Color::Rgb(..)))
+                .unwrap_or(true)
+        );
+    }
+
+    #[test]
+    fn monochrome_dark_uses_light_foreground() {
+        let mono = Theme::monochrome(false);
+        assert_eq!(mono.text.fg, Some(Color::White));
+    }
 }

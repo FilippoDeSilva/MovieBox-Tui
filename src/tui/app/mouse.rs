@@ -375,14 +375,7 @@ impl App {
                 let clicked_relative_row = row.saturating_sub(results_y);
                 let clicked_idx = (clicked_relative_row / row_height) as usize;
 
-                let table_offset = self.state.search_list_state.selected().unwrap_or(0);
-                let visible_items =
-                    ((area.height.saturating_sub(results_y)) / row_height).max(1) as usize;
-                let page_start = if table_offset >= visible_items {
-                    table_offset.saturating_sub(visible_items - 1)
-                } else {
-                    0
-                };
+                let page_start = self.state.search_list_state.offset();
 
                 let target_idx = page_start + clicked_idx;
                 if target_idx < self.state.search_results.len() {

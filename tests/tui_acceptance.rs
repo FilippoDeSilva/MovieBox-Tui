@@ -118,18 +118,45 @@ async fn test_mouse_click_search_input_mode() {
 #[tokio::test]
 async fn test_mouse_scroll_maps_to_key_actions() {
     let mut app = App::new();
-    let up_key = crossterm::event::KeyEvent::new(
-        crossterm::event::KeyCode::Up,
-        crossterm::event::KeyModifiers::empty(),
-    );
-    let down_key = crossterm::event::KeyEvent::new(
-        crossterm::event::KeyCode::Down,
-        crossterm::event::KeyModifiers::empty(),
+    app.state_mut().active_screen = Screen::Home;
+    for i in 0..40 {
+        app.state_mut().search_results.push(SearchResult {
+            id: i.to_string(),
+            title: format!("Title {i}"),
+            stype: 1,
+            release_year: "2010".to_string(),
+            cover_url: None,
+            season: 0,
+            episode: 0,
+            provider: ProviderKind::MovieBox,
+        });
+    }
+    app.state_mut().search_list_state.select(Some(20));
+
+    app.handle_action(Action::WheelScroll { up: true }).await;
+    let after_up = app
+        .state()
+        .search_list_state
+        .selected()
+        .expect("selection stays set");
+    assert!(
+        after_up < 20,
+        "wheel up moves the result selection upward (got {after_up})"
     );
 
-    app.handle_action(Action::Key(down_key)).await;
-    app.handle_action(Action::Key(up_key)).await;
-    assert_eq!(app.state().search_query, "");
+    for _ in 0..3 {
+        app.handle_action(Action::WheelScroll { up: false }).await;
+    }
+    let after_down = app
+        .state()
+        .search_list_state
+        .selected()
+        .expect("selection stays set");
+    assert!(
+        after_down > after_up,
+        "wheel down moves the result selection downward"
+    );
+    assert!(after_down < 40, "selection stays within bounds");
 }
 
 #[tokio::test]

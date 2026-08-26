@@ -1,6 +1,10 @@
 use super::App;
 use crate::providers::models::ProviderKind;
-use crate::tui::{action::Action, event::EventHandler, state::Screen};
+use crate::tui::{
+    action::Action,
+    event::EventHandler,
+    state::{InputMode, Screen},
+};
 use ratatui::Frame;
 use std::time::Duration;
 
@@ -14,7 +18,15 @@ impl App {
     {
         if self.state.image_picker.is_none() && self.state.image_supported {
             let picker = if crate::tui::terminal::should_query_images() {
-                ratatui_image::picker::Picker::from_query_stdio().ok()
+                tokio::task::spawn_blocking(|| {
+                    let options = ratatui_image::picker::cap_parser::QueryStdioOptions {
+                        timeout: Duration::from_millis(400),
+                        ..Default::default()
+                    };
+                    ratatui_image::picker::Picker::from_query_stdio_with_options(options).ok()
+                })
+                .await
+                .unwrap_or_default()
             } else {
                 None
             };
@@ -137,6 +149,25 @@ impl App {
 
             Action::MouseClick(col, row) => {
                 self.handle_mouse(col, row);
+            }
+
+            Action::WheelScroll { up } => {
+                let steps = if self.state.active_screen == Screen::Home
+                    && !self.state.favorites_focus
+                    && !self.state.search_results.is_empty()
+                    && self.state.input_mode != InputMode::Editing
+                {
+                    (self.state.poster_rows.max(3) + 1).min(8)
+                } else {
+                    2
+                };
+                let step = if up { Action::MoveUp } else { Action::MoveDown };
+                for _ in 0..steps {
+                    let action = step.clone();
+                    if let Some(quit) = self.handle_navigation(action).await {
+                        return Some(quit);
+                    }
+                }
             }
 
             Action::Tick

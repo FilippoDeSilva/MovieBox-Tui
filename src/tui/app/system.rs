@@ -1,12 +1,17 @@
 use super::App;
-use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
+use crate::tui::{
+    action::Action,
+    overlay::NotificationKind,
+    state::{InputMode, Screen},
+};
 
 impl App {
     pub(super) async fn handle_system(&mut self, action: Action) -> Option<()> {
         match action {
             Action::Tick => {
                 let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0)
-                    || self.state.tick_count < 15;
+                    || self.state.tick_count < 15
+                    || self.state.input_mode == InputMode::Editing;
                 self.state.tick_count = self.state.tick_count.wrapping_add(1);
                 if !self.state.notifications.is_empty() {
                     needs_redraw = true;
@@ -109,7 +114,6 @@ impl App {
                 self.state.last_resize_time = Some((std::time::Instant::now(), w, h));
                 self.state.poster_protocol = None;
                 self.state.search_poster_protocols.clear();
-                self.state.clear_terminal_before_draw = true;
                 self.state.dirty = true;
             }
 

@@ -885,10 +885,13 @@ impl App {
             Action::SearchPosterLoaded(id, img_opt) => {
                 self.state.in_flight_posters.remove(&id);
                 if let Some(img) = img_opt {
-                    self.state.image_cache.put(id.clone(), img.clone());
-                    self.state.search_posters.put(id, img);
+                    let cached = crate::service::downscale_for_cache(&img);
+                    self.state
+                        .image_cache
+                        .put(id.clone(), std::sync::Arc::clone(&cached));
+                    self.state.search_posters.put(id, cached);
                 } else {
-                    self.state.failed_posters.put(id, ());
+                    self.state.failed_posters.put(id, std::time::Instant::now());
                 }
             }
 

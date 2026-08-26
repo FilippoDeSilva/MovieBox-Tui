@@ -59,6 +59,9 @@ pub enum Action {
     MoveDown,
     MoveLeft,
     MoveRight,
+    WheelScroll {
+        up: bool,
+    },
     Submit,
     TabPane,
     BackTabPane,
