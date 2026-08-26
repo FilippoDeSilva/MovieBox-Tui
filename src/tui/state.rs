@@ -1,5 +1,6 @@
 use crate::providers::models::ProviderKind;
 use ratatui::widgets::{ListState, TableState};
+use unicode_segmentation::UnicodeSegmentation;
 
 pub use crate::player::PlayerKind;
 
@@ -444,6 +445,23 @@ impl AppState {
             columns,
             col_width,
         }
+    }
+
+    pub fn addon_input_graphemes(&self) -> Vec<&str> {
+        self.addon_input_buffer.graphemes(true).collect()
+    }
+
+    pub fn previous_grapheme_index(&self, index: usize) -> usize {
+        let segments = self.addon_input_graphemes();
+        if index == 0 {
+            return 0;
+        }
+        (index - 1).min(segments.len().saturating_sub(1))
+    }
+
+    pub fn next_grapheme_index(&self, index: usize) -> usize {
+        let segments = self.addon_input_graphemes();
+        (index + 1).min(segments.len())
     }
 
     pub fn normalize_result_view(&mut self) {

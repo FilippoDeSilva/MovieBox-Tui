@@ -333,38 +333,43 @@ impl App {
                                     }
                                 }
                                 KeyCode::Left => {
-                                    self.state.addon_input_cursor =
-                                        self.state.addon_input_cursor.saturating_sub(1);
+                                    let previous = self
+                                        .state
+                                        .previous_grapheme_index(self.state.addon_input_cursor);
+                                    self.state.addon_input_cursor = previous;
                                 }
                                 KeyCode::Right => {
-                                    if self.state.addon_input_cursor
-                                        < self.state.addon_input_buffer.chars().count()
-                                    {
-                                        self.state.addon_input_cursor += 1;
-                                    }
+                                    let next = self
+                                        .state
+                                        .next_grapheme_index(self.state.addon_input_cursor);
+                                    self.state.addon_input_cursor = next;
                                 }
                                 KeyCode::Backspace => {
-                                    if self.state.addon_input_cursor > 0 {
-                                        let mut chars: Vec<char> =
-                                            self.state.addon_input_buffer.chars().collect();
-                                        chars.remove(self.state.addon_input_cursor - 1);
-                                        self.state.addon_input_buffer = chars.into_iter().collect();
-                                        self.state.addon_input_cursor -= 1;
+                                    let start = self
+                                        .state
+                                        .previous_grapheme_index(self.state.addon_input_cursor);
+                                    if start < self.state.addon_input_cursor {
+                                        let mut segments = self.state.addon_input_graphemes();
+                                        segments.remove(start);
+                                        self.state.addon_input_buffer = segments.concat();
+                                        self.state.addon_input_cursor = start;
                                     }
                                 }
                                 KeyCode::Delete => {
-                                    let mut chars: Vec<char> =
-                                        self.state.addon_input_buffer.chars().collect();
-                                    if self.state.addon_input_cursor < chars.len() {
-                                        chars.remove(self.state.addon_input_cursor);
-                                        self.state.addon_input_buffer = chars.into_iter().collect();
+                                    let cursor = self.state.addon_input_cursor;
+                                    let mut segments = self.state.addon_input_graphemes();
+                                    if cursor < segments.len() {
+                                        segments.remove(cursor);
+                                        self.state.addon_input_buffer = segments.concat();
                                     }
                                 }
                                 KeyCode::Char(c) if !c.is_control() => {
-                                    let mut chars: Vec<char> =
-                                        self.state.addon_input_buffer.chars().collect();
-                                    chars.insert(self.state.addon_input_cursor, c);
-                                    self.state.addon_input_buffer = chars.into_iter().collect();
+                                    let cursor = self.state.addon_input_cursor;
+                                    let mut segments = self.state.addon_input_graphemes();
+                                    let at = cursor.min(segments.len());
+                                    let inserted = c.to_string();
+                                    segments.insert(at, inserted.as_str());
+                                    self.state.addon_input_buffer = segments.concat();
                                     self.state.addon_input_cursor += 1;
                                 }
                                 _ => {}

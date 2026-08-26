@@ -9,6 +9,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Cell, Paragraph, Row, Table},
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SearchViewState {
@@ -1086,7 +1087,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let name_len = crate::tui::text::width(display_name);
                 let pad = 24usize.saturating_sub(name_len).max(2);
                 spans.push(Span::raw(" ".repeat(pad)));
-                spans.push(Span::styled(description, desc_style));
+                let desc_budget = (available_width as usize)
+                    .saturating_sub(3 + name_len + pad)
+                    .max(6);
+                spans.push(Span::styled(
+                    crate::tui::text::truncate_width(description, desc_budget),
+                    desc_style,
+                ));
             }
 
             let row_area = Rect {
@@ -1174,10 +1181,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         TvManagerRow::Playlist(index) => {
                             let source =
                                 state.tv_playlists.get(*index).cloned().unwrap_or_default();
+                            let url_budget = (inner_area.width as usize).saturating_sub(6).max(12);
+                            let display_source =
+                                crate::tui::text::truncate_middle_width(&source, url_budget);
                             ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
                                 ratatui::text::Span::raw(" "),
                                 ratatui::text::Span::styled(
-                                    format!("{} {}", index + 1, source),
+                                    format!("{} {}", index + 1, display_source),
                                     theme.text,
                                 ),
                             ]))
@@ -1281,8 +1291,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(inner_area);
 
-            let chars: Vec<char> = state.addon_input_buffer.chars().collect();
-            let cursor = state.addon_input_cursor.min(chars.len());
+            let segments: Vec<&str> = state.addon_input_buffer.graphemes(true).collect();
+            let cursor = state.addon_input_cursor.min(segments.len());
             let max_width = inner_area.width.saturating_sub(6) as usize;
 
             let mut start = 0;
@@ -1290,27 +1300,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 start = cursor - max_width + 1;
             }
 
-            let mut before_cursor: String = chars[start..cursor].iter().collect();
+            let mut before_cursor: String = segments[start..cursor].concat();
             if start > 0 && before_cursor.chars().count() > 3 {
                 before_cursor = format!("...{}", &before_cursor[3..]);
             }
 
-            let cursor_char = if cursor < chars.len() {
-                chars[cursor].to_string()
+            let cursor_char = if cursor < segments.len() {
+                segments[cursor].to_string()
             } else {
                 " ".to_string()
             };
 
-            let end = (start + max_width).min(chars.len());
-            let mut after_cursor: String = chars[cursor.saturating_add(1).min(chars.len())..end]
-                .iter()
-                .collect();
-            if end < chars.len() {
+            let end = (start + max_width).min(segments.len());
+            let after_slice = &segments[cursor.saturating_add(1).min(segments.len())..end];
+            let mut after_cursor: String = after_slice.concat();
+            if end < segments.len() {
                 let len = after_cursor.chars().count();
                 if len > 3 {
-                    let mut a_chars: Vec<char> = after_cursor.chars().collect();
-                    a_chars.truncate(len - 3);
-                    after_cursor = format!("{}...", a_chars.into_iter().collect::<String>());
+                    let keep: String = after_cursor.chars().take(len - 3).collect();
+                    after_cursor = format!("{keep}...");
                 } else if len > 0 {
                     after_cursor = "...".to_string();
                 }
@@ -1381,8 +1389,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 } else {
                     ratatui::text::Span::styled("[ ] ", theme.text_dim)
                 };
+                let name_budget = (inner_area.width as usize)
+                    .saturating_sub(3 + 4 + 12)
+                    .max(10);
+                let addon_label = format!("{} v{} ", a.name, a.version.as_deref().unwrap_or("1.0"));
                 let name = ratatui::text::Span::styled(
-                    format!("{} v{} ", a.name, a.version.as_deref().unwrap_or("1.0")),
+                    crate::tui::text::truncate_width(&addon_label, name_budget),
                     if is_selected {
                         theme.text.add_modifier(ratatui::style::Modifier::BOLD)
                     } else {

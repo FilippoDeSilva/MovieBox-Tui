@@ -551,6 +551,9 @@ impl App {
                     .as_deref()
                     .unwrap_or("Downloading...");
 
+                let budget = (dl_area.width as usize).saturating_sub(10);
+                let status_text =
+                    crate::tui::text::truncate_width(status, budget.saturating_sub(30).max(8));
                 let title_text = if self.state.download_queue_total > 0 {
                     let total = self.state.download_queue_total;
                     let remaining = self.state.download_queue.len();
@@ -561,10 +564,10 @@ impl App {
                         self.state.selected_episode,
                         current,
                         total,
-                        status
+                        status_text
                     )
                 } else {
-                    format!(" Download: {} [X] Cancel ", status)
+                    format!(" Download: {} [X] Cancel ", status_text)
                 };
 
                 let gauge = Gauge::default()

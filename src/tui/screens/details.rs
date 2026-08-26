@@ -944,15 +944,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             let remaining = stream_width.saturating_sub(fixed);
                             let has_lang = language != "Unknown" && !language.is_empty();
                             let lang_str = if has_lang {
-                                format!("{language:<15} ")
+                                format!("{} ", crate::tui::text::pad_to_width(&language, 15))
                             } else {
                                 "".to_string()
                             };
-                            let lang_len = lang_str.len();
+                            let lang_len = crate::tui::text::width(&lang_str);
+                            let upload_width = crate::tui::text::width(upload_by.as_str());
 
                             if remaining >= 45 {
                                 let title_avail =
-                                    remaining.saturating_sub(lang_len + upload_by.len() + 3);
+                                    remaining.saturating_sub(lang_len + upload_width + 3);
                                 let display_title = crate::tui::text::truncate_width(
                                     &release_title,
                                     title_avail.max(12),
@@ -967,7 +968,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 stream_spans
                                     .push(Span::styled(upload_by.to_string(), secondary_style));
                             } else if remaining >= 25 {
-                                let title_avail = remaining.saturating_sub(upload_by.len() + 2);
+                                let title_avail = remaining.saturating_sub(upload_width + 2);
                                 let display_title = crate::tui::text::truncate_width(
                                     &release_title,
                                     title_avail.max(8),

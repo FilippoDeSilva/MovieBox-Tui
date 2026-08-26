@@ -34,6 +34,15 @@ pub fn truncate_width(value: &str, max_width: usize) -> String {
     output
 }
 
+pub fn pad_to_width(value: &str, target: usize) -> String {
+    let current = width(value);
+    if current >= target {
+        value.to_string()
+    } else {
+        format!("{value}{}", " ".repeat(target - current))
+    }
+}
+
 pub fn truncate_middle_width(value: &str, max_width: usize) -> String {
     if width(value) <= max_width {
         return value.to_string();
