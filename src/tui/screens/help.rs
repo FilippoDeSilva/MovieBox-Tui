@@ -55,6 +55,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Jump Page of Results", theme.text),
         ]),
         Line::from(vec![
+            Span::styled("    [Tab]          ", theme.header),
+            Span::styled("Auto-complete Suggestion / Command", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [Ctrl+U]       ", theme.header),
+            Span::styled("Clear Search Input Line", theme.text),
+        ]),
+        Line::from(vec![
+            Span::styled("    [Ctrl+W]       ", theme.header),
+            Span::styled("Delete Backward Word", theme.text),
+        ]),
+        Line::from(vec![
             Span::styled("    [Esc]          ", theme.header),
             Span::styled("Go Back / Clear Input", theme.text),
         ]),
@@ -229,6 +241,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Disable BDIX FTP Providers", theme.text),
         ]));
     }
+    help_text.push(Line::from(vec![
+        Span::styled("    /probe         ", theme.header),
+        Span::styled("Re-detect Terminal Graphics", theme.text),
+    ]));
     help_text.push(Line::from(vec![
         Span::styled("    /github        ", theme.header),
         Span::styled("Open GitHub Repository", theme.text),

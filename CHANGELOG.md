@@ -32,6 +32,18 @@
 - **Viewport-adaptive caps**: picker popup rows grow with terminal height
   (4–14), details selector height becomes viewport-proportional, and non-
   graphics terminals get a compact filmstrip poster placeholder.
+- **Search editing shortcuts & Tab suggestion completion**: `Tab` auto-completes
+  regular search query suggestions in addition to slash commands; `Ctrl+U` clears
+  the entire search input line and `Ctrl+W` deletes the previous word.
+- **Cursor shape & real input cursor**: `SetCursorStyle::SteadyBar` activates in
+  input editing mode on supported terminals (Ghostty, Kitty, WezTerm, foot,
+  Alacritty, Windows Terminal) and smoothly restores on normal mode, exit, or panic.
+- **Interactive toasts & gauge cancellation**: clicking notification cards dismisses
+  them; toast badges display kind icons (`ℹ`/`✔`/`⚠`/`✖`); clicking the active
+  download gauge triggers cancellation.
+- **Details footer responsive threshold**: single-row footer breakpoint adjusted to
+  86 columns in sync with mouse hit-testing, preventing button clipping on 70–85
+  column viewports.
 
 ### Fixed
 - **DNS resolution on Android/Termux and minimal containers**: Replaced the reqwest

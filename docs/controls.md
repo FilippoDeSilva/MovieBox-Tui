@@ -9,6 +9,9 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | **Arrow keys** | Navigate lists, search results, tabs, and modal dialogs |
 | **Enter** | Open, play, or confirm the selected item |
 | **Esc** | Go back, dismiss popup dialog, or clear active search |
+| **`Tab`** | Auto-complete active search suggestion / slash command in input mode |
+| **`Ctrl+U`** | Clear entire search input line in input mode |
+| **`Ctrl+W`** | Delete backward word in search input |
 | **`Ctrl+S`** | Switch to standard **Streaming Mode** |
 | **`Ctrl+T`** | Toggle / switch to **TV Mode** |
 | **`Ctrl+A`** | Toggle / switch to **Addon Mode** |
@@ -73,13 +76,21 @@ Type these commands directly into the search bar:
 | `/favorites` | Streaming / Addon | View all starred titles |
 | `/list` | TV | View live TV channels |
 | `/config` | TV / Addon | Manage IPTV playlists (TV Mode) or configure HTTP addons (Addon Mode) |
+| `/download-dir` | All | View, change, or reset the download directory |
+| `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight, Dracula, Gruvbox, RosePine) |
+| `/clear-cache` | All | Clear temporary cache files |
+| `/update` | All | Check if a new release is available on GitHub |
+| `/toggle-update` | All | Toggle automatic startup update checks |
 | `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |
 | `/disable-streaming` | All | Disable Streaming Mode navigation |
 | `/enable-tv` | All | Enable TV Mode navigation in bottom dock |
 | `/disable-tv` | All | Disable TV Mode navigation |
 | `/enable-addons` | All | Enable Addon Mode navigation in bottom dock |
 | `/disable-addons` | All | Disable Addon Mode navigation |
+| `/enable-bdix` | Streaming | Enable BDIX FTP sources (Bangladesh ISPs only) |
+| `/disable-bdix` | Streaming | Disable BDIX FTP sources |
 | `/probe` | All | Re-run terminal graphics detection and report the result |
+| `/github` | All | Open the project repository |
 
 ## Help Overlay
 
@@ -93,11 +104,3 @@ On terminals at least 110 columns wide, search results render in two
 columns (three at 160+). `↑`/`↓` move one visual row, `←`/`→` move one
 item, and clicks map through column bounds. Narrower terminals keep the
 classic single-column list where `←`/`→` jump a full page.
-| `/download-dir` | All | View, change, or reset the download directory |
-| `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight, Dracula, Gruvbox, RosePine) |
-| `/clear-cache` | All | Clear temporary cache files |
-| `/update` | All | Check if a new release is available on GitHub |
-| `/toggle-update` | All | Toggle automatic startup update checks |
-| `/enable-bdix` | Streaming | Enable BDIX FTP sources (Bangladesh ISPs only) |
-| `/disable-bdix` | Streaming | Disable BDIX FTP sources |
-| `/github` | All | Open the project repository |
