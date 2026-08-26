@@ -69,7 +69,7 @@ impl App {
                         self.state.show_theme_popup = false;
                         self.state.theme_list_state.select(None);
                         self.state
-                            .set_status(format!("{theme_name} theme applied."), 150);
+                            .set_status_default(format!("{theme_name} theme applied."));
                     }
                 }
                 Some(None) => {}

@@ -1,6 +1,5 @@
 use crate::providers::models::ProviderKind;
 use ratatui::widgets::{ListState, TableState};
-use unicode_segmentation::UnicodeSegmentation;
 
 pub use crate::player::PlayerKind;
 
@@ -199,7 +198,7 @@ pub struct AppState {
     pub tv_playlists: Vec<String>,
     pub tv_manager_selected: usize,
     pub tv_input_active: bool,
-    pub tv_input_buffer: String,
+    pub tv_input_buffer: crate::tui::text::TextInputBuffer,
     pub tv_input_is_file: bool,
 
     pub is_addon_mode: bool,
@@ -208,8 +207,7 @@ pub struct AppState {
     pub addon_manager_popup: bool,
     pub addon_manager_selected: usize,
     pub addon_input_active: bool,
-    pub addon_input_buffer: String,
-    pub addon_input_cursor: usize,
+    pub addon_input_buffer: crate::tui::text::TextInputBuffer,
     pub history: crate::history::HistoryManager,
     pub favorites: crate::favorites::FavoritesManager,
     pub favorites_focus: bool,
@@ -351,7 +349,7 @@ impl Default for AppState {
             tv_playlists: Vec::new(),
             tv_manager_selected: 0,
             tv_input_active: false,
-            tv_input_buffer: String::new(),
+            tv_input_buffer: crate::tui::text::TextInputBuffer::new(),
             tv_input_is_file: false,
             is_addon_mode: false,
             addons_enabled: false,
@@ -359,8 +357,7 @@ impl Default for AppState {
             addon_manager_popup: false,
             addon_manager_selected: 0,
             addon_input_active: false,
-            addon_input_buffer: String::new(),
-            addon_input_cursor: 0,
+            addon_input_buffer: crate::tui::text::TextInputBuffer::new(),
             history: crate::history::HistoryManager::new(),
             favorites: crate::favorites::FavoritesManager::new(),
             favorites_focus: false,
@@ -429,9 +426,25 @@ impl AppState {
             .retain(|notification| !notification.expired());
     }
 
+    pub const STATUS_TICKS_SHORT: u16 = 90;
+    pub const STATUS_TICKS_DEFAULT: u16 = 150;
+    pub const STATUS_TICKS_LONG: u16 = 240;
+
     pub fn set_status(&mut self, message: impl Into<String>, timer: usize) {
         self.status_message = message.into();
         self.status_timer = timer;
+    }
+
+    pub fn set_status_default(&mut self, msg: impl Into<String>) {
+        self.set_status(msg, Self::STATUS_TICKS_DEFAULT as usize);
+    }
+
+    pub fn set_status_short(&mut self, msg: impl Into<String>) {
+        self.set_status(msg, Self::STATUS_TICKS_SHORT as usize);
+    }
+
+    pub fn set_status_long(&mut self, msg: impl Into<String>) {
+        self.set_status(msg, Self::STATUS_TICKS_LONG as usize);
     }
 
     pub fn result_metrics(&self, results_height: u16, results_width: u16) -> ResultMetrics {
@@ -449,23 +462,6 @@ impl AppState {
             columns,
             col_width,
         }
-    }
-
-    pub fn addon_input_graphemes(&self) -> Vec<&str> {
-        self.addon_input_buffer.graphemes(true).collect()
-    }
-
-    pub fn previous_grapheme_index(&self, index: usize) -> usize {
-        let segments = self.addon_input_graphemes();
-        if index == 0 {
-            return 0;
-        }
-        (index - 1).min(segments.len().saturating_sub(1))
-    }
-
-    pub fn next_grapheme_index(&self, index: usize) -> usize {
-        let segments = self.addon_input_graphemes();
-        (index + 1).min(segments.len())
     }
 
     pub fn normalize_result_view(&mut self) {

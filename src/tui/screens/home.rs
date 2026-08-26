@@ -9,7 +9,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Cell, Paragraph, Row, Table},
 };
-use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SearchViewState {
@@ -1340,6 +1339,39 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else {
                 "Enter playlist URL:"
             };
+            let segments = state.tv_input_buffer.graphemes();
+            let cursor = state.tv_input_buffer.cursor();
+            let max_width = inner_area.width.saturating_sub(6) as usize;
+
+            let mut start = 0;
+            if cursor >= max_width {
+                start = cursor - max_width + 1;
+            }
+
+            let mut before_cursor: String = segments[start..cursor].concat();
+            if start > 0 && before_cursor.chars().count() > 3 {
+                before_cursor = format!("...{}", &before_cursor[3..]);
+            }
+
+            let cursor_char = if cursor < segments.len() {
+                segments[cursor].to_string()
+            } else {
+                " ".to_string()
+            };
+
+            let end = (start + max_width).min(segments.len());
+            let after_slice = &segments[cursor.saturating_add(1).min(segments.len())..end];
+            let mut after_cursor: String = after_slice.concat();
+            if end < segments.len() {
+                let len = after_cursor.chars().count();
+                if len > 3 {
+                    let keep: String = after_cursor.chars().take(len - 3).collect();
+                    after_cursor = format!("{keep}...");
+                } else if !after_cursor.is_empty() {
+                    after_cursor = "...".to_string();
+                }
+            }
+
             let lines = vec![
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::raw(" "),
@@ -1347,8 +1379,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ]),
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::styled(" ❯ ", theme.sapphire),
-                    ratatui::text::Span::styled(&state.tv_input_buffer, theme.text),
-                    ratatui::text::Span::styled("█", theme.rating),
+                    ratatui::text::Span::styled(before_cursor, theme.text),
+                    ratatui::text::Span::styled(
+                        cursor_char,
+                        theme.text.add_modifier(ratatui::style::Modifier::REVERSED),
+                    ),
+                    ratatui::text::Span::styled(after_cursor, theme.text),
                 ]),
             ];
             frame.render_widget(
@@ -1481,8 +1517,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(inner_area);
 
-            let segments: Vec<&str> = state.addon_input_buffer.graphemes(true).collect();
-            let cursor = state.addon_input_cursor.min(segments.len());
+            let segments = state.addon_input_buffer.graphemes();
+            let cursor = state.addon_input_buffer.cursor();
             let max_width = inner_area.width.saturating_sub(6) as usize;
 
             let mut start = 0;

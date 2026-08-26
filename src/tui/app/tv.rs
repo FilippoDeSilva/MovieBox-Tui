@@ -45,20 +45,16 @@ impl App {
     pub(super) fn announce_mode(&mut self) {
         match self.state.mode() {
             crate::tui::state::AppMode::Streaming => {
-                self.state.set_status(
-                    format!(
-                        "Streaming mode active ({}).",
-                        self.state.active_provider.label()
-                    ),
-                    150,
-                );
+                self.state.set_status_default(format!(
+                    "Streaming mode active ({}).",
+                    self.state.active_provider.label()
+                ));
             }
             crate::tui::state::AppMode::Tv => {
-                self.state
-                    .set_status("Loading TV playlists...".to_string(), 200);
+                self.state.set_status_long("Loading TV playlists...");
             }
             crate::tui::state::AppMode::Addon => {
-                self.state.set_status("Addon mode active.".to_string(), 150);
+                self.state.set_status_default("Addon mode active.");
             }
         }
     }
@@ -146,8 +142,7 @@ impl App {
             }
 
             Action::TvReloadPlaylists => {
-                self.state
-                    .set_status("Reloading TV playlists...".to_string(), 150);
+                self.state.set_status_default("Reloading TV playlists...");
                 self.reload_tv_playlists();
             }
 
@@ -187,7 +182,7 @@ impl App {
                     } else {
                         "No TV channels found. Add a playlist (/config).".to_string()
                     };
-                    self.state.set_status(status, 200);
+                    self.state.set_status_long(status);
                 } else {
                     let mut status = format!(
                         "{} TV channels imported from {} playlist(s).",
@@ -197,7 +192,7 @@ impl App {
                     if failed > 0 {
                         status.push_str(&format!(" {failed} playlist(s) failed to load."));
                     }
-                    self.state.set_status(status, 200);
+                    self.state.set_status_long(status);
                 }
             }
             _ => return None,
