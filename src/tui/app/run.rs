@@ -535,12 +535,21 @@ impl App {
             download_area = Some(chunks[1]);
         }
 
+        let screen_area = ratatui::layout::Rect {
+            height: main_area.height.saturating_sub(1),
+            ..main_area
+        };
         match self.state.active_screen {
             Screen::Home => {
-                crate::tui::screens::home::draw(frame, main_area, &mut self.state, &self.theme);
+                crate::tui::screens::home::draw(frame, screen_area, &mut self.state, &self.theme);
             }
             Screen::Details => {
-                crate::tui::screens::details::draw(frame, main_area, &mut self.state, &self.theme);
+                crate::tui::screens::details::draw(
+                    frame,
+                    screen_area,
+                    &mut self.state,
+                    &self.theme,
+                );
             }
         }
 

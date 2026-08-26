@@ -71,8 +71,9 @@ async fn test_update_modal_mouse_hitbox_matches_rendered_geometry() {
     assert_eq!(layout.popup_area.height, 11);
 
     assert_eq!(layout.button_row_y, layout.popup_area.y + 9);
-    assert_eq!(layout.update_btn_end_x, layout.popup_area.x + 24);
-    assert_eq!(layout.open_btn_end_x, layout.popup_area.x + 48);
+    let footer_start = layout.popup_area.x + 1 + (70 - 56) / 2;
+    assert_eq!(layout.update_btn_end_x, footer_start + 18);
+    assert_eq!(layout.open_btn_end_x, layout.update_btn_end_x + 26);
 }
 
 #[tokio::test]

@@ -66,6 +66,114 @@ pub(crate) fn poster_placeholder_lines(basic: bool) -> &'static str {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HomeLayoutTier {
+    Compact,
+    Normal,
+    Wide,
+}
+
+impl HomeLayoutTier {
+    pub(crate) fn for_width(width: u16) -> Self {
+        if width < 76 {
+            Self::Compact
+        } else if width < 110 {
+            Self::Normal
+        } else {
+            Self::Wide
+        }
+    }
+
+    pub(crate) fn is_compact(self) -> bool {
+        self == Self::Compact
+    }
+}
+
+pub(crate) struct LandingRows {
+    pub rects: std::rc::Rc<[Rect]>,
+    pub logo: usize,
+    pub version: usize,
+    pub search: usize,
+    pub favorites: usize,
+    pub mode_row: usize,
+    pub util_row: Option<usize>,
+    pub logo_width: u16,
+}
+
+pub(crate) fn landing_split(
+    area: Rect,
+    tv_mode: bool,
+    basic_terminal: bool,
+) -> (HomeLayoutTier, LandingRows) {
+    let tier = HomeLayoutTier::for_width(area.width);
+    let compact_logo = tier.is_compact();
+    let effective_basic = basic_terminal || compact_logo;
+    let logo_height = if effective_basic { 2 } else { 6 };
+    let logo_width = if effective_basic {
+        if tv_mode { 33 } else { 31 }
+    } else if tv_mode {
+        75
+    } else {
+        73
+    };
+    if compact_logo {
+        let rects = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(12),
+                Constraint::Length(logo_height),
+                Constraint::Length(1),
+                Constraint::Length(3),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ])
+            .split(area);
+        (
+            tier,
+            LandingRows {
+                rects,
+                logo: 1,
+                version: 2,
+                search: 4,
+                favorites: 6,
+                mode_row: 7,
+                util_row: None,
+                logo_width,
+            },
+        )
+    } else {
+        let rects = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(16),
+                Constraint::Length(logo_height),
+                Constraint::Length(1),
+                Constraint::Length(3),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(0),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(area);
+        (
+            tier,
+            LandingRows {
+                rects,
+                logo: 1,
+                version: 2,
+                search: 4,
+                favorites: 6,
+                mode_row: 7,
+                util_row: Some(8),
+                logo_width,
+            },
+        )
+    }
+}
+
 pub(crate) fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
     let query_width = if state.search_query.is_empty() {
         crate::tui::text::width(if state.is_tv_mode {
@@ -92,11 +200,16 @@ pub(crate) fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> 
         0
     };
 
-    query_width
+    let deck = query_width
         .saturating_add(10)
         .saturating_add(status_width)
         .max(minimum.min(maximum))
-        .min(maximum)
+        .min(maximum);
+    if HomeLayoutTier::for_width(area.width).is_compact() {
+        deck.min(area.width.saturating_sub(6)).max(30)
+    } else {
+        deck
+    }
 }
 
 fn render_search_state(
@@ -216,7 +329,11 @@ fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, the
     }
 
     let overflow = state.favorites.items.len().saturating_sub(items.len());
-    let card_width = area.width.clamp(20, 56);
+    let card_width = if HomeLayoutTier::for_width(area.width).is_compact() {
+        area.width.clamp(20, 44)
+    } else {
+        area.width.clamp(20, 56)
+    };
     let row_count = items.len() as u16;
     let overflow_row = u16::from(overflow > 0);
     let content_height = (1 + row_count + overflow_row).min(area.height);
@@ -392,9 +509,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         || (view == SearchViewState::Editing && state.search_results.is_empty())
     {
         let basic_terminal = state.basic_terminal;
-        let logo_height = if basic_terminal { 2 } else { 6 };
+        let (tier, rows) = landing_split(area, state.is_tv_mode, basic_terminal);
+        let vertical_chunks = rows.rects.clone();
 
-        let logo_text = if basic_terminal {
+        let logo_text = if basic_terminal || tier.is_compact() {
             if state.is_tv_mode {
                 "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀\n█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █TV".to_string()
             } else {
@@ -418,27 +536,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .to_string()
         };
 
-        let logo_width: u16 = if basic_terminal {
-            if state.is_tv_mode { 33 } else { 31 }
-        } else if state.is_tv_mode {
-            75
-        } else {
-            73
-        };
-        let vertical_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(16),
-                Constraint::Length(logo_height),
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
-            .split(area);
+        let logo_width: u16 = rows.logo_width;
 
         let pad = area.width.saturating_sub(logo_width) / 2;
         let horizontal_chunks = Layout::default()
@@ -448,7 +546,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 Constraint::Length(logo_width),
                 Constraint::Min(0),
             ])
-            .split(vertical_chunks[1]);
+            .split(vertical_chunks[rows.logo]);
 
         let version_chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -457,7 +555,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 Constraint::Length(logo_width),
                 Constraint::Min(0),
             ])
-            .split(vertical_chunks[2]);
+            .split(vertical_chunks[rows.version]);
 
         let title_art = Paragraph::new(logo_text)
             .alignment(Alignment::Left)
@@ -470,7 +568,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         frame.render_widget(version, version_chunks[1]);
 
         let search_width = search_deck_width(area, state, true);
-        search_bar_area = centered_width(vertical_chunks[4], search_width);
+        search_bar_area = centered_width(vertical_chunks[rows.search], search_width);
 
         if !state.tv_config_popup {
             render_search_bar(
@@ -485,7 +583,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
 
         if state.favorites_landing_visible() {
-            render_favorites_landing(frame, vertical_chunks[6], state, theme);
+            render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
         }
 
         let ctrl_s = crate::tui::text::ctrl_key("S");
@@ -554,15 +652,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let mut mode_spans = vec![];
         for (i, tab) in mode_tabs.into_iter().enumerate() {
             if i > 0 {
-                mode_spans.push(Span::raw("     "));
+                mode_spans.push(Span::raw(if tier.is_compact() { "   " } else { "     " }));
             }
             mode_spans.extend(tab);
         }
-
-        frame.render_widget(
-            Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Center),
-            vertical_chunks[7],
-        );
 
         let util_spans = vec![
             Span::styled("[", theme.text_dim),
@@ -576,10 +669,29 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             Span::styled("Quit", theme.text_dim),
         ];
 
-        frame.render_widget(
-            Paragraph::new(Line::from(util_spans)).alignment(Alignment::Center),
-            vertical_chunks[8],
-        );
+        match rows.util_row {
+            Some(util_idx) => {
+                frame.render_widget(
+                    Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Center),
+                    vertical_chunks[rows.mode_row],
+                );
+                frame.render_widget(
+                    Paragraph::new(Line::from(util_spans)).alignment(Alignment::Center),
+                    vertical_chunks[util_idx],
+                );
+            }
+            None => {
+                let row_rect = vertical_chunks[rows.mode_row];
+                frame.render_widget(
+                    Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Left),
+                    row_rect,
+                );
+                frame.render_widget(
+                    Paragraph::new(Line::from(util_spans)).alignment(Alignment::Right),
+                    row_rect,
+                );
+            }
+        }
     } else {
         if state.is_loading && state.search_results.is_empty() {
             render_search_state(frame, area, state, theme, SearchViewState::Loading);

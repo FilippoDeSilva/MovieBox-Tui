@@ -15,9 +15,13 @@ impl App {
             return None;
         }
 
+        let screen_area = ratatui::layout::Rect {
+            height: area.height.saturating_sub(1),
+            ..area
+        };
         match self.state.active_screen {
-            Screen::Home => self.handle_home_mouse(col, row, area),
-            Screen::Details => self.handle_details_mouse(col, row, area),
+            Screen::Home => self.handle_home_mouse(col, row, screen_area),
+            Screen::Details => self.handle_details_mouse(col, row, screen_area),
         }
     }
 
@@ -337,41 +341,40 @@ impl App {
         let is_landing = self.state.search_results.is_empty()
             && (self.state.search_query.trim().is_empty()
                 || self.state.input_mode == InputMode::Editing);
-        let logo_height = if self.state.basic_terminal { 2 } else { 6 };
         let search_width =
             crate::tui::screens::home::search_deck_width(area, &self.state, is_landing);
 
         let search_bar_area = if is_landing {
-            let vertical_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(16),
-                    Constraint::Length(logo_height),
-                    Constraint::Length(1),
-                    Constraint::Length(3),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Min(0),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                ])
-                .split(area);
+            let (tier, rows) = crate::tui::screens::home::landing_split(
+                area,
+                self.state.is_tv_mode,
+                self.state.basic_terminal,
+            );
+            let compact = tier.is_compact();
 
-            if row == vertical_chunks[7].y {
-                self.handle_home_mode_click(col, area.width);
+            if row == rows.rects[rows.mode_row].y {
+                if compact {
+                    if col < area.width / 2 {
+                        self.handle_home_mode_click(col, area.width, true);
+                    } else {
+                        self.handle_home_util_click(col, area.width, true);
+                    }
+                } else {
+                    self.handle_home_mode_click(col, area.width, false);
+                }
                 return None;
             }
-            if row == vertical_chunks[8].y {
-                self.handle_home_util_click(col, area.width);
+            if rows.util_row.is_some() && row == rows.rects[rows.util_row.unwrap()].y {
+                self.handle_home_util_click(col, area.width, false);
                 return None;
             }
             if self.state.favorites_landing_visible()
-                && self.handle_favorites_landing_click(col, row, vertical_chunks[6])
+                && self.handle_favorites_landing_click(col, row, rows.rects[rows.favorites])
             {
                 return None;
             }
 
-            centered_width_rect(vertical_chunks[4], search_width)
+            centered_width_rect(rows.rects[rows.search], search_width)
         } else {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -503,7 +506,7 @@ impl App {
         true
     }
 
-    fn handle_home_mode_click(&mut self, col: u16, width: u16) {
+    fn handle_home_mode_click(&mut self, col: u16, width: u16, left_aligned: bool) {
         enum ModeBtn {
             Streaming,
             Tv,
@@ -549,7 +552,11 @@ impl App {
 
         let total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
             + (buttons.len().saturating_sub(1) as u16) * sep;
-        let mut curr_x = width.saturating_sub(total_w) / 2;
+        let mut curr_x = if left_aligned {
+            0
+        } else {
+            width.saturating_sub(total_w) / 2
+        };
 
         for (btn, w) in buttons {
             let start = curr_x;
@@ -580,7 +587,7 @@ impl App {
         }
     }
 
-    fn handle_home_util_click(&mut self, col: u16, width: u16) {
+    fn handle_home_util_click(&mut self, col: u16, width: u16, right_aligned: bool) {
         enum UtilBtn {
             Help,
             Quit,
@@ -591,7 +598,11 @@ impl App {
 
         let total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
             + (buttons.len().saturating_sub(1) as u16) * sep;
-        let mut curr_x = width.saturating_sub(total_w) / 2;
+        let mut curr_x = if right_aligned {
+            width.saturating_sub(total_w)
+        } else {
+            width.saturating_sub(total_w) / 2
+        };
 
         for (btn, w) in buttons {
             let start = curr_x;

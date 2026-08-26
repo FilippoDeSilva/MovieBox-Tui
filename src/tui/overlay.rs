@@ -452,9 +452,11 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
         .filter(|l| !l.is_empty())
         .count();
 
-    let min_w: u16 = 46;
+    let min_w: u16 = 58;
     let max_w: u16 = 72;
-    let desired_w = max_w.min(area.width.saturating_sub(4)).max(min_w);
+    let desired_w = max_w
+        .min(area.width.saturating_sub(4))
+        .max(min_w.min(area.width));
 
     let header_rows: u16 = 5;
     let footer_rows: u16 = 3;
@@ -468,11 +470,18 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
         header_rows + (display_count as u16) + (if has_more { 1 } else { 0 }) + footer_rows;
     let desired_h = total_rows.clamp(10, available_height.max(10));
 
-    let popup_area = centered(area, desired_w, desired_h, min_w, max_w);
+    const UPDATE_SEGMENT: u16 = 18;
+    const OPEN_SEGMENT: u16 = 26;
+    const DISMISS_SEGMENT: u16 = 12;
+    let footer_width = UPDATE_SEGMENT + OPEN_SEGMENT + DISMISS_SEGMENT;
+
+    let popup_area = centered(area, desired_w, desired_h, min_w.min(area.width), max_w);
     let button_row_y = popup_area.y + popup_area.height.saturating_sub(2);
-    let update_btn_end_x = popup_area.x + popup_area.width / 3;
-    let open_btn_end_x = popup_area.x + (popup_area.width * 2) / 3;
-    let open_button_midpoint_x = popup_area.x + popup_area.width / 2;
+    let inner_width = popup_area.width.saturating_sub(2);
+    let footer_start = popup_area.x + 1 + inner_width.saturating_sub(footer_width) / 2;
+    let update_btn_end_x = footer_start + UPDATE_SEGMENT;
+    let open_btn_end_x = update_btn_end_x + OPEN_SEGMENT;
+    let open_button_midpoint_x = update_btn_end_x + OPEN_SEGMENT / 2;
 
     UpdateModalLayout {
         popup_area,
@@ -502,7 +511,31 @@ mod tests {
         assert_eq!(layout.popup_area.x, (80 - 72) / 2);
         assert_eq!(layout.popup_area.y, (24 - 12) / 2);
         assert_eq!(layout.button_row_y, layout.popup_area.y + 10);
-        assert_eq!(layout.open_button_midpoint_x, layout.popup_area.x + 36);
+        let footer_start = layout.popup_area.x + 1 + (70 - 56) / 2;
+        assert_eq!(layout.update_btn_end_x, footer_start + 18);
+        assert_eq!(layout.open_btn_end_x, layout.update_btn_end_x + 26);
+        assert_eq!(layout.open_button_midpoint_x, layout.update_btn_end_x + 13);
+    }
+
+    #[test]
+    fn test_update_modal_zones_cover_visible_labels_only() {
+        let area = Rect::new(0, 0, 80, 24);
+        let layout = update_modal_layout(area, "notes");
+        let row = layout.button_row_y;
+
+        assert!(layout.popup_area.contains(ratatui::layout::Position::new(
+            layout.update_btn_end_x - 2,
+            row
+        )));
+        assert!(layout.popup_area.contains(ratatui::layout::Position::new(
+            layout.open_btn_end_x - 2,
+            row
+        )));
+
+        let gap_before_open = layout.update_btn_end_x;
+        assert!(gap_before_open < layout.open_btn_end_x);
+        let dismiss_center = layout.open_btn_end_x + 6;
+        assert!(dismiss_center > layout.open_btn_end_x);
     }
 
     #[test]
@@ -529,7 +562,7 @@ mod tests {
         let notes = "Feature A";
         let layout = update_modal_layout(area, notes);
 
-        let dismiss_x = layout.open_button_midpoint_x + 5;
+        let dismiss_x = layout.open_btn_end_x + 6;
         let dismiss_y = layout.button_row_y;
 
         assert!(
