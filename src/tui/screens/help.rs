@@ -128,7 +128,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Download Video Stream", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [*]            ", theme.header),
+            Span::styled("    [*] / [f]      ", theme.header),
             Span::styled("Favorite / Unfavorite (Home)", theme.text),
         ]));
         help_text.push(Line::from(vec![
@@ -180,7 +180,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Download Episode / Season Batch", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [*]            ", theme.header),
+            Span::styled("    [*] / [f]      ", theme.header),
             Span::styled("Favorite / Unfavorite (Home)", theme.text),
         ]));
         help_text.push(Line::from(vec![
@@ -233,12 +233,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     ]));
     if !state.is_tv_mode && !state.is_addon_mode {
         help_text.push(Line::from(vec![
-            Span::styled("    /enable-bdix   ", theme.header),
-            Span::styled("Enable BDIX FTP Providers", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
-            Span::styled("    /disable-bdix  ", theme.header),
-            Span::styled("Disable BDIX FTP Providers", theme.text),
+            Span::styled("    /toggle-bdix   ", theme.header),
+            Span::styled("Toggle BDIX FTP Providers", theme.text),
         ]));
     }
     help_text.push(Line::from(vec![

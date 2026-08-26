@@ -27,7 +27,7 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 - **`o`**: Open player selection picker for the current stream.
 - **`d`**: Download current episode or full season batch.
 - **`r`**: Refresh search results / stream list.
-- **`*`**: Favorite / unfavorite the selected title on the Home screen.
+- **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
 - **`/history`**: Open watch history.
@@ -37,16 +37,16 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 - **`Enter`**: Play selected TV channel immediately.
 - **`o`**: Open player selection picker for the channel.
 - **`r`**: Reload all active M3U playlist sources.
-- **`/config`**: Open TV Playlist Manager dialog.
+- **`/config`**: Open TV Playlist Manager dialog (`Space` to activate, `Delete`/`d` to remove).
 - **`/list`**: Show all loaded channels.
 
 ### Addon Mode (HTTP Addons)
-- **`Ctrl+P` / `/config`**: Open Addon Manager dialog.
+- **`Ctrl+P` / `/config`**: Open Addon Manager dialog (`Space` to toggle, `Delete`/`d` to remove).
 - **`Enter`**: Select title or play resolved stream.
 - **`o`**: Open player selection picker for the stream.
 - **`d`**: Download HTTP stream release.
 - **`r`**: Refresh addon catalog search results.
-- **`*`**: Favorite / unfavorite the selected title on the Home screen.
+- **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
 - **`/browse`**: Browse curated addon catalogs (Top Movies, Top Series, Top Rated).
 - **`/favorites`**: Open your starred titles.
@@ -81,14 +81,10 @@ Type these commands directly into the search bar:
 | `/clear-cache` | All | Clear temporary cache files |
 | `/update` | All | Check if a new release is available on GitHub |
 | `/toggle-update` | All | Toggle automatic startup update checks |
-| `/enable-streaming` | All | Enable Streaming Mode navigation in bottom dock |
-| `/disable-streaming` | All | Disable Streaming Mode navigation |
-| `/enable-tv` | All | Enable TV Mode navigation in bottom dock |
-| `/disable-tv` | All | Disable TV Mode navigation |
-| `/enable-addons` | All | Enable Addon Mode navigation in bottom dock |
-| `/disable-addons` | All | Disable Addon Mode navigation |
-| `/enable-bdix` | Streaming | Enable BDIX FTP sources (Bangladesh ISPs only) |
-| `/disable-bdix` | Streaming | Disable BDIX FTP sources |
+| `/toggle-streaming` | All | Toggle Streaming Mode navigation in bottom dock (aliases: `/enable-streaming`, `/disable-streaming`) |
+| `/toggle-tv` | All | Toggle TV Mode navigation in bottom dock (aliases: `/enable-tv`, `/disable-tv`) |
+| `/toggle-addons` | All | Toggle Addon Mode navigation in bottom dock (aliases: `/enable-addons`, `/disable-addons`) |
+| `/toggle-bdix` | Streaming | Toggle BDIX FTP sources (aliases: `/enable-bdix`, `/disable-bdix`) |
 | `/probe` | All | Re-run terminal graphics detection and report the result |
 | `/github` | All | Open the project repository |
 

@@ -44,8 +44,24 @@
 - **Details footer responsive threshold**: single-row footer breakpoint adjusted to
   86 columns in sync with mouse hit-testing, preventing button clipping on 70–85
   column viewports.
+- **`f` and `*` favoriting parity**: pressing `f`, `F`, or `*` on Home search results
+  or the Favorites landing row now toggles favorite status, matching Details.
+- **Streamlined `/toggle-*` slash commands**: consolidated paired `/enable-*` and
+  `/disable-*` commands into 4 primary toggles (`/toggle-tv`, `/toggle-addons`,
+  `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
 ### Fixed
+- **Modal key trapping & isolation**: structural modal gating prevents mode
+  chords (`Ctrl+T`, `Ctrl+A`, `Ctrl+S`, `Ctrl+P`), download cancellation (`x`),
+  and background pane navigation from leaking into open dialogs and inputs.
+- **Modal exact clears**: replaced 3-column halo clear with exact popup bounding box
+  clears, eliminating cutout artifacts on background cards and borders.
+- **Favorites landing navigation**: pressing `Up` from the top favorite item cleanly
+  returns focus to the search bar instead of getting stuck.
+- **Manager shortcut harmonization**: `Space` (toggle) and `Delete` (remove) are now
+  supported across both TV Playlist and Addon managers.
+- **Details synopsis & theme contrast**: synopsis text styled with `theme.subtext1`
+  for crisp readability; Nord overlay ramp and TokyoNight border luminance tuned.
 - **DNS resolution on Android/Termux and minimal containers**: Replaced the reqwest
   `hickory-dns` feature flag with a custom resolver (`src/net.rs`) that reads the OS
   DNS configuration first (`/etc/resolv.conf`, registry on Windows) and falls back to
