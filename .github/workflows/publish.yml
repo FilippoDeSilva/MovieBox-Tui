@@ -19,6 +19,7 @@ jobs:
     name: Publish
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Determine ref
         id: ref
@@ -34,7 +35,22 @@ jobs:
         with:
           ref: ${{ steps.ref.outputs.target_ref }}
 
+      - name: Skip when no release was published
+        id: release_gate
+        if: ${{ github.event_name == 'workflow_run' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
+          if gh release view "v$VERSION" --repo "${{ github.repository }}" --json id > /dev/null 2>&1; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release run finished without publishing v$VERSION (no new release). Nothing to do."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Confirm version
+        if: ${{ steps.release_gate.outputs.publish != 'false' }}
         run: |
           VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
           echo "Publishing version $VERSION from ${{ steps.ref.outputs.target_ref }}"
@@ -44,11 +60,13 @@ jobs:
           fi
 
       - name: Install Rust
+        if: ${{ steps.release_gate.outputs.publish != 'false' }}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
 
       - name: Publish to crates.io
+        if: ${{ steps.release_gate.outputs.publish != 'false' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --locked

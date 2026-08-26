@@ -15,6 +15,7 @@ jobs:
   update-homebrew:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -34,8 +35,23 @@ jobs:
           ref: ${{ steps.ref.outputs.target_ref }}
           fetch-depth: 0
 
+      - name: Skip when no release was published
+        id: release_gate
+        if: ${{ github.event_name == 'workflow_run' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')"
+          if gh release view "$VERSION" --repo "${{ github.repository }}" --json id > /dev/null 2>&1; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release run finished without publishing $VERSION (no new release). Nothing to do."
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Get Release Data
         id: release
+        if: ${{ steps.release_gate.outputs.update != 'false' }}
         run: |
           VERSION="v$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')"
           CLEAN_VERSION="${VERSION#v}"
@@ -55,6 +71,7 @@ jobs:
           echo "linux_arm64_sha=$(sha256sum linux-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
 
       - name: Update Formula
+        if: ${{ steps.release_gate.outputs.update != 'false' }}
         run: |
           FORMULA_FILE="Formula/moviebox-tui.rb"
           VERSION="${{ steps.release.outputs.version }}"
@@ -64,6 +81,7 @@ jobs:
           sed -i "s/LINUX_ARM64_SHA256 = \".*\"/LINUX_ARM64_SHA256 = \"${{ steps.release.outputs.linux_arm64_sha }}\"/" "$FORMULA_FILE"
 
       - name: Commit and Push Changes
+        if: ${{ steps.release_gate.outputs.update != 'false' }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore(homebrew): update formula to v${{ steps.release.outputs.version }}"

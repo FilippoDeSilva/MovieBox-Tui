@@ -13,8 +13,20 @@ use std::io::Write;
 #[cfg(target_os = "macos")]
 use std::process::Command;
 
+fn live_tests_enabled() -> bool {
+    matches!(
+        std::env::var("MOVIEBOX_LIVE_TESTS").as_deref(),
+        Ok("1") | Ok("true")
+    )
+}
+
 #[tokio::test]
+#[ignore = "live network test; opt in with MOVIEBOX_LIVE_TESTS=1 cargo test -- --ignored"]
 async fn test_real_github_release_artifact_download_and_integrity() {
+    if !live_tests_enabled() {
+        eprintln!("skipping live-network test; set MOVIEBOX_LIVE_TESTS=1 to enable");
+        return;
+    }
     let temp_dir = tempfile::tempdir().unwrap();
     let archive_path = temp_dir.path().join("MovieBox_macOS_Universal.tar.gz");
     let checksum_url =
