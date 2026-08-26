@@ -1,5 +1,8 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+const STAGED_BINARY_FILENAME: &str = ".moviebox_update_staged.exe";
+const HELPER_SCRIPT_FILENAME: &str = "moviebox_update_helper.bat";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelfUpdateOutcome {
@@ -91,9 +94,32 @@ pub fn apply_staged_binary(
             Ok(SelfUpdateOutcome::Success)
         }
         InstallationEnvironment::WindowsHelper => {
-            spawn_windows_helper(staged_path, current_exe)?;
-            Ok(SelfUpdateOutcome::Success)
+            let result = spawn_windows_helper(staged_path, current_exe);
+            if result.is_err() {
+                let _ = std::fs::remove_file(staged_path);
+            }
+            result.map(|_| SelfUpdateOutcome::Success)
         }
+    }
+}
+
+pub fn persistent_staging_path(current_exe: &Path) -> PathBuf {
+    current_exe.with_file_name(STAGED_BINARY_FILENAME)
+}
+
+pub fn stale_update_artifacts(current_exe: &Path) -> Vec<PathBuf> {
+    vec![
+        current_exe.with_file_name(STAGED_BINARY_FILENAME),
+        current_exe.with_file_name(HELPER_SCRIPT_FILENAME),
+    ]
+}
+
+pub fn cleanup_stale_update_artifacts(current_exe: &Path) {
+    if !cfg!(windows) {
+        return;
+    }
+    for path in stale_update_artifacts(current_exe) {
+        let _ = std::fs::remove_file(path);
     }
 }
 
@@ -146,25 +172,36 @@ fn replace_binary_with_backup(staged_path: &Path, current_exe: &Path) -> Result<
     Ok(())
 }
 
+fn render_helper_script(staged_path: &Path, current_exe: &Path, pid: u32) -> String {
+    [
+        "@echo off".to_string(),
+        ":wait_loop".to_string(),
+        format!("tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL"),
+        "if %ERRORLEVEL% == 0 (".to_string(),
+        "    timeout /t 1 /nobreak >NUL".to_string(),
+        "    goto wait_loop".to_string(),
+        ")".to_string(),
+        format!(
+            "move /y \"{}\" \"{}\"",
+            staged_path.to_string_lossy(),
+            current_exe.to_string_lossy()
+        ),
+        format!(
+            "if exist \"{}\" del /f /q \"{}\"",
+            staged_path.to_string_lossy(),
+            staged_path.to_string_lossy()
+        ),
+        format!("start \"\" \"{}\"", current_exe.to_string_lossy()),
+        "del \"%~f0\"".to_string(),
+    ]
+    .join("\r\n")
+}
+
 fn spawn_windows_helper(staged_path: &Path, current_exe: &Path) -> Result<(), String> {
-    let helper_path = current_exe.with_file_name("moviebox_update_helper.bat");
+    let helper_path = current_exe.with_file_name(HELPER_SCRIPT_FILENAME);
     let pid = std::process::id();
 
-    let script_content = format!(
-        "@echo off\r\n\
-        :wait_loop\r\n\
-        tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL\r\n\
-        if %ERRORLEVEL% == 0 (\r\n\
-            timeout /t 1 /nobreak >NUL\r\n\
-            goto wait_loop\r\n\
-        )\r\n\
-        move /y \"{}\" \"{}\"\r\n\
-        start \"\" \"{}\"\r\n\
-        del \"%~f0\"\r\n",
-        staged_path.to_string_lossy(),
-        current_exe.to_string_lossy(),
-        current_exe.to_string_lossy()
-    );
+    let script_content = render_helper_script(staged_path, current_exe, pid);
 
     std::fs::write(&helper_path, script_content)
         .map_err(|e| format!("failed to write Windows update helper: {e}"))?;
@@ -188,6 +225,72 @@ pub fn restart_process(exe_path: &Path) -> Result<(), String> {
 
     #[cfg(windows)]
     {
+        let _ = exe_path;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn persistent_staging_path_lives_beside_executable() {
+        let exe = Path::new("/opt/tools/moviebox-tui.exe");
+        let staged = persistent_staging_path(exe);
+        assert_eq!(staged.parent(), Some(Path::new("/opt/tools")));
+        assert!(staged.to_string_lossy().contains("moviebox_update_staged"));
+    }
+
+    #[test]
+    fn stale_artifacts_cover_staging_and_helper() {
+        let exe = Path::new("C:/App/moviebox-tui.exe");
+        let paths = stale_update_artifacts(exe);
+        assert_eq!(paths.len(), 2);
+        assert!(
+            paths[0]
+                .to_string_lossy()
+                .contains("moviebox_update_staged")
+        );
+        assert!(
+            paths[1]
+                .to_string_lossy()
+                .contains("moviebox_update_helper.bat")
+        );
+    }
+
+    #[test]
+    fn helper_script_waits_moves_and_cleans_up() {
+        let script = render_helper_script(
+            Path::new("C:\\App\\update dir\\.moviebox_update_staged.exe"),
+            Path::new("C:\\App\\moviebox-tui.exe"),
+            4242,
+        );
+        let lines: Vec<&str> = script.split("\r\n").collect();
+        assert_eq!(lines[0], "@echo off");
+        assert!(script.contains("tasklist /FI \"PID eq 4242\""));
+        assert!(script.contains(
+            "move /y \"C:\\App\\update dir\\.moviebox_update_staged.exe\" \"C:\\App\\moviebox-tui.exe\""
+        ));
+        assert!(script.contains(
+            "if exist \"C:\\App\\update dir\\.moviebox_update_staged.exe\" del /f /q \"C:\\App\\update dir\\.moviebox_update_staged.exe\""
+        ));
+        assert!(script.contains("start \"\" \"C:\\App\\moviebox-tui.exe\""));
+        assert_eq!(*lines.last().expect("non-empty"), "del \"%~f0\"");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cleanup_removes_only_known_artifacts() {
+        let dir = std::env::temp_dir().join(format!("mbx_apply_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("moviebox-tui.exe");
+        std::fs::write(&exe, b"current").unwrap();
+        let staged = persistent_staging_path(&exe);
+        std::fs::write(&staged, b"staged").unwrap();
+        cleanup_stale_update_artifacts(&exe);
+        assert!(!staged.exists());
+        assert!(exe.exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

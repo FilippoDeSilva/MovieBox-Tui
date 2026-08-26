@@ -46,6 +46,14 @@ fn purge_stale_subtitles() {
     });
 }
 
+fn purge_stale_update_artifacts() {
+    tokio::task::spawn_blocking(|| {
+        if let Ok(current_exe) = std::env::current_exe() {
+            moviebox_tui::updater::apply::cleanup_stale_update_artifacts(&current_exe);
+        }
+    });
+}
+
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         restore_terminal();
@@ -64,7 +72,7 @@ async fn main() -> std::io::Result<()> {
         println!("    -h, --help           Print help information");
         println!("    -v, -V, --version    Print version information\n");
         println!("ENVIRONMENT VARIABLES:");
-        println!("    MOVIEBOX_LOG            Log level (info, warn, error, debug, trace)");
+        println!("    MOVIEBOX_LOG            Log level (off, error, warn, info, debug, trace)");
         println!("    MOVIEBOX_THEME          Theme name (e.g. catppuccin, dracula, nord, etc.)");
         println!("    MOVIEBOX_PLAYER         Preferred player (mpv, iina, vlc, android)");
         println!("    MOVIEBOX_MPV_PATH       Custom mpv binary path");
@@ -105,6 +113,7 @@ async fn main() -> std::io::Result<()> {
 
     moviebox_tui::cache::clean_old_cache_background();
     purge_stale_subtitles();
+    purge_stale_update_artifacts();
 
     let mut app = App::new();
     if let Err(err) = app.run(&mut terminal).await {

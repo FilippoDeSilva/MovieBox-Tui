@@ -53,7 +53,11 @@ pub async fn perform_self_update(
         .map_err(|e| format!("failed to create temporary update directory: {e}"))?;
 
     let archive_path = temp_dir.path().join(&asset.name);
-    let staged_binary_path = temp_dir.path().join(platform.expected_binary_name());
+    let staged_binary_path = if env == InstallationEnvironment::WindowsHelper {
+        apply::persistent_staging_path(&current_exe)
+    } else {
+        temp_dir.path().join(platform.expected_binary_name())
+    };
 
     if let Some(tx) = progress_sender {
         let _ = tx.send(format!("Downloading {}...", asset.name));
