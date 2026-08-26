@@ -231,7 +231,7 @@ impl FourKHdHubClient {
 }
 
 fn build_client() -> reqwest::Client {
-    reqwest::Client::builder()
+    crate::net::http_client_builder()
         .timeout(std::time::Duration::from_secs(20))
         .connect_timeout(std::time::Duration::from_secs(5))
         .user_agent(BROWSER_UA)

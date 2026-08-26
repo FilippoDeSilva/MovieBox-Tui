@@ -17,7 +17,7 @@ impl M3UParser {
     pub fn new() -> Self {
         let cache_dir = crate::config::cache_dir().join("tv_playlists");
         std::fs::create_dir_all(&cache_dir).ok();
-        let client = reqwest::Client::builder()
+        let client = crate::net::http_client_builder()
             .connect_timeout(std::time::Duration::from_secs(10))
             .timeout(std::time::Duration::from_secs(30))
             .build()

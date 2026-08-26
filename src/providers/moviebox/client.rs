@@ -47,7 +47,7 @@ impl Default for MovieBoxClient {
 
 impl MovieBoxClient {
     pub fn new() -> Self {
-        let client = reqwest::Client::builder()
+        let client = crate::net::http_client_builder()
             .timeout(std::time::Duration::from_secs(12))
             .connect_timeout(std::time::Duration::from_secs(3))
             .tcp_keepalive(std::time::Duration::from_secs(30))

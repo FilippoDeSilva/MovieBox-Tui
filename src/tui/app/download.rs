@@ -124,7 +124,7 @@ impl App {
 
         let cancel = self.state.cancel_download.clone();
         let sender = self.action_sender.clone();
-        let client = reqwest::Client::builder()
+        let client = crate::net::http_client_builder()
             .connect_timeout(std::time::Duration::from_secs(15))
             .tcp_keepalive(std::time::Duration::from_secs(30))
             .build()

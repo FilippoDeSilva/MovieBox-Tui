@@ -15,7 +15,7 @@ impl Default for AddonClient {
 
 impl AddonClient {
     pub fn new() -> Self {
-        let http = Client::builder()
+        let http = crate::net::http_client_builder()
             .timeout(Duration::from_secs(12))
             .connect_timeout(Duration::from_secs(8))
             .user_agent("MovieBox-Tui/1.0 (Addon-Client)")

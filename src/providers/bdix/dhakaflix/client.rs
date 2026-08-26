@@ -83,7 +83,7 @@ impl Default for DhakaFlixClient {
 impl DhakaFlixClient {
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::builder()
+            client: crate::net::http_client_builder()
                 .timeout(Duration::from_secs(5))
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .build()

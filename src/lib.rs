@@ -5,6 +5,7 @@ pub mod favorites;
 pub mod history;
 pub mod logging;
 pub mod models;
+pub mod net;
 pub mod player;
 pub mod providers;
 pub mod service;

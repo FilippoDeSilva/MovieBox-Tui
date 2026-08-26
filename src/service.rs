@@ -27,7 +27,7 @@ impl Default for MovieBoxService {
 
 impl MovieBoxService {
     pub fn new() -> Self {
-        let http_client = reqwest::Client::builder()
+        let http_client = crate::net::http_client_builder()
             .timeout(std::time::Duration::from_secs(15))
             .build()
             .unwrap_or_default();
@@ -360,6 +360,14 @@ pub async fn decode_poster(bytes: Vec<u8>) -> Option<Arc<image::DynamicImage>> {
         .ok()?
         .ok()
         .map(Arc::new)
+}
+
+pub fn downscale_for_cache(img: &Arc<image::DynamicImage>) -> Arc<image::DynamicImage> {
+    const MAX_DIM: u32 = 512;
+    if img.width().max(img.height()) <= MAX_DIM {
+        return Arc::clone(img);
+    }
+    Arc::new(img.resize(MAX_DIM, MAX_DIM, image::imageops::FilterType::Triangle))
 }
 
 pub fn extract_cover_url(val: &serde_json::Value) -> Option<String> {

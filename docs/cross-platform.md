@@ -15,7 +15,7 @@ the release checks in [`release-checklist.md`](release-checklist.md).
 | macOS            | IINA preferred player (via the installed IINA `iina-cli`); VLC/mpv `.app` paths detected. `process_group(0)` on spawn.                                                                                                                                                                                |
 | Windows          | mpv/VLC detected via Program Files + `%LOCALAPPDATA%`; path-safe file stems; static MSVC CRT linking (`+crt-static`) for zero-dependency standalone binaries. |
 | Linux            | Flatpak mpv/VLC supported (`flatpak run …`); xdg data/cache dirs.                                                                                                                                                                                                                                    |
-| Android (Termux) | Uses the Linux ARM64 binary with pure-Rust async DNS (`hickory-dns`) for zero-config name resolution and dynamically checks for `termux-open`, `termux-open-url`, `termux-am`, or in-terminal `mpv`; playback strips `LD_LIBRARY_PATH` and `LD_PRELOAD` before launching the chooser. Android intent playback cannot forward stream headers or attach subtitles. Real-device chooser behavior is a release prerequisite; Proot/Termux X11 behavior is unsupported unless separately tested. |
+| Android (Termux) | Uses the Linux ARM64 binary with a pure-Rust DNS resolver that reads the system configuration when available and otherwise falls back to public resolvers (Cloudflare, Google, Quad9) for zero-config name resolution, and dynamically checks for `termux-open`, `termux-open-url`, `termux-am`, or in-terminal `mpv`; playback strips `LD_LIBRARY_PATH` and `LD_PRELOAD` before launching the chooser. Android intent playback cannot forward stream headers or attach subtitles. Real-device chooser behavior is a release prerequisite; Proot/Termux X11 behavior is unsupported unless separately tested. |
 
 ## Terminal capabilities
 
@@ -28,7 +28,11 @@ The app probes the terminal at startup via `ratatui_image`:
 ## Network & TLS portability
 
 - **TLS Engine**: Uses `rustls` with embedded Mozilla roots (`webpki-roots`) across all targets (macOS, Linux, Windows, Android/Termux). The release binary has no OpenSSL runtime dependency; the `ring` cryptography backend is compiled into the binary by the platform build toolchain.
-- **DNS Resolution**: Uses standard POSIX/WinSock system DNS (`getaddrinfo`) on all platforms, without requiring JNI or `ndk-context`.
+- **DNS Resolution**: Pure-Rust resolver (hickory) on all platforms: it reads the OS
+  configuration first (`/etc/resolv.conf`, registry on Windows) and falls back to
+  embedded public resolvers (Cloudflare `1.1.1.1`, Google `8.8.8.8`, Quad9 `9.9.9.9`)
+  when no system configuration exists — as on Android/Termux or minimal containers.
+  No JNI or `ndk-context` required.
 
 ## Things to verify per release
 
