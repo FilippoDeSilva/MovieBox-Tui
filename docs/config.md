@@ -33,7 +33,7 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 
 | Variable                  | Purpose                                                                           |
 | ------------------------- | --------------------------------------------------------------------------------- |
-| `MOVIEBOX_LOG`            | Log level: `off`, `warn`, `info`, `debug`, `trace`. See [logging.md](logging.md). |
+| `MOVIEBOX_LOG`            | Log level: `off`, `error`, `warn`, `info`, `debug`, `trace`. See [logging.md](logging.md). |
 | `MOVIEBOX_PLAYER`         | Preferred player (overrides `default_player`).                                    |
 | `MOVIEBOX_MPV_PATH`       | Custom mpv executable.                                                            |
 | `MOVIEBOX_VLC_PATH`       | Custom VLC executable.                                                            |

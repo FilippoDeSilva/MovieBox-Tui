@@ -2,9 +2,54 @@
 
 ## [Unreleased]
 
-### Added
-- **Pure-Rust Async DNS Engine**: Enabled `hickory-dns` in the HTTP client so the prebuilt `musl` Linux binary resolves DNS hostnames automatically without requiring `/etc/resolv.conf`, enabling zero-configuration out-of-the-box networking on Android/Termux and minimal container environments.
-- **Termux Installer DNS Helper**: Automatically populate `$PREFIX/etc/resolv.conf` with fallback nameservers (`1.1.1.1` and `8.8.8.8`) during Termux installation.
+### Fixed
+- **DNS resolution on Android/Termux and minimal containers**: Replaced the reqwest
+  `hickory-dns` feature flag with a custom resolver (`src/net.rs`) that reads the OS
+  DNS configuration first (`/etc/resolv.conf`, registry on Windows) and falls back to
+  embedded public resolvers (Cloudflare, Google, Quad9) when none exists. The previous
+  approach failed every lookup on platforms without `/etc/resolv.conf` (hickory reads
+  only the hardcoded `/etc/resolv.conf` path); the Termux `$PREFIX/etc/resolv.conf`
+  installer workaround it required is removed.
+- **Crash on multibyte titles**: Year stripping sliced remote HTML titles at a raw
+  byte offset and could abort the whole app on CJK/accented characters.
+- **Windows self-update never applied**: The staged binary lived inside a temporary
+  directory deleted before the detached `.bat` helper ran, so the update silently
+  never replaced the executable. Staging now persists beside the installed binary,
+  the helper consumes and cleans it, and stale staging artifacts are swept at startup.
+- **State file durability**: History/favorites/config writes fsync before rename and
+  never delete the existing destination unless a replacement has succeeded.
+- **install.sh correctness**: Install-directory fallback now happens outside the
+  spinner subshell (reported path and shell-rc PATH edits previously used the wrong
+  directory), INT/TERM exit cleanly instead of continuing, the version temp file is
+  cleaned up on failure, PATH/profile matching is literal (regex-safe paths), missing
+  `--version`/`--dir` values fail with clear errors, unknown arguments warn, trailing
+  slashes in `--dir` are normalized, and reinstalling over a running binary avoids
+  `ETXTBSY`.
+- **install.ps1 hardening**: TLS 1.2 is enabled independently so older .NET stacks
+  keep it even when TLS 1.3 is unavailable; User PATH updates are written through the
+  registry preserving REG_EXPAND_SZ variables and use exact segment matching; the
+  uninstaller removes its stale User PATH entry; `-Version 0.1.x` is accepted and
+  normalized to `v0.1.x`.
+- **Mouse click accuracy**: Search-result hit testing uses the real scroll offset
+  instead of deriving it from the selection, fixing clicks selecting or opening the
+  wrong title after sorting or scrolling partway.
+- **Poster memory footprint**: Decoded posters are downscaled to ≤512px before
+  caching, decoded/encoded cache sizes were right-sized (roughly 10× less RAM on
+  low-end devices), failed posters retry after 10 minutes instead of being negatively
+  cached forever, and prefetch shares one concurrency limiter instead of creating a
+  new semaphore per scroll batch.
+- **Rendering & input polish**: The terminal graphics probe is capped at 400ms and
+  runs off the UI thread (previously up to 2s of blank screen at startup); resize
+  performs a single deferred clear instead of two flashes; grid poster width derives
+  from real terminal cell metrics; the input caret blink keeps animating while
+  typing; the mouse wheel scrolls one result row per notch; `NO_COLOR` now overrides
+  `MOVIEBOX_THEME`; strict 256-color terminals receive quantized indexed palettes
+  rather than RGB sequences.
+
+### Changed
+- CI: `Publish to Crates.io` and `Update Homebrew Formula` now skip gracefully when a
+  Release run completed without publishing a new version; the live-network acceptance
+  test is opt-in via `MOVIEBOX_LIVE_TESTS=1 cargo test --test real_acceptance -- --ignored`.
 
 ## [0.1.14] - 2026-08-26
 

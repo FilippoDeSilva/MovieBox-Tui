@@ -9,7 +9,7 @@ src/
   main.rs            Entry point. Logging init, panic hook, raw mode, alternate
                      screen, TerminalGuard, App::new + App::run.
   lib.rs             Crate root: declares pub mod cache/config/download/favorites/
-                     history/logging/models/player/providers/service/tui/updater.
+                     history/logging/models/net/player/providers/service/tui/updater.
 
   cache.rs           Disk cache: provider-namespaced directories, TTL expiry,
                      atomic temp-file writes, payload validation, background purge.
@@ -35,6 +35,11 @@ src/
                      BrowsePreset, BrowseMetrics, SubjectStreamPool, Notification,
                      SubjectIdentity (cross-provider identity rules shared by
                      history and favorites).
+
+  net.rs             Shared HTTP plumbing: FallbackResolver (hickory DNS reading the
+                     OS configuration, falling back to Cloudflare/Google/Quad9 when
+                     absent) wired into every reqwest client via
+                     net::http_client_builder().
 
   player.rs          Player detection (OnceLock) and command construction for
                      mpv / VLC / IINA / Android intent, subtitle args, headers,
