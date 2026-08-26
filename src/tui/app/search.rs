@@ -140,6 +140,12 @@ impl App {
                 self.state.input_mode = InputMode::Normal;
                 Some(true)
             }
+            crate::tui::commands::ParsedCommand::Probe => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.action_sender.send(Action::ProbeTerminal).ok();
+                Some(true)
+            }
             crate::tui::commands::ParsedCommand::Update => {
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;

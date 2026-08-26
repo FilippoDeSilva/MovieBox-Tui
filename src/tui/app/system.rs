@@ -107,6 +107,15 @@ impl App {
             }
 
             Action::FocusChange => {
+                if self.state.initial_probe_failed
+                    && self.state.image_probe_attempts < 3
+                    && self
+                        .state
+                        .last_image_probe
+                        .is_none_or(|probe| probe.elapsed() >= std::time::Duration::from_secs(30))
+                {
+                    self.probe_terminal().await;
+                }
                 self.prepare_image_soft_refresh();
             }
 
@@ -321,8 +330,6 @@ impl App {
 
             Action::SelectTheme(theme_name) => {
                 if theme_name.is_empty() && self.state.theme_is_auto {
-                    // Esc from the picker with no explicit theme configured:
-                    // restore the auto-detected theme instead of forcing Mocha.
                     self.theme = crate::tui::theme::Theme::detect();
                 } else {
                     let kind = crate::tui::theme::ThemeKind::parse(&theme_name);

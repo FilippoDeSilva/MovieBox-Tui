@@ -8,6 +8,11 @@ use crate::tui::{
 use ratatui::Frame;
 use std::time::Duration;
 
+enum ForcedProtocol {
+    None,
+    Type(ratatui_image::picker::ProtocolType),
+}
+
 impl App {
     pub async fn run<B: ratatui::backend::Backend>(
         &mut self,
@@ -17,55 +22,7 @@ impl App {
         std::io::Error: From<<B as ratatui::backend::Backend>::Error>,
     {
         if self.state.image_picker.is_none() && self.state.image_supported {
-            let picker = if crate::tui::terminal::should_query_images() {
-                tokio::task::spawn_blocking(|| {
-                    let options = ratatui_image::picker::cap_parser::QueryStdioOptions {
-                        timeout: Duration::from_millis(400),
-                        terminal_background_color_osc: true,
-                        ..Default::default()
-                    };
-                    ratatui_image::picker::Picker::from_query_stdio_with_options(options).ok()
-                })
-                .await
-                .unwrap_or_default()
-            } else {
-                None
-            };
-            if self.state.theme_is_auto
-                && let Some(background) = picker.as_ref().and_then(|p| {
-                    p.capabilities()
-                        .iter()
-                        .find_map(|capability| match capability {
-                            ratatui_image::picker::Capability::Background(red, green, blue) => {
-                                Some((*red, *green, *blue))
-                            }
-                            _ => None,
-                        })
-                })
-            {
-                let luminance = 0.2126 * f32::from(background.0)
-                    + 0.7152 * f32::from(background.1)
-                    + 0.0722 * f32::from(background.2);
-                let is_light = luminance > 128.0;
-                self.theme = crate::tui::theme::Theme::detect_with_light(Some(is_light));
-                self.state.active_theme_kind = if is_light { "Latte" } else { "Mocha" }.to_string();
-            }
-            if let Some(picker) = picker
-                && !matches!(
-                    picker.protocol_type(),
-                    ratatui_image::picker::ProtocolType::Halfblocks
-                )
-            {
-                let cell_h = picker.font_size().height;
-                if cell_h > 0 {
-                    self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
-                }
-                self.state.image_picker = Some(picker);
-                self.state.image_supported = true;
-            } else {
-                self.state.image_supported = false;
-                self.state.image_picker = None;
-            }
+            self.probe_terminal().await;
         }
 
         let mut events = EventHandler::new(Duration::from_millis(100));
@@ -152,6 +109,161 @@ impl App {
         }
     }
 
+    pub(super) async fn probe_terminal(&mut self) {
+        use ratatui_image::picker::{Capability, ProtocolType};
+
+        self.state.image_probe_attempts = self.state.image_probe_attempts.saturating_add(1);
+        self.state.last_image_probe = Some(std::time::Instant::now());
+
+        match Self::forced_protocol() {
+            Some(ForcedProtocol::None) => {
+                self.state.image_supported = false;
+                self.state.image_picker = None;
+                self.state.initial_probe_failed = false;
+                return;
+            }
+            forced => {
+                if forced.is_some() {
+                    let font_size = Self::cell_size_override().unwrap_or(ratatui_image::FontSize {
+                        width: 10,
+                        height: 20,
+                    });
+                    #[allow(deprecated)]
+                    let mut picker = ratatui_image::picker::Picker::from_fontsize(font_size);
+                    if let Some(ForcedProtocol::Type(protocol)) = forced {
+                        picker.set_protocol_type(protocol);
+                    }
+                    self.accept_picker(picker);
+                    return;
+                }
+            }
+        }
+
+        let picker = self.query_picker().await;
+
+        if self.state.theme_is_auto
+            && let Some(background) = picker.as_ref().and_then(|p| {
+                p.capabilities()
+                    .iter()
+                    .find_map(|capability| match capability {
+                        Capability::Background(red, green, blue) => Some((*red, *green, *blue)),
+                        _ => None,
+                    })
+            })
+        {
+            let luminance = 0.2126 * f32::from(background.0)
+                + 0.7152 * f32::from(background.1)
+                + 0.0722 * f32::from(background.2);
+            let is_light = luminance > 128.0;
+            self.theme = crate::tui::theme::Theme::detect_with_light(Some(is_light));
+            self.state.active_theme_kind = if is_light { "Latte" } else { "Mocha" }.to_string();
+        }
+
+        let mut picker = match (picker, Self::cell_size_override()) {
+            (Some(picker), None) => picker,
+            (probed, cell_size) => {
+                let font_size = cell_size.unwrap_or(ratatui_image::FontSize {
+                    width: 10,
+                    height: 20,
+                });
+                #[allow(deprecated)]
+                let mut rebuilt = ratatui_image::picker::Picker::from_fontsize(font_size);
+                if let Some(probed) = probed {
+                    rebuilt.set_protocol_type(probed.protocol_type());
+                }
+                if let Some(ForcedProtocol::Type(protocol)) = Self::forced_protocol() {
+                    rebuilt.set_protocol_type(protocol);
+                }
+                rebuilt
+            }
+        };
+
+        let capabilities_empty = picker.capabilities().is_empty();
+        if matches!(picker.protocol_type(), ProtocolType::Halfblocks) && !capabilities_empty {
+            let caps = picker.capabilities();
+            let salvaged = if caps.iter().any(|c| matches!(c, Capability::Kitty)) {
+                Some(ProtocolType::Kitty)
+            } else if caps.iter().any(|c| matches!(c, Capability::Sixel)) {
+                Some(ProtocolType::Sixel)
+            } else {
+                None
+            };
+            if let Some(protocol) = salvaged {
+                log::info!(
+                    "salvaging graphics-capable terminal that answered as halfblocks: {:?}",
+                    protocol
+                );
+                picker.set_protocol_type(protocol);
+            }
+        }
+
+        if matches!(picker.protocol_type(), ProtocolType::Halfblocks) {
+            self.state.image_supported = false;
+            self.state.image_picker = None;
+            self.state.initial_probe_failed = !capabilities_empty;
+            return;
+        }
+        self.accept_picker(picker);
+    }
+
+    fn accept_picker(&mut self, picker: ratatui_image::picker::Picker) {
+        let cell_h = picker.font_size().height;
+        if cell_h > 0 {
+            self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
+        }
+        self.state.image_picker = Some(picker);
+        self.state.image_supported = true;
+        self.state.initial_probe_failed = false;
+    }
+
+    async fn query_picker(&self) -> Option<ratatui_image::picker::Picker> {
+        if !crate::tui::terminal::should_query_images() {
+            return None;
+        }
+        tokio::task::spawn_blocking(|| {
+            let options = ratatui_image::picker::cap_parser::QueryStdioOptions {
+                timeout: Duration::from_millis(400),
+                terminal_background_color_osc: true,
+                ..Default::default()
+            };
+            ratatui_image::picker::Picker::from_query_stdio_with_options(options).ok()
+        })
+        .await
+        .unwrap_or_default()
+    }
+
+    fn forced_protocol() -> Option<ForcedProtocol> {
+        match std::env::var("MOVIEBOX_IMAGE_PROTOCOL")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "none" | "off" | "false" => Some(ForcedProtocol::None),
+            "sixel" => Some(ForcedProtocol::Type(
+                ratatui_image::picker::ProtocolType::Sixel,
+            )),
+            "kitty" => Some(ForcedProtocol::Type(
+                ratatui_image::picker::ProtocolType::Kitty,
+            )),
+            "iterm2" => Some(ForcedProtocol::Type(
+                ratatui_image::picker::ProtocolType::Iterm2,
+            )),
+            _ => None,
+        }
+    }
+
+    fn cell_size_override() -> Option<ratatui_image::FontSize> {
+        let raw = std::env::var("MOVIEBOX_CELL_SIZE").ok()?;
+        let raw = raw.trim().to_ascii_lowercase();
+        let (width, height) = raw.split_once(['x', '*'])?;
+        let width: u16 = width.trim().parse().ok()?;
+        let height: u16 = height.trim().parse().ok()?;
+        if width == 0 || height == 0 {
+            return None;
+        }
+        Some(ratatui_image::FontSize { width, height })
+    }
+
     pub async fn handle_action(&mut self, action: Action) -> Option<()> {
         if self.state.last_resize_time.is_some()
             || !matches!(action, Action::Tick | Action::UpdateDownload(..))
@@ -169,6 +281,26 @@ impl App {
 
             Action::MouseClick(col, row) => {
                 self.handle_mouse(col, row);
+            }
+
+            Action::ProbeTerminal => {
+                self.probe_terminal().await;
+                let outcome = if self.state.image_supported {
+                    let protocol = self
+                        .state
+                        .image_picker
+                        .as_ref()
+                        .map(|picker| format!("{:?}", picker.protocol_type()))
+                        .unwrap_or_default();
+                    format!("Graphics protocol: {protocol}")
+                } else {
+                    "No graphics protocol detected; using text placeholders".to_string()
+                };
+                self.state.notify(
+                    crate::tui::overlay::NotificationKind::Info,
+                    "Terminal probe",
+                    outcome,
+                );
             }
 
             Action::WheelScroll { up } => {

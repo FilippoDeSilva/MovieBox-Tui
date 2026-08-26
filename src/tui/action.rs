@@ -62,6 +62,7 @@ pub enum Action {
     WheelScroll {
         up: bool,
     },
+    ProbeTerminal,
     Submit,
     TabPane,
     BackTabPane,

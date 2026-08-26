@@ -80,6 +80,10 @@ async fn main() -> std::io::Result<()> {
         println!("    MOVIEBOX_IINA_PATH      Custom iina-cli binary path");
         println!("    MOVIEBOX_FOURKHDHUB_URL Custom 4KHDHub base URL");
         println!("    MOVIEBOX_NO_IMAGE       Disable poster image queries (1/true)");
+        println!(
+            "    MOVIEBOX_IMAGE_PROTOCOL Force graphics protocol (kitty, sixel, iterm2, none)"
+        );
+        println!("    MOVIEBOX_CELL_SIZE      Override terminal cell size as WxH (e.g. 10x20)");
         return Ok(());
     }
     if args

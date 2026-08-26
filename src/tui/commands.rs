@@ -21,6 +21,7 @@ pub enum SlashCommand {
     DisableTv,
     EnableAddons,
     DisableAddons,
+    Probe,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,10 +45,11 @@ pub enum ParsedCommand<'a> {
     DisableTv,
     EnableAddons,
     DisableAddons,
+    Probe,
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::Browse,
         Self::History,
         Self::Favorites,
@@ -67,6 +69,7 @@ impl SlashCommand {
         Self::DisableTv,
         Self::EnableAddons,
         Self::DisableAddons,
+        Self::Probe,
     ];
 
     pub fn name(self) -> &'static str {
@@ -90,6 +93,7 @@ impl SlashCommand {
             Self::DisableTv => "/disable-tv",
             Self::EnableAddons => "/enable-addons",
             Self::DisableAddons => "/disable-addons",
+            Self::Probe => "/probe",
         }
     }
 
@@ -120,6 +124,7 @@ impl SlashCommand {
             Self::DisableTv => "Disable TV mode navigation",
             Self::EnableAddons => "Enable Addon mode navigation",
             Self::DisableAddons => "Disable Addon mode navigation",
+            Self::Probe => "Re-detect terminal graphics support",
         }
     }
 
@@ -162,7 +167,8 @@ impl SlashCommand {
             | Self::Update
             | Self::ToggleUpdate
             | Self::ClearCache
-            | Self::Github => true,
+            | Self::Github
+            | Self::Probe => true,
         }
     }
 
@@ -243,6 +249,7 @@ impl SlashCommand {
             "/disable-tv" => Some(ParsedCommand::DisableTv),
             "/enable-addons" => Some(ParsedCommand::EnableAddons),
             "/disable-addons" => Some(ParsedCommand::DisableAddons),
+            "/probe" => Some(ParsedCommand::Probe),
             _ => None,
         }
     }

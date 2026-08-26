@@ -256,17 +256,10 @@ impl Theme {
 }
 
 impl Theme {
-    /// Detects the best theme for the current terminal.
-    ///
-    /// Explicit user choices (`MOVIEBOX_THEME` / saved config) are resolved by
-    /// the caller and take precedence; this path only runs when no explicit
-    /// choice exists.
     pub fn detect() -> Self {
         Self::detect_with_light(None)
     }
 
-    /// Like [`Theme::detect`] but overrides the light/dark decision (for
-    /// example from an OSC 11 background-color query).
     pub fn detect_with_light(light: Option<bool>) -> Self {
         let resolved_light = light.unwrap_or_else(crate::tui::terminal::background_is_light);
         if std::env::var("NO_COLOR").is_ok() {
@@ -302,8 +295,6 @@ impl Theme {
         }
     }
 
-    /// Maps every RGB color in the theme to the nearest xterm-256 palette
-    /// entry so strict 256-color terminals never receive RGB sequences.
     pub fn quantized_to_256(mut self) -> Self {
         self.border = quantize_style(self.border);
         self.border_focus = quantize_style(self.border_focus);
