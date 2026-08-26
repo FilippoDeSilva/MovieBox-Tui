@@ -389,3 +389,52 @@ async fn test_ctrl_w_deletes_backward_word() {
     app.handle_action(Action::Key(ctrl_w)).await;
     assert_eq!(app.state().search_query, "the");
 }
+
+#[tokio::test]
+async fn test_f_key_toggles_favorite_on_home_results() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    let res = SearchResult {
+        id: "100".to_string(),
+        title: "Test Movie".to_string(),
+        stype: 1,
+        release_year: "2024".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::MovieBox,
+    };
+    app.state_mut().search_results.push(res.clone());
+    app.state_mut().search_list_state.select(Some(0));
+
+    let identity = moviebox_tui::models::SubjectIdentity {
+        provider: res.provider.cache_key(),
+        subject_id: &res.id,
+        title: &res.title,
+        stype: res.stype,
+        release_year: &res.release_year,
+    };
+    assert!(!app.state().favorites.is_favorite(&identity));
+
+    let f_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('f'),
+        crossterm::event::KeyModifiers::empty(),
+    );
+    app.handle_action(Action::Key(f_key)).await;
+    app.handle_action(Action::ToggleFavorite).await;
+
+    assert!(app.state().favorites.is_favorite(&identity));
+}
+
+#[tokio::test]
+async fn test_up_from_favorites_landing_unfocuses() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().favorites_focus = true;
+    app.state_mut().favorites_landing_state.select(Some(0));
+
+    app.handle_action(Action::MoveUp).await;
+
+    assert!(!app.state().favorites_focus);
+    assert_eq!(app.state().favorites_landing_state.selected(), None);
+}

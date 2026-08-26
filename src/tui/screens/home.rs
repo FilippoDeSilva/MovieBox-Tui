@@ -253,11 +253,6 @@ fn render_search_state(
         ])
         .split(card);
 
-    let pulse = match (state.tick_count / 4) % 4 {
-        0 => "·",
-        1 | 3 => "◦",
-        _ => "○",
-    };
     let query = crate::tui::text::truncate_width(
         &state.search_query,
         card_width.saturating_sub(10) as usize,
@@ -280,12 +275,7 @@ fn render_search_state(
             Line::from(vec![Span::styled(msg, theme.lavender)])
         }
         SearchViewState::NoResults => {
-            let symbol = if state.basic_terminal { "-" } else { pulse };
-            let style = if (state.tick_count / 4) % 2 == 0 {
-                theme.lavender
-            } else {
-                theme.subtext1
-            };
+            let symbol = if state.basic_terminal { "-" } else { "·" };
             let msg = if let Some(preset) = state.active_browse_preset {
                 format!("No items found for {}", preset.label())
             } else if let Some(catalog) = &state.active_addon_catalog {
@@ -298,7 +288,7 @@ fn render_search_state(
                 "No results found".to_string()
             };
             Line::from(vec![
-                Span::styled(format!("{symbol} "), style),
+                Span::styled(format!("{symbol} "), theme.text_dim),
                 Span::styled(msg, theme.text),
             ])
         }
@@ -721,13 +711,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
             None => {
                 let row_rect = vertical_chunks[rows.mode_row];
+                let util_width = 19u16;
+                let sub_chunks = Layout::horizontal([
+                    Constraint::Min(1),
+                    Constraint::Length(util_width.min(row_rect.width)),
+                ])
+                .split(row_rect);
                 frame.render_widget(
                     Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Left),
-                    row_rect,
+                    sub_chunks[0],
                 );
                 frame.render_widget(
                     Paragraph::new(Line::from(util_spans)).alignment(Alignment::Right),
-                    row_rect,
+                    sub_chunks[1],
                 );
             }
         }

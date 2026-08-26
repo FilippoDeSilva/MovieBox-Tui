@@ -483,7 +483,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let synopsis_capacity =
         (meta_chunks[1].width as usize).saturating_mul(meta_chunks[1].height as usize);
     let synopsis = truncate_with_ellipsis(intro, synopsis_capacity);
-    let syn_lines = vec![Line::from(vec![Span::styled(synopsis, theme.overlay1)])];
+    let syn_lines = vec![Line::from(vec![Span::styled(synopsis, theme.subtext1)])];
     let intro_p = Paragraph::new(syn_lines).wrap(Wrap { trim: true });
     frame.render_widget(intro_p, meta_chunks[1]);
 

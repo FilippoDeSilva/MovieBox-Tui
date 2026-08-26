@@ -370,9 +370,8 @@ impl App {
 
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::EnableBdix
-            | crate::tui::commands::ParsedCommand::DisableBdix => {
-                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableBdix;
+            crate::tui::commands::ParsedCommand::ToggleBdix => {
+                let enable_req = !self.state.bdix_enabled;
                 if current_mode != crate::tui::state::AppMode::Streaming {
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
@@ -380,20 +379,6 @@ impl App {
                         NotificationKind::Info,
                         "BDIX Sources",
                         format!("BDIX FTP sources are only available in Streaming Mode. Switch with {ctrl_s}."),
-                    );
-                    return Some(true);
-                }
-                if self.state.bdix_enabled == enable_req {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "BDIX Providers",
-                        if enable_req {
-                            "Already Enabled"
-                        } else {
-                            "Already Disabled"
-                        },
                     );
                     return Some(true);
                 }
@@ -423,23 +408,8 @@ impl App {
                 }
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::EnableStreaming
-            | crate::tui::commands::ParsedCommand::DisableStreaming => {
-                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableStreaming;
-                if self.state.streaming_enabled == enable_req {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Streaming Mode",
-                        if enable_req {
-                            "Already Enabled"
-                        } else {
-                            "Already Disabled"
-                        },
-                    );
-                    return Some(true);
-                }
+            crate::tui::commands::ParsedCommand::ToggleStreaming => {
+                let enable_req = !self.state.streaming_enabled;
                 if !enable_req && !self.state.tv_enabled && !self.state.addons_enabled {
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
@@ -476,23 +446,8 @@ impl App {
                 }
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::EnableTv
-            | crate::tui::commands::ParsedCommand::DisableTv => {
-                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableTv;
-                if self.state.tv_enabled == enable_req {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "TV Mode",
-                        if enable_req {
-                            "Already Enabled"
-                        } else {
-                            "Already Disabled"
-                        },
-                    );
-                    return Some(true);
-                }
+            crate::tui::commands::ParsedCommand::ToggleTv => {
+                let enable_req = !self.state.tv_enabled;
                 if !enable_req && !self.state.streaming_enabled && !self.state.addons_enabled {
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
@@ -526,23 +481,8 @@ impl App {
                 }
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::EnableAddons
-            | crate::tui::commands::ParsedCommand::DisableAddons => {
-                let enable_req = parsed == crate::tui::commands::ParsedCommand::EnableAddons;
-                if self.state.addons_enabled == enable_req {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Addon Mode",
-                        if enable_req {
-                            "Already Enabled"
-                        } else {
-                            "Already Disabled"
-                        },
-                    );
-                    return Some(true);
-                }
+            crate::tui::commands::ParsedCommand::ToggleAddons => {
+                let enable_req = !self.state.addons_enabled;
                 if !enable_req && !self.state.streaming_enabled && !self.state.tv_enabled {
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;

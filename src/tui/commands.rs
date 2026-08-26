@@ -13,14 +13,10 @@ pub enum SlashCommand {
     ToggleUpdate,
     ClearCache,
     Github,
-    EnableBdix,
-    DisableBdix,
-    EnableStreaming,
-    DisableStreaming,
-    EnableTv,
-    DisableTv,
-    EnableAddons,
-    DisableAddons,
+    ToggleBdix,
+    ToggleStreaming,
+    ToggleTv,
+    ToggleAddons,
     Probe,
 }
 
@@ -37,19 +33,15 @@ pub enum ParsedCommand<'a> {
     ToggleUpdate,
     ClearCache,
     Github,
-    EnableBdix,
-    DisableBdix,
-    EnableStreaming,
-    DisableStreaming,
-    EnableTv,
-    DisableTv,
-    EnableAddons,
-    DisableAddons,
+    ToggleBdix,
+    ToggleStreaming,
+    ToggleTv,
+    ToggleAddons,
     Probe,
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 16] = [
         Self::Browse,
         Self::History,
         Self::Favorites,
@@ -61,14 +53,10 @@ impl SlashCommand {
         Self::ToggleUpdate,
         Self::ClearCache,
         Self::Github,
-        Self::EnableBdix,
-        Self::DisableBdix,
-        Self::EnableStreaming,
-        Self::DisableStreaming,
-        Self::EnableTv,
-        Self::DisableTv,
-        Self::EnableAddons,
-        Self::DisableAddons,
+        Self::ToggleBdix,
+        Self::ToggleStreaming,
+        Self::ToggleTv,
+        Self::ToggleAddons,
         Self::Probe,
     ];
 
@@ -85,14 +73,10 @@ impl SlashCommand {
             Self::ToggleUpdate => "/toggle-update",
             Self::ClearCache => "/clear-cache",
             Self::Github => "/github",
-            Self::EnableBdix => "/enable-bdix",
-            Self::DisableBdix => "/disable-bdix",
-            Self::EnableStreaming => "/enable-streaming",
-            Self::DisableStreaming => "/disable-streaming",
-            Self::EnableTv => "/enable-tv",
-            Self::DisableTv => "/disable-tv",
-            Self::EnableAddons => "/enable-addons",
-            Self::DisableAddons => "/disable-addons",
+            Self::ToggleBdix => "/toggle-bdix",
+            Self::ToggleStreaming => "/toggle-streaming",
+            Self::ToggleTv => "/toggle-tv",
+            Self::ToggleAddons => "/toggle-addons",
             Self::Probe => "/probe",
         }
     }
@@ -116,14 +100,10 @@ impl SlashCommand {
             Self::ToggleUpdate => "Toggle automatic update checks",
             Self::ClearCache => "Clear cached data",
             Self::Github => "Open project repository",
-            Self::EnableBdix => "Enable BDIX FTP sources",
-            Self::DisableBdix => "Disable BDIX FTP sources",
-            Self::EnableStreaming => "Enable Streaming mode navigation",
-            Self::DisableStreaming => "Disable Streaming mode navigation",
-            Self::EnableTv => "Enable TV mode navigation",
-            Self::DisableTv => "Disable TV mode navigation",
-            Self::EnableAddons => "Enable Addon mode navigation",
-            Self::DisableAddons => "Disable Addon mode navigation",
+            Self::ToggleBdix => "Toggle BDIX FTP sources",
+            Self::ToggleStreaming => "Toggle Streaming mode navigation",
+            Self::ToggleTv => "Toggle TV mode navigation",
+            Self::ToggleAddons => "Toggle Addon mode navigation",
             Self::Probe => "Re-detect terminal graphics support",
         }
     }
@@ -144,25 +124,11 @@ impl SlashCommand {
                 (state.tv_enabled && state.is_tv_mode)
                     || (state.addons_enabled && state.is_addon_mode)
             }
-            Self::EnableBdix => {
-                state.streaming_enabled
-                    && !state.is_tv_mode
-                    && !state.is_addon_mode
-                    && !state.bdix_enabled
-            }
-            Self::DisableBdix => {
-                state.streaming_enabled
-                    && !state.is_tv_mode
-                    && !state.is_addon_mode
-                    && state.bdix_enabled
-            }
-            Self::EnableStreaming => !state.streaming_enabled,
-            Self::DisableStreaming => state.streaming_enabled,
-            Self::EnableTv => !state.tv_enabled,
-            Self::DisableTv => state.tv_enabled,
-            Self::EnableAddons => !state.addons_enabled,
-            Self::DisableAddons => state.addons_enabled,
-            Self::DownloadDir
+            Self::ToggleBdix => !state.is_tv_mode && !state.is_addon_mode,
+            Self::ToggleStreaming
+            | Self::ToggleTv
+            | Self::ToggleAddons
+            | Self::DownloadDir
             | Self::Theme
             | Self::Update
             | Self::ToggleUpdate
@@ -241,14 +207,14 @@ impl SlashCommand {
             "/toggle-update" => Some(ParsedCommand::ToggleUpdate),
             "/clear-cache" => Some(ParsedCommand::ClearCache),
             "/github" => Some(ParsedCommand::Github),
-            "/enable-bdix" => Some(ParsedCommand::EnableBdix),
-            "/disable-bdix" => Some(ParsedCommand::DisableBdix),
-            "/enable-streaming" => Some(ParsedCommand::EnableStreaming),
-            "/disable-streaming" => Some(ParsedCommand::DisableStreaming),
-            "/enable-tv" => Some(ParsedCommand::EnableTv),
-            "/disable-tv" => Some(ParsedCommand::DisableTv),
-            "/enable-addons" => Some(ParsedCommand::EnableAddons),
-            "/disable-addons" => Some(ParsedCommand::DisableAddons),
+            "/toggle-bdix" | "/enable-bdix" | "/disable-bdix" => Some(ParsedCommand::ToggleBdix),
+            "/toggle-streaming" | "/enable-streaming" | "/disable-streaming" => {
+                Some(ParsedCommand::ToggleStreaming)
+            }
+            "/toggle-tv" | "/enable-tv" | "/disable-tv" => Some(ParsedCommand::ToggleTv),
+            "/toggle-addons" | "/enable-addons" | "/disable-addons" => {
+                Some(ParsedCommand::ToggleAddons)
+            }
             "/probe" => Some(ParsedCommand::Probe),
             _ => None,
         }
@@ -341,6 +307,45 @@ mod tests {
             ..Default::default()
         };
         assert!(!SlashCommand::Favorites.is_available(&state));
+    }
+
+    #[test]
+    fn test_toggle_commands_and_aliases_parse() {
+        let state = AppState::default();
+        assert_eq!(SlashCommand::ALL.len(), 16);
+
+        assert_eq!(
+            SlashCommand::parse("/toggle-tv"),
+            Some(ParsedCommand::ToggleTv)
+        );
+        assert_eq!(
+            SlashCommand::parse("/enable-tv"),
+            Some(ParsedCommand::ToggleTv)
+        );
+        assert_eq!(
+            SlashCommand::parse("/disable-tv"),
+            Some(ParsedCommand::ToggleTv)
+        );
+
+        assert_eq!(
+            SlashCommand::parse("/toggle-addons"),
+            Some(ParsedCommand::ToggleAddons)
+        );
+        assert_eq!(
+            SlashCommand::parse("/enable-addons"),
+            Some(ParsedCommand::ToggleAddons)
+        );
+        assert_eq!(
+            SlashCommand::parse("/disable-addons"),
+            Some(ParsedCommand::ToggleAddons)
+        );
+
+        let toggle_sug = SlashCommand::suggest(&state, "/toggle-");
+        assert!(toggle_sug.contains(&"/toggle-tv".to_string()));
+        assert!(toggle_sug.contains(&"/toggle-addons".to_string()));
+        assert!(toggle_sug.contains(&"/toggle-bdix".to_string()));
+        assert!(toggle_sug.contains(&"/toggle-streaming".to_string()));
+        assert!(!toggle_sug.contains(&"/enable-tv".to_string()));
     }
 
     #[test]

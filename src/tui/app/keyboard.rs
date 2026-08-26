@@ -31,6 +31,9 @@ impl App {
                 self.action_sender.send(Action::Quit).ok();
                 return None;
             }
+            if self.has_active_modal() {
+                return None;
+            }
             if let KeyCode::Char('t') = key.code {
                 if self.state.tv_enabled {
                     self.action_sender.send(Action::ToggleTvMode).ok();
@@ -93,6 +96,8 @@ impl App {
             && self.state.download_progress.is_some()
             && self.state.input_mode != InputMode::Editing
             && !self.state.tv_input_active
+            && !self.state.addon_input_active
+            && !self.has_active_modal()
         {
             self.action_sender.send(Action::CancelDownload).ok();
             return None;
@@ -555,7 +560,7 @@ impl App {
                                 }
                                 self.state.tv_manager_selected = next;
                             }
-                            KeyCode::Char('d') => {
+                            KeyCode::Char('d') | KeyCode::Delete => {
                                 use crate::tui::state::TvManagerRow;
                                 if let Some(TvManagerRow::Playlist(index)) = self
                                     .state
@@ -568,7 +573,7 @@ impl App {
                                         .ok();
                                 }
                             }
-                            KeyCode::Enter => {
+                            KeyCode::Enter | KeyCode::Char(' ') => {
                                 self.tv_manager_activate();
                             }
                             _ => {}
@@ -631,7 +636,11 @@ impl App {
                                 }
                             }
                         }
-                        KeyCode::Char('*') if self.state.favorites_available() => {
+                        KeyCode::Char('*') | KeyCode::Char('f') | KeyCode::Char('F')
+                            if self.state.favorites_available()
+                                && (!self.state.search_results.is_empty()
+                                    || self.state.favorites_focus) =>
+                        {
                             self.action_sender.send(Action::ToggleFavorite).ok();
                         }
                         KeyCode::Char(c)
@@ -656,10 +665,22 @@ impl App {
                 }
                 Screen::Details => match key.code {
                     KeyCode::Tab => {
-                        self.action_sender.send(Action::TabPane).ok();
+                        if !self.state.subtitle_popup
+                            && !self.state.player_picker_popup
+                            && !self.state.show_season_download_confirm
+                            && !self.state.show_episode_download_confirm
+                        {
+                            self.action_sender.send(Action::TabPane).ok();
+                        }
                     }
                     KeyCode::BackTab => {
-                        self.action_sender.send(Action::BackTabPane).ok();
+                        if !self.state.subtitle_popup
+                            && !self.state.player_picker_popup
+                            && !self.state.show_season_download_confirm
+                            && !self.state.show_episode_download_confirm
+                        {
+                            self.action_sender.send(Action::BackTabPane).ok();
+                        }
                     }
                     KeyCode::Char('y') | KeyCode::Char('Y') => {
                         if self.state.show_season_download_confirm {
@@ -708,13 +729,16 @@ impl App {
                         }
                     }
                     KeyCode::Char('r') => {
-                        self.action_sender.send(Action::Refresh).ok();
+                        if !self.state.subtitle_popup
+                            && !self.state.player_picker_popup
+                            && !self.state.show_season_download_confirm
+                            && !self.state.show_episode_download_confirm
+                        {
+                            self.action_sender.send(Action::Refresh).ok();
+                        }
                     }
                     KeyCode::Char('?') => {
                         self.action_sender.send(Action::ToggleHelp).ok();
-                    }
-                    KeyCode::Char('b') => {
-                        self.action_sender.send(Action::GoBack).ok();
                     }
                     KeyCode::Char('f') | KeyCode::Char('F') => {
                         if !self.state.subtitle_popup
@@ -793,5 +817,19 @@ impl App {
             },
         }
         None
+    }
+
+    fn has_active_modal(&self) -> bool {
+        self.state.show_help
+            || self.state.show_theme_popup
+            || self.state.show_browse_popup
+            || self.state.addon_manager_popup
+            || self.state.tv_config_popup
+            || self.state.update_available.is_some()
+            || self.state.player_picker_popup
+            || self.state.subtitle_popup
+            || self.state.is_download_subtitle_popup
+            || self.state.show_season_download_confirm
+            || self.state.show_episode_download_confirm
     }
 }

@@ -392,25 +392,8 @@ pub fn centered(
     )
 }
 
-pub fn clear_modal_area(frame: &mut Frame, bounds: Rect, popup: Rect, theme: &Theme) {
-    const HORIZONTAL_HALO: u16 = 3;
-    const VERTICAL_HALO: u16 = 1;
-
-    let x = popup.x.saturating_sub(HORIZONTAL_HALO).max(bounds.x);
-    let y = popup.y.saturating_sub(VERTICAL_HALO).max(bounds.y);
-    let right = popup
-        .right()
-        .saturating_add(HORIZONTAL_HALO)
-        .min(bounds.right());
-    let bottom = popup
-        .bottom()
-        .saturating_add(VERTICAL_HALO)
-        .min(bounds.bottom());
-    crate::tui::clear_area(
-        frame,
-        Rect::new(x, y, right.saturating_sub(x), bottom.saturating_sub(y)),
-        theme,
-    );
+pub fn clear_modal_area(frame: &mut Frame, _bounds: Rect, popup: Rect, theme: &Theme) {
+    crate::tui::clear_area(frame, popup, theme);
 }
 
 pub fn border_type(basic_terminal: bool) -> BorderType {

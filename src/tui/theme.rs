@@ -549,18 +549,18 @@ impl Theme {
             surface0: Style::default().fg(cp(59, 66, 82)),
             surface1: Style::default().fg(cp(67, 76, 94)),
             surface2: Style::default().fg(cp(76, 86, 106)),
-            overlay0: Style::default().fg(cp(76, 86, 106)),
-            overlay1: Style::default().fg(cp(76, 86, 106)),
-            overlay2: Style::default().fg(cp(76, 86, 106)),
-            mantle: Style::default().fg(cp(46, 52, 64)),
-            crust: Style::default().fg(cp(46, 52, 64)),
+            overlay0: Style::default().fg(cp(94, 106, 131)),
+            overlay1: Style::default().fg(cp(114, 126, 151)),
+            overlay2: Style::default().fg(cp(146, 153, 163)),
+            mantle: Style::default().fg(cp(40, 45, 56)),
+            crust: Style::default().fg(cp(36, 40, 50)),
             is_light: false,
         }
     }
 
     pub fn tokyo_night() -> Self {
         Self {
-            border: Style::default().fg(cp(41, 46, 66)),
+            border: Style::default().fg(cp(56, 62, 90)),
             border_focus: Style::default().fg(cp(122, 162, 247)),
             text: Style::default().fg(cp(192, 202, 245)),
             text_dim: Style::default().fg(cp(169, 177, 214)),
@@ -581,7 +581,7 @@ impl Theme {
             accent: Style::default()
                 .fg(cp(42, 203, 213))
                 .add_modifier(Modifier::BOLD),
-            muted: Style::default().fg(cp(41, 46, 66)),
+            muted: Style::default().fg(cp(56, 62, 90)),
             teal: Style::default().fg(cp(115, 218, 202)),
             lavender: Style::default().fg(cp(187, 154, 247)),
             sapphire: Style::default().fg(cp(125, 207, 255)),
@@ -595,8 +595,8 @@ impl Theme {
             surface1: Style::default().fg(cp(41, 46, 66)),
             surface2: Style::default().fg(cp(65, 72, 104)),
             overlay0: Style::default().fg(cp(86, 95, 137)),
-            overlay1: Style::default().fg(cp(86, 95, 137)),
-            overlay2: Style::default().fg(cp(86, 95, 137)),
+            overlay1: Style::default().fg(cp(106, 115, 157)),
+            overlay2: Style::default().fg(cp(126, 135, 177)),
             mantle: Style::default().fg(cp(22, 22, 30)),
             crust: Style::default().fg(cp(22, 22, 30)),
             is_light: false,

@@ -525,6 +525,9 @@ impl App {
                                 self.state.favorites_landing_state.selected().unwrap_or(0);
                             if current > 0 {
                                 self.state.favorites_landing_state.select(Some(current - 1));
+                            } else {
+                                self.state.favorites_focus = false;
+                                self.state.favorites_landing_state.select(None);
                             }
                             return None;
                         }
