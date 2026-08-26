@@ -9,6 +9,23 @@ impl App {
     pub(super) async fn handle_key(&mut self, key: KeyEvent) -> Option<()> {
         use crossterm::event::{KeyCode, KeyModifiers};
 
+        if self.state.show_help {
+            match key.code {
+                KeyCode::Up | KeyCode::PageUp => {
+                    self.state.help_scroll = self.state.help_scroll.saturating_sub(1);
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    self.state.help_scroll = self.state.help_scroll.saturating_add(1);
+                }
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?') => {
+                    self.state.show_help = false;
+                    self.state.help_scroll = 0;
+                }
+                _ => {}
+            }
+            return None;
+        }
+
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             if let KeyCode::Char('c') = key.code {
                 self.action_sender.send(Action::Quit).ok();

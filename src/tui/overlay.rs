@@ -11,7 +11,11 @@ use ratatui::{
 
 use crate::tui::theme::Theme;
 
-const MAX_PICKER_ROWS: usize = 8;
+const MAX_PICKER_ROWS_CAP: usize = 14;
+
+fn max_picker_rows(area: Rect) -> usize {
+    (area.height.saturating_sub(6) as usize / 2).clamp(4, MAX_PICKER_ROWS_CAP)
+}
 
 pub use crate::models::{Notification, NotificationKind};
 
@@ -27,7 +31,7 @@ pub fn picker_layout(
     confirm_label: &str,
     minimum_width: u16,
 ) -> Rect {
-    let visible_rows = items.len().clamp(1, MAX_PICKER_ROWS);
+    let visible_rows = items.len().clamp(1, max_picker_rows(area));
     let footer_str = format!("[↑↓] Move  [Enter] {confirm_label}  [Esc] Back");
     let footer_width = crate::tui::text::width(&footer_str);
     let content_width = items
@@ -111,7 +115,7 @@ pub fn picker(
         .selected()
         .unwrap_or(0)
         .min(items.len().saturating_sub(1));
-    let visible_rows = items.len().clamp(1, MAX_PICKER_ROWS);
+    let visible_rows = items.len().clamp(1, max_picker_rows(area));
     let popup = picker_layout(area, items, spec.confirm_label, spec.minimum_width);
     clear_modal_area(frame, area, popup, theme);
 

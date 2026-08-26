@@ -134,6 +134,7 @@ pub struct AppState {
     pub image_cache: lru::LruCache<String, std::sync::Arc<image::DynamicImage>>,
 
     pub show_help: bool,
+    pub help_scroll: usize,
     pub last_result_metrics: Option<ResultMetrics>,
     pub result_scroll: usize,
 
@@ -286,6 +287,7 @@ impl Default for AppState {
             poster_rows: 3,
             image_cache: lru::LruCache::new(cache_capacity(10)),
             show_help: false,
+            help_scroll: 0,
             last_result_metrics: None,
             result_scroll: 0,
             active_resource_request: 0,

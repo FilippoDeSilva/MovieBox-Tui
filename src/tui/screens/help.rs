@@ -236,9 +236,42 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
 
     let content_width = help_text.iter().map(Line::width).max().unwrap_or(42) as u16;
     let total_lines = help_text.len() as u16;
-    let available_height = area.height.saturating_sub(4);
+    let capacity = area.height.saturating_sub(6).max(4) as usize;
 
-    let two_columns = total_lines > available_height;
+    if total_lines as usize > capacity {
+        let max_scroll = help_text.len().saturating_sub(capacity);
+        let scroll = state.help_scroll.min(max_scroll);
+        let window: Vec<Line> = help_text[scroll..scroll + capacity.min(help_text.len())].to_vec();
+        let position = if max_scroll > 0 {
+            format!(" · {}/{scroll_max}", scroll + 1, scroll_max = max_scroll)
+        } else {
+            String::new()
+        };
+        let title = format!(" Help · {mode_title}{position} ");
+        let block = Block::default()
+            .title(title)
+            .title_alignment(Alignment::Center)
+            .title_style(theme.title)
+            .borders(Borders::ALL)
+            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+            .border_style(theme.border_focus);
+        let p = Paragraph::new(window)
+            .block(block)
+            .alignment(Alignment::Left);
+        frame.render_widget(
+            p,
+            crate::tui::overlay::centered(
+                area,
+                (content_width + 8).min(area.width.saturating_sub(2)),
+                capacity as u16 + 2,
+                46,
+                120,
+            ),
+        );
+        return;
+    }
+
+    let two_columns = total_lines as usize > capacity;
 
     let desired_width = if two_columns {
         content_width.saturating_mul(2).saturating_add(8)

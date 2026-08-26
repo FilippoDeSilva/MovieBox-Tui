@@ -305,6 +305,12 @@ impl App {
             }
 
             Action::WheelScroll { up } => {
+                if self.state.show_help {
+                    let delta = 3 * if up { -1i32 } else { 1 };
+                    self.state.help_scroll =
+                        (self.state.help_scroll as i32 + delta).max(0) as usize;
+                    return None;
+                }
                 let steps = if self.state.active_screen == Screen::Home
                     && !self.state.favorites_focus
                     && !self.state.search_results.is_empty()
@@ -541,6 +547,26 @@ impl App {
         if self.state.show_help {
             crate::tui::screens::help::draw(frame, main_area, &self.state, &self.theme);
         }
+        if self.state.status_timer > 0 && !self.state.status_message.is_empty() {
+            let bottom = frame.area().height.saturating_sub(1);
+            let message = crate::tui::text::truncate_width(
+                &self.state.status_message.clone(),
+                (frame.area().width as usize).saturating_sub(4),
+            );
+            let strip_area = ratatui::layout::Rect {
+                x: 0,
+                y: bottom,
+                width: frame.area().width,
+                height: 1,
+            };
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(format!(" {message} "))
+                    .alignment(ratatui::layout::Alignment::Center)
+                    .style(self.theme.accent),
+                strip_area,
+            );
+        }
+
         if let Some(prog) = self.state.download_progress {
             if let Some(dl_area) = download_area {
                 use ratatui::widgets::{Block, Borders, Gauge};

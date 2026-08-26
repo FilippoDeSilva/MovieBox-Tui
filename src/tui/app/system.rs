@@ -132,6 +132,9 @@ impl App {
                 if matches!(self.state.active_screen, Screen::Home | Screen::Details) {
                     self.state.show_help = !self.state.show_help;
                     if self.state.show_help {
+                        self.state.help_scroll = 0;
+                    }
+                    if self.state.show_help {
                         self.state.show_theme_popup = false;
                         self.state.show_browse_popup = false;
                         self.state.tv_config_popup = false;

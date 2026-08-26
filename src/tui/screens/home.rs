@@ -58,6 +58,14 @@ pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&
     crate::tui::commands::SlashCommand::description_for(cmd, state)
 }
 
+pub(crate) fn poster_placeholder_lines(basic: bool) -> &'static str {
+    if basic {
+        "[ no poster ]"
+    } else {
+        "┌──────┐\n│ ▓  ▓ │\n│  ──  │\n│ ▓  ▓ │\n└──────┘"
+    }
+}
+
 pub(crate) fn search_deck_width(area: Rect, state: &AppState, landing: bool) -> u16 {
     let query_width = if state.search_query.is_empty() {
         crate::tui::text::width(if state.is_tv_mode {
@@ -762,9 +770,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             frame.render_widget(ratatui_image::Image::new(proto), p_area);
                         }
                     } else {
-                        let placeholder = Paragraph::new("No\nPoster")
-                            .style(theme.text_dim)
-                            .alignment(Alignment::Center);
+                        let placeholder =
+                            Paragraph::new(poster_placeholder_lines(state.basic_terminal))
+                                .style(theme.text_dim)
+                                .alignment(Alignment::Center);
                         frame.render_widget(placeholder, poster_area);
                     }
                 } else {

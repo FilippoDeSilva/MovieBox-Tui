@@ -537,7 +537,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         language_count
             .max(state.available_seasons.len())
             .max(episode_count)
-            .min(4) as u16
+            .min((bottom_area.height / 3).clamp(4, 10) as usize) as u16
             + 2
     };
 
