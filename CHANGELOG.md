@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Added
+- **Terminal-aware rendering overhaul**:
+  - Theme autodetection now actually runs when no explicit theme is configured:
+    `NO_COLOR` forces monochrome, truecolor terminals get full RGB palettes,
+    strict 256-color terminals get quantized indexed palettes, ANSI-only
+    terminals get the fallback palette, and an OSC 11 background query picks
+    light/dark variants by measured luminance instead of `COLORFGBG` guesswork.
+  - Graphics salvage: terminals that answer kitty/sixel capability probes but
+    no cell size (Windows Terminal sixel, iTerm2 over SSH) keep posters via
+    default cell metrics instead of falling back to "No Poster".
+  - `MOVIEBOX_IMAGE_PROTOCOL=kitty|sixel|iterm2|none` and
+    `MOVIEBOX_CELL_SIZE=WxH` overrides, documented in `--help`.
+  - Automatic re-probe on focus regain when the initial probe found nothing
+    (covers tmux attach after startup), plus a `/probe` slash command.
+  - Kitty keyboard protocol (`DISAMBIGUATE_ESCAPE_CODES | REPORT_EVENT_TYPES`)
+    for faster unambiguous keys on Ghostty/kitty/foot/WezTerm/Alacritty.
+- **Responsive result grid**: results render in two columns at ≥110 columns
+  and three at ≥160, with row-based `↑`/`↓`, item-step `←`/`→`, grid-aware
+  click mapping, pagination, prefetching, and scroll clamping. Narrow
+  terminals keep the classic single-column behavior.
+- **Status strip**: transient status messages (previously computed but never
+  rendered) now appear as a slim centered line on the bottom row.
+- **Scrollable help overlay**: overflowing help content switches to a scrolled
+  single column with position indicator; keyboard and wheel scrolling with
+  key-swallowing so shortcuts no longer act behind the overlay.
+- **Viewport-adaptive caps**: picker popup rows grow with terminal height
+  (4–14), details selector height becomes viewport-proportional, and non-
+  graphics terminals get a compact filmstrip poster placeholder.
+
 ### Fixed
 - **DNS resolution on Android/Termux and minimal containers**: Replaced the reqwest
   `hickory-dns` feature flag with a custom resolver (`src/net.rs`) that reads the OS
@@ -33,6 +62,15 @@
 - **Mouse click accuracy**: Search-result hit testing uses the real scroll offset
   instead of deriving it from the selection, fixing clicks selecting or opening the
   wrong title after sorting or scrolling partway.
+- **Popup geometry parity**: Picker, TV-config, addon-manager, and download-confirm
+  popups share one layout function between renderer and mouse handler, fixing
+  off-by-one-row TV clicks, missed confirmation buttons on short summaries, skewed
+  picker widths, and scroll-blind hit-testing on lists longer than eight rows.
+- **Text layout safety**: Details stream rows budget by display width rather than
+  byte length (CJK uploaders/languages no longer overflow); suggestion descriptions,
+  addon names, download gauge status, and playlist URLs truncate to their containers;
+  notification card width no longer panics below 40 columns; addon URL input edits by
+  grapheme clusters so CJK/emoji cursors stay aligned.
 - **Poster memory footprint**: Decoded posters are downscaled to ≤512px before
   caching, decoded/encoded cache sizes were right-sized (roughly 10× less RAM on
   low-end devices), failed posters retry after 10 minutes instead of being negatively
@@ -42,7 +80,7 @@
   runs off the UI thread (previously up to 2s of blank screen at startup); resize
   performs a single deferred clear instead of two flashes; grid poster width derives
   from real terminal cell metrics; the input caret blink keeps animating while
-  typing; the mouse wheel scrolls one result row per notch; `NO_COLOR` now overrides
+  typing; the mouse wheel scrolls contextually; `NO_COLOR` now overrides
   `MOVIEBOX_THEME`; strict 256-color terminals receive quantized indexed palettes
   rather than RGB sequences.
 

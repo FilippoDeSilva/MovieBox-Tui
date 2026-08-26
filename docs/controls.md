@@ -79,6 +79,20 @@ Type these commands directly into the search bar:
 | `/disable-tv` | All | Disable TV Mode navigation |
 | `/enable-addons` | All | Enable Addon Mode navigation in bottom dock |
 | `/disable-addons` | All | Disable Addon Mode navigation |
+| `/probe` | All | Re-run terminal graphics detection and report the result |
+
+## Help Overlay
+
+- Open with `?`; close with `?`, `Esc`, or `q`.
+- `↑`/`↓`, `PageUp`/`PageDown`, and the mouse wheel scroll long content.
+- Other keys are ignored while help is open.
+
+## Wide-Terminal Grid
+
+On terminals at least 110 columns wide, search results render in two
+columns (three at 160+). `↑`/`↓` move one visual row, `←`/`→` move one
+item, and clicks map through column bounds. Narrower terminals keep the
+classic single-column list where `←`/`→` jump a full page.
 | `/download-dir` | All | View, change, or reset the download directory |
 | `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight, Dracula, Gruvbox, RosePine) |
 | `/clear-cache` | All | Clear temporary cache files |

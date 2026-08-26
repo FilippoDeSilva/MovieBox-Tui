@@ -67,12 +67,16 @@ async fn test_tui_all_theme_rendering() {
 async fn test_tui_terminal_resizing_matrix_no_panics() {
     let sizes = [
         (40, 15),
+        (49, 13),
+        (50, 14),
+        (55, 18),
         (80, 24),
         (100, 30),
         (120, 40),
         (160, 50),
         (200, 60),
         (25, 8),
+        (60, 100),
         (300, 80),
     ];
 
@@ -84,6 +88,77 @@ async fn test_tui_terminal_resizing_matrix_no_panics() {
         let res = terminal.draw(|frame| app.draw(frame));
         assert!(res.is_ok(), "Failed to render at terminal size {w}x{h}");
     }
+}
+
+#[tokio::test]
+async fn test_grid_metrics_and_visibility_at_tier_boundaries() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    for i in 0..30 {
+        app.state_mut().search_results.push(SearchResult {
+            id: i.to_string(),
+            title: format!("Title {i}"),
+            stype: 1,
+            release_year: "2020".to_string(),
+            cover_url: None,
+            season: 0,
+            episode: 0,
+            provider: ProviderKind::MovieBox,
+        });
+    }
+
+    app.state_mut().last_result_metrics = Some(app.state().result_metrics(20, 180));
+    let wide = app.state().last_result_metrics.unwrap();
+    assert_eq!(wide.columns, 3);
+    assert!(wide.visible_items >= 3);
+
+    app.state_mut().last_result_metrics = Some(app.state().result_metrics(20, 100));
+    let narrow = app.state().last_result_metrics.unwrap();
+    assert_eq!(narrow.columns, 1);
+    assert!(narrow.visible_items >= 1);
+
+    app.state_mut().poster_rows = 12;
+    let cramped = app.state().result_metrics(10, 100);
+    assert_eq!(cramped.visible_items, 1);
+
+    app.state_mut().poster_rows = 3;
+    app.state_mut().last_result_metrics = Some(app.state().result_metrics(20, 180));
+    app.state_mut().search_list_state.select(Some(29));
+    app.state_mut().result_scroll = 0;
+    app.state_mut().normalize_result_view();
+    let selected = app.state().search_list_state.selected().unwrap();
+    let scroll = app.state().result_scroll;
+    let visible = app.state().effective_visible_items();
+    assert!(selected >= scroll && selected < scroll + visible);
+}
+
+#[tokio::test]
+async fn test_help_overlay_scrolls_with_keys() {
+    let mut app = App::new();
+    let state = app.state_mut();
+    state.show_help = true;
+    state.help_scroll = 0;
+
+    app.handle_action(Action::Key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Down,
+        crossterm::event::KeyModifiers::empty(),
+    )))
+    .await;
+    assert_eq!(app.state().help_scroll, 1);
+
+    app.handle_action(Action::Key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Up,
+        crossterm::event::KeyModifiers::empty(),
+    )))
+    .await;
+    assert_eq!(app.state().help_scroll, 0);
+
+    app.handle_action(Action::Key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('x'),
+        crossterm::event::KeyModifiers::empty(),
+    )))
+    .await;
+    assert!(app.state().show_help, "unrelated keys are swallowed");
 }
 
 #[tokio::test]

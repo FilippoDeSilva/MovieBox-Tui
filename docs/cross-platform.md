@@ -19,11 +19,27 @@ the release checks in [`release-checklist.md`](release-checklist.md).
 
 ## Terminal capabilities
 
-The app probes the terminal at startup via `ratatui_image`:
+The app probes the terminal at startup via `ratatui_image` (400ms cap,
+off the UI thread; retried on focus regain if the first probe found
+nothing, and on demand via `/probe`):
 
-- **Poster rendering**: High-resolution graphics via Sixel, Kitty, and iTerm2 protocols when supported by the terminal. Non-graphics terminals (for example Apple Terminal.app or basic xterm) display a clean, centered `No Poster` label. Image queries can be disabled via `MOVIEBOX_NO_IMAGE=1`.
+- **Poster rendering**: Sixel, Kitty, and iTerm2 protocols where the probe
+  detects them. Terminals that report kitty/sixel capability but no cell
+  size (Windows Terminal sixel, iTerm2 over SSH) are salvaged with default
+  cell metrics. True Halfblocks-only terminals show a compact filmstrip
+  placeholder instead. `MOVIEBOX_NO_IMAGE=1` disables queries;
+  `MOVIEBOX_IMAGE_PROTOCOL` forces a protocol; `MOVIEBOX_CELL_SIZE=WxH`
+  overrides metrics.
+- **Colors**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB,
+  quantized 256-color palettes for strict terminals, ANSI fallback
+  otherwise; an OSC 11 background query picks light/dark variants. An
+  explicit `MOVIEBOX_THEME` or saved theme always wins over autodetection.
+- **Keyboard**: The kitty keyboard protocol (disambiguated escapes, event
+  types) is requested at start and popped on exit; unsupported terminals
+  ignore it.
 - **Terminal classification**: `TERM=dumb`/`linux` fall back to a basic UI.
-- Focus events (focus loss/gain) are used to re-render in place without clearing.
+- Focus events re-render in place without clearing; results render in two
+  columns from 110 columns wide (three from 160).
 
 ## Network & TLS portability
 

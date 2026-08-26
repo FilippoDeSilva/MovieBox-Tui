@@ -479,23 +479,26 @@ impl AppState {
             .unwrap_or(0)
             .min(total - 1);
         self.search_list_state.select(Some(selected));
-        let (columns, visible_items) = match self.last_result_metrics {
-            Some(metrics) => (metrics.columns as usize, metrics.visible_items),
-            None => (1, 8),
+        let columns = match self.last_result_metrics {
+            Some(metrics) => metrics.columns as usize,
+            None => 1,
         };
-        let mut scroll = self.result_scroll;
-        if selected < scroll {
-            scroll = selected;
-        } else if selected >= scroll + visible_items.max(1) {
-            scroll = (selected + 1).saturating_sub(visible_items.max(1));
+        let visible_items = match self.last_result_metrics {
+            Some(metrics) => metrics.visible_items,
+            None => 8,
+        };
+        let cols = columns.max(1);
+        let rows_visible = (visible_items / cols).max(1);
+        let selected_row = selected / cols;
+        let mut base_row = self.result_scroll / cols;
+        if selected_row < base_row {
+            base_row = selected_row;
+        } else if selected_row >= base_row + rows_visible {
+            base_row = selected_row.saturating_sub(rows_visible - 1);
         }
-        scroll -= scroll % columns.max(1);
-        let max_scroll = total.saturating_sub(visible_items);
-        if scroll > max_scroll {
-            scroll = max_scroll;
-        }
-        scroll -= scroll % columns.max(1);
-        self.result_scroll = scroll;
+        let max_base = total.saturating_sub(rows_visible * cols) / cols;
+        let base_row = base_row.min(max_base);
+        self.result_scroll = base_row * cols;
     }
 
     pub fn effective_visible_items(&self) -> usize {
@@ -659,5 +662,81 @@ impl AppState {
         }
         rows.push(AddonManagerRow::AddUrl);
         rows
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state_with(results: usize) -> AppState {
+        let mut state = AppState::default();
+        for i in 0..results {
+            state.search_results.push(crate::models::SearchResult {
+                id: i.to_string(),
+                title: format!("T{i}"),
+                stype: 1,
+                release_year: "2020".to_string(),
+                cover_url: None,
+                season: 0,
+                episode: 0,
+                provider: crate::providers::models::ProviderKind::MovieBox,
+            });
+        }
+        state
+    }
+
+    #[test]
+    fn columns_follow_width_tiers() {
+        assert_eq!(result_columns_for(80), 1);
+        assert_eq!(result_columns_for(110), 2);
+        assert_eq!(result_columns_for(160), 3);
+        assert_eq!(result_columns_for(60), 1);
+    }
+
+    #[test]
+    fn poster_rows_clamp_to_viewport() {
+        let state = AppState {
+            poster_rows: 12,
+            ..Default::default()
+        };
+        let metrics = state.result_metrics(10, 100);
+        assert!(metrics.poster_rows_eff <= 9, "rows must fit viewport");
+        assert!(metrics.visible_items >= 1);
+    }
+
+    #[test]
+    fn normalize_clamps_selection_and_aligns_scroll() {
+        let mut state = state_with(20);
+        state.last_result_metrics = Some(ResultMetrics {
+            poster_rows_eff: 3,
+            row_height: 4,
+            visible_items: 9,
+            columns: 3,
+            col_width: 60,
+        });
+        state.search_list_state.select(Some(25));
+        state.result_scroll = 50;
+        state.normalize_result_view();
+        assert_eq!(state.search_list_state.selected(), Some(19));
+        assert!(state.result_scroll <= 11);
+        assert_eq!(state.result_scroll % 3, 0);
+    }
+
+    #[test]
+    fn normalize_keeps_selection_visible_when_scrolling_down() {
+        let mut state = state_with(30);
+        state.last_result_metrics = Some(ResultMetrics {
+            poster_rows_eff: 3,
+            row_height: 4,
+            visible_items: 6,
+            columns: 3,
+            col_width: 40,
+        });
+        state.search_list_state.select(Some(10));
+        state.result_scroll = 0;
+        state.normalize_result_view();
+        assert_eq!(state.result_scroll, 6);
+        assert!(state.search_list_state.selected().unwrap() < state.result_scroll + 6);
     }
 }

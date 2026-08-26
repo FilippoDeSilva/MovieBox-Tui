@@ -39,8 +39,10 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `MOVIEBOX_VLC_PATH`       | Custom VLC executable.                                                            |
 | `MOVIEBOX_IINA_PATH`      | Custom IINA/iina-cli executable.                                                  |
 | `MOVIEBOX_FOURKHDHUB_URL` | Override the 4KHDHub base URL.                                                    |
-| `MOVIEBOX_THEME`          | Force a theme (e.g. `Dracula`, `Gruvbox`, `Nord`, `Mocha`, `RosePine`, etc.).    |
+| `MOVIEBOX_THEME`          | Force a theme (e.g. `Dracula`, `Gruvbox`, `Nord`, `Mocha`, `RosePine`, etc.). When unset and no saved theme exists, the app auto-detects: `NO_COLOR` wins, truecolor terminals get full palettes, 256-color terminals get quantized palettes, and the OSC 11 background query picks light/dark variants. |
 | `MOVIEBOX_NO_IMAGE`       | Disable poster image queries (set to `1` or `true`).                              |
+| `MOVIEBOX_IMAGE_PROTOCOL` | Force poster graphics protocol: `kitty`, `sixel`, `iterm2`, or `none`.            |
+| `MOVIEBOX_CELL_SIZE`      | Override terminal cell size as `WxH` (e.g. `10x20`) for poster scaling.           |
 
 ## CLI
 
