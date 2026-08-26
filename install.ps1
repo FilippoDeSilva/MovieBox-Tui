@@ -11,7 +11,10 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {}
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls13
 } catch {}
 Set-StrictMode -Version Latest
 
@@ -29,7 +32,7 @@ USAGE:
     .\install.ps1 [OPTIONS]
 
 OPTIONS:
-    -Version <tag>       Install a specific version (e.g. v0.1.13)
+    -Version <tag>       Install a specific version (e.g. v0.1.14)
     -InstallDir <path>   Install binary to a custom directory
     -Force               Reinstall even if already at the latest version
     -DryRun              Perform preflight checks without writing files
@@ -44,6 +47,55 @@ function Write-Step { param([string]$Message) Write-Host "  > " -ForegroundColor
 function Write-Success { param([string]$Message) Write-Host "  + " -ForegroundColor Green -NoNewline; Write-Host $Message }
 function Write-Warn { param([string]$Message) Write-Host "  ! " -ForegroundColor Yellow -NoNewline; Write-Host $Message }
 function Write-Err { param([string]$Message) Write-Host "  x " -ForegroundColor Red -NoNewline; Write-Host $Message; exit 1 }
+
+if ($Version -and $Version[0] -ne "v") {
+    $Version = "v$Version"
+}
+
+function Get-UserPathRaw {
+    param([ref]$Kind)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment")
+    if (-not $key) { return "" }
+    try {
+        $raw = $key.GetValue("Path", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        try { $Kind.Value = $key.GetValueKind("Path") } catch { $Kind.Value = [Microsoft.Win32.RegistryValueKind]::ExpandString }
+        return [string]$raw
+    } finally {
+        $key.Close()
+    }
+}
+
+function Set-UserPathRaw {
+    param([string]$NewPath, [Microsoft.Win32.RegistryValueKind]$ValueKind)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+    if (-not $key) { return }
+    try { $key.SetValue("Path", $NewPath, $ValueKind) } finally { $key.Close() }
+}
+
+function Add-ToUserPath {
+    param([string]$Directory)
+    $kind = [Microsoft.Win32.RegistryValueKind]::ExpandString
+    $raw = Get-UserPathRaw -Kind ([ref]$kind)
+    $segments = @($raw -split ";" | Where-Object { $_ })
+    if ($segments -notcontains $Directory.TrimEnd("\")) {
+        $joined = if ($raw.Trim()) { "$raw;$Directory" } else { $Directory }
+        Set-UserPathRaw -NewPath $joined -ValueKind $kind
+        return $true
+    }
+    return $false
+}
+
+function Remove-FromUserPath {
+    param([string[]]$Directories)
+    $kind = [Microsoft.Win32.RegistryValueKind]::ExpandString
+    $raw = Get-UserPathRaw -Kind ([ref]$kind)
+    if (-not $raw) { return $false }
+    $normalized = @($Directories | ForEach-Object { $_.TrimEnd("\").ToLowerInvariant() })
+    $kept = @($raw -split ";" | Where-Object { $_ -and ($normalized -notcontains $_.TrimEnd("\").ToLowerInvariant()) })
+    if ($kept.Count -eq @($raw -split ";" | Where-Object { $_ }).Count) { return $false }
+    Set-UserPathRaw -NewPath ($kept -join ";") -ValueKind $kind
+    return $true
+}
 
 function Print-Header {
     try { [Console]::Clear() } catch { Clear-Host }
@@ -87,7 +139,11 @@ function Do-Uninstall {
     }
 
     if ($Found) {
+        $Removed = Remove-FromUserPath -Directories @($DefaultInstallDir, "$env:LOCALAPPDATA\MovieBox-Tui\bin")
         Write-Success "$AppName was successfully uninstalled."
+        if ($Removed) {
+            Write-Success "Removed stale entry from User PATH."
+        }
     } else {
         Write-Warn "No installed binary of $BinName was found."
     }
@@ -220,13 +276,10 @@ try {
 
 $PathModified = $false
 if (-not $NoModifyPath) {
-    $UserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-    if ($UserPath -notmatch [regex]::Escape($EffectiveInstallDir)) {
-        $NewPath = if ($UserPath) { "$UserPath;$EffectiveInstallDir" } else { $EffectiveInstallDir }
-        [Environment]::SetEnvironmentVariable("PATH", $NewPath, "User")
+    if (Add-ToUserPath -Directory $EffectiveInstallDir) {
         $PathModified = $true
     }
-    if ($env:PATH -notmatch [regex]::Escape($EffectiveInstallDir)) {
+    if (@($env:PATH -split ";") -notcontains $EffectiveInstallDir.TrimEnd("\")) {
         $env:PATH = "$env:PATH;$EffectiveInstallDir"
     }
 }
