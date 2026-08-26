@@ -20,6 +20,10 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --version|-v)
+            if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+                printf "error: --version requires a release tag argument.\n" >&2
+                exit 1
+            fi
             VERSION="${2:-}"
             shift 2
             ;;
@@ -28,6 +32,10 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --dir)
+            if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+                printf "error: --dir requires a path argument.\n" >&2
+                exit 1
+            fi
             CUSTOM_DIR="${2:-}"
             shift 2
             ;;
@@ -52,11 +60,11 @@ while [ $# -gt 0 ]; do
 MovieBox-TUI Installer
 
 USAGE:
-    curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash [OPTIONS]
+    curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash -s -- [OPTIONS]
     ./install.sh [OPTIONS]
 
 OPTIONS:
-    -v, --version <tag>    Install a specific version (e.g. v0.1.12)
+    -v, --version <tag>    Install a specific version (e.g. v0.1.14)
         --dir <path>       Install binary to a custom directory
     -f, --force            Reinstall even if already at the latest version
         --dry-run          Perform preflight checks without writing files
@@ -67,9 +75,14 @@ EOF
             exit 0
             ;;
         *)
+            printf "warning: ignoring unknown argument: %s\n" "$1" >&2
             shift
             ;;
     esac
+done
+
+while [ -n "$CUSTOM_DIR" ] && [ "${CUSTOM_DIR%/}" != "$CUSTOM_DIR" ]; do
+    CUSTOM_DIR="${CUSTOM_DIR%/}"
 done
 
 IS_TTY=0
@@ -136,11 +149,16 @@ fi
 
 cleanup() {
     printf "%b" "$CURSOR_SHOW" 2>/dev/null || true
+    if [ -n "${TMP_VER_FILE:-}" ] && [ -f "$TMP_VER_FILE" ]; then
+        rm -f "$TMP_VER_FILE"
+    fi
     if [ -n "${TMP_DIR:-}" ] && [ -d "$TMP_DIR" ]; then
         rm -rf "$TMP_DIR"
     fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 log_step() {
     printf "  %b%s%b %b%s%b\n" "$C_BLUE" "→" "$C_RESET" "$C_TEXT" "$1" "$C_RESET"
@@ -253,8 +271,10 @@ do_uninstall() {
     local target_paths=(
         "$HOME/.local/bin/$BIN_NAME"
         "/usr/local/bin/$BIN_NAME"
-        "${PREFIX:-}/bin/$BIN_NAME"
     )
+    if [ -n "${PREFIX:-}" ]; then
+        target_paths+=("$PREFIX/bin/$BIN_NAME")
+    fi
 
     if command -v "$BIN_NAME" >/dev/null 2>&1; then
         local current_path
@@ -353,6 +373,7 @@ resolve_version() {
 run_spinner "[1/4] Checking environment & resolving version" resolve_version || exit 1
 TARGET_VERSION=$(cat "$TMP_VER_FILE" 2>/dev/null || true)
 rm -f "$TMP_VER_FILE"
+TMP_VER_FILE=""
 
 if [ -z "$TARGET_VERSION" ]; then
     log_error "Could not resolve release version."
@@ -448,28 +469,22 @@ verify_checksum() {
 run_spinner "[3/4] Verifying SHA256 checksum" verify_checksum || exit 1
 log_success "[3/4] Cryptographic checksum verified"
 
+mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+if [ ! -w "$INSTALL_DIR" ] && [ ! -w "$(dirname "$INSTALL_DIR")" ]; then
+    INSTALL_DIR="$HOME/.local/bin"
+    APP_PATH="$INSTALL_DIR/$BIN_NAME"
+    mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+fi
+
 install_binary() {
     tar -xzf "$TMP_DIR/$FILE" -C "$TMP_DIR"
     if [ ! -f "$TMP_DIR/$BIN_NAME" ]; then
         return 1
     fi
 
-    mkdir -p "$INSTALL_DIR" 2>/dev/null || true
-    if [ ! -w "$INSTALL_DIR" ] && [ ! -w "$(dirname "$INSTALL_DIR")" ]; then
-        INSTALL_DIR="$HOME/.local/bin"
-        APP_PATH="$INSTALL_DIR/$BIN_NAME"
-        mkdir -p "$INSTALL_DIR" 2>/dev/null || true
-    fi
-
+    rm -f "$APP_PATH"
     cp "$TMP_DIR/$BIN_NAME" "$APP_PATH"
     chmod 755 "$APP_PATH"
-
-    if [ "$IS_TERMUX" -eq 1 ]; then
-        if [ -n "$PREFIX" ] && [ ! -s "$PREFIX/etc/resolv.conf" ]; then
-            mkdir -p "$PREFIX/etc" 2>/dev/null || true
-            printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > "$PREFIX/etc/resolv.conf" 2>/dev/null || true
-        fi
-    fi
 }
 
 run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary || exit 1
@@ -477,7 +492,7 @@ log_success "[4/4] Binary installed to $APP_PATH"
 
 SHELL_MODIFIED=""
 if [ "$NO_MODIFY_PATH" -eq 0 ]; then
-    if ! echo "$PATH" | tr ':' '\n' | grep -q "^$INSTALL_DIR$"; then
+    if ! echo "$PATH" | tr ':' '\n' | grep -Fqx "$INSTALL_DIR"; then
         CURRENT_SHELL=$(basename "${SHELL:-bash}")
         RC_FILE=""
         case "$CURRENT_SHELL" in
@@ -500,7 +515,7 @@ if [ "$NO_MODIFY_PATH" -eq 0 ]; then
 
         if [ -n "$RC_FILE" ]; then
             mkdir -p "$(dirname "$RC_FILE")"
-            if [ -f "$RC_FILE" ] && grep -q "$INSTALL_DIR" "$RC_FILE"; then
+            if [ -f "$RC_FILE" ] && grep -Fq -- "$INSTALL_DIR" "$RC_FILE"; then
                 :
             else
                 if [ "$CURRENT_SHELL" = "fish" ]; then
