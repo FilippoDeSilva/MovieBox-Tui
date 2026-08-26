@@ -441,8 +441,11 @@ fn search_content(
         .saturating_sub(4)
         .saturating_sub(crate::tui::text::width(prefix) as u16)
         .saturating_sub(cursor_width as u16) as usize;
+    let has_status = state.status_timer > 0 && !state.status_message.is_empty();
     let content = if state.search_query.is_empty() {
-        if state.is_tv_mode {
+        if has_status && !editing {
+            crate::tui::text::truncate_width(&state.status_message, available)
+        } else if state.is_tv_mode {
             "Search live channels…".to_string()
         } else if state.is_addon_mode {
             "Search movies and series via addons…".to_string()
@@ -490,6 +493,10 @@ fn render_search_bar(
         ])
         .split(area);
     let real_cursor = view == SearchViewState::Editing && show_cursor && !state.basic_terminal;
+    let has_status = state.status_timer > 0
+        && !state.status_message.is_empty()
+        && state.search_query.is_empty()
+        && view != SearchViewState::Editing;
     let mut paragraph = Paragraph::new(search_content(
         state,
         view,
@@ -499,6 +506,8 @@ fn render_search_bar(
     ))
     .style(if view == SearchViewState::Editing {
         theme.text
+    } else if has_status {
+        theme.accent
     } else if state.search_query.is_empty() {
         theme.text_dim
     } else {

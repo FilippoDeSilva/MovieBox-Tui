@@ -22,8 +22,10 @@
   and three at ≥160, with row-based `↑`/`↓`, item-step `←`/`→`, grid-aware
   click mapping, pagination, prefetching, and scroll clamping. Narrow
   terminals keep the classic single-column behavior.
-- **Status strip**: transient status messages (previously computed but never
-  rendered) now appear as a slim centered line on the bottom row.
+- **Contextual search bar status feedback**: transient status messages (such
+  as search clears, provider switching, and cache updates) now display directly
+  inside the search bar prompt in accent styling, returning to the mode placeholder
+  when the timer expires.
 - **Scrollable help overlay**: overflowing help content switches to a scrolled
   single column with position indicator; keyboard and wheel scrolling with
   key-swallowing so shortcuts no longer act behind the overlay.

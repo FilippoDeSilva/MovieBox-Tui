@@ -15,13 +15,9 @@ impl App {
             return None;
         }
 
-        let screen_area = ratatui::layout::Rect {
-            height: area.height.saturating_sub(1),
-            ..area
-        };
         match self.state.active_screen {
-            Screen::Home => self.handle_home_mouse(col, row, screen_area),
-            Screen::Details => self.handle_details_mouse(col, row, screen_area),
+            Screen::Home => self.handle_home_mouse(col, row, area),
+            Screen::Details => self.handle_details_mouse(col, row, area),
         }
     }
 
