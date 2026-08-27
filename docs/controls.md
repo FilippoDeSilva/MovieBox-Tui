@@ -11,7 +11,8 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | **`Home` / `End`** | Jump to start / end of list, results grid, or text input line |
 | **`PageUp` / `PageDown`** | Scroll lists and modal pickers by 5 items (or scroll help overlay) |
 | **`Enter`** | Open, play, or confirm the selected item |
-| **`Esc`** | Go back, dismiss popup dialog, or clear active search |
+| **`Space` / `P`** | Direct resume playback for recorded season/episode on `/history` items |
+| **`Esc`** | Focus search input (when results present), dismiss popup dialog, or return to landing |
 | **`Tab` / `Shift+Tab`** | Auto-complete suggestion / command; switch details panes; toggle dialog buttons |
 | **`Backspace`** | Delete character before cursor, or return focus to search bar from results |
 | **`Delete`** | Delete character at cursor in text inputs, or remove entry in TV/Addon managers |
@@ -65,8 +66,9 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
-- **`/history`**: Open watch history.
+- **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
+- **`/clear`**: Clear active search query and return to landing.
 ### TV Mode (Live IPTV)
 - **`Enter`**: Play selected TV channel immediately.
 - **`o`**: Open player selection picker for the channel.
@@ -83,8 +85,9 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`r`**: Refresh addon catalog search results.
 - **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
-- **`/browse`**: Browse curated addon catalogs (Top Movies, Top Series, Top Rated).
+- **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
+- **`/clear`**: Clear active search query and return to landing.
 ## Mouse Controls
 
 | Action | Result |

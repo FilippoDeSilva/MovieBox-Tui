@@ -17,6 +17,8 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `tv_enabled`        | bool           | Enable TV Mode navigation in bottom dock (`/enable-tv`, `/disable-tv`).                                     |
 | `addons_enabled`    | bool           | Enable Addon Mode navigation in bottom dock (`/enable-addons`, `/disable-addons`).                          |
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
+| `preferred_subtitle_language` | string or null | Preferred subtitle language for auto-selection (default `"English"`; case-insensitive matching). |
+| `auto_load_subtitles` | bool         | Automatically load and attach matching preferred subtitles without opening the picker modal (default `true`). |
 | `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
 
 ## Other persisted files

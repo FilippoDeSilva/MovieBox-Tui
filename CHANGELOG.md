@@ -3,6 +3,25 @@
 ## [Unreleased]
 
 ### Added
+- **Preferred subtitle auto-selection**: Added `preferred_subtitle_language` (default `"English"`)
+  and `auto_load_subtitles` (default `true`) configuration options. When playback resolves,
+  matching subtitle tracks are automatically attached and the player launches immediately,
+  bypassing the repetitive subtitle picker popup during binge-watching.
+- **1-Key direct watch history resume (`Space` / `P`)**: Pressing `Space` or `P` on any item in
+  `/history` immediately launches direct playback for the recorded season and episode without
+  manual Details navigation. Opening Details from history (`Enter`) pre-seeds selection to the
+  recorded season/episode.
+- **Non-destructive `Esc` search navigation & `/clear`**: In `Normal` mode with active search results,
+  pressing `Esc` focuses the search bar (`InputMode::Editing`) for quick query adjustments rather
+  than wiping results; pressing `Esc` on an empty query or using `/clear` returns to landing cleanly.
+- **Actionable zero-results & multi-line wrapped error cards**: Zero-results states now display
+  interactive guidance shortcuts (`[Ctrl+P] Switch provider`, `[/browse] Browse categories`,
+  `[Ctrl+U] Clear`), and error states wrap full diagnostic descriptions with `[r] Retry request`
+  and `[Esc] Back` action pills.
+- **Synopsis wrap line-clamping & Details fetch error fallback**: Synopsis paragraphs are now bounded
+  by actual visual line capacity with `wrap_text` rather than raw character counts, and failed
+  details fetches render an actionable error box (`[r] Retry fetch`, `[Esc] Back`) rather than
+  hanging indefinitely on the loading spinner.
 - **Grapheme-safe search & text input centralization (`TextInputBuffer`)**: Unified all text
   editing across the main Search Bar, TV Playlist Manager, and Addon Manager with full
   grapheme-cluster awareness, horizontal cursor navigation (`Left`/`Right`, `Home`/`End`),

@@ -205,7 +205,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    /history       ", theme.header),
-            Span::styled("Watch History", theme.text),
+            Span::styled("Watch History ([Space] Direct Resume)", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    /favorites     ", theme.header),
