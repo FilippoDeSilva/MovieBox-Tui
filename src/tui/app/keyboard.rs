@@ -1005,24 +1005,28 @@ impl App {
                         }
                     }
 
-                    KeyCode::Up => {
+                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
                         self.action_sender.send(Action::MoveUp).ok();
                     }
-                    KeyCode::Down => {
+                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
                         self.action_sender.send(Action::MoveDown).ok();
                     }
-                    KeyCode::Left => {
+                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
                         if self.state.show_season_download_confirm {
                             self.state.season_download_confirm_yes_selected = true;
                         } else if self.state.show_episode_download_confirm {
                             self.state.episode_download_confirm_yes_selected = true;
+                        } else if !self.state.subtitle_popup && !self.state.player_picker_popup {
+                            self.action_sender.send(Action::BackTabPane).ok();
                         }
                     }
-                    KeyCode::Right => {
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => {
                         if self.state.show_season_download_confirm {
                             self.state.season_download_confirm_yes_selected = false;
                         } else if self.state.show_episode_download_confirm {
                             self.state.episode_download_confirm_yes_selected = false;
+                        } else if !self.state.subtitle_popup && !self.state.player_picker_popup {
+                            self.action_sender.send(Action::TabPane).ok();
                         }
                     }
                     KeyCode::Enter => {

@@ -27,6 +27,7 @@ impl App {
                 area,
                 &self.state.notifications,
                 self.state.basic_terminal,
+                self.state.download_progress.is_some(),
             );
             for (idx, rect) in rects {
                 if rect.contains(ratatui::layout::Position::new(col, row)) {

@@ -208,7 +208,7 @@ impl Theme {
 
     pub fn latte() -> Self {
         Self {
-            border: Style::default().fg(cp(156, 160, 176)),
+            border: Style::default().fg(cp(140, 143, 161)),
             border_focus: Style::default().fg(cp(30, 102, 245)),
             text: Style::default().fg(cp(76, 79, 105)),
             text_dim: Style::default().fg(cp(108, 111, 133)),
@@ -224,12 +224,12 @@ impl Theme {
             error: Style::default().fg(cp(210, 15, 57)),
             success: Style::default().fg(cp(64, 160, 43)),
             shortcut: Style::default().fg(cp(254, 100, 11)),
-            overlay: Style::default().fg(cp(156, 160, 176)),
+            overlay: Style::default().fg(cp(108, 111, 133)),
             rating: Style::default().fg(cp(223, 142, 29)),
             accent: Style::default()
                 .fg(cp(23, 146, 153))
                 .add_modifier(Modifier::BOLD),
-            muted: Style::default().fg(cp(156, 160, 176)),
+            muted: Style::default().fg(cp(108, 111, 133)),
             teal: Style::default().fg(cp(23, 146, 153)),
             lavender: Style::default().fg(cp(114, 135, 253)),
             sapphire: Style::default().fg(cp(32, 159, 181)),
@@ -242,9 +242,9 @@ impl Theme {
             surface0: Style::default().fg(cp(204, 208, 218)),
             surface1: Style::default().fg(cp(188, 192, 204)),
             surface2: Style::default().fg(cp(172, 176, 190)),
-            overlay0: Style::default().fg(cp(156, 160, 176)),
-            overlay1: Style::default().fg(cp(140, 143, 161)),
-            overlay2: Style::default().fg(cp(124, 127, 147)),
+            overlay0: Style::default().fg(cp(108, 111, 133)),
+            overlay1: Style::default().fg(cp(92, 95, 119)),
+            overlay2: Style::default().fg(cp(76, 79, 105)),
             mantle: Style::default().fg(cp(230, 233, 239)),
             crust: Style::default().fg(cp(220, 224, 232)),
             is_light: true,

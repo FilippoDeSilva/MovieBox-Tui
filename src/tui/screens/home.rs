@@ -256,20 +256,41 @@ fn render_search_state(
         &state.search_query,
         card_width.saturating_sub(10) as usize,
     );
-
     let line = match view {
         SearchViewState::Loading => {
-            let dots = state.loading_dots();
-            let msg = if let Some(preset) = state.active_browse_preset {
-                format!("Loading {}{dots}", preset.label())
-            } else if let Some(catalog) = &state.active_addon_catalog {
-                format!("Loading {}{dots}", catalog.label)
-            } else if state.is_homepage_mode {
-                format!("Loading discover{dots}")
-            } else if !state.search_query.trim().is_empty() {
-                format!("Searching for “{query}”{dots}")
+            let msg = if state.basic_terminal {
+                let dots = match (state.tick_count / 4) % 3 {
+                    0 => ".",
+                    1 => "..",
+                    _ => "...",
+                };
+                if let Some(preset) = state.active_browse_preset {
+                    format!("Loading {}{dots}", preset.label())
+                } else if let Some(catalog) = &state.active_addon_catalog {
+                    format!("Loading {}{dots}", catalog.label)
+                } else if state.is_homepage_mode {
+                    format!("Loading discover{dots}")
+                } else if !state.search_query.trim().is_empty() {
+                    format!("Searching for “{query}”{dots}")
+                } else {
+                    format!("Loading{dots}")
+                }
             } else {
-                format!("Loading{dots}")
+                const SPINNER_FRAMES: [&str; 10] =
+                    ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                let spinner =
+                    SPINNER_FRAMES[(state.tick_count as usize / 2) % SPINNER_FRAMES.len()];
+                if let Some(preset) = state.active_browse_preset {
+                    format!("{spinner} Loading {}", preset.label())
+                } else if let Some(catalog) = &state.active_addon_catalog {
+                    format!("{spinner} Loading {}", catalog.label)
+                } else if state.is_homepage_mode {
+                    format!("{spinner} Loading discover")
+                } else if !state.search_query.trim().is_empty() {
+                    format!("{spinner} Searching for “{query}”")
+                } else {
+                    format!("{spinner} Loading")
+                }
             };
             Line::from(vec![Span::styled(msg, theme.lavender)])
         }
@@ -1209,120 +1230,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
     }
 
-    if state.input_mode == InputMode::Editing
-        && !state.search_suggestions.is_empty()
-        && search_bar_area.width > 0
-    {
-        let visible_count = state.search_suggestions.len().min(6);
-        let selected_index = state.suggest_index.unwrap_or(0);
-        let suggestion_offset = selected_index
-            .saturating_add(1)
-            .saturating_sub(visible_count)
-            .min(state.search_suggestions.len().saturating_sub(visible_count));
-
-        let is_centered = state.search_results.is_empty();
-
-        let search_text_len = if is_centered {
-            let content_sample = search_content(state, view, false, search_bar_area.width, false);
-            crate::tui::text::width(&content_sample) as u16
-        } else {
-            0
-        };
-
-        let prompt_x = if is_centered {
-            search_bar_area.x + search_bar_area.width.saturating_sub(search_text_len) / 2
-        } else {
-            search_bar_area.x
-        };
-
-        let available_width = area.right().saturating_sub(prompt_x).saturating_sub(2);
-        let start_y = search_bar_area.bottom();
-
-        let visible_slice: Vec<(usize, &String)> = state
-            .search_suggestions
-            .iter()
-            .enumerate()
-            .skip(suggestion_offset)
-            .take(visible_count)
-            .collect();
-
-        for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
-            let current_y = start_y + row_idx as u16;
-            if current_y >= area.bottom() {
-                break;
-            }
-
-            let is_selected = Some(orig_idx) == state.suggest_index;
-            let is_last = row_idx + 1 == visible_slice.len()
-                && suggestion_offset + visible_count >= state.search_suggestions.len();
-
-            let branch_symbol = if is_last {
-                if state.basic_terminal {
-                    "\\- "
-                } else {
-                    "└─ "
-                }
-            } else if state.basic_terminal {
-                "|- "
-            } else {
-                "├─ "
-            };
-
-            let is_slash_cmd = suggestion.starts_with('/');
-            let display_name = if is_slash_cmd {
-                suggestion.strip_prefix('/').unwrap_or(suggestion)
-            } else {
-                suggestion.as_str()
-            };
-
-            let desc = slash_command_description(suggestion, state);
-
-            let branch_style = if is_selected {
-                theme.lavender.add_modifier(Modifier::BOLD)
-            } else {
-                theme.overlay0
-            };
-
-            let text_style = if is_selected {
-                theme.highlight.add_modifier(Modifier::BOLD)
-            } else {
-                theme.text_dim
-            };
-
-            let desc_style = if is_selected {
-                theme.subtext1.add_modifier(Modifier::BOLD)
-            } else {
-                theme.overlay1
-            };
-
-            let mut spans = vec![
-                Span::styled(branch_symbol, branch_style),
-                Span::styled(display_name, text_style),
-            ];
-
-            if let Some(description) = desc {
-                let name_len = crate::tui::text::width(display_name);
-                let pad = 24usize.saturating_sub(name_len).max(2);
-                spans.push(Span::raw(" ".repeat(pad)));
-                let desc_budget = (available_width as usize)
-                    .saturating_sub(3 + name_len + pad)
-                    .max(6);
-                spans.push(Span::styled(
-                    crate::tui::text::truncate_width(description, desc_budget),
-                    desc_style,
-                ));
-            }
-
-            let row_area = Rect {
-                x: prompt_x,
-                y: current_y,
-                width: available_width,
-                height: 1,
-            };
-
-            frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
-        }
-    }
+    render_search_suggestions(frame, area, search_bar_area, state, theme, view);
     if state.tv_config_popup {
         let rows = state.tv_manager_rows();
         let total_rows = rows.len();
@@ -1768,5 +1676,148 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             theme,
             state.basic_terminal,
         );
+    }
+}
+
+fn render_search_suggestions(
+    frame: &mut Frame,
+    area: Rect,
+    search_bar_area: Rect,
+    state: &AppState,
+    theme: &Theme,
+    view: SearchViewState,
+) {
+    if state.input_mode != InputMode::Editing
+        || state.search_suggestions.is_empty()
+        || search_bar_area.width == 0
+    {
+        return;
+    }
+
+    let visible_count = state.search_suggestions.len().min(6);
+    let selected_index = state.suggest_index.unwrap_or(0);
+    let suggestion_offset = selected_index
+        .saturating_add(1)
+        .saturating_sub(visible_count)
+        .min(state.search_suggestions.len().saturating_sub(visible_count));
+
+    let is_centered = state.search_results.is_empty();
+
+    let search_text_len = if is_centered {
+        let content_sample = search_content(state, view, false, search_bar_area.width, false);
+        crate::tui::text::width(&content_sample) as u16
+    } else {
+        0
+    };
+
+    let prompt_x = if is_centered {
+        search_bar_area.x + search_bar_area.width.saturating_sub(search_text_len) / 2
+    } else {
+        search_bar_area.x
+    };
+
+    let available_width = area.right().saturating_sub(prompt_x).saturating_sub(2);
+    let start_y = search_bar_area.bottom();
+
+    let visible_slice: Vec<(usize, &String)> = state
+        .search_suggestions
+        .iter()
+        .enumerate()
+        .skip(suggestion_offset)
+        .take(visible_count)
+        .collect();
+
+    if visible_slice.is_empty() {
+        return;
+    }
+
+    let container_h = (visible_slice.len() as u16).min(area.bottom().saturating_sub(start_y));
+    let container_w = available_width.min(search_bar_area.width.max(48));
+    let container_area = Rect {
+        x: prompt_x.saturating_sub(1).max(area.x),
+        y: start_y,
+        width: container_w.min(area.right().saturating_sub(prompt_x)),
+        height: container_h,
+    };
+
+    crate::tui::clear_area(frame, container_area, theme);
+    let container_block = Block::default().style(theme.surface0);
+    frame.render_widget(container_block, container_area);
+
+    for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
+        let current_y = start_y + row_idx as u16;
+        if current_y >= area.bottom() {
+            break;
+        }
+
+        let is_selected = Some(orig_idx) == state.suggest_index;
+        let is_last = row_idx + 1 == visible_slice.len()
+            && suggestion_offset + visible_count >= state.search_suggestions.len();
+
+        let branch_symbol = if is_last {
+            if state.basic_terminal {
+                "\\- "
+            } else {
+                "└─ "
+            }
+        } else if state.basic_terminal {
+            "|- "
+        } else {
+            "├─ "
+        };
+
+        let is_slash_cmd = suggestion.starts_with('/');
+        let display_name = if is_slash_cmd {
+            suggestion.strip_prefix('/').unwrap_or(suggestion)
+        } else {
+            suggestion.as_str()
+        };
+
+        let desc = slash_command_description(suggestion, state);
+
+        let branch_style = if is_selected {
+            theme.lavender.add_modifier(Modifier::BOLD)
+        } else {
+            theme.overlay0
+        };
+
+        let text_style = if is_selected {
+            theme.highlight.add_modifier(Modifier::BOLD)
+        } else {
+            theme.text_dim
+        };
+
+        let desc_style = if is_selected {
+            theme.subtext1.add_modifier(Modifier::BOLD)
+        } else {
+            theme.overlay1
+        };
+
+        let mut spans = vec![
+            Span::styled(branch_symbol, branch_style),
+            Span::styled(display_name, text_style),
+        ];
+
+        if let Some(description) = desc {
+            let name_len = crate::tui::text::width(display_name);
+            let pad = 24usize.saturating_sub(name_len).max(2);
+            spans.push(Span::raw(" ".repeat(pad)));
+            let desc_budget = (available_width as usize)
+                .saturating_sub(3 + name_len + pad)
+                .max(6);
+            spans.push(Span::styled(
+                crate::tui::text::truncate_width(description, desc_budget),
+                desc_style,
+            ));
+        }
+
+        let row_area = Rect {
+            x: prompt_x,
+            y: current_y,
+            width: available_width,
+            height: 1,
+        };
+
+        frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
     }
 }

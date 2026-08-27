@@ -532,6 +532,7 @@ impl App {
             &self.state.notifications,
             &self.theme,
             self.state.basic_terminal,
+            self.state.download_progress.is_some(),
         );
     }
 

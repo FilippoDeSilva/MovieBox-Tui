@@ -2,7 +2,7 @@ use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{
         Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
@@ -105,7 +105,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let details_json = match &state.selected_details {
         Some(d) => d,
         None => {
-            let dots = state.loading_dots();
+            let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
 
             let vertical_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -116,9 +116,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ])
                 .split(area);
 
-            let loading_p = Paragraph::new(format!("Loading details{dots}"))
+            let loading_text = if state.basic_terminal {
+                format!("Loading details {spinner}")
+            } else {
+                format!("{spinner} Loading details...")
+            };
+            let loading_p = Paragraph::new(loading_text)
                 .alignment(ratatui::layout::Alignment::Center)
-                .style(theme.text_dim);
+                .style(theme.lavender);
 
             frame.render_widget(loading_p, vertical_chunks[1]);
             return;
@@ -374,14 +379,31 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         theme.text.add_modifier(ratatui::style::Modifier::BOLD),
     ));
     title_spans.push(Span::styled("   ", theme.text));
-    title_spans.push(Span::styled(
-        format!(
-            "{}IMDb {}",
-            if state.basic_terminal { "* " } else { "★ " },
-            imdb_rating
-        ),
-        theme.rating,
-    ));
+
+    if imdb_rating != "N/A" {
+        if state.basic_terminal {
+            title_spans.push(Span::styled(
+                format!("[★ {} IMDb]", imdb_rating),
+                theme.rating.add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            let badge_bg = theme_color(theme.rating, Color::Rgb(249, 226, 175));
+            let badge_fg = if theme.is_light {
+                Color::White
+            } else {
+                theme_color(theme.crust, Color::Rgb(17, 17, 27))
+            };
+            title_spans.push(Span::styled(
+                format!(" ★ {} IMDb ", imdb_rating),
+                Style::default()
+                    .bg(badge_bg)
+                    .fg(badge_fg)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        }
+    } else {
+        title_spans.push(Span::styled("★ IMDb N/A", theme.text_dim));
+    }
     let title_line = Line::from(title_spans);
 
     let duration_str = if duration.is_empty() || duration == "N/A" {
@@ -465,8 +487,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     } else if matches!(tier, DetailsLayoutTier::Narrow) {
         top_meta.truncate(4);
     }
-    let title_width = crate::tui::text::width(&title)
-        + crate::tui::text::width(&format!("   ★ IMDb {}", imdb_rating));
+    let rating_text_len = if imdb_rating != "N/A" {
+        crate::tui::text::width(&format!("   ★ {} IMDb", imdb_rating)) + 2
+    } else {
+        crate::tui::text::width("   ★ IMDb N/A")
+    };
+    let title_width = crate::tui::text::width(&title) + rating_text_len;
     let title_rows = title_width
         .div_ceil(right_area.width.max(1) as usize)
         .clamp(1, 2);
@@ -947,30 +973,48 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .and_then(|value| value.as_u64())
                             .unwrap_or(0);
                         let stream_width = streams_area.width.saturating_sub(6) as usize;
-                        let codec = codec.to_uppercase();
-                        let mut stream_spans = vec![
-                            Span::styled(pointer, marker_style),
-                            Span::styled(format!("{size_formatted:<9} "), primary_style),
-                            Span::styled(format!("{codec:<11} "), secondary_style),
-                        ];
+                        let codec_str = codec.to_uppercase();
+                        let tags = extract_media_tags(raw_release_title, &codec_str);
+                        let tag_spans = render_media_tag_spans(&tags, theme, state.basic_terminal);
+
+                        let mut stream_spans = vec![Span::styled(pointer, marker_style)];
+                        stream_spans.extend(resolution_badge_spans(
+                            resolution,
+                            theme,
+                            state.basic_terminal,
+                        ));
+                        stream_spans
+                            .push(Span::styled(format!("{size_formatted:<9} "), primary_style));
+
+                        if !tag_spans.is_empty() && stream_width >= 48 {
+                            stream_spans.extend(tag_spans);
+                        } else if tags.codec.is_none() && codec != "None" && !codec.is_empty() {
+                            stream_spans
+                                .push(Span::styled(format!("{codec_str:<8} "), secondary_style));
+                        }
+
+                        let used_prefix_width = stream_spans
+                            .iter()
+                            .map(|s| crate::tui::text::width(s.content.as_ref()))
+                            .sum::<usize>();
+                        let remaining = stream_width.saturating_sub(used_prefix_width);
+
                         if is_addon {
-                            let fixed = 10 + 12;
-                            let remaining = stream_width.saturating_sub(fixed);
                             let has_lang = language != "Unknown" && !language.is_empty();
                             let lang_str = if has_lang {
-                                format!("{} ", crate::tui::text::pad_to_width(&language, 15))
+                                format!("{} ", crate::tui::text::pad_to_width(&language, 12))
                             } else {
                                 "".to_string()
                             };
                             let lang_len = crate::tui::text::width(&lang_str);
                             let upload_width = crate::tui::text::width(upload_by.as_str());
 
-                            if remaining >= 45 {
+                            if remaining >= 35 {
                                 let title_avail =
-                                    remaining.saturating_sub(lang_len + upload_width + 3);
+                                    remaining.saturating_sub(lang_len + upload_width + 2);
                                 let display_title = crate::tui::text::truncate_width(
                                     &release_title,
-                                    title_avail.max(12),
+                                    title_avail.max(8),
                                 );
                                 if has_lang {
                                     stream_spans.push(Span::styled(lang_str, secondary_style));
@@ -981,11 +1025,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 ));
                                 stream_spans
                                     .push(Span::styled(upload_by.to_string(), secondary_style));
-                            } else if remaining >= 25 {
+                            } else if remaining >= 20 {
                                 let title_avail = remaining.saturating_sub(upload_width + 2);
                                 let display_title = crate::tui::text::truncate_width(
                                     &release_title,
-                                    title_avail.max(8),
+                                    title_avail.max(6),
                                 );
                                 stream_spans.push(Span::styled(
                                     format!("{display_title}  "),
@@ -997,36 +1041,37 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 stream_spans
                                     .push(Span::styled(upload_by.to_string(), secondary_style));
                             }
-                        } else if is_fourk && stream_width >= 58 {
+                        } else if is_fourk && remaining >= 28 {
                             let mirror_str = format!(
                                 "{source_count} mirror{}",
                                 if source_count == 1 { "" } else { "s" }
                             );
                             let mirror_width = mirror_str.len() + 2;
-                            let max_lang_width = stream_width.saturating_sub(9 + 8 + mirror_width);
+                            let max_lang_width = remaining.saturating_sub(mirror_width + 2);
                             let display_lang =
-                                crate::tui::text::truncate_width(&language, max_lang_width);
+                                crate::tui::text::truncate_width(&language, max_lang_width.max(6));
                             stream_spans.push(Span::styled(
-                                format!("{display_lang:<16}  "),
+                                format!("{display_lang:<14}  "),
                                 secondary_style,
                             ));
                             stream_spans.push(Span::styled(mirror_str, secondary_style));
-                        } else if is_fourk && stream_width >= 38 {
-                            let max_lang_width = stream_width.saturating_sub(9 + 8 + 2);
-                            let display_lang =
-                                crate::tui::text::truncate_width(&language, max_lang_width);
-                            stream_spans
-                                .push(Span::styled(display_lang.to_string(), secondary_style));
-                        } else if !is_fourk && stream_width >= 64 {
-                            let fixed_width = 9 + 8 + 12;
-                            let uploader = crate::tui::text::truncate_width(
-                                &upload_by,
-                                stream_width.saturating_sub(fixed_width).max(4),
+                        } else if is_fourk && remaining >= 12 {
+                            let display_lang = crate::tui::text::truncate_width(
+                                &language,
+                                remaining.saturating_sub(2),
                             );
                             stream_spans
-                                .push(Span::styled(format!("{duration_str:<12}"), secondary_style));
+                                .push(Span::styled(display_lang.to_string(), secondary_style));
+                        } else if !is_fourk && remaining >= 28 {
+                            let uploader_avail = remaining.saturating_sub(12);
+                            let uploader =
+                                crate::tui::text::truncate_width(&upload_by, uploader_avail.max(4));
+                            stream_spans.push(Span::styled(
+                                format!("{duration_str:<10}  "),
+                                secondary_style,
+                            ));
                             stream_spans.push(Span::styled(uploader, secondary_style));
-                        } else if !is_fourk && stream_width >= 38 {
+                        } else if !is_fourk && remaining >= 10 {
                             stream_spans.push(Span::styled(duration_str, secondary_style));
                         }
                         if is_selected {
@@ -1034,13 +1079,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 .iter()
                                 .map(|span| crate::tui::text::width(span.content.as_ref()))
                                 .sum::<usize>();
-                            stream_spans.push(Span::styled(
-                                " ".repeat(stream_width.saturating_sub(used_width)),
-                                row_style,
-                            ));
+                            if stream_width > used_width {
+                                stream_spans.push(Span::styled(
+                                    " ".repeat(stream_width.saturating_sub(used_width)),
+                                    row_style,
+                                ));
+                            }
                         }
                         let stream_line = Line::from(stream_spans);
-
                         let mut lines = vec![];
                         if is_first_of_quality {
                             if i > 0 {
@@ -1048,20 +1094,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             }
                             let option_count =
                                 quality_counts.get(&resolution).copied().unwrap_or(1);
-                            lines.push(Line::from(vec![
-                                Span::styled(quality_str, group_heading_style(theme)),
-                                Span::styled(" · ", theme.overlay0),
-                                Span::styled(
-                                    format!(
-                                        "{} option{}",
-                                        option_count,
-                                        if option_count == 1 { "" } else { "s" }
-                                    ),
-                                    metadata_style(theme),
+                            let mut header_spans = Vec::new();
+                            header_spans.extend(resolution_badge_spans(
+                                resolution,
+                                theme,
+                                state.basic_terminal,
+                            ));
+                            header_spans.push(Span::styled(" · ", theme.overlay0));
+                            header_spans.push(Span::styled(
+                                format!(
+                                    "{} option{}",
+                                    option_count,
+                                    if option_count == 1 { "" } else { "s" }
                                 ),
-                            ]));
+                                metadata_style(theme),
+                            ));
+                            lines.push(Line::from(header_spans));
                         }
-
                         lines.push(stream_line);
                         ListItem::new(lines)
                     })
@@ -1147,19 +1196,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     format!("{error} — press r to retry or Ctrl+P to switch provider.")
                 }
             } else {
-                let dots = match (state.tick_count / 4) % 4 {
-                    0 => "",
-                    1 => ".",
-                    2 => "..",
-                    _ => "...",
-                };
-                format!("Loading streams{dots}")
+                let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
+                if state.basic_terminal {
+                    format!("Loading streams {spinner}")
+                } else {
+                    format!("{spinner} Loading streams...")
+                }
             };
 
             let style = if has_error {
                 theme.error
-            } else {
+            } else if waiting_for_language {
                 theme.text_dim
+            } else {
+                theme.lavender
             };
 
             if !msg.is_empty() {
@@ -1435,8 +1485,278 @@ fn metadata_style(theme: &Theme) -> Style {
     theme.subtext1
 }
 
-fn group_heading_style(theme: &Theme) -> Style {
-    theme.lavender.add_modifier(Modifier::BOLD)
+const BRAILLE_SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+pub(crate) fn stream_loading_spinner(tick_count: u64, basic_terminal: bool) -> &'static str {
+    if basic_terminal {
+        match (tick_count / 4) % 4 {
+            0 => "..",
+            1 => "...",
+            2 => "....",
+            _ => "..",
+        }
+    } else {
+        BRAILLE_SPINNER[(tick_count as usize) % BRAILLE_SPINNER.len()]
+    }
+}
+
+pub(crate) fn resolution_badge_spans<'a>(
+    resolution: i64,
+    theme: &'a Theme,
+    basic_terminal: bool,
+) -> Vec<Span<'a>> {
+    if basic_terminal {
+        let (label, style) = match resolution {
+            2160 | 4320 => ("[4K]", theme.rating.add_modifier(Modifier::BOLD)),
+            1080 => ("[1080p]", theme.highlight.add_modifier(Modifier::BOLD)),
+            720 => ("[720p]", theme.teal.add_modifier(Modifier::BOLD)),
+            480 | 540 | 576 => ("[SD]", theme.text_dim.add_modifier(Modifier::BOLD)),
+            _ if resolution > 0 => (
+                match resolution {
+                    2160 => "[4K]",
+                    1080 => "[1080p]",
+                    720 => "[720p]",
+                    480 => "[480p]",
+                    360 => "[360p]",
+                    _ => "[HD]",
+                },
+                theme.text.add_modifier(Modifier::BOLD),
+            ),
+            _ => ("[SD]", theme.text_dim),
+        };
+        return vec![Span::styled(format!("{:<8}", label), style)];
+    }
+
+    let (badge_bg, contrast_fg, label) = match resolution {
+        2160 | 4320 => (
+            theme_color(theme.rating, Color::Rgb(249, 226, 175)),
+            if theme.is_light {
+                Color::White
+            } else {
+                theme_color(theme.crust, Color::Rgb(17, 17, 27))
+            },
+            " 4K ",
+        ),
+        1080 => (
+            theme_color(theme.sapphire, Color::Rgb(116, 199, 236)),
+            if theme.is_light {
+                Color::White
+            } else {
+                theme_color(theme.crust, Color::Rgb(17, 17, 27))
+            },
+            " 1080p ",
+        ),
+        720 => (
+            theme_color(theme.teal, Color::Rgb(148, 226, 213)),
+            if theme.is_light {
+                Color::White
+            } else {
+                theme_color(theme.crust, Color::Rgb(17, 17, 27))
+            },
+            " 720p ",
+        ),
+        480 | 540 | 576 => (
+            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
+            theme_color(theme.text, Color::White),
+            " SD ",
+        ),
+        _ if resolution > 0 => (
+            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
+            theme_color(theme.text, Color::White),
+            match resolution {
+                2160 => " 4K ",
+                1080 => " 1080p ",
+                720 => " 720p ",
+                480 => " 480p ",
+                360 => " 360p ",
+                _ => " HD ",
+            },
+        ),
+        _ => (
+            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
+            theme_color(theme.text_dim, Color::Gray),
+            " SD ",
+        ),
+    };
+
+    vec![
+        Span::styled(
+            label,
+            Style::default()
+                .bg(badge_bg)
+                .fg(contrast_fg)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" "),
+    ]
+}
+
+#[derive(Debug, Clone, Default)]
+struct MediaTags {
+    hdr: Option<&'static str>,
+    audio: Option<&'static str>,
+    codec: Option<&'static str>,
+    source: Option<&'static str>,
+}
+
+fn extract_media_tags(title: &str, codec_name: &str) -> MediaTags {
+    let lower_title = title.to_ascii_lowercase();
+    let lower_codec = codec_name.to_ascii_lowercase();
+
+    let hdr = if lower_title.contains("hdr10+") || lower_title.contains("hdr10plus") {
+        Some("HDR10+")
+    } else if lower_title.contains("dovi")
+        || lower_title.contains("dolby vision")
+        || lower_title.contains("dolbyvision")
+        || lower_title.contains(".dv.")
+        || lower_title.contains(" dv ")
+        || lower_title.contains("-dv")
+    {
+        Some("DV")
+    } else if lower_title.contains("hdr") {
+        Some("HDR")
+    } else {
+        None
+    };
+
+    let audio = if lower_title.contains("atmos") {
+        Some("ATMOS")
+    } else if lower_title.contains("7.1") {
+        Some("7.1")
+    } else if lower_title.contains("5.1")
+        || lower_title.contains("ddp5.1")
+        || lower_title.contains("dd5.1")
+        || lower_title.contains("ac3")
+    {
+        Some("5.1")
+    } else {
+        None
+    };
+
+    let codec = if lower_codec.contains("hevc")
+        || lower_codec.contains("x265")
+        || lower_codec.contains("h265")
+        || lower_title.contains("hevc")
+        || lower_title.contains("x265")
+        || lower_title.contains("h.265")
+        || lower_title.contains("h265")
+    {
+        Some("HEVC")
+    } else if lower_codec.contains("av1") || lower_title.contains("av1") {
+        Some("AV1")
+    } else if lower_codec.contains("h264")
+        || lower_codec.contains("x264")
+        || lower_codec.contains("avc")
+        || lower_title.contains("x264")
+        || lower_title.contains("h.264")
+        || lower_title.contains("h264")
+        || lower_title.contains("avc")
+    {
+        Some("H.264")
+    } else {
+        None
+    };
+
+    let source = if lower_title.contains("remux") {
+        Some("REMUX")
+    } else if lower_title.contains("bluray")
+        || lower_title.contains("bdrip")
+        || lower_title.contains("brrip")
+    {
+        Some("BluRay")
+    } else if lower_title.contains("web-dl")
+        || lower_title.contains("webdl")
+        || lower_title.contains("webrip")
+    {
+        Some("WEB-DL")
+    } else {
+        None
+    };
+
+    MediaTags {
+        hdr,
+        audio,
+        codec,
+        source,
+    }
+}
+
+fn render_media_tag_spans<'a>(
+    tags: &MediaTags,
+    theme: &'a Theme,
+    basic_terminal: bool,
+) -> Vec<Span<'a>> {
+    let mut spans = Vec::new();
+
+    if let Some(hdr) = tags.hdr {
+        if basic_terminal {
+            spans.push(Span::styled(
+                format!("[{hdr}] "),
+                theme.rating.add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            let bg = theme_color(theme.surface1, Color::Rgb(73, 76, 94));
+            let fg = theme_color(theme.rating, Color::Yellow);
+            spans.push(Span::styled(
+                format!(" {hdr} "),
+                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" "));
+        }
+    }
+
+    if let Some(audio) = tags.audio {
+        if basic_terminal {
+            spans.push(Span::styled(
+                format!("[{audio}] "),
+                theme.sapphire.add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
+            let fg = theme_color(theme.sapphire, Color::Cyan);
+            spans.push(Span::styled(
+                format!(" {audio} "),
+                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" "));
+        }
+    }
+
+    if let Some(codec) = tags.codec {
+        if basic_terminal {
+            spans.push(Span::styled(
+                format!("[{codec}] "),
+                theme.teal.add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
+            let fg = theme_color(theme.teal, Color::Rgb(148, 226, 213));
+            spans.push(Span::styled(
+                format!(" {codec} "),
+                Style::default().bg(bg).fg(fg),
+            ));
+            spans.push(Span::raw(" "));
+        }
+    }
+
+    if let Some(source) = tags.source {
+        if basic_terminal {
+            spans.push(Span::styled(
+                format!("[{source}] "),
+                theme.lavender.add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
+            let fg = theme_color(theme.lavender, Color::Rgb(180, 190, 254));
+            spans.push(Span::styled(
+                format!(" {source} "),
+                Style::default().bg(bg).fg(fg),
+            ));
+            spans.push(Span::raw(" "));
+        }
+    }
+
+    spans
 }
 
 fn with_selection_surface(style: Style, basic_terminal: bool, theme: &Theme) -> Style {
@@ -1628,7 +1948,11 @@ fn details_footer(
     let compact = width < 80;
     let very_compact = width < 45;
     let mut primary = footer_group(
-        "Tab",
+        if state.basic_terminal {
+            "Tab"
+        } else {
+            "Tab/←→"
+        },
         if compact { "Pane" } else { "Next pane" },
         false,
         theme,
@@ -1740,4 +2064,72 @@ fn render_scroll_indicator(
         }),
         &mut state,
     );
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stream_loading_spinner_frames() {
+        assert_eq!(stream_loading_spinner(0, false), "⠋");
+        assert_eq!(stream_loading_spinner(1, false), "⠙");
+        assert_eq!(stream_loading_spinner(9, false), "⠏");
+        assert_eq!(stream_loading_spinner(10, false), "⠋");
+        assert_eq!(stream_loading_spinner(0, true), "..");
+    }
+
+    #[test]
+    fn test_resolution_badge_spans() {
+        let theme = Theme::mocha();
+        let spans_4k = resolution_badge_spans(2160, &theme, false);
+        assert_eq!(spans_4k[0].content, " 4K ");
+
+        let spans_1080 = resolution_badge_spans(1080, &theme, false);
+        assert_eq!(spans_1080[0].content, " 1080p ");
+
+        let spans_720 = resolution_badge_spans(720, &theme, false);
+        assert_eq!(spans_720[0].content, " 720p ");
+
+        let spans_sd = resolution_badge_spans(480, &theme, false);
+        assert_eq!(spans_sd[0].content, " SD ");
+
+        let basic_4k = resolution_badge_spans(2160, &theme, true);
+        assert_eq!(basic_4k[0].content.trim(), "[4K]");
+    }
+
+    #[test]
+    fn test_extract_media_tags() {
+        let tags = extract_media_tags(
+            "Dune.Part.Two.2024.2160p.UHD.BluRay.x265.TrueHD.7.1.Atmos.DV.HDR-FLUX",
+            "HEVC",
+        );
+        assert_eq!(tags.hdr, Some("DV"));
+        assert_eq!(tags.audio, Some("ATMOS"));
+        assert_eq!(tags.codec, Some("HEVC"));
+        assert_eq!(tags.source, Some("BluRay"));
+
+        let tags_web = extract_media_tags(
+            "Movie.Title.2023.1080p.HDR10Plus.WEB-DL.DDP5.1.H.264",
+            "H264",
+        );
+        assert_eq!(tags_web.hdr, Some("HDR10+"));
+        assert_eq!(tags_web.audio, Some("5.1"));
+        assert_eq!(tags_web.codec, Some("H.264"));
+        assert_eq!(tags_web.source, Some("WEB-DL"));
+    }
+
+    #[test]
+    fn test_render_media_tag_spans() {
+        let theme = Theme::mocha();
+        let tags = MediaTags {
+            hdr: Some("HDR"),
+            audio: Some("5.1"),
+            codec: Some("HEVC"),
+            source: Some("REMUX"),
+        };
+        let spans = render_media_tag_spans(&tags, &theme, false);
+        assert!(!spans.is_empty());
+        let basic_spans = render_media_tag_spans(&tags, &theme, true);
+        assert_eq!(basic_spans[0].content, "[HDR] ");
+    }
 }

@@ -289,8 +289,10 @@ pub fn notifications(
     notifications: &std::collections::VecDeque<Notification>,
     theme: &Theme,
     basic_terminal: bool,
+    download_active: bool,
 ) {
-    let mut y = area.bottom().saturating_sub(2);
+    let bottom_offset = if download_active { 5 } else { 2 };
+    let mut y = area.bottom().saturating_sub(bottom_offset);
 
     for notification in notifications.iter().rev().take(3) {
         let (badge, badge_style) = notification_style(notification.kind, theme, basic_terminal);
@@ -354,11 +356,44 @@ pub fn notifications(
             )]));
         }
 
+        let total_duration = match notification.kind {
+            NotificationKind::Info => std::time::Duration::from_secs(4),
+            NotificationKind::Success => std::time::Duration::from_secs(5),
+            NotificationKind::Warning => std::time::Duration::from_secs(7),
+            NotificationKind::Error => std::time::Duration::from_secs(10),
+        };
+        let remaining = notification
+            .expires_at
+            .saturating_duration_since(std::time::Instant::now());
+        let ratio = (remaining.as_secs_f64() / total_duration.as_secs_f64()).clamp(0.0, 1.0);
+        let bar_width = inner_width.clamp(3, 16);
+        let filled = ((bar_width as f64) * ratio).round() as usize;
+        let countdown_bar = if basic_terminal {
+            format!(
+                "[{}{}]",
+                "=".repeat(filled),
+                "-".repeat(bar_width.saturating_sub(filled))
+            )
+        } else {
+            format!(
+                "{}{}",
+                "━".repeat(filled),
+                "─".repeat(bar_width.saturating_sub(filled))
+            )
+        };
+
         let block = Block::default()
             .title(Line::from(vec![Span::styled(
                 format!(" {badge} "),
                 badge_style.add_modifier(Modifier::BOLD),
             )]))
+            .title_bottom(
+                Line::from(vec![Span::styled(
+                    format!(" {countdown_bar} "),
+                    badge_style.add_modifier(Modifier::DIM),
+                )])
+                .alignment(Alignment::Right),
+            )
             .borders(Borders::ALL)
             .border_type(border_type(basic_terminal))
             .border_style(badge_style)
@@ -458,9 +493,11 @@ pub fn notification_rects(
     area: Rect,
     notifications: &std::collections::VecDeque<Notification>,
     basic_terminal: bool,
+    download_active: bool,
 ) -> Vec<(usize, Rect)> {
     let mut rects = Vec::new();
-    let mut y = area.bottom().saturating_sub(2);
+    let bottom_offset = if download_active { 5 } else { 2 };
+    let mut y = area.bottom().saturating_sub(bottom_offset);
     let theme_placeholder = Theme::default();
 
     for (rev_idx, notification) in notifications.iter().rev().take(3).enumerate() {
