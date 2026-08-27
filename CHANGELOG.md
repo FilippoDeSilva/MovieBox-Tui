@@ -3,10 +3,6 @@
 ## [Unreleased]
 
 ### Added
-- **Preferred subtitle auto-selection**: Added `preferred_subtitle_language` (default `"English"`)
-  and `auto_load_subtitles` (default `true`) configuration options. When playback resolves,
-  matching subtitle tracks are automatically attached and the player launches immediately,
-  bypassing the repetitive subtitle picker popup during binge-watching.
 - **1-Key direct watch history resume (`Space` / `P`)**: Pressing `Space` or `P` on any item in
   `/history` immediately launches direct playback for the recorded season and episode without
   manual Details navigation. Opening Details from history (`Enter`) pre-seeds selection to the

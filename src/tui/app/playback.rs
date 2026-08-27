@@ -514,26 +514,6 @@ impl App {
                 self.state.is_resolving_playback = false;
                 let options = crate::tui::state::caption_options(&ext_captions);
 
-                if self.state.auto_load_subtitles {
-                    if let Some(preferred) = &self.state.preferred_subtitle_language {
-                        let pref_lower = preferred.to_lowercase();
-                        if let Some((_, sub_url)) = options.iter().find(|(name, url)| {
-                            !url.is_empty() && name.to_lowercase().contains(&pref_lower)
-                        }) {
-                            if open_with {
-                                self.action_sender
-                                    .send(Action::ShowPlayerPicker(link, Some(sub_url.clone())))
-                                    .ok();
-                            } else {
-                                self.action_sender
-                                    .send(Action::LaunchMpv(link, Some(sub_url.clone())))
-                                    .ok();
-                            }
-                            return None;
-                        }
-                    }
-                }
-
                 if options.len() > 1 {
                     self.state.show_help = false;
                     self.state.player_picker_popup = false;
@@ -744,41 +724,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn auto_select_matching_preferred_subtitle() {
+    async fn show_popup_when_subtitles_available() {
         let mut app = crate::tui::app::App::new();
-        app.state.auto_load_subtitles = true;
-        app.state.preferred_subtitle_language = Some("English".to_string());
-
-        let ext_captions = serde_json::json!({
-            "extCaptions": [
-                { "lanName": "Spanish", "url": "https://example.com/es.srt" },
-                { "lanName": "English (Full)", "url": "https://example.com/en.srt" }
-            ]
-        });
-
-        app.handle_playback(crate::tui::action::Action::ShowSubtitlePopup(
-            "https://example.com/video.mp4".to_string(),
-            ext_captions,
-            false,
-        ))
-        .await;
-
-        assert!(!app.state.subtitle_popup);
-        let action = app.action_receiver.recv().await;
-        assert!(matches!(
-            action,
-            Some(crate::tui::action::Action::LaunchMpv(
-                link,
-                Some(sub)
-            )) if link == "https://example.com/video.mp4" && sub == "https://example.com/en.srt"
-        ));
-    }
-
-    #[tokio::test]
-    async fn show_popup_when_auto_load_subtitles_disabled_or_no_match() {
-        let mut app = crate::tui::app::App::new();
-        app.state.auto_load_subtitles = false;
-        app.state.preferred_subtitle_language = Some("English".to_string());
 
         let ext_captions = serde_json::json!({
             "extCaptions": [

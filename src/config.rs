@@ -18,8 +18,6 @@ pub struct Config {
     pub addons_enabled: bool,
     pub default_player: Option<String>,
     pub download_dir: Option<String>,
-    pub preferred_subtitle_language: Option<String>,
-    pub auto_load_subtitles: bool,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -35,8 +33,6 @@ impl Default for Config {
             addons_enabled: false,
             default_player: None,
             download_dir: None,
-            preferred_subtitle_language: Some("English".to_string()),
-            auto_load_subtitles: true,
         }
     }
 }
@@ -161,18 +157,11 @@ mod tests {
     #[test]
     fn config_defaults_and_serde() {
         let config = Config::default();
-        assert_eq!(
-            config.preferred_subtitle_language.as_deref(),
-            Some("English")
-        );
-        assert!(config.auto_load_subtitles);
+        assert!(config.auto_update);
+        assert_eq!(config.active_provider, ProviderKind::MovieBox);
 
         let json = serde_json::to_string(&config).expect("serialize");
         let deserialized: Config = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(
-            deserialized.preferred_subtitle_language,
-            config.preferred_subtitle_language
-        );
-        assert_eq!(deserialized.auto_load_subtitles, config.auto_load_subtitles);
+        assert_eq!(deserialized.active_mode, config.active_mode);
     }
 }
