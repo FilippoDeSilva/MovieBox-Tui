@@ -13,6 +13,9 @@ pub fn should_query_images() -> bool {
     {
         return false;
     }
+    if std::env::var("TMUX").is_ok() && std::env::var("MOVIEBOX_IMAGE_PROTOCOL").is_err() {
+        return false;
+    }
     let term = env("TERM");
 
     term != "dumb" && term != "linux"

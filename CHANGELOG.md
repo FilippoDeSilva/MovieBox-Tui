@@ -3,11 +3,40 @@
 ## [Unreleased]
 
 ### Added
-- **Centralized grapheme-safe text input engine (`TextInputBuffer`)**: unified text
-  editing across TV Playlist and Addon managers with full grapheme-cluster awareness,
-  horizontal cursor navigation (`Left`/`Right`, `Home`/`End`), forward deletion (`Delete`),
-  backward deletion (`Backspace`), word deletion (`Ctrl+W`), whole-line clearing (`Ctrl+U`),
-  and active cursor rendering matching the main search bar.
+- **Grapheme-safe search & text input centralization (`TextInputBuffer`)**: Unified all text
+  editing across the main Search Bar, TV Playlist Manager, and Addon Manager with full
+  grapheme-cluster awareness, horizontal cursor navigation (`Left`/`Right`, `Home`/`End`),
+  forward deletion (`Delete`), backward deletion (`Backspace`), backward word deletion (`Ctrl+W`),
+  and whole-line clearing (`Ctrl+U`).
+- **High-contrast media resolution badges & audio/codec tags**: Color-coded, high-contrast
+  media resolution badges (`4K UHD`, `1080p FHD`, `720p HD`, `SD`) and granular audio/video
+  codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`) in Details
+  stream listings, with theme-aware foreground/background contrast styling and clean bracketed
+  ASCII fallbacks on basic terminals.
+- **Smooth 10-frame Unicode Braille loading spinners**: Added fluid 10-frame Braille animation
+  spinners (`⠋`, `⠙`, `⠹`, `⠸`, `⠼`, `⠴`, `⠦`, `⠧`, `⠇`, `⠏`) for search queries, metadata discovery,
+  and stream fetching states, with graceful 2-character ASCII fallback (`..`) on basic terminals.
+- **Horizontal Details pane navigation (`Left`/`Right`/`h`/`l`)**: Added intuitive horizontal
+  directional navigation (`Left`/`Right` and `h`/`l` vim keys) to smoothly cycle between Audio
+  Languages, Seasons, Episodes, and Streams panes in the Details view alongside `Tab` and `Shift+Tab`.
+- **Surfaced backdrop container for slash command suggestions**: Autocomplete and slash command
+  suggestions now render inside a dedicated `theme.surface0` background container with clear
+  tree-branch hierarchy glyphs (`├─`, `└─` with `|-`, `\-` fallbacks) and aligned descriptions.
+- **Toast notification clearance & visual countdown progress bar**: Elevated toast notifications
+  dynamically adjust their bottom clearance (`bottom_offset: 5`) when the active download gauge
+  is visible to prevent visual collisions, and feature a live countdown progress bar (`━───` and
+  `[==--]`) indicating remaining toast lifespan.
+- **Contextual terminal window titles**: Dynamically updates the terminal emulator window title
+  based on active navigation state (`MovieBox-Tui — Streaming`, `MovieBox-Tui — Live TV`,
+  `MovieBox-Tui — Addons`, and `MovieBox-Tui — {Title}` on Details screens).
+- **Modal graphic anti-bleed gating (`has_active_modal()`)**: Suppresses background Kitty, Sixel,
+  and iTerm2 poster rendering whenever any modal overlay or dialog is active (Help, Theme picker,
+  Browse categories, TV/Addon managers, Subtitles, Player picker, and Download confirmation),
+  preventing terminal graphics from bleeding through popup borders and text.
+- **Catppuccin Latte light theme & Basic 16-color ANSI light palette**: Tuned Catppuccin Latte
+  colors to meet WCAG AA contrast standards on light terminal backgrounds, and introduced a
+  specialized 16-color ANSI light fallback palette (`Theme::fallback(true)`) ensuring crisp
+  readability without truecolor support.
 - **Harmonized modal & picker navigation**: `Home` (jump to first), `End` (jump to last),
   `PageUp` (step -5), and `PageDown` (step +5) support across Browse categories, Theme
   picker, TV Playlist manager, and Addon manager dialogs.
@@ -65,6 +94,13 @@
   `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
 ### Fixed
+- **Poster placeholder overlap on loaded images**: Fixed a rendering bug on the Home
+  results screen where the fallback placeholder widget was unconditionally drawn on top
+  of loaded poster image protocols; the placeholder is now restricted to the `else` branch
+  when an image is still fetching or unavailable.
+- **Results view background bleed-through**: Added explicit area clearing for the results
+  chunk before rendering search cards, eliminating ghost text artifacts (such as ASCII
+  headers or landing row labels) bleeding through beneath unselected cards in multi-column grids.
 - **Modal key trapping & isolation**: structural modal gating prevents mode
   chords (`Ctrl+T`, `Ctrl+A`, `Ctrl+S`, `Ctrl+P`), download cancellation (`x`),
   and background pane navigation from leaking into open dialogs and inputs.

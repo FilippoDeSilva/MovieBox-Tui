@@ -97,7 +97,7 @@ src/
       help.rs        Keybinding help (mode-aware).
     terminal.rs      Terminal capability probes (basic UI, image querying).
     theme.rs         Color themes + terminal color detection.
-    text.rs          Grapheme-safe width/truncation helpers.
+    text.rs          Grapheme-safe text input buffer (TextInputBuffer) and width/truncation helpers.
 
   tui/app/           The application object (App) and all behavior.
     mod.rs           App struct, App::new, and small helpers.

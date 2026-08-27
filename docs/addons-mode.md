@@ -8,8 +8,8 @@ Addon Mode enables support for community HTTP addon manifests. You can install a
 - **Core Metadata Protection**: Cinemeta is pre-installed out-of-the-box as the core metadata provider (`[Core]`) and locked to prevent accidental removal.
 - **Direct HTTP Stream Engine**: Automatically extracts and filters direct Cloudflare R2, PixelDrain, direct video CDN, and HubCloud/HubDrive HTTP streams.
 - **Multi-Addon Concurrency**: Simultaneously queries all enabled stream addons and aggregates releases.
-- **Quality & Size Parsing**: Ranks streams by quality (`4K UHD / 2160p`, `1080p`, `720p`, `SD`), file size in GB/MB, and audio language tracks (e.g. `[Dual]`, `[Multi]`, `Hindi + English`).
-- **Series & Episode Hierarchy**: Series are automatically organized into explicit `Seasons` and `Episodes` selector panes. Selecting any episode drives episode-specific stream requests (`/stream/series/:id:season:episode.json`).
+- **Quality, Resolution & Codec Parsing**: Ranks streams with high-contrast color-coded resolution badges (`4K UHD`, `1080p FHD`, `720p HD`, `SD`) and granular audio/video codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`), file size in GB/MB, and audio language tracks (e.g. `[Dual]`, `[Multi]`, `Hindi + English`).
+- **Series & Episode Hierarchy**: Series are automatically organized into explicit `Seasons` and `Episodes` selector panes with smooth horizontal navigation (`←`/`→`/`h`/`l`/`Tab`). Selecting any episode drives episode-specific stream requests (`/stream/series/:id:season:episode.json`).
 - **Episode Stream Isolation**: Built-in token parsing (`parse_season_episode`) guarantees that only streams matching the selected season and episode are displayed, eliminating cross-episode stream mixing.
 - **Direct Playback & Custom Headers**: Video stream headers (`behaviorHints.headers`) such as `Referer` and `User-Agent` are preserved and forwarded directly to external media players (`mpv`, `IINA`, `VLC`) and the multi-segment downloader.
 - **Watch History & Progress Parity**: Full `/history` support in Addon Mode with real-time `mpv` position tracking, scrub lines, and auto-resume.

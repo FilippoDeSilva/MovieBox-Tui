@@ -52,7 +52,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         ]),
         Line::from(vec![
             Span::styled("    [←] / [→]      ", theme.header),
-            Span::styled("Jump Page / Move Input Cursor", theme.text),
+            Span::styled("Move Cursor / Switch Details Pane", theme.text),
         ]),
         Line::from(vec![
             Span::styled("    [Home] / [End] ", theme.header),
@@ -124,6 +124,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Open Addons Manager", theme.text),
         ]));
         help_text.push(Line::from(vec![
+            Span::styled("    [←] [→] / [Tab]", theme.header),
+            Span::styled("Switch Details Pane (Seasons/Streams)", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
             Span::styled("    [Enter]        ", theme.header),
             Span::styled("Select Movie / Play Stream", theme.text),
         ]));
@@ -172,8 +176,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             ),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [Tab] / [S-Tab]", theme.header),
-            Span::styled("Next / Previous Details Pane", theme.text),
+            Span::styled("    [←] [→] / [Tab]", theme.header),
+            Span::styled("Switch Details Pane (Audio/Seasons/Streams)", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    [Enter]        ", theme.header),

@@ -27,20 +27,30 @@ nothing, and on demand via `/probe`):
   detects them. Terminals that report kitty/sixel capability but no cell
   size (Windows Terminal sixel, iTerm2 over SSH) are salvaged with default
   cell metrics. True Halfblocks-only terminals show a compact filmstrip
-  placeholder instead. `MOVIEBOX_NO_IMAGE=1` disables queries;
+  placeholder instead. All poster image rendering is automatically gated
+  behind `has_active_modal()` to prevent image protocol graphic bleed
+  through modal popups and overlays. `MOVIEBOX_NO_IMAGE=1` disables queries;
   `MOVIEBOX_IMAGE_PROTOCOL` forces a protocol; `MOVIEBOX_CELL_SIZE=WxH`
   overrides metrics.
-- **Colors**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB,
-  quantized 256-color palettes for strict terminals, ANSI fallback
-  otherwise; an OSC 11 background query picks light/dark variants. An
-  explicit `MOVIEBOX_THEME` or saved theme always wins over autodetection.
-- **Keyboard**: The kitty keyboard protocol (disambiguated escapes, event
+- **Colors & Themes**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB,
+  quantized 256-color palettes for strict terminals, and a 16-color ANSI fallback
+  palette (`Theme::fallback`); an OSC 11 background query picks light/dark variants.
+  Light mode themes (including Catppuccin Latte) are tuned for WCAG AA compliance,
+  ensuring high-contrast readability across light terminal backgrounds. An explicit
+  `MOVIEBOX_THEME` or saved theme always wins over autodetection.
+- **Keyboard & Cursor**: The kitty keyboard protocol (disambiguated escapes, event
   types) is requested at start and popped on exit; unsupported terminals
-  ignore it.
+  ignore it. Real input cursor styling (`SetCursorStyle::SteadyBar`) activates
+  during text editing modes on supported terminals.
+- **Loading & Progress Animations**: Fluid 10-frame Unicode Braille loading
+  spinners (`⠋ ⠙ ⠹ ...`) render during search, metadata discovery, and stream
+  fetching, falling back to clean text indicators (`..`) on basic/dumb terminals.
+- **Window Titles**: Contextual terminal emulator window titles are emitted dynamically
+  reflecting active navigation mode and title (`MovieBox-Tui — Streaming`,
+  `MovieBox-Tui — Live TV`, `MovieBox-Tui — Addons`, `MovieBox-Tui — {Title}`).
 - **Terminal classification**: `TERM=dumb`/`linux` fall back to a basic UI.
 - Focus events re-render in place without clearing; results render in two
   columns from 110 columns wide (three from 160).
-
 ## Network & TLS portability
 
 - **TLS Engine**: Uses `rustls` with embedded Mozilla roots (`webpki-roots`) across all targets (macOS, Linux, Windows, Android/Termux). The release binary has no OpenSSL runtime dependency; the `ring` cryptography backend is compiled into the binary by the platform build toolchain.

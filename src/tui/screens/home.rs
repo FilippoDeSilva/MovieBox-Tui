@@ -850,6 +850,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 12
             };
             let results_area = results_chunk;
+            crate::tui::clear_area(frame, results_area, theme);
             let selected_idx = state.search_list_state.selected();
 
             let metrics = state.result_metrics(results_area.height, results_area.width);
@@ -965,6 +966,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 frame.render_widget(ratatui_image::Image::new(proto), p_area);
                             }
                         }
+                    } else {
                         let is_in_flight = state.in_flight_posters.contains(&res.id);
                         let placeholder = Paragraph::new(poster_placeholder_lines(
                             state.basic_terminal,

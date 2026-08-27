@@ -6,11 +6,12 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 
 | Key | Action |
 | :--- | :--- |
-| **Arrow keys** | Navigate lists, search results, tabs, and move cursor in input fields |
+| **`↑` / `↓` / `k` / `j`** | Navigate lists, search results, or move cursor up/down |
+| **`←` / `→` / `h` / `l`** | Move text input cursor, step wide grid columns, or switch Details panes (Audio/Seasons/Episodes/Streams) |
 | **`Home` / `End`** | Jump to start / end of list, results grid, or text input line |
 | **`PageUp` / `PageDown`** | Scroll lists and modal pickers by 5 items (or scroll help overlay) |
-| **Enter** | Open, play, or confirm the selected item |
-| **Esc** | Go back, dismiss popup dialog, or clear active search |
+| **`Enter`** | Open, play, or confirm the selected item |
+| **`Esc`** | Go back, dismiss popup dialog, or clear active search |
 | **`Tab` / `Shift+Tab`** | Auto-complete suggestion / command; switch details panes; toggle dialog buttons |
 | **`Backspace`** | Delete character before cursor, or return focus to search bar from results |
 | **`Delete`** | Delete character at cursor in text inputs, or remove entry in TV/Addon managers |
@@ -56,7 +57,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 
 ### Streaming Mode
 - **`Ctrl+P`**: Cycle content providers (`MovieBox` $\to$ `4KHDHub` $\to$ `BDIX`).
-- **`Tab` / `Shift+Tab`**: Switch details screen panes (Seasons, Episodes, Streams, Overview).
+- **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Audio Languages, Seasons, Episodes, Streams).
 - **`Enter`**: Play with default player.
 - **`o`**: Open player selection picker for the current stream.
 - **`d`**: Download current episode or full season batch.
@@ -66,7 +67,6 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
 - **`/history`**: Open watch history.
 - **`/favorites`**: Open your starred titles.
-
 ### TV Mode (Live IPTV)
 - **`Enter`**: Play selected TV channel immediately.
 - **`o`**: Open player selection picker for the channel.
@@ -76,6 +76,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 
 ### Addon Mode (HTTP Addons)
 - **`Ctrl+P` / `/config`**: Open Addon Manager dialog (`Space` to toggle, `Delete`/`d` to remove).
+- **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Seasons, Episodes, Streams).
 - **`Enter`**: Select title or play resolved stream.
 - **`o`**: Open player selection picker for the stream.
 - **`d`**: Download HTTP stream release.
@@ -84,7 +85,6 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
 - **`/browse`**: Browse curated addon catalogs (Top Movies, Top Series, Top Rated).
 - **`/favorites`**: Open your starred titles.
-
 ## Mouse Controls
 
 | Action | Result |
