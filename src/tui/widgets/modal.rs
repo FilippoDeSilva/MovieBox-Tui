@@ -1,0 +1,101 @@
+use ratatui::{
+    Frame,
+    layout::{Alignment, Rect},
+    style::Style,
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph},
+};
+
+use crate::tui::{overlay, theme::Theme};
+
+pub struct ModalFrame<'a> {
+    title: &'a str,
+    theme: &'a Theme,
+    basic_terminal: bool,
+    border_style: Option<Style>,
+}
+
+impl<'a> ModalFrame<'a> {
+    pub fn new(title: &'a str, theme: &'a Theme, basic_terminal: bool) -> Self {
+        Self {
+            title,
+            theme,
+            basic_terminal,
+            border_style: None,
+        }
+    }
+
+    pub fn border_style(mut self, style: Style) -> Self {
+        self.border_style = Some(style);
+        self
+    }
+
+    pub fn render(&self, frame: &mut Frame, area: Rect, full_area: Rect) -> Rect {
+        overlay::clear_modal_area(frame, full_area, area, self.theme);
+        let block = Block::default()
+            .title(format!(" {} ", self.title.trim()))
+            .title_style(self.theme.title)
+            .borders(Borders::ALL)
+            .border_type(overlay::border_type(self.basic_terminal))
+            .border_style(self.border_style.unwrap_or(self.theme.lavender));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        inner
+    }
+}
+
+pub fn render_modal_footer(
+    frame: &mut Frame,
+    area: Rect,
+    spans: Vec<Span<'static>>,
+    theme: &Theme,
+) {
+    let footer = Line::from(spans);
+    frame.render_widget(
+        Paragraph::new(footer).alignment(Alignment::Center).block(
+            Block::default()
+                .borders(Borders::TOP)
+                .border_style(theme.muted),
+        ),
+        area,
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn test_modal_frame_render() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let theme = Theme::default();
+
+        terminal
+            .draw(|f| {
+                let full = Rect::new(0, 0, 80, 24);
+                let popup = Rect::new(10, 5, 60, 14);
+                let modal = ModalFrame::new("Test Modal", &theme, false);
+                let inner = modal.render(f, popup, full);
+                assert_eq!(inner.width, 58);
+                assert_eq!(inner.height, 12);
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn test_render_modal_footer() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let theme = Theme::default();
+
+        terminal
+            .draw(|f| {
+                let footer_area = Rect::new(10, 15, 60, 2);
+                let spans = vec![Span::raw("Enter: Save  Esc: Cancel")];
+                render_modal_footer(f, footer_area, spans, &theme);
+            })
+            .unwrap();
+    }
+}

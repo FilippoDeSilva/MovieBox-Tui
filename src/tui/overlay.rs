@@ -3,10 +3,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState,
-    },
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
 };
 
 use crate::tui::theme::Theme;
@@ -117,22 +114,14 @@ pub fn picker(
         .min(items.len().saturating_sub(1));
     let visible_rows = items.len().clamp(1, max_picker_rows(area));
     let popup = picker_layout(area, items, spec.confirm_label, spec.minimum_width);
-    clear_modal_area(frame, area, popup, theme);
-
     let title = format!(
-        " {} · {}/{} ",
+        "{} · {}/{}",
         spec.title,
         selected.saturating_add(1),
         items.len().max(1)
     );
-    let block = Block::default()
-        .title(title)
-        .title_style(theme.title)
-        .borders(Borders::ALL)
-        .border_type(border_type(basic_terminal))
-        .border_style(theme.lavender);
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = crate::tui::widgets::ModalFrame::new(&title, theme, basic_terminal)
+        .render(frame, popup, area);
 
     let sections = Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).split(inner);
     let max_item_w = sections[0]
@@ -152,28 +141,15 @@ pub fn picker(
     frame.render_stateful_widget(list, sections[0], state);
 
     if items.len() > visible_rows {
-        let mut scrollbar_state = ScrollbarState::new(items.len())
-            .viewport_content_length(visible_rows)
-            .position(selected);
-        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .thumb_style(theme.lavender)
-            .track_style(theme.surface1)
-            .begin_symbol(if basic_terminal {
-                Some("^")
-            } else {
-                Some("▲")
-            })
-            .end_symbol(if basic_terminal {
-                Some("v")
-            } else {
-                Some("▼")
-            })
-            .track_symbol(if basic_terminal {
-                Some("|")
-            } else {
-                Some("│")
-            });
-        frame.render_stateful_widget(scrollbar, sections[0], &mut scrollbar_state);
+        crate::tui::widgets::render_scrollbar(
+            frame,
+            sections[0],
+            items.len(),
+            visible_rows,
+            selected,
+            theme,
+            basic_terminal,
+        );
     }
 
     let confirm_label = if sections[1].width < 40 && spec.confirm_label == "Download" {
@@ -181,21 +157,14 @@ pub fn picker(
     } else {
         spec.confirm_label
     };
-    let footer = Line::from(vec![
+    let footer = vec![
         key_hint("↑↓", "Move", theme),
         Span::raw("  "),
         key_hint("Enter", confirm_label, theme),
         Span::raw("  "),
         key_hint("Esc", "Back", theme),
-    ]);
-    frame.render_widget(
-        Paragraph::new(footer).alignment(Alignment::Center).block(
-            Block::default()
-                .borders(Borders::TOP)
-                .border_style(theme.muted),
-        ),
-        sections[1],
-    );
+    ];
+    crate::tui::widgets::render_modal_footer(frame, sections[1], footer, theme);
 }
 
 pub fn confirmation(
@@ -215,16 +184,8 @@ pub fn confirmation(
         36,
         64,
     );
-    clear_modal_area(frame, area, popup, theme);
-
-    let block = Block::default()
-        .title(format!(" {title} "))
-        .title_style(theme.title)
-        .borders(Borders::ALL)
-        .border_type(border_type(basic_terminal))
-        .border_style(theme.lavender);
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = crate::tui::widgets::ModalFrame::new(title, theme, basic_terminal)
+        .render(frame, popup, area);
     let sections = Layout::vertical([
         Constraint::Length(summary.len() as u16),
         Constraint::Length(1),

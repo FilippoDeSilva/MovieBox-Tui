@@ -385,6 +385,7 @@ impl App {
         match action {
             Action::GoBack => {
                 if self.state.player_picker_popup {
+                    self.state.is_resolving_playback = false;
                     self.state.player_picker_popup = false;
                     self.state.player_picker_link = None;
                     self.state.player_picker_subtitle = None;
@@ -393,6 +394,7 @@ impl App {
                     return None;
                 }
                 if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
+                    self.state.is_resolving_playback = false;
                     self.state.subtitle_popup = false;
                     self.state.is_download_subtitle_popup = false;
                     self.state.pending_play_link = None;

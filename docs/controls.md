@@ -8,8 +8,8 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | :--- | :--- |
 | **`↑` / `↓` / `k` / `j`** | Navigate lists, search results, or move cursor up/down |
 | **`←` / `→` / `h` / `l`** | Move text input cursor, step wide grid columns, or switch Details panes (Audio/Seasons/Episodes/Streams) |
-| **`Home` / `End`** | Jump to start / end of list, results grid, or text input line |
-| **`PageUp` / `PageDown`** | Scroll lists and modal pickers by 5 items (or scroll help overlay) |
+| **`Home` / `End` / `g` / `G`** | Jump to start / end of list or search results (auto-fetches next page), or move cursor to beginning / end of input line |
+| **`PageUp` / `PageDown`** | Scroll search results, lists, and modal pickers by visible page height (or scroll help overlay) |
 | **`Enter`** | Open, play, or confirm the selected item |
 | **`Space` / `P`** | Direct resume playback for recorded season/episode on `/history` items |
 | **`Esc`** | Focus search input (when results present), dismiss popup dialog, or return to landing |

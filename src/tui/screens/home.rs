@@ -1247,35 +1247,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
             }
 
-            let content_len = state.search_results.len();
-            if content_len > metrics.visible_items {
-                let scrollbar = ratatui::widgets::Scrollbar::default()
-                    .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(if state.basic_terminal {
-                        Some("^")
-                    } else {
-                        Some("▲")
-                    })
-                    .end_symbol(if state.basic_terminal {
-                        Some("v")
-                    } else {
-                        Some("▼")
-                    })
-                    .track_symbol(if state.basic_terminal {
-                        Some("|")
-                    } else {
-                        Some("│")
-                    })
-                    .thumb_symbol(if state.basic_terminal { "|" } else { "█" });
-
-                let mut scrollbar_state = ratatui::widgets::ScrollbarState::default()
-                    .content_length(content_len.saturating_sub(metrics.visible_items))
-                    .position(state.result_scroll);
-
-                let sb_area = results_area;
-
-                frame.render_stateful_widget(scrollbar, sb_area, &mut scrollbar_state);
-            }
+            crate::tui::widgets::render_scrollbar(
+                frame,
+                results_area,
+                state.search_results.len(),
+                metrics.visible_items,
+                state.result_scroll,
+                theme,
+                state.basic_terminal,
+            );
         } else {
             render_search_state(frame, chunks[4], state, theme, view);
         }
@@ -1297,22 +1277,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             total_rows,
             state.tv_input_active,
         );
-        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
-
         let title = format!(
-            " TV Playlists · {}/{} ",
+            "TV Playlists · {}/{}",
             state.tv_manager_selected.saturating_add(1),
             total_rows.max(1)
         );
-        let popup_block = ratatui::widgets::Block::default()
-            .title(title)
-            .title_style(theme.title)
-            .borders(ratatui::widgets::Borders::ALL)
-            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-            .border_style(theme.lavender);
-
-        let inner_area = popup_block.inner(popup_area);
-        frame.render_widget(popup_block, popup_area);
+        let inner_area = crate::tui::widgets::ModalFrame::new(&title, theme, state.basic_terminal)
+            .render(frame, popup_area, area);
 
         let sections = ratatui::layout::Layout::vertical([
             ratatui::layout::Constraint::Min(1),
@@ -1326,58 +1297,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else {
                 "Enter playlist URL:"
             };
-            let segments = state.tv_input_buffer.graphemes();
-            let cursor = state.tv_input_buffer.cursor();
-            let max_width = inner_area.width.saturating_sub(6) as usize;
-
-            let mut start = 0;
-            if cursor >= max_width {
-                start = cursor - max_width + 1;
-            }
-
-            let mut before_cursor: String = segments[start..cursor].concat();
-            if start > 0 && before_cursor.chars().count() > 3 {
-                before_cursor = format!("...{}", &before_cursor[3..]);
-            }
-
-            let cursor_char = if cursor < segments.len() {
-                segments[cursor].to_string()
-            } else {
-                " ".to_string()
-            };
-
-            let end = (start + max_width).min(segments.len());
-            let after_slice = &segments[cursor.saturating_add(1).min(segments.len())..end];
-            let mut after_cursor: String = after_slice.concat();
-            if end < segments.len() {
-                let len = after_cursor.chars().count();
-                if len > 3 {
-                    let keep: String = after_cursor.chars().take(len - 3).collect();
-                    after_cursor = format!("{keep}...");
-                } else if !after_cursor.is_empty() {
-                    after_cursor = "...".to_string();
-                }
-            }
-
-            let lines = vec![
-                ratatui::text::Line::from(vec![
-                    ratatui::text::Span::raw(" "),
-                    ratatui::text::Span::styled(label, theme.sapphire),
-                ]),
-                ratatui::text::Line::from(vec![
-                    ratatui::text::Span::styled(" ❯ ", theme.sapphire),
-                    ratatui::text::Span::styled(before_cursor, theme.text),
-                    ratatui::text::Span::styled(
-                        cursor_char,
-                        theme.text.add_modifier(ratatui::style::Modifier::REVERSED),
-                    ),
-                    ratatui::text::Span::styled(after_cursor, theme.text),
-                ]),
-            ];
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(lines)
-                    .wrap(ratatui::widgets::Wrap { trim: false }),
+            crate::tui::widgets::render_single_line_input(
+                frame,
                 sections[0],
+                label,
+                &state.tv_input_buffer,
+                theme,
+                state.basic_terminal,
             );
         } else {
             let items: Vec<ratatui::widgets::ListItem> = rows
@@ -1446,13 +1372,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
 
         let footer = if state.tv_input_active {
-            ratatui::text::Line::from(vec![
+            vec![
                 crate::tui::overlay::key_hint("Enter", "Add", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Esc", "Cancel", theme),
-            ])
+            ]
         } else {
-            ratatui::text::Line::from(vec![
+            vec![
                 crate::tui::overlay::key_hint("↑↓", "Move", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Enter", "Select", theme),
@@ -1460,19 +1386,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 crate::tui::overlay::key_hint("d", "Remove", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Esc", "Close", theme),
-            ])
+            ]
         };
-
-        frame.render_widget(
-            ratatui::widgets::Paragraph::new(footer)
-                .alignment(ratatui::layout::Alignment::Center)
-                .block(
-                    ratatui::widgets::Block::default()
-                        .borders(ratatui::widgets::Borders::TOP)
-                        .border_style(theme.muted),
-                ),
-            sections[1],
-        );
+        crate::tui::widgets::render_modal_footer(frame, sections[1], footer, theme);
     }
 
     if state.addon_manager_popup {
@@ -1480,22 +1396,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let total_rows = state.addon_manager_rows().len();
         let popup_area =
             crate::tui::overlay::addon_manager_layout(area, addons_count, state.addon_input_active);
-        crate::tui::overlay::clear_modal_area(frame, area, popup_area, theme);
-
         let title = format!(
-            " Addons Manager · {}/{} ",
+            "Addons Manager · {}/{}",
             state.addon_manager_selected.saturating_add(1),
             total_rows.max(1)
         );
-        let popup_block = ratatui::widgets::Block::default()
-            .title(title)
-            .title_style(theme.title)
-            .borders(ratatui::widgets::Borders::ALL)
-            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-            .border_style(theme.lavender);
-
-        let inner_area = popup_block.inner(popup_area);
-        frame.render_widget(popup_block, popup_area);
+        let inner_area = crate::tui::widgets::ModalFrame::new(&title, theme, state.basic_terminal)
+            .render(frame, popup_area, area);
 
         if state.addon_input_active {
             let sections = ratatui::layout::Layout::vertical([
@@ -1504,71 +1411,21 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(inner_area);
 
-            let segments = state.addon_input_buffer.graphemes();
-            let cursor = state.addon_input_buffer.cursor();
-            let max_width = inner_area.width.saturating_sub(6) as usize;
+            crate::tui::widgets::render_single_line_input(
+                frame,
+                sections[0],
+                "Enter Addon Manifest URL:",
+                &state.addon_input_buffer,
+                theme,
+                state.basic_terminal,
+            );
 
-            let mut start = 0;
-            if cursor >= max_width {
-                start = cursor - max_width + 1;
-            }
-
-            let mut before_cursor: String = segments[start..cursor].concat();
-            if start > 0 && before_cursor.chars().count() > 3 {
-                before_cursor = format!("...{}", &before_cursor[3..]);
-            }
-
-            let cursor_char = if cursor < segments.len() {
-                segments[cursor].to_string()
-            } else {
-                " ".to_string()
-            };
-
-            let end = (start + max_width).min(segments.len());
-            let after_slice = &segments[cursor.saturating_add(1).min(segments.len())..end];
-            let mut after_cursor: String = after_slice.concat();
-            if end < segments.len() {
-                let len = after_cursor.chars().count();
-                if len > 3 {
-                    let keep: String = after_cursor.chars().take(len - 3).collect();
-                    after_cursor = format!("{keep}...");
-                } else if len > 0 {
-                    after_cursor = "...".to_string();
-                }
-            }
-
-            let lines = vec![
-                ratatui::text::Line::from(vec![
-                    ratatui::text::Span::raw(" "),
-                    ratatui::text::Span::styled("Enter Addon Manifest URL:", theme.sapphire),
-                ]),
-                ratatui::text::Line::from(vec![
-                    ratatui::text::Span::styled(" ❯ ", theme.sapphire),
-                    ratatui::text::Span::styled(before_cursor, theme.text),
-                    ratatui::text::Span::styled(
-                        cursor_char,
-                        theme.text.add_modifier(ratatui::style::Modifier::REVERSED),
-                    ),
-                    ratatui::text::Span::styled(after_cursor, theme.text),
-                ]),
-            ];
-            frame.render_widget(ratatui::widgets::Paragraph::new(lines), sections[0]);
-
-            let footer = ratatui::text::Line::from(vec![
+            let footer = vec![
                 crate::tui::overlay::key_hint("Enter", "Add", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Esc", "Cancel", theme),
-            ]);
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(footer)
-                    .alignment(ratatui::layout::Alignment::Center)
-                    .block(
-                        ratatui::widgets::Block::default()
-                            .borders(ratatui::widgets::Borders::TOP)
-                            .border_style(theme.muted),
-                    ),
-                sections[1],
-            );
+            ];
+            crate::tui::widgets::render_modal_footer(frame, sections[1], footer, theme);
         } else {
             let sections = ratatui::layout::Layout::vertical([
                 ratatui::layout::Constraint::Min(1),
@@ -1658,7 +1515,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ratatui::text::Line::from(vec![ratatui::text::Span::raw(" "), add_button]);
             frame.render_widget(ratatui::widgets::Paragraph::new(button_line), sections[1]);
 
-            let footer = ratatui::text::Line::from(vec![
+            let footer = vec![
                 crate::tui::overlay::key_hint("↑↓←→", "Move", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Enter/Space", "Toggle/Select", theme),
@@ -1666,18 +1523,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 crate::tui::overlay::key_hint("d", "Remove", theme),
                 ratatui::text::Span::raw("  "),
                 crate::tui::overlay::key_hint("Esc", "Close", theme),
-            ]);
-
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(footer)
-                    .alignment(ratatui::layout::Alignment::Center)
-                    .block(
-                        ratatui::widgets::Block::default()
-                            .borders(ratatui::widgets::Borders::TOP)
-                            .border_style(theme.muted),
-                    ),
-                sections[2],
-            );
+            ];
+            crate::tui::widgets::render_modal_footer(frame, sections[2], footer, theme);
         }
     }
 
@@ -1727,6 +1574,32 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             theme,
             state.basic_terminal,
         );
+    }
+}
+fn suggestion_source_badge<'a>(
+    suggestion: &str,
+    state: &AppState,
+    theme: &'a Theme,
+    basic_terminal: bool,
+) -> Span<'a> {
+    let (tag, style) = if suggestion.starts_with('/') {
+        if suggestion.eq_ignore_ascii_case("/history") {
+            ("[HISTORY]", theme.sapphire)
+        } else if suggestion.eq_ignore_ascii_case("/favorites") {
+            ("[FAVORITES]", theme.rating)
+        } else {
+            ("[CMD]", theme.teal)
+        }
+    } else if state.is_tv_mode {
+        ("[TV]", theme.lavender)
+    } else {
+        ("[SUGGEST]", theme.overlay1)
+    };
+
+    if basic_terminal {
+        Span::styled(format!("{tag} "), style.add_modifier(Modifier::BOLD))
+    } else {
+        Span::styled(format!("{tag} "), style)
     }
 }
 
@@ -1844,14 +1717,18 @@ fn render_search_suggestions(
             theme.overlay1
         };
 
+        let badge_span = suggestion_source_badge(suggestion, state, theme, state.basic_terminal);
+        let badge_width = crate::tui::text::width(&badge_span.content);
+
         let mut spans = vec![
             Span::styled(branch_symbol, branch_style),
+            badge_span,
             Span::styled(display_name, text_style),
         ];
 
         if let Some(description) = desc {
-            let name_len = crate::tui::text::width(display_name);
-            let pad = 24usize.saturating_sub(name_len).max(2);
+            let name_len = crate::tui::text::width(display_name) + badge_width;
+            let pad = 28usize.saturating_sub(name_len).max(2);
             spans.push(Span::raw(" ".repeat(pad)));
             let desc_budget = (available_width as usize)
                 .saturating_sub(3 + name_len + pad)
@@ -1870,5 +1747,61 @@ fn render_search_suggestions(
         };
 
         frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn test_suggestion_source_badge_types() {
+        let theme = Theme::mocha();
+        let state = AppState::default();
+
+        let badge_cmd = suggestion_source_badge("/help", &state, &theme, false);
+        assert!(badge_cmd.content.contains("[CMD]"));
+
+        let badge_hist = suggestion_source_badge("/history", &state, &theme, false);
+        assert!(badge_hist.content.contains("[HISTORY]"));
+
+        let badge_fav = suggestion_source_badge("/favorites", &state, &theme, false);
+        assert!(badge_fav.content.contains("[FAVORITES]"));
+
+        let badge_sug = suggestion_source_badge("Breaking Bad", &state, &theme, false);
+        assert!(badge_sug.content.contains("[SUGGEST]"));
+    }
+
+    #[test]
+    fn test_render_search_suggestions_dropdown() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let state = AppState {
+            input_mode: InputMode::Editing,
+            search_suggestions: vec![
+                "/help".to_string(),
+                "/history".to_string(),
+                "Inception".to_string(),
+            ],
+            suggest_index: Some(0),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                let search_bar = Rect::new(10, 2, 60, 3);
+                render_search_suggestions(
+                    frame,
+                    area,
+                    search_bar,
+                    &state,
+                    &theme,
+                    SearchViewState::Empty,
+                );
+            })
+            .unwrap();
     }
 }

@@ -47,6 +47,9 @@ pub struct ResultMetrics {
 }
 
 pub fn result_columns_for(width: u16) -> u16 {
+    if width < 75 {
+        return 1;
+    }
     let by_width = if width >= 160 {
         3
     } else if width >= 110 {

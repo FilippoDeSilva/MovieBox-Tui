@@ -395,8 +395,13 @@ impl App {
                         };
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
-                            match client.resolve_release(&release).await {
-                                Ok(source) => {
+                            let result = tokio::time::timeout(
+                                std::time::Duration::from_secs(15),
+                                client.resolve_release(&release),
+                            )
+                            .await;
+                            match result {
+                                Ok(Ok(source)) => {
                                     let default_player =
                                         available_players.iter().copied().find(|kind| {
                                             crate::tui::player::supports_headers(
@@ -410,12 +415,20 @@ impl App {
                                         sender.send(Action::LaunchPlayback(player, source)).ok();
                                     }
                                 }
-                                Err(error) => {
+                                Ok(Err(error)) => {
                                     log::error!("4KHDHub resolve failed: {error}");
                                     sender
                                         .send(Action::SetStatus(format!(
                                             "Error: 4KHDHub source failed: {error}"
                                         )))
+                                        .ok();
+                                }
+                                Err(_) => {
+                                    log::error!("4KHDHub resolve timed out");
+                                    sender
+                                        .send(Action::SetStatus(
+                                            "Error: 4KHDHub source resolve timed out".to_string(),
+                                        ))
                                         .ok();
                                 }
                             }
@@ -743,5 +756,38 @@ mod tests {
 
         assert!(app.state.subtitle_popup);
         assert_eq!(app.state.subtitle_list.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_playback_resolving_lock_resets_on_picker_and_player_actions() {
+        let mut app = crate::tui::app::App::new();
+        app.state.is_resolving_playback = true;
+
+        app.handle_playback(crate::tui::action::Action::ShowPlaybackPicker(
+            crate::providers::models::PlaybackSource::bare(
+                crate::providers::models::ProviderKind::MovieBox,
+                "https://example.com/stream.m3u8",
+                None,
+            ),
+        ))
+        .await;
+
+        assert!(!app.state.is_resolving_playback);
+    }
+
+    #[tokio::test]
+    async fn test_playback_resolving_lock_resets_on_player_crash() {
+        let mut app = crate::tui::app::App::new();
+        app.state.is_resolving_playback = true;
+        app.state.is_playing = true;
+
+        app.handle_playback(crate::tui::action::Action::PlayerCrashed(
+            Some(1),
+            "failed".to_string(),
+        ))
+        .await;
+
+        assert!(!app.state.is_resolving_playback);
+        assert!(!app.state.is_playing);
     }
 }

@@ -1,13 +1,13 @@
+pub(crate) use crate::tui::widgets::{
+    extract_media_tags, render_media_tag_spans, resolution_badge_spans,
+};
 use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
-        Wrap,
-    },
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1536,265 +1536,6 @@ pub(crate) fn stream_loading_spinner(tick_count: u64, basic_terminal: bool) -> &
     }
 }
 
-pub(crate) fn resolution_badge_spans<'a>(
-    resolution: i64,
-    theme: &'a Theme,
-    basic_terminal: bool,
-) -> Vec<Span<'a>> {
-    if basic_terminal {
-        let (label, style) = match resolution {
-            2160 | 4320 => ("[4K]", theme.rating.add_modifier(Modifier::BOLD)),
-            1080 => ("[1080p]", theme.highlight.add_modifier(Modifier::BOLD)),
-            720 => ("[720p]", theme.teal.add_modifier(Modifier::BOLD)),
-            480 | 540 | 576 => ("[SD]", theme.text_dim.add_modifier(Modifier::BOLD)),
-            _ if resolution > 0 => (
-                match resolution {
-                    2160 => "[4K]",
-                    1080 => "[1080p]",
-                    720 => "[720p]",
-                    480 => "[480p]",
-                    360 => "[360p]",
-                    _ => "[HD]",
-                },
-                theme.text.add_modifier(Modifier::BOLD),
-            ),
-            _ => ("[SD]", theme.text_dim),
-        };
-        return vec![Span::styled(format!("{:<8}", label), style)];
-    }
-
-    let (badge_bg, contrast_fg, label) = match resolution {
-        2160 | 4320 => (
-            theme_color(theme.rating, Color::Rgb(249, 226, 175)),
-            if theme.is_light {
-                Color::White
-            } else {
-                theme_color(theme.crust, Color::Rgb(17, 17, 27))
-            },
-            " 4K ",
-        ),
-        1080 => (
-            theme_color(theme.sapphire, Color::Rgb(116, 199, 236)),
-            if theme.is_light {
-                Color::White
-            } else {
-                theme_color(theme.crust, Color::Rgb(17, 17, 27))
-            },
-            " 1080p ",
-        ),
-        720 => (
-            theme_color(theme.teal, Color::Rgb(148, 226, 213)),
-            if theme.is_light {
-                Color::White
-            } else {
-                theme_color(theme.crust, Color::Rgb(17, 17, 27))
-            },
-            " 720p ",
-        ),
-        480 | 540 | 576 => (
-            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
-            theme_color(theme.text, Color::White),
-            " SD ",
-        ),
-        _ if resolution > 0 => (
-            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
-            theme_color(theme.text, Color::White),
-            match resolution {
-                2160 => " 4K ",
-                1080 => " 1080p ",
-                720 => " 720p ",
-                480 => " 480p ",
-                360 => " 360p ",
-                _ => " HD ",
-            },
-        ),
-        _ => (
-            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
-            theme_color(theme.text_dim, Color::Gray),
-            " SD ",
-        ),
-    };
-
-    vec![
-        Span::styled(
-            label,
-            Style::default()
-                .bg(badge_bg)
-                .fg(contrast_fg)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-    ]
-}
-
-#[derive(Debug, Clone, Default)]
-struct MediaTags {
-    hdr: Option<&'static str>,
-    audio: Option<&'static str>,
-    codec: Option<&'static str>,
-    source: Option<&'static str>,
-}
-
-fn extract_media_tags(title: &str, codec_name: &str) -> MediaTags {
-    let lower_title = title.to_ascii_lowercase();
-    let lower_codec = codec_name.to_ascii_lowercase();
-
-    let hdr = if lower_title.contains("hdr10+") || lower_title.contains("hdr10plus") {
-        Some("HDR10+")
-    } else if lower_title.contains("dovi")
-        || lower_title.contains("dolby vision")
-        || lower_title.contains("dolbyvision")
-        || lower_title.contains(".dv.")
-        || lower_title.contains(" dv ")
-        || lower_title.contains("-dv")
-    {
-        Some("DV")
-    } else if lower_title.contains("hdr") {
-        Some("HDR")
-    } else {
-        None
-    };
-
-    let audio = if lower_title.contains("atmos") {
-        Some("ATMOS")
-    } else if lower_title.contains("7.1") {
-        Some("7.1")
-    } else if lower_title.contains("5.1")
-        || lower_title.contains("ddp5.1")
-        || lower_title.contains("dd5.1")
-        || lower_title.contains("ac3")
-    {
-        Some("5.1")
-    } else {
-        None
-    };
-
-    let codec = if lower_codec.contains("hevc")
-        || lower_codec.contains("x265")
-        || lower_codec.contains("h265")
-        || lower_title.contains("hevc")
-        || lower_title.contains("x265")
-        || lower_title.contains("h.265")
-        || lower_title.contains("h265")
-    {
-        Some("HEVC")
-    } else if lower_codec.contains("av1") || lower_title.contains("av1") {
-        Some("AV1")
-    } else if lower_codec.contains("h264")
-        || lower_codec.contains("x264")
-        || lower_codec.contains("avc")
-        || lower_title.contains("x264")
-        || lower_title.contains("h.264")
-        || lower_title.contains("h264")
-        || lower_title.contains("avc")
-    {
-        Some("H.264")
-    } else {
-        None
-    };
-
-    let source = if lower_title.contains("remux") {
-        Some("REMUX")
-    } else if lower_title.contains("bluray")
-        || lower_title.contains("bdrip")
-        || lower_title.contains("brrip")
-    {
-        Some("BluRay")
-    } else if lower_title.contains("web-dl")
-        || lower_title.contains("webdl")
-        || lower_title.contains("webrip")
-    {
-        Some("WEB-DL")
-    } else {
-        None
-    };
-
-    MediaTags {
-        hdr,
-        audio,
-        codec,
-        source,
-    }
-}
-
-fn render_media_tag_spans<'a>(
-    tags: &MediaTags,
-    theme: &'a Theme,
-    basic_terminal: bool,
-) -> Vec<Span<'a>> {
-    let mut spans = Vec::new();
-
-    if let Some(hdr) = tags.hdr {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{hdr}] "),
-                theme.rating.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface1, Color::Rgb(73, 76, 94));
-            let fg = theme_color(theme.rating, Color::Yellow);
-            spans.push(Span::styled(
-                format!(" {hdr} "),
-                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::raw(" "));
-        }
-    }
-
-    if let Some(audio) = tags.audio {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{audio}] "),
-                theme.sapphire.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
-            let fg = theme_color(theme.sapphire, Color::Cyan);
-            spans.push(Span::styled(
-                format!(" {audio} "),
-                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::raw(" "));
-        }
-    }
-
-    if let Some(codec) = tags.codec {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{codec}] "),
-                theme.teal.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
-            let fg = theme_color(theme.teal, Color::Rgb(148, 226, 213));
-            spans.push(Span::styled(
-                format!(" {codec} "),
-                Style::default().bg(bg).fg(fg),
-            ));
-            spans.push(Span::raw(" "));
-        }
-    }
-
-    if let Some(source) = tags.source {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{source}] "),
-                theme.lavender.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
-            let fg = theme_color(theme.lavender, Color::Rgb(180, 190, 254));
-            spans.push(Span::styled(
-                format!(" {source} "),
-                Style::default().bg(bg).fg(fg),
-            ));
-            spans.push(Span::raw(" "));
-        }
-    }
-
-    spans
-}
-
 fn with_selection_surface(style: Style, basic_terminal: bool, theme: &Theme) -> Style {
     if basic_terminal {
         style
@@ -2064,47 +1805,24 @@ fn render_scroll_indicator(
     theme: &Theme,
     basic_terminal: bool,
 ) {
-    let viewport_length = area.height.saturating_sub(2) as usize;
-    if content_length <= viewport_length || viewport_length == 0 {
-        return;
-    }
-
-    let mut state = ScrollbarState::default()
-        .content_length(content_length)
-        .viewport_content_length(viewport_length)
-        .position(position);
-    let scrollbar = Scrollbar::default()
-        .orientation(ScrollbarOrientation::VerticalRight)
-        .thumb_style(theme.lavender)
-        .track_style(theme.surface1)
-        .begin_symbol(if basic_terminal {
-            Some("^")
-        } else {
-            Some("▲")
-        })
-        .end_symbol(if basic_terminal {
-            Some("v")
-        } else {
-            Some("▼")
-        })
-        .track_symbol(if basic_terminal {
-            Some("|")
-        } else {
-            Some("│")
-        });
-    frame.render_stateful_widget(
-        scrollbar,
-        area.inner(ratatui::layout::Margin {
-            vertical: 1,
-            horizontal: 0,
-        }),
-        &mut state,
+    let scroll_area = area.inner(ratatui::layout::Margin {
+        vertical: 1,
+        horizontal: 0,
+    });
+    crate::tui::widgets::render_scrollbar(
+        frame,
+        scroll_area,
+        content_length,
+        scroll_area.height as usize,
+        position,
+        theme,
+        basic_terminal,
     );
 }
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::tui::widgets::MediaTags;
     #[test]
     fn test_stream_loading_spinner_frames() {
         assert_eq!(stream_loading_spinner(0, false), "⠋");

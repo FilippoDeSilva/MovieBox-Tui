@@ -3,6 +3,23 @@
 ## [Unreleased]
 
 ### Added
+- **Centralized UI widgets subsystem (`src/tui/widgets`)**: Standardized single-line text input
+  fields (`render_single_line_input`), viewport-accurate Ratatui scrollbars (`render_scrollbar`),
+  modal dialog framing and footer action bars (`ModalFrame`, `render_modal_footer`), and unified
+  media badge and codec tag extraction (`badge.rs`) across search, details, and modal popups.
+- **Search suggestion source badges**: Added visual pill origin tags (`[CMD]`, `[HISTORY]`,
+  `[FAVORITES]`, `[TV]`, `[SUGGEST]`) to dropdown suggestions for instant origin clarity.
+- **Responsive single-column result cards on narrow terminals (<75 cols)**: Dynamic single-column
+  grid fallback on compact terminal windows ensuring titles, badges, ratings, and tags never clip
+  or distort horizontally.
+- **Search result jump & pagination ergonomics (`Home`, `End`, `PageDown`, `PageUp`, `g`, `G`)**:
+  In `Normal` mode on the search results screen, `Home` and `g` jump to the top result, `End` and `G`
+  jump to the bottom result while automatically fetching the next page, and `PageDown`/`PageUp`
+  page through results.
+- **Playback & stream resolve state-lock fix (`playback.rs`, `download.rs`)**: Fixed an issue
+  where failed or timed-out 4KHDHub/mirror resolutions left `is_resolving_playback` permanently set
+  to `true`, preventing subsequent playback attempts; added a 15-second resolution timeout and
+  enforced state resets on all error, cancellation, and modal dismissal paths.
 - **1-Key direct watch history resume (`Space` / `P`)**: Pressing `Space` or `P` on any item in
   `/history` immediately launches direct playback for the recorded season and episode without
   manual Details navigation. Opening Details from history (`Enter`) pre-seeds selection to the

@@ -98,6 +98,11 @@ src/
     terminal.rs      Terminal capability probes (basic UI, image querying).
     theme.rs         Color themes + terminal color detection.
     text.rs          Grapheme-safe text input buffer (TextInputBuffer) and width/truncation helpers.
+    widgets/         Centralized UI widgets subsystem.
+      badge.rs       Resolution pill badges and audio/video media tag extraction.
+      input.rs       Single-line text input field rendering with grapheme cursor and truncation.
+      modal.rs       Modal dialog frame builder (ModalFrame) and centered footer key action bars.
+      scrollbar.rs   Viewport-accurate vertical scrollbars.
 
   tui/app/           The application object (App) and all behavior.
     mod.rs           App struct, App::new, and small helpers.

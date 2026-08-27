@@ -862,6 +862,94 @@ impl App {
                         KeyCode::Right => {
                             self.action_sender.send(Action::MoveRight).ok();
                         }
+                        KeyCode::Home | KeyCode::Char('g') => {
+                            if self.state.favorites_focus {
+                                self.state.favorites_landing_state.select(Some(0));
+                            } else if !self.state.search_results.is_empty() {
+                                self.state.search_list_state.select(Some(0));
+                                if let Some(res) = self.state.search_results.first() {
+                                    self.action_sender
+                                        .send(Action::FetchPreview(res.id.clone()))
+                                        .ok();
+                                }
+                                self.prefetch_visible_posters();
+                                self.state.normalize_result_view();
+                            }
+                        }
+                        KeyCode::End | KeyCode::Char('G') => {
+                            if self.state.favorites_focus {
+                                let total = self.state.favorites_landing_items().len();
+                                if total > 0 {
+                                    self.state.favorites_landing_state.select(Some(total - 1));
+                                }
+                            } else if !self.state.search_results.is_empty() {
+                                let last = self.state.search_results.len().saturating_sub(1);
+                                self.state.search_list_state.select(Some(last));
+                                if let Some(res) = self.state.search_results.get(last) {
+                                    self.action_sender
+                                        .send(Action::FetchPreview(res.id.clone()))
+                                        .ok();
+                                }
+                                self.prefetch_visible_posters();
+                                self.state.normalize_result_view();
+                                self.trigger_next_page_if_needed();
+                            }
+                        }
+                        KeyCode::PageDown => {
+                            if self.state.favorites_focus {
+                                let cur =
+                                    self.state.favorites_landing_state.selected().unwrap_or(0);
+                                let total = self.state.favorites_landing_items().len();
+                                if total > 0 {
+                                    self.state
+                                        .favorites_landing_state
+                                        .select(Some((cur + 5).min(total - 1)));
+                                }
+                            } else if !self.state.search_results.is_empty() {
+                                let step = self
+                                    .state
+                                    .last_result_metrics
+                                    .map(|m| m.visible_items)
+                                    .unwrap_or(8);
+                                let cur = self.state.search_list_state.selected().unwrap_or(0);
+                                let target = (cur + step)
+                                    .min(self.state.search_results.len().saturating_sub(1));
+                                self.state.search_list_state.select(Some(target));
+                                if let Some(res) = self.state.search_results.get(target) {
+                                    self.action_sender
+                                        .send(Action::FetchPreview(res.id.clone()))
+                                        .ok();
+                                }
+                                self.prefetch_visible_posters();
+                                self.state.normalize_result_view();
+                                self.trigger_next_page_if_needed();
+                            }
+                        }
+                        KeyCode::PageUp => {
+                            if self.state.favorites_focus {
+                                let cur =
+                                    self.state.favorites_landing_state.selected().unwrap_or(0);
+                                self.state
+                                    .favorites_landing_state
+                                    .select(Some(cur.saturating_sub(5)));
+                            } else if !self.state.search_results.is_empty() {
+                                let step = self
+                                    .state
+                                    .last_result_metrics
+                                    .map(|m| m.visible_items)
+                                    .unwrap_or(8);
+                                let cur = self.state.search_list_state.selected().unwrap_or(0);
+                                let target = cur.saturating_sub(step);
+                                self.state.search_list_state.select(Some(target));
+                                if let Some(res) = self.state.search_results.get(target) {
+                                    self.action_sender
+                                        .send(Action::FetchPreview(res.id.clone()))
+                                        .ok();
+                                }
+                                self.prefetch_visible_posters();
+                                self.state.normalize_result_view();
+                            }
+                        }
                         KeyCode::Enter => {
                             if self.state.search_results.is_empty()
                                 && !self.state.search_query.trim().is_empty()
@@ -1142,5 +1230,71 @@ impl App {
             || self.state.is_download_subtitle_popup
             || self.state.show_season_download_confirm
             || self.state.show_episode_download_confirm
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    #[tokio::test]
+    async fn test_normal_mode_jump_navigation() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.search_results = vec![
+            crate::models::SearchResult {
+                id: "1".to_string(),
+                title: "Movie 1".to_string(),
+                stype: 1,
+                release_year: "2020".to_string(),
+                provider: crate::models::ProviderKind::MovieBox,
+                cover_url: None,
+                season: 0,
+                episode: 0,
+            },
+            crate::models::SearchResult {
+                id: "2".to_string(),
+                title: "Movie 2".to_string(),
+                stype: 1,
+                release_year: "2021".to_string(),
+                provider: crate::models::ProviderKind::MovieBox,
+                cover_url: None,
+                season: 0,
+                episode: 0,
+            },
+            crate::models::SearchResult {
+                id: "3".to_string(),
+                title: "Movie 3".to_string(),
+                stype: 1,
+                release_year: "2022".to_string(),
+                provider: crate::models::ProviderKind::MovieBox,
+                cover_url: None,
+                season: 0,
+                episode: 0,
+            },
+        ];
+        app.state.search_list_state.select(Some(0));
+
+        // Jump to End
+        app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.search_list_state.selected(), Some(2));
+
+        // Jump to Home
+        app.handle_key(KeyEvent::new(KeyCode::Home, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.search_list_state.selected(), Some(0));
+
+        // Jump to End with G
+        app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT))
+            .await;
+        assert_eq!(app.state.search_list_state.selected(), Some(2));
+
+        // Jump to Home with g
+        app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.search_list_state.selected(), Some(0));
     }
 }

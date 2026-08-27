@@ -335,18 +335,31 @@ impl App {
                         };
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
-                            match client.resolve_release(&release).await {
-                                Ok(source) => {
+                            let result = tokio::time::timeout(
+                                std::time::Duration::from_secs(15),
+                                client.resolve_release(&release),
+                            )
+                            .await;
+                            match result {
+                                Ok(Ok(source)) => {
                                     sender
                                         .send(Action::StartDownload(subtitle_url, Some(source.url)))
                                         .ok();
                                 }
-                                Err(error) => {
+                                Ok(Err(error)) => {
                                     log::error!("stream resolve failed: {error}");
                                     sender
                                         .send(Action::SetStatus(format!(
                                             "Error: Resolve failed: {error}"
                                         )))
+                                        .ok();
+                                }
+                                Err(_) => {
+                                    log::error!("stream resolve timed out");
+                                    sender
+                                        .send(Action::SetStatus(
+                                            "Error: Stream resolve timed out".to_string(),
+                                        ))
                                         .ok();
                                 }
                             }
