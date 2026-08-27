@@ -105,6 +105,43 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let details_json = match &state.selected_details {
         Some(d) => d,
         None => {
+            if let Some(err) = &state.details_error {
+                let box_width = area.width.saturating_sub(4).clamp(30, 60).min(area.width);
+                let box_height = area.height.saturating_sub(2).clamp(5, 7).min(area.height);
+                let x = area.x + (area.width.saturating_sub(box_width)) / 2;
+                let y = area.y + (area.height.saturating_sub(box_height)) / 2;
+                let error_area = Rect::new(x, y, box_width, box_height);
+
+                let error_block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+                    .border_style(theme.error)
+                    .title(Line::from(vec![Span::styled(
+                        " Error Loading Details ",
+                        theme.error.add_modifier(Modifier::BOLD),
+                    )]));
+
+                let err_msg =
+                    crate::tui::text::truncate_width(err, (box_width.saturating_sub(4)) as usize);
+                let text = vec![
+                    Line::from(""),
+                    Line::from(Span::styled(err_msg, theme.text)),
+                    Line::from(""),
+                    Line::from(vec![
+                        crate::tui::overlay::key_hint("r", "Retry fetch", theme),
+                        Span::raw("   "),
+                        crate::tui::overlay::key_hint("Esc", "Back", theme),
+                    ]),
+                ];
+
+                let error_p = Paragraph::new(text)
+                    .block(error_block)
+                    .alignment(Alignment::Center);
+
+                frame.render_widget(error_p, error_area);
+                return;
+            }
+
             let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
 
             let vertical_chunks = Layout::default()
@@ -506,11 +543,26 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let meta_p = Paragraph::new(top_meta).wrap(Wrap { trim: true });
     frame.render_widget(meta_p, meta_chunks[0]);
 
-    let synopsis_capacity =
-        (meta_chunks[1].width as usize).saturating_mul(meta_chunks[1].height as usize);
-    let synopsis = truncate_with_ellipsis(intro, synopsis_capacity);
-    let syn_lines = vec![Line::from(vec![Span::styled(synopsis, theme.subtext1)])];
-    let intro_p = Paragraph::new(syn_lines).wrap(Wrap { trim: true });
+    let max_width = meta_chunks[1].width as usize;
+    let max_lines = meta_chunks[1].height as usize;
+    let mut wrapped = crate::tui::text::wrap_text(intro, max_width);
+    if wrapped.len() > max_lines {
+        wrapped.truncate(max_lines);
+        if let Some(last) = wrapped.last_mut() {
+            let ellipsis = if state.basic_terminal { "..." } else { "…" };
+            let ellipsis_w = crate::tui::text::width(ellipsis);
+            if max_width >= ellipsis_w {
+                let trimmed =
+                    crate::tui::text::truncate_width(last, max_width.saturating_sub(ellipsis_w));
+                *last = format!("{trimmed}{ellipsis}");
+            }
+        }
+    }
+    let syn_lines: Vec<Line> = wrapped
+        .into_iter()
+        .map(|line| Line::from(vec![Span::styled(line, theme.subtext1)]))
+        .collect();
+    let intro_p = Paragraph::new(syn_lines);
     frame.render_widget(intro_p, meta_chunks[1]);
 
     let has_languages = if let Some(dubs) = details_json.get("dubs").and_then(|d| d.as_array()) {
@@ -1390,22 +1442,6 @@ fn selected_stream_summary(state: &AppState) -> Option<String> {
     (!fields.is_empty()).then(|| fields.join(" · "))
 }
 
-fn truncate_with_ellipsis(value: &str, capacity: usize) -> String {
-    if capacity == 0 {
-        return String::new();
-    }
-    if crate::tui::text::width(value) <= capacity {
-        return value.to_string();
-    }
-    if capacity == 1 {
-        return "…".to_string();
-    }
-    format!(
-        "{}…",
-        crate::tui::text::truncate_width(value, capacity.saturating_sub(1))
-    )
-}
-
 fn clean_language_name(value: &str) -> String {
     let mut name = if value.to_ascii_lowercase().starts_with("original") {
         "Original".to_string()
@@ -2131,5 +2167,52 @@ mod tests {
         assert!(!spans.is_empty());
         let basic_spans = render_media_tag_spans(&tags, &theme, true);
         assert_eq!(basic_spans[0].content, "[HDR] ");
+    }
+
+    #[test]
+    fn test_details_error_state_rendering() {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            details_error: Some("Failed to fetch details: network timeout".to_string()),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(content.contains("Error Loading Details"));
+        assert!(content.contains("Retry fetch"));
+        assert!(content.contains("Back"));
+    }
+
+    #[test]
+    fn test_synopsis_wrap_clamping() {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(serde_json::json!({
+                "title": "Test Movie",
+                "description": "A very long synopsis that will definitely exceed the single line boundary and should be clamped cleanly with an ellipsis without overflowing the paragraph bounds."
+            })),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
     }
 }

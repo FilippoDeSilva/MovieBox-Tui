@@ -18,8 +18,9 @@ pub struct Config {
     pub addons_enabled: bool,
     pub default_player: Option<String>,
     pub download_dir: Option<String>,
+    pub preferred_subtitle_language: Option<String>,
+    pub auto_load_subtitles: bool,
 }
-
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -34,6 +35,8 @@ impl Default for Config {
             addons_enabled: false,
             default_player: None,
             download_dir: None,
+            preferred_subtitle_language: Some("English".to_string()),
+            auto_load_subtitles: true,
         }
     }
 }
@@ -148,5 +151,28 @@ pub fn save_addons(addons: &[InstalledAddon]) {
     };
     if let Err(error) = crate::cache::atomic_write_file(&path, json.as_bytes()) {
         log::warn!("failed to write addons config: {error}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_defaults_and_serde() {
+        let config = Config::default();
+        assert_eq!(
+            config.preferred_subtitle_language.as_deref(),
+            Some("English")
+        );
+        assert!(config.auto_load_subtitles);
+
+        let json = serde_json::to_string(&config).expect("serialize");
+        let deserialized: Config = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            deserialized.preferred_subtitle_language,
+            config.preferred_subtitle_language
+        );
+        assert_eq!(deserialized.auto_load_subtitles, config.auto_load_subtitles);
     }
 }

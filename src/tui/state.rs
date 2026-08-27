@@ -91,8 +91,10 @@ pub struct AppState {
     pub show_episode_download_confirm: bool,
     pub episode_download_confirm_yes_selected: bool,
     pub is_waiting_for_download_stream: bool,
+    pub auto_play_on_ready: bool,
     pub is_fetching_streams: bool,
     pub stream_error: Option<String>,
+    pub details_error: Option<String>,
     pub preview_cache: lru::LruCache<String, serde_json::Value>,
     pub resource_list_state: ListState,
 
@@ -187,6 +189,8 @@ pub struct AppState {
     pub subtitle_list_state: ListState,
     pub pending_play_link: Option<String>,
     pub pending_open_with: bool,
+    pub preferred_subtitle_language: Option<String>,
+    pub auto_load_subtitles: bool,
     pub basic_terminal: bool,
     pub bdix_enabled: bool,
     pub streaming_enabled: bool,
@@ -249,7 +253,9 @@ impl Default for AppState {
             episode_download_confirm_yes_selected: false,
             is_waiting_for_download_stream: false,
             is_fetching_streams: false,
+            auto_play_on_ready: false,
             stream_error: None,
+            details_error: None,
             preview_cache: lru::LruCache::new(cache_capacity(30)),
             resource_list_state: ListState::default(),
 
@@ -340,6 +346,8 @@ impl Default for AppState {
             subtitle_list_state: ListState::default(),
             pending_play_link: None,
             pending_open_with: false,
+            preferred_subtitle_language: Some("English".to_string()),
+            auto_load_subtitles: true,
             bdix_enabled: false,
             streaming_enabled: true,
             is_tv_mode: false,
@@ -567,7 +575,9 @@ impl AppState {
         self.selected_resources = None;
         self.is_fetching_streams = false;
         self.pending_episode_fetch = None;
+        self.auto_play_on_ready = false;
         self.stream_error = None;
+        self.details_error = None;
         self.available_seasons.clear();
         self.available_episode_numbers.clear();
         self.season_list_state.select(None);

@@ -502,3 +502,207 @@ async fn test_contextual_window_title() {
     }));
     assert_eq!(app.contextual_title(), "MovieBox-Tui — Inception");
 }
+#[tokio::test]
+async fn test_esc_in_normal_mode_focuses_search_bar_when_results_present() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().search_query.set_content("matrix");
+    app.state_mut().search_results.push(SearchResult {
+        id: "1".to_string(),
+        title: "The Matrix".to_string(),
+        stype: 1,
+        release_year: "1999".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::MovieBox,
+    });
+    app.state_mut().search_list_state.select(Some(0));
+
+    let esc_key = KeyEvent::new(KeyCode::Esc, KeyModifiers::empty());
+    app.handle_action(Action::Key(esc_key)).await;
+    app.handle_action(Action::GoBack).await;
+
+    assert_eq!(app.state().input_mode, InputMode::Editing);
+    assert_eq!(app.state().search_results.len(), 1);
+    assert_eq!(app.state().search_query, "matrix");
+}
+
+#[tokio::test]
+async fn test_esc_in_editing_mode_switches_to_normal_when_results_present() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query.set_content("matrix");
+    app.state_mut().search_results.push(SearchResult {
+        id: "1".to_string(),
+        title: "The Matrix".to_string(),
+        stype: 1,
+        release_year: "1999".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::MovieBox,
+    });
+
+    let esc_key = KeyEvent::new(KeyCode::Esc, KeyModifiers::empty());
+    app.handle_action(Action::Key(esc_key)).await;
+
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+    assert_eq!(app.state().search_results.len(), 1);
+    assert_eq!(app.state().search_query, "matrix");
+}
+
+#[tokio::test]
+async fn test_esc_in_editing_mode_clears_when_no_results() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query.set_content("matrix");
+    assert!(app.state().search_results.is_empty());
+
+    let esc_key = KeyEvent::new(KeyCode::Esc, KeyModifiers::empty());
+    app.handle_action(Action::Key(esc_key)).await;
+
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+    assert!(app.state().search_query.is_empty());
+}
+
+#[tokio::test]
+async fn test_ctrl_u_and_clear_command_clears_results_cleanly() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query.set_content("matrix");
+    app.state_mut().search_results.push(SearchResult {
+        id: "1".to_string(),
+        title: "The Matrix".to_string(),
+        stype: 1,
+        release_year: "1999".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::MovieBox,
+    });
+
+    let ctrl_u = KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL);
+    app.handle_action(Action::Key(ctrl_u)).await;
+
+    assert!(app.state().search_results.is_empty());
+    assert!(app.state().search_query.is_empty());
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+
+    // Test /clear slash command
+    app.state_mut().search_results.push(SearchResult {
+        id: "2".to_string(),
+        title: "Inception".to_string(),
+        stype: 1,
+        release_year: "2010".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::MovieBox,
+    });
+    app.state_mut().search_query.set_content("/clear");
+    app.handle_action(Action::Search {
+        query: "/clear".to_string(),
+        force_refresh: false,
+    })
+    .await;
+
+    assert!(app.state().search_results.is_empty());
+    assert!(app.state().search_query.is_empty());
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+}
+
+#[tokio::test]
+async fn test_history_item_space_and_p_key_direct_resume() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().search_query.set_content("/history");
+    app.state_mut().search_results.push(SearchResult {
+        id: "tv_100".to_string(),
+        title: "Breaking Bad".to_string(),
+        stype: 2,
+        release_year: "2008".to_string(),
+        cover_url: None,
+        season: 2,
+        episode: 4,
+        provider: ProviderKind::MovieBox,
+    });
+    app.state_mut().search_list_state.select(Some(0));
+    app.state_mut().last_search_edit =
+        std::time::Instant::now() - std::time::Duration::from_secs(1);
+
+    let space_key = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty());
+    app.handle_action(Action::Key(space_key)).await;
+
+    assert_eq!(app.state().active_screen, Screen::Details);
+    assert_eq!(app.state().active_subject_id.as_deref(), Some("tv_100"));
+    assert_eq!(app.state().selected_season, 2);
+    assert_eq!(app.state().selected_episode, 4);
+    assert!(app.state().auto_play_on_ready);
+}
+
+#[tokio::test]
+async fn test_history_item_enter_pre_seeds_season_and_episode() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().search_query.set_content("/history");
+    app.state_mut().search_results.push(SearchResult {
+        id: "tv_200".to_string(),
+        title: "Better Call Saul".to_string(),
+        stype: 2,
+        release_year: "2015".to_string(),
+        cover_url: None,
+        season: 3,
+        episode: 7,
+        provider: ProviderKind::MovieBox,
+    });
+    app.state_mut().search_list_state.select(Some(0));
+    app.state_mut().last_search_edit =
+        std::time::Instant::now() - std::time::Duration::from_secs(1);
+
+    app.handle_action(Action::Submit).await;
+
+    assert_eq!(app.state().active_screen, Screen::Details);
+    assert_eq!(app.state().active_subject_id.as_deref(), Some("tv_200"));
+    assert_eq!(app.state().selected_season, 3);
+    assert_eq!(app.state().selected_episode, 7);
+    assert!(!app.state().auto_play_on_ready);
+}
+
+#[tokio::test]
+async fn test_no_results_and_error_state_rendering_hints() {
+    let backend = TestBackend::new(100, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut app = App::new();
+
+    // No results view
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut()
+        .search_query
+        .set_content("nonexistent_movie_xyz");
+    app.state_mut().search_results.clear();
+
+    terminal.draw(|frame| app.draw(frame)).unwrap();
+    let content = terminal.backend().buffer().content();
+    let text: String = content.iter().map(|c| c.symbol()).collect();
+    assert!(text.contains("Switch provider"));
+    assert!(text.contains("Browse categories"));
+    assert!(text.contains("Clear"));
+
+    // Error view
+    app.state_mut().search_error =
+        Some("Failed to connect to MovieBox provider: connection refused by server".to_string());
+    terminal.draw(|frame| app.draw(frame)).unwrap();
+    let content_err = terminal.backend().buffer().content();
+    let text_err: String = content_err.iter().map(|c| c.symbol()).collect();
+    assert!(text_err.contains("Retry request"));
+    assert!(text_err.contains("Switch provider"));
+    assert!(text_err.contains("Back"));
+}

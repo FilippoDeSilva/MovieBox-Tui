@@ -132,6 +132,12 @@ impl App {
                 self.action_sender.send(Action::ClearCache).ok();
                 Some(true)
             }
+            crate::tui::commands::ParsedCommand::Clear => {
+                self.state.clear_search_state();
+                self.state.input_mode = InputMode::Normal;
+                self.state.set_status_default("Search cleared.");
+                Some(true)
+            }
             crate::tui::commands::ParsedCommand::Github => {
                 let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
                 self.state.search_query.clear();
@@ -662,6 +668,7 @@ impl App {
         self.state.active_subject_id = Some(id.to_string());
         self.state.poster_protocol = None;
         self.state.is_loading = true;
+        self.state.details_error = None;
         self.state.active_details_request = self.state.active_details_request.wrapping_add(1);
         self.state
             .fetch_cancel

@@ -1,6 +1,9 @@
 use super::App;
 use crate::providers::models::{ProviderKind, Release};
-use crate::tui::{action::Action, state::Screen};
+use crate::tui::{
+    action::Action,
+    state::{InputMode, Screen},
+};
 
 impl App {
     fn remember_player_preference(&mut self, player: crate::tui::state::PlayerKind) {
@@ -414,6 +417,13 @@ impl App {
                 }
                 match self.state.active_screen {
                     Screen::Home => {
+                        if !self.state.search_results.is_empty() {
+                            self.state.input_mode = InputMode::Editing;
+                            self.state.favorites_focus = false;
+                            self.state.favorites_landing_state.select(None);
+                            self.state.last_search_edit = std::time::Instant::now();
+                            return None;
+                        }
                         self.state.is_loading = false;
                         self.state.active_search_request =
                             self.state.active_search_request.wrapping_add(1);
@@ -421,20 +431,7 @@ impl App {
                             self.state.active_homepage_request.wrapping_add(1);
                         self.state.active_preview_request =
                             self.state.active_preview_request.wrapping_add(1);
-                        self.state.search_poster_protocols.clear();
-                        self.state.search_results.clear();
-                        self.state.active_browse_preset = None;
-                        self.state.active_addon_catalog = None;
-                        self.state.browse_metrics.clear();
-                        self.state.search_error = None;
-                        self.state.search_query.clear();
-                        self.state.search_suggestions.clear();
-                        self.state.suggest_index = None;
-                        self.state.search_preview = None;
-                        self.state.preview_loading = false;
-                        self.state.poster_image = None;
-                        self.state.poster_protocol = None;
-                        self.state.search_list_state.select(None);
+                        self.state.clear_search_state();
                         self.state.set_status_default("Search cleared.");
                     }
                     Screen::Details => {
@@ -856,8 +853,31 @@ impl App {
                         self.state.stream_error = None;
                         self.state.resource_list_state.select(None);
                         self.state.language_list_state.select(Some(0));
-                        self.state.season_list_state.select(Some(0));
-                        self.state.episode_list_state.select(Some(0));
+
+                        let is_history = self
+                            .state
+                            .search_query
+                            .trim()
+                            .eq_ignore_ascii_case("/history")
+                            || (item.season > 0 && item.episode > 0);
+                        let se = if is_history && item.season > 0 {
+                            item.season
+                        } else {
+                            1
+                        };
+                        let ep = if is_history && item.episode > 0 {
+                            item.episode
+                        } else {
+                            1
+                        };
+                        self.state.selected_season = se;
+                        self.state.selected_episode = ep;
+                        self.state
+                            .season_list_state
+                            .select(Some(se.saturating_sub(1)));
+                        self.state
+                            .episode_list_state
+                            .select(Some(ep.saturating_sub(1)));
                         self.state.language_chosen = false;
                         if let Some(cached) = self
                             .state
@@ -883,5 +903,84 @@ impl App {
             _ => return None,
         }
         None
+    }
+
+    pub(super) fn resume_history_playback(&mut self) {
+        if self.state.is_loading {
+            return;
+        }
+        if self.state.last_search_edit.elapsed().as_millis() < 500 {
+            return;
+        }
+        let idx_opt = self.state.search_list_state.selected();
+        let item_opt = idx_opt.and_then(|idx| self.state.search_results.get(idx).cloned());
+        if let Some(item) = item_opt {
+            if self.state.is_tv_mode || item.stype == 3 {
+                self.action_sender
+                    .send(Action::LaunchMpv(item.id.clone(), None))
+                    .ok();
+                return;
+            }
+            self.state.active_screen = Screen::Details;
+            self.state.active_subject_id = Some(item.id.clone());
+            let mut fallback_details = serde_json::json!({
+                "id": item.id,
+                "subjectId": item.id,
+                "title": item.title,
+                "subjectType": item.stype,
+                "releaseDate": item.release_year,
+                "cover": { "url": item.cover_url },
+            });
+            if let Some(preview) = &self.state.search_preview {
+                if let Some(preview_obj) = preview.as_object() {
+                    if let Some(fallback_obj) = fallback_details.as_object_mut() {
+                        for (k, v) in preview_obj {
+                            if !fallback_obj.contains_key(k) || fallback_obj[k].is_null() {
+                                fallback_obj.insert(k.clone(), v.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            self.state.selected_details = Some(fallback_details);
+            self.state.selected_resources = None;
+            self.state.is_loading = true;
+            self.state.is_fetching_streams = false;
+            self.state.stream_error = None;
+            self.state.resource_list_state.select(None);
+            self.state.language_list_state.select(Some(0));
+
+            let se = if item.season > 0 { item.season } else { 1 };
+            let ep = if item.episode > 0 { item.episode } else { 1 };
+            self.state.selected_season = se;
+            self.state.selected_episode = ep;
+            self.state
+                .season_list_state
+                .select(Some(se.saturating_sub(1)));
+            self.state
+                .episode_list_state
+                .select(Some(ep.saturating_sub(1)));
+
+            self.state.auto_play_on_ready = true;
+            self.state.language_chosen = false;
+            if let Some(cached) = self
+                .state
+                .image_cache
+                .get(&item.id)
+                .or_else(|| self.state.search_posters.get(&item.id))
+            {
+                self.state.poster_image = Some(std::sync::Arc::clone(cached));
+            } else {
+                self.state.poster_image = None;
+            }
+            self.state.available_seasons.clear();
+            self.state
+                .set_status_default(format!("Resuming playback for {}...", item.title));
+
+            let sender = self.action_sender.clone();
+            sender
+                .send(Action::FetchDetails(item.id.clone(), false))
+                .ok();
+        }
     }
 }

@@ -77,6 +77,8 @@ impl App {
         state.active_theme_kind = config.active_theme;
         state.default_player = config.default_player;
         state.download_dir = config.download_dir.map(std::path::PathBuf::from);
+        state.preferred_subtitle_language = config.preferred_subtitle_language;
+        state.auto_load_subtitles = config.auto_load_subtitles;
         state.installed_addons = crate::config::load_addons();
 
         let env_theme = std::env::var("MOVIEBOX_THEME")
@@ -168,6 +170,8 @@ impl App {
                 .download_dir
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string()),
+            preferred_subtitle_language: self.state.preferred_subtitle_language.clone(),
+            auto_load_subtitles: self.state.auto_load_subtitles,
         };
         crate::tui::config::save(&config);
     }

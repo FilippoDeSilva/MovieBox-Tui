@@ -12,6 +12,7 @@ pub enum SlashCommand {
     Update,
     ToggleUpdate,
     ClearCache,
+    Clear,
     Github,
     ToggleBdix,
     ToggleStreaming,
@@ -32,6 +33,7 @@ pub enum ParsedCommand<'a> {
     Update,
     ToggleUpdate,
     ClearCache,
+    Clear,
     Github,
     ToggleBdix,
     ToggleStreaming,
@@ -41,7 +43,7 @@ pub enum ParsedCommand<'a> {
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::Browse,
         Self::History,
         Self::Favorites,
@@ -52,6 +54,7 @@ impl SlashCommand {
         Self::Update,
         Self::ToggleUpdate,
         Self::ClearCache,
+        Self::Clear,
         Self::Github,
         Self::ToggleBdix,
         Self::ToggleStreaming,
@@ -72,6 +75,7 @@ impl SlashCommand {
             Self::Update => "/update",
             Self::ToggleUpdate => "/toggle-update",
             Self::ClearCache => "/clear-cache",
+            Self::Clear => "/clear",
             Self::Github => "/github",
             Self::ToggleBdix => "/toggle-bdix",
             Self::ToggleStreaming => "/toggle-streaming",
@@ -99,6 +103,7 @@ impl SlashCommand {
             Self::Update => "Check for newer release",
             Self::ToggleUpdate => "Toggle automatic update checks",
             Self::ClearCache => "Clear cached data",
+            Self::Clear => "Clear search results and return to landing",
             Self::Github => "Open project repository",
             Self::ToggleBdix => "Toggle BDIX FTP sources",
             Self::ToggleStreaming => "Toggle Streaming mode navigation",
@@ -133,6 +138,7 @@ impl SlashCommand {
             | Self::Update
             | Self::ToggleUpdate
             | Self::ClearCache
+            | Self::Clear
             | Self::Github
             | Self::Probe => true,
         }
@@ -206,6 +212,7 @@ impl SlashCommand {
             "/update" => Some(ParsedCommand::Update),
             "/toggle-update" => Some(ParsedCommand::ToggleUpdate),
             "/clear-cache" => Some(ParsedCommand::ClearCache),
+            "/clear" => Some(ParsedCommand::Clear),
             "/github" => Some(ParsedCommand::Github),
             "/toggle-bdix" | "/enable-bdix" | "/disable-bdix" => Some(ParsedCommand::ToggleBdix),
             "/toggle-streaming" | "/enable-streaming" | "/disable-streaming" => {
@@ -312,8 +319,10 @@ mod tests {
     #[test]
     fn test_toggle_commands_and_aliases_parse() {
         let state = AppState::default();
-        assert_eq!(SlashCommand::ALL.len(), 16);
-
+        assert_eq!(SlashCommand::ALL.len(), 17);
+        assert_eq!(SlashCommand::parse("/clear"), Some(ParsedCommand::Clear));
+        assert!(SlashCommand::Clear.is_available(&state));
+        assert_eq!(SlashCommand::Clear.name(), "/clear");
         assert_eq!(
             SlashCommand::parse("/toggle-tv"),
             Some(ParsedCommand::ToggleTv)

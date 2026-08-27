@@ -908,6 +908,7 @@ impl App {
                     return None;
                 }
                 self.state.is_loading = false;
+                self.state.details_error = None;
                 let mut final_payload = payload.clone();
                 if self.state.language_chosen {
                     if let Some(existing) = &self.state.selected_details {
@@ -1152,18 +1153,16 @@ impl App {
                     default_episode = history.episode;
                 }
 
-                let target_season = if self.state.language_chosen && self.state.selected_season > 0
-                {
+                let target_season = if self.state.selected_season > 0 {
                     self.state.selected_season
                 } else {
                     default_season
                 };
-                let target_episode =
-                    if self.state.language_chosen && self.state.selected_episode > 0 {
-                        self.state.selected_episode
-                    } else {
-                        default_episode
-                    };
+                let target_episode = if self.state.selected_episode > 0 {
+                    self.state.selected_episode
+                } else {
+                    default_episode
+                };
 
                 let season_idx = self
                     .state
@@ -1229,7 +1228,10 @@ impl App {
                     .and_then(|d| d.as_array())
                     .is_some_and(|a| a.len() > 1);
 
-                if has_multiple_dubs && !self.state.language_chosen {
+                if has_multiple_dubs
+                    && !self.state.language_chosen
+                    && !self.state.auto_play_on_ready
+                {
                     self.state.details_pane = crate::tui::state::DetailsPane::Languages;
                     self.state.is_loading = false;
                     self.state
@@ -1254,6 +1256,7 @@ impl App {
                 if request_id != self.state.active_details_request {
                     return None;
                 }
+                self.state.auto_play_on_ready = false;
                 if !self.context_is_current(context) {
                     return None;
                 }
@@ -1271,6 +1274,7 @@ impl App {
                 }
                 self.state.is_fetching_streams = false;
                 self.state.stream_error = None;
+                self.state.details_error = Some(err.clone());
                 self.state
                     .set_status_default(format!("Details fetch failed: {}", err));
 
@@ -1397,6 +1401,10 @@ impl App {
                     }
                     self.state.is_loading = false;
                     self.state.is_fetching_streams = false;
+                    if self.state.auto_play_on_ready {
+                        self.state.auto_play_on_ready = false;
+                        self.action_sender.send(Action::PlayStream(false)).ok();
+                    }
                     return None;
                 }
 
@@ -2010,6 +2018,10 @@ impl App {
 
                     self.action_sender.send(Action::DownloadStream(None)).ok();
                 }
+                if self.state.auto_play_on_ready {
+                    self.state.auto_play_on_ready = false;
+                    self.action_sender.send(Action::PlayStream(false)).ok();
+                }
             }
 
             Action::EpisodeStreamsFailed(
@@ -2033,6 +2045,7 @@ impl App {
                 {
                     return None;
                 }
+                self.state.auto_play_on_ready = false;
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
                 self.state.selected_resources = None;

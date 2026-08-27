@@ -237,26 +237,22 @@ fn render_search_state(
     }
 
     let card_width = area.width.min(64);
-    let card = Rect {
-        x: area.x + area.width.saturating_sub(card_width) / 2,
-        y: area.y + area.height.saturating_sub(3) / 2,
-        width: card_width,
-        height: 3,
-    };
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ])
-        .split(card);
-
     let query = crate::tui::text::truncate_width(
         &state.search_query,
         card_width.saturating_sub(10) as usize,
     );
-    let line = match view {
+
+    let ctrl_p = crate::tui::text::ctrl_key("P");
+    let ctrl_u = crate::tui::text::ctrl_key("U");
+    let bullet = if state.basic_terminal {
+        " - "
+    } else {
+        "  •  "
+    };
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    match view {
         SearchViewState::Loading => {
             let msg = if state.basic_terminal {
                 let dots = match (state.tick_count / 4) % 3 {
@@ -292,7 +288,7 @@ fn render_search_state(
                     format!("{spinner} Loading")
                 }
             };
-            Line::from(vec![Span::styled(msg, theme.lavender)])
+            lines.push(Line::from(vec![Span::styled(msg, theme.lavender)]));
         }
         SearchViewState::NoResults => {
             let symbol = if state.basic_terminal { "-" } else { "·" };
@@ -307,10 +303,27 @@ fn render_search_state(
             } else {
                 "No results found".to_string()
             };
-            Line::from(vec![
+            lines.push(Line::from(vec![
                 Span::styled(format!("{symbol} "), theme.text_dim),
                 Span::styled(msg, theme.text),
-            ])
+            ]));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("[", theme.text_dim),
+                Span::styled(&ctrl_p, theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Switch provider", theme.text_dim),
+                Span::styled(bullet, theme.text_dim),
+                Span::styled("[", theme.text_dim),
+                Span::styled("/browse", theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Browse categories", theme.text_dim),
+                Span::styled(bullet, theme.text_dim),
+                Span::styled("[", theme.text_dim),
+                Span::styled(&ctrl_u, theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Clear", theme.text_dim),
+            ]));
         }
         SearchViewState::Error => {
             let symbol = if state.basic_terminal { "!" } else { "×" };
@@ -321,23 +334,59 @@ fn render_search_state(
                     "Search request failed"
                 }
             });
-            Line::from(vec![
-                Span::styled(format!("{symbol} "), theme.error),
-                Span::styled(
-                    crate::tui::text::truncate_width(
-                        err_text,
-                        card_width.saturating_sub(4) as usize,
-                    ),
-                    theme.error,
-                ),
-            ])
+            let wrap_width = card_width.saturating_sub(6).max(10) as usize;
+            let wrapped_err_lines = crate::tui::text::wrap_text(err_text, wrap_width);
+            if wrapped_err_lines.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{symbol} "), theme.error),
+                    Span::styled("Search request failed", theme.error),
+                ]));
+            } else {
+                for (idx, eline) in wrapped_err_lines.into_iter().enumerate() {
+                    if idx == 0 {
+                        lines.push(Line::from(vec![
+                            Span::styled(format!("{symbol} "), theme.error),
+                            Span::styled(eline, theme.error),
+                        ]));
+                    } else {
+                        lines.push(Line::from(vec![
+                            Span::styled("  ", theme.error),
+                            Span::styled(eline, theme.error),
+                        ]));
+                    }
+                }
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("[", theme.text_dim),
+                Span::styled("r", theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Retry request", theme.text_dim),
+                Span::styled(bullet, theme.text_dim),
+                Span::styled("[", theme.text_dim),
+                Span::styled(&ctrl_p, theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Switch provider", theme.text_dim),
+                Span::styled(bullet, theme.text_dim),
+                Span::styled("[", theme.text_dim),
+                Span::styled("Esc", theme.shortcut),
+                Span::styled("] ", theme.text_dim),
+                Span::styled("Back", theme.text_dim),
+            ]));
         }
         _ => return,
     };
 
-    frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), rows[1]);
-}
+    let card_height = (lines.len() as u16).min(area.height);
+    let card = Rect {
+        x: area.x + area.width.saturating_sub(card_width) / 2,
+        y: area.y + area.height.saturating_sub(card_height) / 2,
+        width: card_width,
+        height: card_height,
+    };
 
+    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), card);
+}
 fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     if area.height < 2 || area.width < 20 {
         return;

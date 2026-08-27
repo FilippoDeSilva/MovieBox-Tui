@@ -81,7 +81,26 @@ impl App {
                     return None;
                 }
             } else if !self.state.addon_input_active && !self.state.tv_input_active {
+                if let KeyCode::Char('u') = key.code {
+                    if self.state.active_screen == Screen::Home {
+                        self.state.clear_search_state();
+                        self.state.input_mode = InputMode::Normal;
+                        self.state.set_status_default("Search cleared.");
+                        return None;
+                    }
+                }
                 return None;
+            }
+            if let KeyCode::Char('u') = key.code {
+                if self.state.active_screen == Screen::Home
+                    && !self.state.addon_input_active
+                    && !self.state.tv_input_active
+                {
+                    self.state.clear_search_state();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.set_status_default("Search cleared.");
+                    return None;
+                }
             }
         }
 
@@ -304,10 +323,9 @@ impl App {
             InputMode::Editing => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     if let KeyCode::Char('u') = key.code {
-                        self.state.search_query.clear();
-                        self.state.suggest_index = None;
-                        self.state.search_suggestions.clear();
-                        self.state.last_search_edit = std::time::Instant::now();
+                        self.state.clear_search_state();
+                        self.state.input_mode = InputMode::Normal;
+                        self.state.set_status_default("Search cleared.");
                         return None;
                     }
                     if let KeyCode::Char('w') = key.code {
@@ -323,10 +341,8 @@ impl App {
                         self.state.input_mode = InputMode::Normal;
                         self.state.suggest_index = None;
                         self.state.search_suggestions.clear();
-                        if self.state.search_query.starts_with('/')
-                            || self.state.search_results.is_empty()
-                        {
-                            self.state.search_query.clear();
+                        if self.state.search_results.is_empty() {
+                            self.state.clear_search_state();
                         }
                         self.state.set_status_default("");
                     }
@@ -893,6 +909,16 @@ impl App {
                         {
                             self.action_sender.send(Action::ToggleFavorite).ok();
                         }
+                        KeyCode::Char(' ') | KeyCode::Char('p') | KeyCode::Char('P')
+                            if self
+                                .state
+                                .search_query
+                                .trim()
+                                .eq_ignore_ascii_case("/history")
+                                && !self.state.search_results.is_empty() =>
+                        {
+                            self.resume_history_playback();
+                        }
                         KeyCode::Char(c)
                             if (key.modifiers.is_empty()
                                 || key.modifiers == KeyModifiers::SHIFT) =>
@@ -957,6 +983,33 @@ impl App {
                             self.state.show_episode_download_confirm = false;
                         } else {
                             self.action_sender.send(Action::GoBack).ok();
+                        }
+                    }
+                    KeyCode::Char(' ') | KeyCode::Char('p') | KeyCode::Char('P') => {
+                        if !self.state.subtitle_popup
+                            && !self.state.player_picker_popup
+                            && !self.state.show_season_download_confirm
+                            && !self.state.show_episode_download_confirm
+                        {
+                            let open_with = key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::SHIFT);
+                            match self.state.details_pane {
+                                crate::tui::state::DetailsPane::Streams => {
+                                    self.action_sender.send(Action::PlayStream(open_with)).ok();
+                                }
+                                crate::tui::state::DetailsPane::Seasons => {
+                                    self.trigger_episode_fetch();
+                                }
+                                crate::tui::state::DetailsPane::Episodes => {
+                                    self.trigger_episode_fetch();
+                                }
+                                crate::tui::state::DetailsPane::Languages => {
+                                    let idx =
+                                        self.state.language_list_state.selected().unwrap_or(0);
+                                    self.action_sender.send(Action::SelectLanguage(idx)).ok();
+                                }
+                            }
                         }
                     }
                     KeyCode::Char('q') => {
