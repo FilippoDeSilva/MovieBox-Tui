@@ -54,7 +54,7 @@ impl TextInputBuffer {
 
     pub fn set_content(&mut self, content: impl Into<String>) {
         self.content = content.into();
-        self.cursor = self.cursor.min(self.len_graphemes());
+        self.cursor = self.len_graphemes();
     }
 
     pub fn graphemes(&self) -> Vec<&str> {
@@ -137,7 +137,6 @@ impl TextInputBuffer {
         while new_cursor > 0 && !is_delim(graphemes[new_cursor - 1]) {
             new_cursor -= 1;
         }
-
         if new_cursor == old_cursor {
             return false;
         }
@@ -219,6 +218,44 @@ impl std::str::FromStr for TextInputBuffer {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self::from_str(s))
+    }
+}
+
+impl std::ops::Deref for TextInputBuffer {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.content
+    }
+}
+
+impl PartialEq<str> for TextInputBuffer {
+    fn eq(&self, other: &str) -> bool {
+        self.content == other
+    }
+}
+
+impl PartialEq<&str> for TextInputBuffer {
+    fn eq(&self, other: &&str) -> bool {
+        self.content == *other
+    }
+}
+
+impl PartialEq<String> for TextInputBuffer {
+    fn eq(&self, other: &String) -> bool {
+        self.content == *other
+    }
+}
+
+impl PartialEq<TextInputBuffer> for &str {
+    fn eq(&self, other: &TextInputBuffer) -> bool {
+        *self == other.content
+    }
+}
+
+impl PartialEq<TextInputBuffer> for String {
+    fn eq(&self, other: &TextInputBuffer) -> bool {
+        *self == other.content
     }
 }
 

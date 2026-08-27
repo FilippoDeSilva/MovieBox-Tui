@@ -11,7 +11,7 @@ async fn test_search_failure_clears_loading_and_sets_error_state() {
     let mut app = App::new();
     app.state_mut().is_loading = true;
     app.state_mut().active_search_request = 42;
-    app.state_mut().search_query = "Inception".to_string();
+    app.state_mut().search_query.set_content("Inception");
 
     let context = RequestContext {
         provider: app.state().active_provider,

@@ -123,7 +123,7 @@ impl App {
             }
 
             Action::SelectSuggestion { query } => {
-                self.state.search_query = query.clone();
+                self.state.search_query.set_content(&query);
                 self.state.suggest_index = None;
                 self.state.search_suggestions.clear();
                 self.state.input_mode = InputMode::Normal;
@@ -166,7 +166,7 @@ impl App {
                     self.state.search_suggestions.clear();
                     self.state.suggest_index = None;
 
-                    self.state.search_query = "/history".to_string();
+                    self.state.search_query.set_content("/history");
                     let mut recent = self.state.history.recent.clone();
                     if recent.is_empty() {
                         self.state.notify(

@@ -214,7 +214,7 @@ impl App {
         self.state.suggest_index = None;
         self.state.favorites_focus = false;
 
-        self.state.search_query = "/favorites".to_string();
+        self.state.search_query.set_content("/favorites");
         let mut items = self.state.favorites.items.clone();
         if items.is_empty() {
             self.state.notify(

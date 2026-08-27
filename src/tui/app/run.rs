@@ -65,6 +65,7 @@ impl App {
             let kind = self.state.available_players.remove(index);
             self.state.available_players.insert(0, kind);
         }
+        let mut last_window_title = String::new();
 
         loop {
             let want_beam =
@@ -78,6 +79,11 @@ impl App {
                 };
                 let _ = crossterm::execute!(std::io::stdout(), style);
                 self.state.cursor_beam = want_beam;
+            }
+            let title = self.contextual_title();
+            if title != last_window_title {
+                let _ = crate::tui::terminal::set_window_title(&title);
+                last_window_title = title;
             }
             self.state.normalize_result_view();
             if self.state.clear_terminal_before_draw {
@@ -275,6 +281,25 @@ impl App {
             return None;
         }
         Some(ratatui_image::FontSize { width, height })
+    }
+    pub fn contextual_title(&self) -> String {
+        match self.state.active_screen {
+            Screen::Home => match self.state.mode() {
+                crate::tui::state::AppMode::Streaming => "MovieBox-Tui — Streaming".to_string(),
+                crate::tui::state::AppMode::Tv => "MovieBox-Tui — Live TV".to_string(),
+                crate::tui::state::AppMode::Addon => "MovieBox-Tui — Addons".to_string(),
+            },
+            Screen::Details => {
+                if let Some(details) = &self.state.selected_details {
+                    if let Some(title) = details.get("title").and_then(|t| t.as_str()) {
+                        if !title.is_empty() {
+                            return format!("MovieBox-Tui — {title}");
+                        }
+                    }
+                }
+                "MovieBox-Tui — Details".to_string()
+            }
+        }
     }
 
     pub async fn handle_action(&mut self, action: Action) -> Option<()> {

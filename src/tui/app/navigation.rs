@@ -152,7 +152,7 @@ impl App {
                     })
                     .ok();
             } else {
-                let query = self.state.search_query.clone();
+                let query = self.state.search_query.to_string();
                 let service = self.service.clone();
                 let sender = self.action_sender.clone();
                 let context = self.request_context();
@@ -744,9 +744,6 @@ impl App {
                 if self.state.is_loading {
                     return None;
                 }
-                if self.state.last_search_edit.elapsed().as_millis() < 500 {
-                    return None;
-                }
                 if self.state.player_picker_popup {
                     let idx = self.state.player_picker_state.selected().unwrap_or(0);
                     if let Some(player) = self.state.available_players.get(idx).copied() {
@@ -816,6 +813,9 @@ impl App {
                     return None;
                 }
                 if self.state.active_screen == Screen::Home {
+                    if self.state.last_search_edit.elapsed().as_millis() < 500 {
+                        return None;
+                    }
                     let idx_opt = self.state.search_list_state.selected();
                     let item_opt =
                         idx_opt.and_then(|idx| self.state.search_results.get(idx).cloned());

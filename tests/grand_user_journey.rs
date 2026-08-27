@@ -19,7 +19,7 @@ async fn test_grand_user_journey_complete_lifecycle() {
 
     app.state_mut().set_mode(AppMode::Streaming);
     app.state_mut().active_provider = ProviderKind::MovieBox;
-    app.state_mut().search_query = "Inception".to_string();
+    app.state_mut().search_query.set_content("Inception");
 
     let streaming_ctx = RequestContext {
         provider: ProviderKind::MovieBox,
@@ -220,7 +220,7 @@ async fn test_grand_user_journey_complete_lifecycle() {
     assert!(app.state().download_progress.is_none());
 
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query = "/download-dir".to_string();
+    app.state_mut().search_query.set_content("/download-dir");
     assert_eq!(app.state().search_query, "/download-dir");
 
     let esc_key = crossterm::event::KeyEvent::new(

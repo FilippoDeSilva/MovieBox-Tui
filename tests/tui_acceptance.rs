@@ -13,7 +13,7 @@ async fn test_backspace_from_home_focuses_search_input() {
     let mut app = App::new();
     app.state_mut().active_screen = Screen::Home;
     app.state_mut().input_mode = InputMode::Normal;
-    app.state_mut().search_query = "Inception".to_string();
+    app.state_mut().search_query.set_content("Inception");
     app.state_mut().favorites_focus = true;
 
     let key = KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty());
@@ -309,7 +309,7 @@ async fn test_esc_key_cancels_slash_command_and_clears_search_bar() {
     app.state_mut().show_theme_popup = false;
     app.state_mut().show_browse_popup = false;
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query = "/download-dir".to_string();
+    app.state_mut().search_query.set_content("/download-dir");
 
     let esc_key = crossterm::event::KeyEvent::new(
         crossterm::event::KeyCode::Esc,
@@ -328,7 +328,7 @@ async fn test_esc_key_cancels_unsubmitted_search_query() {
     app.state_mut().show_theme_popup = false;
     app.state_mut().show_browse_popup = false;
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query = "batman".to_string();
+    app.state_mut().search_query.set_content("batman");
     assert!(app.state().search_results.is_empty());
 
     let esc_key = crossterm::event::KeyEvent::new(
@@ -345,7 +345,7 @@ async fn test_esc_key_cancels_unsubmitted_search_query() {
 async fn test_tab_key_completes_regular_search_suggestions() {
     let mut app = App::new();
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query = "inter".to_string();
+    app.state_mut().search_query.set_content("inter");
     app.state_mut().search_suggestions =
         vec!["Interstellar".to_string(), "Interstellar 2".to_string()];
 
@@ -362,7 +362,7 @@ async fn test_tab_key_completes_regular_search_suggestions() {
 async fn test_ctrl_u_clears_search_input() {
     let mut app = App::new();
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query = "hello world".to_string();
+    app.state_mut().search_query.set_content("hello world");
 
     let ctrl_u = crossterm::event::KeyEvent::new(
         crossterm::event::KeyCode::Char('u'),
@@ -377,23 +377,27 @@ async fn test_ctrl_u_clears_search_input() {
 async fn test_ctrl_w_deletes_backward_word() {
     let mut app = App::new();
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query = "the dark knight".to_string();
+    app.state_mut().search_query.set_content("the dark knight");
 
     let ctrl_w = crossterm::event::KeyEvent::new(
         crossterm::event::KeyCode::Char('w'),
         crossterm::event::KeyModifiers::CONTROL,
     );
     app.handle_action(Action::Key(ctrl_w)).await;
-    assert_eq!(app.state().search_query, "the dark");
+    assert_eq!(app.state().search_query, "the dark ");
 
     app.handle_action(Action::Key(ctrl_w)).await;
-    assert_eq!(app.state().search_query, "the");
+    assert_eq!(app.state().search_query, "the ");
+
+    app.handle_action(Action::Key(ctrl_w)).await;
+    assert_eq!(app.state().search_query, "");
 }
 
 #[tokio::test]
 async fn test_f_key_toggles_favorite_on_home_results() {
     let mut app = App::new();
     app.state_mut().active_screen = Screen::Home;
+    app.state_mut().favorites.items.clear();
     let res = SearchResult {
         id: "100".to_string(),
         title: "Test Movie".to_string(),
@@ -437,4 +441,64 @@ async fn test_up_from_favorites_landing_unfocuses() {
 
     assert!(!app.state().favorites_focus);
     assert_eq!(app.state().favorites_landing_state.selected(), None);
+}
+
+#[tokio::test]
+async fn test_search_cursor_navigation_and_mid_string_editing() {
+    let mut app = App::new();
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_query.set_content("avtar");
+
+    // Move left twice to position cursor between 'v' and 't' (pos 2)
+    let left = KeyEvent::new(KeyCode::Left, KeyModifiers::empty());
+    app.handle_action(Action::Key(left)).await;
+    app.handle_action(Action::Key(left)).await;
+    assert_eq!(app.state().search_query.cursor(), 3);
+    app.handle_action(Action::Key(left)).await;
+    assert_eq!(app.state().search_query.cursor(), 2);
+
+    // Insert 'a' -> "avatar"
+    let char_a = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty());
+    app.handle_action(Action::Key(char_a)).await;
+    assert_eq!(app.state().search_query, "avatar");
+    assert_eq!(app.state().search_query.cursor(), 3);
+
+    // Home -> cursor at 0
+    let home = KeyEvent::new(KeyCode::Home, KeyModifiers::empty());
+    app.handle_action(Action::Key(home)).await;
+    assert_eq!(app.state().search_query.cursor(), 0);
+
+    // Forward delete 'a' -> "vatar"
+    let delete = KeyEvent::new(KeyCode::Delete, KeyModifiers::empty());
+    app.handle_action(Action::Key(delete)).await;
+    assert_eq!(app.state().search_query, "vatar");
+    assert_eq!(app.state().search_query.cursor(), 0);
+
+    // End -> cursor at end
+    let end = KeyEvent::new(KeyCode::End, KeyModifiers::empty());
+    app.handle_action(Action::Key(end)).await;
+    assert_eq!(app.state().search_query.cursor(), 5);
+}
+
+#[tokio::test]
+async fn test_contextual_window_title() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Streaming);
+    assert_eq!(app.contextual_title(), "MovieBox-Tui — Streaming");
+
+    app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Tv);
+    assert_eq!(app.contextual_title(), "MovieBox-Tui — Live TV");
+
+    app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Addon);
+    assert_eq!(app.contextual_title(), "MovieBox-Tui — Addons");
+
+    app.state_mut().active_screen = Screen::Details;
+    app.state_mut().selected_details = Some(serde_json::json!({
+        "title": "Inception"
+    }));
+    assert_eq!(app.contextual_title(), "MovieBox-Tui — Inception");
 }

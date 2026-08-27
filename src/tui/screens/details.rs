@@ -300,7 +300,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
             }
             if let Some((_, proto)) = &state.poster_protocol {
-                if !state.show_help {
+                if !state.has_active_modal() {
                     frame.render_widget(ratatui_image::Image::new(proto), poster_area);
                 }
             }
@@ -1175,9 +1175,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 frame.render_widget(streams_block.clone(), streams_area);
             }
         }
-    }
-    if !state.selected_resources.is_some() {
-        frame.render_widget(streams_block, streams_area);
     }
 
     let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);

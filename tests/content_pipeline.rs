@@ -323,7 +323,7 @@ async fn test_search_failure_vs_empty_result_distinction() {
     app.state_mut().update_available = None;
     app.state_mut().active_provider = ProviderKind::MovieBox;
     app.state_mut().input_mode = InputMode::Normal;
-    app.state_mut().search_query = "xyznonexistent".to_string();
+    app.state_mut().search_query.set_content("xyznonexistent");
 
     let context = RequestContext {
         provider: ProviderKind::MovieBox,
@@ -375,7 +375,7 @@ async fn test_mode_switch_stale_response_protection() {
         generation: streaming_generation,
     };
     app.state_mut().active_search_request = 1;
-    app.state_mut().search_query = "avatar".to_string();
+    app.state_mut().search_query.set_content("avatar");
 
     app.handle_action(Action::ToggleAddonMode).await;
     assert_eq!(app.state().mode(), AppMode::Addon);

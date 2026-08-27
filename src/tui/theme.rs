@@ -117,6 +117,17 @@ pub enum ColorSupport {
     Color256,
     Basic,
 }
+impl ColorSupport {
+    pub fn current() -> Self {
+        if std::env::var("NO_COLOR").is_ok() {
+            return ColorSupport::NoColor;
+        }
+        let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+        let term = std::env::var("TERM").unwrap_or_default();
+        let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
+        classify_terminal(&colorterm, &term, &term_program)
+    }
+}
 
 pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str) -> ColorSupport {
     let colorterm = colorterm.to_lowercase();
@@ -241,7 +252,7 @@ impl Theme {
     }
 
     pub fn from_kind(kind: ThemeKind) -> Self {
-        match kind {
+        let base = match kind {
             ThemeKind::Latte => Self::latte(),
             ThemeKind::Macchiato => Self::macchiato(),
             ThemeKind::Frappe => Self::frappe(),
@@ -251,6 +262,10 @@ impl Theme {
             ThemeKind::Gruvbox => Self::gruvbox(),
             ThemeKind::RosePine => Self::rose_pine(),
             ThemeKind::Mocha => Self::mocha(),
+        };
+        match ColorSupport::current() {
+            ColorSupport::Color256 => base.quantized_to_256(),
+            _ => base,
         }
     }
 }
@@ -265,13 +280,7 @@ impl Theme {
         if std::env::var("NO_COLOR").is_ok() {
             return Self::monochrome(resolved_light);
         }
-        let colorterm = std::env::var("COLORTERM").unwrap_or_default();
-        let term = std::env::var("TERM").unwrap_or_default();
-        let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-        Self::detect_from(
-            classify_terminal(&colorterm, &term, &term_program),
-            resolved_light,
-        )
+        Self::detect_from(ColorSupport::current(), resolved_light)
     }
 
     pub(crate) fn detect_from(support: ColorSupport, is_light: bool) -> Self {
@@ -375,7 +384,50 @@ impl Theme {
 
     pub fn fallback(is_light: bool) -> Self {
         if is_light {
-            return Self::latte();
+            return Self {
+                border: Style::default().fg(Color::DarkGray),
+                border_focus: Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+                text: Style::default().fg(Color::Black),
+                text_dim: Style::default().fg(Color::DarkGray),
+                title: Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+                highlight: Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+                header: Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+                error: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                success: Style::default().fg(Color::Green),
+                shortcut: Style::default().fg(Color::Red),
+                overlay: Style::default().fg(Color::DarkGray),
+                rating: Style::default().fg(Color::Yellow),
+                accent: Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+                muted: Style::default().fg(Color::DarkGray),
+                teal: Style::default().fg(Color::Cyan),
+                lavender: Style::default().fg(Color::Blue),
+                sapphire: Style::default().fg(Color::Blue),
+                subtext1: Style::default().fg(Color::Black),
+                base: Color::White,
+                bg: Style::default(),
+                rosewater: Style::default().fg(Color::Black),
+                flamingo: Style::default().fg(Color::Magenta),
+                maroon: Style::default().fg(Color::Red),
+                surface0: Style::default().fg(Color::DarkGray),
+                surface1: Style::default().fg(Color::DarkGray),
+                surface2: Style::default().fg(Color::Black),
+                overlay0: Style::default().fg(Color::DarkGray),
+                overlay1: Style::default().fg(Color::DarkGray),
+                overlay2: Style::default().fg(Color::Black),
+                mantle: Style::default().fg(Color::White),
+                crust: Style::default().fg(Color::White),
+                is_light: true,
+            };
         }
         Self {
             border: Style::default().fg(Color::DarkGray),
@@ -419,7 +471,7 @@ impl Theme {
             overlay2: Style::default().fg(Color::Gray),
             mantle: Style::default().fg(Color::Black),
             crust: Style::default().fg(Color::Black),
-            is_light,
+            is_light: false,
         }
     }
 
@@ -913,5 +965,34 @@ mod tests {
         assert!(!Theme::detect_from(ColorSupport::Truecolor, false).is_light);
         assert!(Theme::detect_from(ColorSupport::Truecolor, true).is_light);
         assert!(!Theme::detect_from(ColorSupport::NoColor, false).is_light);
+    }
+
+    #[test]
+    fn fallback_light_uses_high_contrast_ansi_palette_with_no_rgb() {
+        let fallback_light = Theme::fallback(true);
+        assert!(fallback_light.is_light);
+        assert_eq!(fallback_light.text.fg, Some(Color::Black));
+        assert_eq!(fallback_light.base, Color::White);
+
+        for style in [
+            fallback_light.border,
+            fallback_light.border_focus,
+            fallback_light.text,
+            fallback_light.text_dim,
+            fallback_light.title,
+            fallback_light.highlight,
+            fallback_light.header,
+            fallback_light.error,
+            fallback_light.success,
+            fallback_light.shortcut,
+            fallback_light.accent,
+        ] {
+            assert!(
+                style
+                    .fg
+                    .map(|c| !matches!(c, Color::Rgb(..)))
+                    .unwrap_or(true)
+            );
+        }
     }
 }

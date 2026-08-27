@@ -63,7 +63,7 @@ pub struct AppState {
     pub active_screen: Screen,
     pub dirty: bool,
     pub input_mode: InputMode,
-    pub search_query: String,
+    pub search_query: crate::tui::text::TextInputBuffer,
     pub last_suggest_query: String,
     pub last_search_edit: std::time::Instant,
     pub search_suggestions: Vec<String>,
@@ -221,7 +221,7 @@ impl Default for AppState {
             provider_generation: 0,
             active_screen: Screen::Home,
             input_mode: InputMode::Normal,
-            search_query: String::new(),
+            search_query: crate::tui::text::TextInputBuffer::new(),
             last_suggest_query: String::new(),
             last_search_edit: std::time::Instant::now(),
             search_suggestions: Vec::new(),
@@ -525,6 +525,19 @@ impl AppState {
             None => false,
         }
     }
+    pub fn has_active_modal(&self) -> bool {
+        self.show_help
+            || self.show_theme_popup
+            || self.show_browse_popup
+            || self.addon_manager_popup
+            || self.tv_config_popup
+            || self.player_picker_popup
+            || self.subtitle_popup
+            || self.is_download_subtitle_popup
+            || self.show_season_download_confirm
+            || self.show_episode_download_confirm
+            || self.update_available.is_some()
+    }
 
     pub fn clear_search_state(&mut self) {
         self.search_query.clear();
@@ -736,5 +749,57 @@ mod tests {
         state.normalize_result_view();
         assert_eq!(state.result_scroll, 6);
         assert!(state.search_list_state.selected().unwrap() < state.result_scroll + 6);
+    }
+
+    #[test]
+    fn test_has_active_modal_detection() {
+        let mut state = AppState::default();
+        assert!(!state.has_active_modal());
+
+        state.show_help = true;
+        assert!(state.has_active_modal());
+        state.show_help = false;
+
+        state.show_theme_popup = true;
+        assert!(state.has_active_modal());
+        state.show_theme_popup = false;
+
+        state.show_browse_popup = true;
+        assert!(state.has_active_modal());
+        state.show_browse_popup = false;
+
+        state.addon_manager_popup = true;
+        assert!(state.has_active_modal());
+        state.addon_manager_popup = false;
+
+        state.tv_config_popup = true;
+        assert!(state.has_active_modal());
+        state.tv_config_popup = false;
+
+        state.player_picker_popup = true;
+        assert!(state.has_active_modal());
+        state.player_picker_popup = false;
+
+        state.subtitle_popup = true;
+        assert!(state.has_active_modal());
+        state.subtitle_popup = false;
+
+        state.is_download_subtitle_popup = true;
+        assert!(state.has_active_modal());
+        state.is_download_subtitle_popup = false;
+
+        state.show_season_download_confirm = true;
+        assert!(state.has_active_modal());
+        state.show_season_download_confirm = false;
+
+        state.show_episode_download_confirm = true;
+        assert!(state.has_active_modal());
+        state.show_episode_download_confirm = false;
+
+        state.update_available = Some(("v2.0.0".to_string(), "Notes".to_string()));
+        assert!(state.has_active_modal());
+        state.update_available = None;
+
+        assert!(!state.has_active_modal());
     }
 }

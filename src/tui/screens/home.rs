@@ -431,8 +431,9 @@ fn search_content(
         .saturating_sub(crate::tui::text::width(prefix) as u16)
         .saturating_sub(cursor_width as u16) as usize;
     let has_status = state.status_timer > 0 && !state.status_message.is_empty();
-    let content = if state.search_query.is_empty() {
-        if has_status && !editing {
+
+    if state.search_query.is_empty() {
+        let content = if has_status && !editing {
             crate::tui::text::truncate_width(&state.status_message, available)
         } else if state.is_tv_mode {
             "Search live channels…".to_string()
@@ -440,16 +441,36 @@ fn search_content(
             "Search movies and series via addons…".to_string()
         } else {
             "Search movies and series…".to_string()
-        }
+        };
+        let cursor = if editing && !real_cursor {
+            if show_cursor { "█" } else { " " }
+        } else {
+            ""
+        };
+        format!("{prefix}{content}{cursor}")
+    } else if editing && !real_cursor {
+        let segments = state.search_query.graphemes();
+        let cursor = state.search_query.cursor();
+        let cursor_char = if show_cursor {
+            "█"
+        } else if cursor < segments.len() {
+            segments[cursor]
+        } else {
+            " "
+        };
+        let before: String = segments.iter().take(cursor).copied().collect();
+        let after: String = if cursor < segments.len() {
+            segments.iter().skip(cursor + 1).copied().collect()
+        } else {
+            String::new()
+        };
+        let full = format!("{before}{cursor_char}{after}");
+        let truncated = crate::tui::text::truncate_width(&full, available);
+        format!("{prefix}{truncated}")
     } else {
-        crate::tui::text::truncate_width(&state.search_query, available)
-    };
-    let cursor = if editing && !real_cursor {
-        if show_cursor { "█" } else { " " }
-    } else {
-        ""
-    };
-    format!("{prefix}{content}{cursor}")
+        let content = crate::tui::text::truncate_width(state.search_query.as_str(), available);
+        format!("{prefix}{content}")
+    }
 }
 
 fn render_search_bar(
@@ -507,15 +528,21 @@ fn render_search_bar(
     }
     frame.render_widget(paragraph, content_row[0]);
     if real_cursor {
-        let prefix_width = 2u16;
-        let text_width = crate::tui::text::width(&state.search_query) as u16;
-        let shown = text_width.min(content_row[0].width.saturating_sub(6));
+        let prefix_width =
+            crate::tui::text::width(if state.basic_terminal { "> " } else { "❯ " }) as u16;
+        let segments = state.search_query.graphemes();
+        let cursor = state.search_query.cursor();
+        let before_cursor: String = segments.into_iter().take(cursor).collect();
+        let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
+        let total_text_width = crate::tui::text::width(state.search_query.as_str()) as u16;
+        let shown = total_text_width.min(content_row[0].width.saturating_sub(6));
         let line_offset = if centered {
             (content_row[0].width.saturating_sub(prefix_width + shown)) / 2
         } else {
             0
         };
-        let cursor_x = content_row[0].x + line_offset + prefix_width + shown;
+        let cursor_x = (content_row[0].x + line_offset + prefix_width + before_cursor_width)
+            .min(content_row[0].right().saturating_sub(1));
         frame.set_cursor_position((cursor_x, content_row[0].y));
     }
     if let Some(status) = result_status {
@@ -906,16 +933,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             }
                         }
                         if let Some((_, proto)) = state.search_poster_protocols.peek(&res.id) {
-                            let img_height = poster_area.height.min(state.poster_rows);
-                            let img_y_offset = item_area.height.saturating_sub(img_height) / 2;
-                            let p_area = Rect {
-                                y: poster_area.y + img_y_offset,
-                                height: img_height,
-                                ..poster_area
-                            };
-                            frame.render_widget(ratatui_image::Image::new(proto), p_area);
+                            if !state.has_active_modal() {
+                                let img_height = poster_area.height.min(state.poster_rows);
+                                let img_y_offset = item_area.height.saturating_sub(img_height) / 2;
+                                let p_area = Rect {
+                                    y: poster_area.y + img_y_offset,
+                                    height: img_height,
+                                    ..poster_area
+                                };
+                                frame.render_widget(ratatui_image::Image::new(proto), p_area);
+                            }
                         }
-                    } else {
                         let is_in_flight = state.in_flight_posters.contains(&res.id);
                         let placeholder = Paragraph::new(poster_placeholder_lines(
                             state.basic_terminal,

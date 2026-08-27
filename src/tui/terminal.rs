@@ -30,3 +30,7 @@ pub fn background_is_light() -> bool {
 
     std::env::var("TERM_BACKGROUND").is_ok_and(|value| value.eq_ignore_ascii_case("light"))
 }
+
+pub fn set_window_title(title: &str) -> std::io::Result<()> {
+    crossterm::execute!(std::io::stdout(), crossterm::terminal::SetTitle(title))
+}

@@ -311,15 +311,9 @@ impl App {
                         return None;
                     }
                     if let KeyCode::Char('w') = key.code {
-                        let trimmed = self.state.search_query.trim_end();
-                        if let Some(last_space) = trimmed
-                            .rfind(|c: char| c.is_whitespace() || c == '/' || c == '-' || c == '_')
-                        {
-                            self.state.search_query.truncate(last_space);
-                        } else {
-                            self.state.search_query.clear();
-                        }
+                        self.state.search_query.delete_word_backwards();
                         self.state.suggest_index = None;
+                        self.state.search_suggestions.clear();
                         self.state.last_search_edit = std::time::Instant::now();
                         return None;
                     }
@@ -358,11 +352,11 @@ impl App {
 
                         if !query.is_empty() {
                             if query.trim().eq_ignore_ascii_case("/history") {
-                                self.state.search_query = "/history".to_string();
+                                self.state.search_query.set_content("/history");
                             } else if query.starts_with('/') {
                                 self.state.search_query.clear();
                             } else {
-                                self.state.search_query = query.clone();
+                                self.state.search_query.set_content(&query);
                             }
                             self.state.input_mode = InputMode::Normal;
                             self.state.search_suggestions.clear();
@@ -397,17 +391,42 @@ impl App {
                                 .or_else(|| self.state.search_suggestions.first().cloned())
                         };
                         if let Some(sug) = selected_or_first {
-                            self.state.search_query = sug;
+                            self.state.search_query.set_content(&sug);
                             self.state.last_search_edit = std::time::Instant::now();
                         }
                     }
+                    KeyCode::Left => {
+                        self.state.search_query.move_left();
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
+                    KeyCode::Right => {
+                        self.state.search_query.move_right();
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
+                    KeyCode::Home => {
+                        self.state.search_query.move_home();
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
+                    KeyCode::End => {
+                        self.state.search_query.move_end();
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
                     KeyCode::Backspace => {
-                        crate::tui::text::remove_last_grapheme(&mut self.state.search_query);
+                        self.state.search_query.delete_backwards();
+                        self.state.suggest_index = None;
+                        self.state.last_search_edit = std::time::Instant::now();
+                    }
+                    KeyCode::Delete => {
+                        self.state.search_query.delete_forwards();
                         self.state.suggest_index = None;
                         self.state.last_search_edit = std::time::Instant::now();
                     }
                     KeyCode::Char(c) => {
-                        self.state.search_query.push(c);
+                        self.state.search_query.insert(c);
                         self.state.suggest_index = None;
                         self.state.last_search_edit = std::time::Instant::now();
                     }
@@ -884,7 +903,7 @@ impl App {
                             if c == '/' {
                                 self.state.search_query.clear();
                             }
-                            self.state.search_query.push(c);
+                            self.state.search_query.insert(c);
 
                             self.state.search_suggestions.clear();
                             self.state.suggest_index = None;

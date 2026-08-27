@@ -99,7 +99,7 @@ pub fn download_confirm_layout(
 }
 
 pub fn download_confirm_action_row(popup: Rect, summary_lines: usize) -> u16 {
-    popup.y + summary_lines as u16 + 2
+    popup.y + summary_lines as u16 + 1
 }
 
 pub fn picker(
@@ -679,5 +679,29 @@ mod tests {
         assert_eq!(large.popup_area.width, 72);
         assert_eq!(large.display_count, 10);
         assert!(large.has_more);
+    }
+
+    #[test]
+    fn test_download_confirm_action_row_matches_rendered_button_section() {
+        let popup = Rect::new(10, 10, 40, 10);
+        let summary_lines = 3;
+        let action_row = download_confirm_action_row(popup, summary_lines);
+
+        // Borders = 1 (top border at popup.y), Summary = 3 lines (popup.y + 1 .. popup.y + 4)
+        // Action row = popup.y + 1 + 3 = popup.y + 4
+        assert_eq!(action_row, popup.y + 4);
+        assert!(popup.contains(ratatui::layout::Position::new(popup.x + 2, action_row)));
+    }
+
+    #[test]
+    fn test_download_confirm_zones_do_not_overlap() {
+        let area = Rect::new(0, 0, 80, 24);
+        let summary_lines = 4;
+        let longest = 30;
+        let popup = download_confirm_layout(area, summary_lines, longest);
+        let action_row = download_confirm_action_row(popup, summary_lines);
+
+        assert!(popup.contains(ratatui::layout::Position::new(popup.x + 1, action_row)));
+        assert!(action_row < popup.bottom() - 1); // Action row is inside inner area before footer/border
     }
 }
