@@ -259,10 +259,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     ]));
 
     let content_width = help_text.iter().map(Line::width).max().unwrap_or(42) as u16;
-    let total_lines = help_text.len() as u16;
     let capacity = area.height.saturating_sub(6).max(4) as usize;
 
-    if total_lines as usize > capacity {
+    let two_columns = area.width >= 90;
+
+    let required_lines = if two_columns {
+        help_text.len().div_ceil(2)
+    } else {
+        help_text.len()
+    };
+
+    if required_lines > capacity && !two_columns {
         let max_scroll = help_text.len().saturating_sub(capacity);
         let scroll = state.help_scroll.min(max_scroll);
         let window: Vec<Line> = help_text[scroll..scroll + capacity.min(help_text.len())].to_vec();
@@ -294,19 +301,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         return;
     }
 
-    let two_columns = total_lines as usize > capacity;
-
     let desired_width = if two_columns {
         content_width.saturating_mul(2).saturating_add(8)
     } else {
         content_width.saturating_add(4)
     };
 
-    let desired_height = if two_columns {
-        total_lines.div_ceil(2) + 2
-    } else {
-        total_lines + 2
-    };
+    let desired_height = required_lines as u16 + 2;
 
     let popup_chunk = crate::tui::overlay::centered(area, desired_width, desired_height, 46, 120);
 

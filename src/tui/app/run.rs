@@ -646,7 +646,16 @@ impl App {
                 };
 
                 let gauge = Gauge::default()
-                    .block(Block::default().borders(Borders::ALL).title(title_text))
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(title_text)
+                            .border_style(self.theme.lavender)
+                            .title_style(self.theme.title)
+                            .border_type(crate::tui::overlay::border_type(
+                                self.state.basic_terminal,
+                            )),
+                    )
                     .gauge_style(self.theme.accent)
                     .ratio((prog / 100.0).clamp(0.0, 1.0));
 

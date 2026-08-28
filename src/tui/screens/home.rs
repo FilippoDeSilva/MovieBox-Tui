@@ -236,7 +236,7 @@ fn render_search_state(
         return;
     }
 
-    let card_width = area.width.min(64);
+    let mut card_width = area.width.min(64);
     let query = crate::tui::text::truncate_width(
         &state.search_query,
         card_width.saturating_sub(10) as usize,
@@ -308,22 +308,43 @@ fn render_search_state(
                 Span::styled(msg, theme.text),
             ]));
             lines.push(Line::from(""));
-            lines.push(Line::from(vec![
-                Span::styled("[", theme.text_dim),
-                Span::styled(&ctrl_p, theme.shortcut),
-                Span::styled("] ", theme.text_dim),
-                Span::styled("Switch provider", theme.text_dim),
-                Span::styled(bullet, theme.text_dim),
-                Span::styled("[", theme.text_dim),
-                Span::styled("/browse", theme.shortcut),
-                Span::styled("] ", theme.text_dim),
-                Span::styled("Browse categories", theme.text_dim),
-                Span::styled(bullet, theme.text_dim),
-                Span::styled("[", theme.text_dim),
-                Span::styled(&ctrl_u, theme.shortcut),
-                Span::styled("] ", theme.text_dim),
-                Span::styled("Clear", theme.text_dim),
-            ]));
+            if area.width < 76 {
+                lines.push(Line::from(vec![
+                    Span::styled("[", theme.text_dim),
+                    Span::styled(&ctrl_p, theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Switch provider", theme.text_dim),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("[", theme.text_dim),
+                    Span::styled("/browse", theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Browse categories", theme.text_dim),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("[", theme.text_dim),
+                    Span::styled(&ctrl_u, theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Clear", theme.text_dim),
+                ]));
+            } else {
+                lines.push(Line::from(vec![
+                    Span::styled("[", theme.text_dim),
+                    Span::styled(&ctrl_p, theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Switch provider", theme.text_dim),
+                    Span::styled(bullet, theme.text_dim),
+                    Span::styled("[", theme.text_dim),
+                    Span::styled("/browse", theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Browse categories", theme.text_dim),
+                    Span::styled(bullet, theme.text_dim),
+                    Span::styled("[", theme.text_dim),
+                    Span::styled(&ctrl_u, theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Clear", theme.text_dim),
+                ]));
+            }
         }
         SearchViewState::Error => {
             let symbol = if state.basic_terminal { "!" } else { "×" };
@@ -377,6 +398,11 @@ fn render_search_state(
         _ => return,
     };
 
+    let max_line_width = lines.iter().map(|l| l.width()).max().unwrap_or(0) as u16;
+    if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
+        card_width = max_line_width.clamp(20, area.width.min(64));
+    }
+
     let card_height = (lines.len() as u16).min(area.height);
     let card = Rect {
         x: area.x + area.width.saturating_sub(card_width) / 2,
@@ -385,7 +411,13 @@ fn render_search_state(
         height: card_height,
     };
 
-    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), card);
+    let alignment = if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
+        Alignment::Left
+    } else {
+        Alignment::Center
+    };
+
+    frame.render_widget(Paragraph::new(lines).alignment(alignment), card);
 }
 fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     if area.height < 2 || area.width < 20 {
@@ -859,15 +891,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         };
 
         let results_chunk = if has_results { chunks[2] } else { chunks[4] };
-        search_bar_area = if has_results {
-            Rect {
-                x: chunks[0].x + 2,
-                width: chunks[0].width.saturating_sub(4),
-                ..chunks[0]
-            }
-        } else {
-            let search_width = search_deck_width(area, state, false);
-            centered_width(chunks[0], search_width)
+        search_bar_area = Rect {
+            x: chunks[0].x + 2,
+            width: chunks[0].width.saturating_sub(4),
+            ..chunks[0]
         };
         render_search_bar(
             frame,

@@ -27,7 +27,7 @@ pub fn render_single_line_input(
 
     let mut before_cursor: String = segments[start..cursor].concat();
     if start > 0 && before_cursor.chars().count() > 3 {
-        before_cursor = format!("...{}", &before_cursor[3..]);
+        before_cursor = format!("...{}", before_cursor.chars().skip(3).collect::<String>());
     }
 
     let cursor_char = if cursor < segments.len() {

@@ -134,6 +134,15 @@
   chunk before rendering search cards, eliminating ghost text artifacts (such as ASCII
   headers or landing row labels) bleeding through beneath unselected cards in multi-column grids.
 - **Modal key trapping & isolation**: structural modal gating prevents mode
+- **Search dropdown alignment & bleed**: Pinned the suggestion dropdown position to the search bar for stability, fixed layout starvation edge cases allowing background colors to bleed, and padded visual pill badges to standard widths.
+- **Search bar view normalization**: Search bar correctly fills terminal width rather than floating when active in empty, No Results, and Error states.
+- **Centered text-aligned error cards**: Replaced per-line centering on multiline diagnostic error states with block-level centering containing cleanly left-aligned text, making diagnostics far more readable.
+- **Adaptive No Results layout**: Wrapped action pill shortcuts (`[Ctrl+P]`, `[/browse]`, `[Ctrl+U]`) across multiple lines rather than clipping on terminal windows narrower than 76 columns.
+- **Text poster fallback clamp**: Fixed an edge case where text-based "No Poster" fallbacks expanded beyond visual limits in compact window modes.
+- **Results metadata line truncation**: Added defensive truncation across styled multi-span metadata lines in search results to protect multi-column layouts from overflow crashes.
+- **TV & Addon Manager visual polish**: Aligned the selection cursor perfectly in TV playlist manager without introducing a visual shift, and switched the Addon Manager to `render_stateful_widget` enabling deep scrolling with vertical scrollbars.
+- **Dual-column Help overlay layout**: Implemented a responsive two-column Help layout for wide viewports (>=90 cols), fitting the entire Help guide on one screen without scrolling.
+- **Picker & Stream list mouse offsets**: Rectified a bounds calculation mapping `click_in_picker` to the popup height instead of the active screen area which restricted clicks, and repaired stream-row mouse tracking which was previously ignoring `stream_scroll` offsets.
   chords (`Ctrl+T`, `Ctrl+A`, `Ctrl+S`, `Ctrl+P`), download cancellation (`x`),
   and background pane navigation from leaking into open dialogs and inputs.
 - **Modal exact clears**: replaced 3-column halo clear with exact popup bounding box

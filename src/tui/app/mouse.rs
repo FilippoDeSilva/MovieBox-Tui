@@ -60,6 +60,7 @@ impl App {
                 row,
                 &self.state.theme_list_state,
                 items.len(),
+                area,
             ) {
                 Some(Some(clicked_idx)) => {
                     self.state.theme_list_state.select(Some(clicked_idx));
@@ -103,6 +104,7 @@ impl App {
                 row,
                 &self.state.browse_list_state,
                 browse_items.len(),
+                area,
             ) {
                 Some(Some(clicked_idx)) => {
                     self.state.browse_list_state.select(Some(clicked_idx));
@@ -170,6 +172,7 @@ impl App {
                 row,
                 &self.state.player_picker_state,
                 items.len(),
+                area,
             ) {
                 Some(Some(clicked_idx)) => {
                     self.state.player_picker_state.select(Some(clicked_idx));
@@ -207,6 +210,7 @@ impl App {
                 row,
                 &self.state.subtitle_list_state,
                 items.len(),
+                area,
             ) {
                 Some(Some(clicked_idx)) => {
                     self.state.subtitle_list_state.select(Some(clicked_idx));
@@ -817,7 +821,9 @@ impl App {
                     .cloned()
                     .unwrap_or_default();
 
-                let clicked_stream_row = row.saturating_sub(streams_area.y + 1);
+                let clicked_stream_row = row
+                    .saturating_sub(streams_area.y + 1)
+                    .saturating_add(self.state.resource_list_state.offset() as u16);
                 let mut line_offset = 0_u16;
                 let mut prev_resolution = None;
                 let mut matched_idx = None;
@@ -988,11 +994,12 @@ fn click_in_picker(
     row: u16,
     state: &ratatui::widgets::ListState,
     total_items: usize,
+    area: Rect,
 ) -> Option<Option<usize>> {
     if !popup.contains(ratatui::layout::Position::new(col, row)) {
         return None;
     }
-    let visible_rows = total_items.clamp(1, crate::tui::overlay::max_picker_rows(popup));
+    let visible_rows = total_items.clamp(1, crate::tui::overlay::max_picker_rows(area));
     let offset = state.offset();
     let item_y = popup.y.saturating_add(1);
     if row >= item_y && (row - item_y) < visible_rows as u16 {
