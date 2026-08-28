@@ -1838,7 +1838,7 @@ fn suggestion_source_badge<'a>(
 }
 
 pub fn search_suggestions_bounds(area: Rect, search_bar_area: Rect, count: usize) -> (Rect, Rect) {
-    if count == 0 || search_bar_area.width == 0 {
+    if count == 0 || search_bar_area.width == 0 || area.width == 0 || area.height == 0 {
         return (Rect::default(), Rect::default());
     }
 
@@ -1846,14 +1846,18 @@ pub fn search_suggestions_bounds(area: Rect, search_bar_area: Rect, count: usize
     let max_h = area.bottom().saturating_sub(start_y);
     let container_h = ((count as u16).saturating_add(2)).min(max_h);
 
-    let max_w = area
-        .right()
-        .saturating_sub(search_bar_area.x)
-        .saturating_sub(1);
-    let container_w = search_bar_area.width.max(48).min(max_w);
+    let is_centered = search_bar_area.x > area.x;
+    let container_w = search_bar_area.width.min(area.width);
+    let x = if is_centered {
+        search_bar_area.x + search_bar_area.width.saturating_sub(container_w) / 2
+    } else {
+        search_bar_area
+            .x
+            .min(area.right().saturating_sub(container_w))
+    };
 
     let container_area = Rect {
-        x: search_bar_area.x,
+        x,
         y: start_y,
         width: container_w,
         height: container_h,
@@ -2086,6 +2090,50 @@ mod tests {
         assert!(rendered.contains('▌'));
         assert!(!rendered.contains('├'));
         assert!(!rendered.contains('└'));
+    }
+
+    #[test]
+    fn test_landing_draw_hides_favorites_when_suggestions_open() {
+        let backend = TestBackend::new(90, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Editing,
+            streaming_enabled: true,
+            search_suggestions: vec!["/help".to_string(), "Inception".to_string()],
+            suggest_index: Some(0),
+            ..Default::default()
+        };
+        state.favorites.items.push(crate::favorites::FavoriteItem {
+            provider: "moviebox".to_string(),
+            subject_id: "fav-1".to_string(),
+            title: "Secret Favorite Movie".to_string(),
+            cover_url: None,
+            stype: 1,
+            release_year: "2024".to_string(),
+            added_at: 0,
+        });
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 90, 24);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..90 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("help"));
+        assert!(rendered.contains("Inception"));
+        assert!(!rendered.contains("Favorites"));
+        assert!(!rendered.contains("Secret Favorite Movie"));
     }
 
     #[test]

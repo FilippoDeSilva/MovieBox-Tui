@@ -593,7 +593,9 @@ impl AppState {
     }
 
     pub fn favorites_landing_visible(&self) -> bool {
-        self.favorites_available() && !self.favorites.items.is_empty()
+        self.favorites_available()
+            && !self.favorites.items.is_empty()
+            && !(self.input_mode == InputMode::Editing && !self.search_suggestions.is_empty())
     }
 
     pub fn favorites_landing_items(&self) -> Vec<&crate::favorites::FavoriteItem> {
@@ -818,5 +820,34 @@ mod tests {
         state.input_mode = InputMode::Normal;
 
         assert!(!state.has_active_modal());
+    }
+
+    #[test]
+    fn test_favorites_landing_visible_conditions() {
+        let mut state = AppState::default();
+        state.favorites.items.clear();
+        state.streaming_enabled = true;
+        assert!(!state.favorites_landing_visible());
+        state.favorites.items.push(crate::favorites::FavoriteItem {
+            provider: "moviebox".to_string(),
+            subject_id: "fav-1".to_string(),
+            title: "Favorite Movie".to_string(),
+            cover_url: None,
+            stype: 1,
+            release_year: "2024".to_string(),
+            added_at: 0,
+        });
+        assert!(state.favorites_landing_visible());
+
+        state.input_mode = InputMode::Editing;
+        state.search_suggestions = vec!["suggestion".to_string()];
+        assert!(!state.favorites_landing_visible());
+
+        state.search_suggestions.clear();
+        assert!(state.favorites_landing_visible());
+
+        state.search_suggestions = vec!["suggestion".to_string()];
+        state.input_mode = InputMode::Normal;
+        assert!(state.favorites_landing_visible());
     }
 }

@@ -393,37 +393,17 @@ impl App {
         let search_width =
             crate::tui::screens::home::search_deck_width(area, &self.state, is_landing);
 
-        let search_bar_area = if is_landing {
-            let (tier, rows) = crate::tui::screens::home::landing_split(
+        let landing_layout = if is_landing {
+            Some(crate::tui::screens::home::landing_split(
                 area,
                 self.state.is_tv_mode,
                 self.state.basic_terminal,
-            );
-            let compact = tier.is_compact();
+            ))
+        } else {
+            None
+        };
 
-            if row == rows.rects[rows.mode_row].y {
-                if compact {
-                    let util_split = area.width.saturating_sub(19);
-                    if col < util_split {
-                        self.handle_home_mode_click(col, util_split, true);
-                    } else {
-                        self.handle_home_util_click(col.saturating_sub(util_split), 19, true);
-                    }
-                } else {
-                    self.handle_home_mode_click(col, area.width, false);
-                }
-                return None;
-            }
-            if rows.util_row.is_some() && row == rows.rects[rows.util_row.unwrap()].y {
-                self.handle_home_util_click(col, area.width, false);
-                return None;
-            }
-            if self.state.favorites_landing_visible()
-                && self.handle_favorites_landing_click(col, row, rows.rects[rows.favorites])
-            {
-                return None;
-            }
-
+        let search_bar_area = if let Some((_, ref rows)) = landing_layout {
             centered_width_rect(rows.rects[rows.search], search_width)
         } else {
             let chunks = Layout::default()
@@ -442,7 +422,6 @@ impl App {
                 height: chunks[0].height,
             }
         };
-
         if self.state.input_mode == InputMode::Editing && !self.state.search_suggestions.is_empty()
         {
             let visible_count = self.state.search_suggestions.len().min(6);
@@ -488,6 +467,33 @@ impl App {
                 && col < container_area.right()
                 && row >= container_area.top()
                 && row < container_area.bottom()
+            {
+                return None;
+            }
+        }
+
+        if let Some((tier, rows)) = landing_layout {
+            let compact = tier.is_compact();
+
+            if row == rows.rects[rows.mode_row].y {
+                if compact {
+                    let util_split = area.width.saturating_sub(19);
+                    if col < util_split {
+                        self.handle_home_mode_click(col, util_split, true);
+                    } else {
+                        self.handle_home_util_click(col.saturating_sub(util_split), 19, true);
+                    }
+                } else {
+                    self.handle_home_mode_click(col, area.width, false);
+                }
+                return None;
+            }
+            if rows.util_row.is_some() && row == rows.rects[rows.util_row.unwrap()].y {
+                self.handle_home_util_click(col, area.width, false);
+                return None;
+            }
+            if self.state.favorites_landing_visible()
+                && self.handle_favorites_landing_click(col, row, rows.rects[rows.favorites])
             {
                 return None;
             }
