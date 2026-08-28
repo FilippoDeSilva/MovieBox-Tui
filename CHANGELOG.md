@@ -19,6 +19,7 @@
 - **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
 
 ### Changed
+- **Clean search suggestion dropdown card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
 - **Streamlined search suggestions dropdown**: Removed redundant `[SUGGEST]` badges on regular title queries, replaced tree branch glyphs with clean `▌ ` / `> ` selection indicators, and added full-width active row background styling.
 - **Streams list tabular column alignment**: Standardized resolution badges to a uniform 7-column width and aligned file size, codec/media tags, duration, and uploader columns across all resolution tiers.
 - **Clean streams section headers**: Replaced solid block badges on stream quality group headers with clean typographic labels (`1080p · 1 option`) eliminating double-box visual clutter.

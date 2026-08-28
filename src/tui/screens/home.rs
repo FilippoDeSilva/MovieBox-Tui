@@ -1842,12 +1842,15 @@ pub fn search_suggestions_bounds(area: Rect, search_bar_area: Rect, count: usize
         return (Rect::default(), Rect::default());
     }
 
-    let start_y = search_bar_area.bottom();
+    let start_y = search_bar_area.y + 1;
     let max_h = area.bottom().saturating_sub(start_y);
     let container_h = ((count as u16).saturating_add(2)).min(max_h);
 
     let is_centered = search_bar_area.x > area.x;
-    let container_w = search_bar_area.width.min(area.width);
+    let container_w = search_bar_area
+        .width
+        .min(area.width.saturating_sub(2))
+        .max(40);
     let x = if is_centered {
         search_bar_area.x + search_bar_area.width.saturating_sub(container_w) / 2
     } else {
@@ -1918,8 +1921,7 @@ fn render_search_suggestions(
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-        .border_style(theme.border_focus)
-        .style(Style::default().bg(theme.surface0.fg.unwrap_or(theme.base)));
+        .border_style(theme.border_focus);
     frame.render_widget(container_block, container_area);
 
     for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
@@ -1951,12 +1953,11 @@ fn render_search_suggestions(
 
         let desc = slash_command_description(suggestion, state);
 
-        let row_bg = if is_selected {
-            theme.surface1.fg.unwrap_or(theme.base)
+        let row_style = if is_selected {
+            Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
         } else {
-            theme.surface0.fg.unwrap_or(theme.base)
+            Style::default()
         };
-        let row_style = Style::default().bg(row_bg);
 
         let text_style = if is_selected {
             theme.highlight.add_modifier(Modifier::BOLD)
@@ -2142,11 +2143,11 @@ mod tests {
         let search_bar = Rect::new(10, 2, 60, 3);
         let (container, inner) = search_suggestions_bounds(area, search_bar, 3);
         assert_eq!(container.x, 10);
-        assert_eq!(container.y, 5);
+        assert_eq!(container.y, 3);
         assert_eq!(container.width, 60);
         assert_eq!(container.height, 5);
         assert_eq!(inner.x, 11);
-        assert_eq!(inner.y, 6);
+        assert_eq!(inner.y, 4);
         assert_eq!(inner.width, 58);
         assert_eq!(inner.height, 3);
     }
