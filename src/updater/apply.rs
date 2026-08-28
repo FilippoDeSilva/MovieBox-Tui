@@ -176,7 +176,9 @@ fn render_helper_script(staged_path: &Path, current_exe: &Path, pid: u32) -> Str
     [
         "@echo off".to_string(),
         ":wait_loop".to_string(),
-        format!("tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL"),
+        format!(
+            "tasklist /FI \"PID eq {pid}\" 2>NUL | %SystemRoot%\\System32\\find.exe \"{pid}\" >NUL"
+        ),
         "if %ERRORLEVEL% == 0 (".to_string(),
         "    timeout /t 1 /nobreak >NUL".to_string(),
         "    goto wait_loop".to_string(),
@@ -268,7 +270,9 @@ mod tests {
         );
         let lines: Vec<&str> = script.split("\r\n").collect();
         assert_eq!(lines[0], "@echo off");
-        assert!(script.contains("tasklist /FI \"PID eq 4242\""));
+        assert!(script.contains(
+            "tasklist /FI \"PID eq 4242\" 2>NUL | %SystemRoot%\\System32\\find.exe \"4242\" >NUL"
+        ));
         assert!(script.contains(
             "move /y \"C:\\App\\update dir\\.moviebox_update_staged.exe\" \"C:\\App\\moviebox-tui.exe\""
         ));

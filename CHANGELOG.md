@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Season Download Stream Error Recovery**: Prevented download queue stalls when resolving individual episode stream URLs fails; failed streams report diagnostics and allow the remaining queue to continue.
+- **Favorites & Watch History Corruption Recovery**: Corrupted JSON configuration and history state files now rotate to `.corrupt` backups instead of hard deletion, preserving recoverable user data.
+- **Details Screen Hit-Testing & Selector Alignment**: Aligned mouse hit-testing regions and season/episode selector column geometry across all compact, medium, and wide terminal tiers.
+- **Unicode Display Width in Input Widgets**: Single-line text input fields now compute column offsets using visual Unicode width instead of raw character counts, preventing CJK and multi-byte character overflow from wrapping box borders.
+- **M3U Playlist Channel Title Parsing**: Channel titles containing commas in `#EXTINF` metadata are now parsed without truncation, preserving complete channel display names.
+- **Subtitle Cache Purge Path Alignment**: Aligned `purge_stale_subtitles` with `resolve_subtitle_dir()` to ensure downloaded subtitle sidecars are cleaned automatically on startup.
+- **Android Termux Directory Resolution**: Added comprehensive fallback resolution for config, cache, and data directories when `dirs::*` returns `None` on Android Termux.
+- **Android Termux Self-Update Protection**: Added architecture guard preventing Termux from downloading incompatible glibc Linux ARM64 binaries that overwrite working Bionic installations.
+- **Windows UNC & Extended Path Escaping**: Preserved leading backslashes on Windows UNC (`\\server\share`) and extended-length (`\\?\`) paths when formatting player arguments.
+- **Windows Update Helper `find.exe` Qualification**: Explicitly qualified `%SystemRoot%\System32\find.exe` in the update helper `.bat` script to prevent shadowing by Git for Windows' `find.exe`.
+- **Windows NTFS Forbidden Character Sanitization**: Hardened tracker state file generation by stripping control characters and NTFS forbidden characters (`*`, `?`, `"`, `<`, `>`, `|`, `:`).
+- **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
+
 ### Changed
 - **Responsive Mode Tabs**: Mode tabs on compact viewports dynamically abbreviate to `<76` (`[Ctrl+S] Stream`) and ultra-compact `<58` (`[S] Stream`), protecting them against collisions with the right-aligned utility bar.
 - **TV Mode Logo Responsiveness**: Terminal width `<80` triggers the narrower 33-column compact logo to render in TV mode, establishing clean margins on medium setups.

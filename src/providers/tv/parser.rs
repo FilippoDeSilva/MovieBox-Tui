@@ -135,7 +135,7 @@ impl M3UParser {
                 current_channel.logo = extract_attr(line, "tvg-logo");
                 current_channel.group = extract_attr(line, "group-title");
 
-                if let Some(idx) = line.rfind(',') {
+                if let Some(idx) = find_extinf_title_comma(line) {
                     current_channel.name = line[idx + 1..].trim().to_string();
                 }
             } else if !line.starts_with('#') {
@@ -157,6 +157,19 @@ impl M3UParser {
 
         channels
     }
+}
+
+fn find_extinf_title_comma(line: &str) -> Option<usize> {
+    let mut in_quote: Option<char> = None;
+    for (idx, ch) in line.char_indices() {
+        match in_quote {
+            Some(quote) if ch == quote => in_quote = None,
+            None if ch == '"' || ch == '\'' => in_quote = Some(ch),
+            None if ch == ',' => return Some(idx),
+            _ => {}
+        }
+    }
+    line.find(',')
 }
 
 fn cache_filename(raw: &str) -> String {
@@ -197,5 +210,21 @@ http://example.com/discovery.m3u8
         assert_eq!(channels[2].name, "Discovery Channel");
         assert_eq!(channels[2].group, "");
         assert_eq!(channels[2].stream_url, "http://example.com/discovery.m3u8");
+    }
+
+    #[test]
+    fn test_parse_m3u_title_with_commas_and_quoted_attributes() {
+        let parser = M3UParser::new();
+        let content = r#"#EXTM3U
+#EXTINF:-1 tvg-id="cnn.us" group-title="News, International",CNN, The Worldwide News Leader
+http://example.com/cnn.m3u8
+#EXTINF:0,Movie Channel, HD (US), 24/7
+http://example.com/movie.m3u8
+"#;
+        let channels = parser.parse_m3u(content);
+        assert_eq!(channels.len(), 2);
+        assert_eq!(channels[0].name, "CNN, The Worldwide News Leader");
+        assert_eq!(channels[0].group, "News, International");
+        assert_eq!(channels[1].name, "Movie Channel, HD (US), 24/7");
     }
 }

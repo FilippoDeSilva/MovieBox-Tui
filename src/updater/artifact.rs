@@ -32,12 +32,8 @@ impl TargetPlatform {
     }
 
     pub fn detect(os: &str, arch: &str, is_termux: bool) -> Option<Self> {
-        if is_termux {
-            if arch == "aarch64" || arch == "arm64" {
-                return Some(Self::LinuxArm64);
-            } else {
-                return None;
-            }
+        if is_termux || os == "android" {
+            return None;
         }
 
         match os {
@@ -75,7 +71,10 @@ impl TargetPlatform {
 }
 
 pub fn is_termux_environment() -> bool {
-    std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
+    cfg!(target_os = "android")
+        || std::env::var("TERMUX_VERSION").is_ok()
+        || std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
+        || std::path::Path::new("/data/data/com.termux/files/usr").exists()
 }
 
 impl Release {

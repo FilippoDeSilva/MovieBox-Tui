@@ -50,7 +50,17 @@ impl FavoritesManager {
                     return manager;
                 }
             }
-            let _ = fs::remove_file(path);
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
+            log::error!(
+                "failed to parse favorites from {}, rotating to {}",
+                crate::logging::sanitize_path(path),
+                crate::logging::sanitize_path(&corrupt_path)
+            );
+            let _ = fs::rename(path, corrupt_path);
         }
         Self::default()
     }
@@ -298,6 +308,11 @@ mod tests {
         let loaded = FavoritesManager::load_from_path(&path);
         assert!(loaded.items.is_empty());
         assert!(!path.exists());
+        let corrupt_exists = std::fs::read_dir(&temp_dir)
+            .unwrap()
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().contains("corrupt"));
+        assert!(corrupt_exists, "expected .corrupt backup file");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

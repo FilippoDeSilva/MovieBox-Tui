@@ -43,22 +43,70 @@ pub fn config_dir() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("MOVIEBOX_CONFIG_DIR") {
         return Some(PathBuf::from(dir));
     }
-    dirs::config_dir().map(|dir| dir.join(APP_NAME))
+    if let Some(dir) = dirs::config_dir() {
+        return Some(dir.join(APP_NAME));
+    }
+    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+        let p = PathBuf::from(xdg);
+        if !p.as_os_str().is_empty() {
+            return Some(p.join(APP_NAME));
+        }
+    }
+    if let Ok(prefix) = std::env::var("PREFIX") {
+        let p = PathBuf::from(prefix).join("etc").join(APP_NAME);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    dirs::home_dir().map(|h| h.join(".config").join(APP_NAME))
 }
 
 pub fn data_dir() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("MOVIEBOX_DATA_DIR") {
         return Some(PathBuf::from(dir));
     }
-    dirs::data_dir().map(|dir| dir.join(APP_NAME))
+    if let Some(dir) = dirs::data_dir() {
+        return Some(dir.join(APP_NAME));
+    }
+    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+        let p = PathBuf::from(xdg);
+        if !p.as_os_str().is_empty() {
+            return Some(p.join(APP_NAME));
+        }
+    }
+    if let Ok(prefix) = std::env::var("PREFIX") {
+        let p = PathBuf::from(prefix).join("var").join("lib").join(APP_NAME);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    dirs::home_dir().map(|h| h.join(".local").join("share").join(APP_NAME))
 }
 
 pub fn cache_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("MOVIEBOX_CACHE_DIR") {
         return PathBuf::from(dir);
     }
-    dirs::cache_dir()
-        .map(|dir| dir.join(APP_NAME))
+    if let Some(dir) = dirs::cache_dir() {
+        return dir.join(APP_NAME);
+    }
+    if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
+        let p = PathBuf::from(xdg);
+        if !p.as_os_str().is_empty() {
+            return p.join(APP_NAME);
+        }
+    }
+    if let Ok(prefix) = std::env::var("PREFIX") {
+        let p = PathBuf::from(prefix)
+            .join("var")
+            .join("cache")
+            .join(APP_NAME);
+        if p.exists() {
+            return p;
+        }
+    }
+    dirs::home_dir()
+        .map(|h| h.join(".cache").join(APP_NAME))
         .unwrap_or_else(|| std::env::temp_dir().join(APP_NAME))
 }
 

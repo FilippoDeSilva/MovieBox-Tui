@@ -155,7 +155,17 @@ impl HistoryManager {
                         hist.hydrate_watched_index();
                         hist
                     } else {
-                        let _ = fs::remove_file(&path);
+                        let stamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
+                        log::error!(
+                            "failed to parse watch history from {}, rotating to {}",
+                            crate::logging::sanitize_path(&path),
+                            crate::logging::sanitize_path(&corrupt_path)
+                        );
+                        let _ = fs::rename(&path, corrupt_path);
                         Self::default()
                     }
                 } else {
@@ -320,6 +330,7 @@ impl HistoryManager {
             let excess = self.recent.len() - 100;
             self.recent.drain(0..excess);
         }
+        self.save();
     }
 
     pub fn update_progress(

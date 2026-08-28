@@ -703,19 +703,16 @@ impl App {
             return None;
         }
 
-        let visible_selector_panes = if matches!(
-            tier,
-            crate::tui::screens::details::DetailsLayoutTier::Narrow
-                | crate::tui::screens::details::DetailsLayoutTier::Tiny
-        ) {
-            available_panes
-                .iter()
-                .copied()
-                .filter(|pane| *pane == self.state.details_pane)
-                .collect::<Vec<_>>()
-        } else {
-            available_panes
-        };
+        let visible_selector_panes =
+            if matches!(tier, crate::tui::screens::details::DetailsLayoutTier::Tiny) {
+                available_panes
+                    .iter()
+                    .copied()
+                    .filter(|pane| *pane == self.state.details_pane)
+                    .collect::<Vec<_>>()
+            } else {
+                available_panes
+            };
 
         let selector_height = if visible_selector_panes.is_empty() {
             0
@@ -732,7 +729,7 @@ impl App {
             language_count
                 .max(self.state.available_seasons.len())
                 .max(episode_count)
-                .min(4) as u16
+                .min((bottom_area.height / 3).clamp(4, 10) as usize) as u16
                 + 2
         };
 

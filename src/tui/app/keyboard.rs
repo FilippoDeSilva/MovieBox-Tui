@@ -119,6 +119,7 @@ impl App {
             match key.code {
                 KeyCode::Char('u') | KeyCode::Char('U') => {
                     self.action_sender.send(Action::StartSelfUpdate).ok();
+                    return None;
                 }
                 KeyCode::Char('o') | KeyCode::Char('O') => {
                     let url = format!(
@@ -127,13 +128,14 @@ impl App {
                     );
                     let _ = open::that(&url);
                     self.state.update_available = None;
+                    return None;
                 }
                 KeyCode::Esc => {
                     self.state.update_available = None;
+                    return None;
                 }
                 _ => {}
             }
-            return None;
         }
 
         if self.state.show_browse_popup {
@@ -1298,10 +1300,49 @@ mod tests {
         app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(2));
-
         // Jump to Home with g
         app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn test_update_modal_keystroke_fallthrough() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.update_available = Some(("2.0.0".to_string(), "Notes".to_string()));
+        app.state.search_results = vec![
+            crate::models::SearchResult {
+                id: "1".to_string(),
+                title: "Movie 1".to_string(),
+                stype: 1,
+                release_year: "2020".to_string(),
+                provider: crate::models::ProviderKind::MovieBox,
+                cover_url: None,
+                season: 0,
+                episode: 0,
+            },
+            crate::models::SearchResult {
+                id: "2".to_string(),
+                title: "Movie 2".to_string(),
+                stype: 1,
+                release_year: "2021".to_string(),
+                provider: crate::models::ProviderKind::MovieBox,
+                cover_url: None,
+                season: 0,
+                episode: 0,
+            },
+        ];
+        app.state.search_list_state.select(Some(0));
+
+        // End key should fall through and jump to end of search list
+        app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.search_list_state.selected(), Some(1));
+        // Esc should dismiss the update modal
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        assert!(app.state.update_available.is_none());
     }
 }

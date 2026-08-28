@@ -2057,6 +2057,15 @@ impl App {
                 );
                 self.state.stream_error = Some(err.clone());
                 self.state.set_status_default(format!("Error: {}", err));
+                if self.state.is_waiting_for_download_stream {
+                    self.state.is_waiting_for_download_stream = false;
+                    self.action_sender
+                        .send(Action::DownloadFailed(format!(
+                            "Failed to resolve streams for S{:02}E{:02}: {}",
+                            target_se, target_ep, err
+                        )))
+                        .ok();
+                }
             }
             _ => return None,
         }

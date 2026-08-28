@@ -101,7 +101,28 @@ pub fn state_file_path(
 }
 
 fn sanitize_component(value: &str) -> String {
-    value.replace(['/', '\\', ':', ' '], "_")
+    let sanitized = value
+        .chars()
+        .take(120)
+        .map(|character| {
+            if character.is_control()
+                || matches!(
+                    character,
+                    '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | ' '
+                )
+            {
+                '_'
+            } else {
+                character
+            }
+        })
+        .collect::<String>();
+    let trimmed = sanitized.trim_matches(['.', ' ', '_']);
+    if trimmed.is_empty() {
+        "unknown".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -117,6 +138,10 @@ mod tests {
         assert_eq!(
             sanitize_component("subject:with space"),
             "subject_with_space"
+        );
+        assert_eq!(
+            sanitize_component("subject*with?forbidden<chars>|quote\""),
+            "subject_with_forbidden_chars__quote"
         );
     }
 }

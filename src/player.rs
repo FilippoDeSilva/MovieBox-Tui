@@ -294,7 +294,7 @@ fn mpv_command(
 
     if let Some((provider, subject_id, season, episode)) = tracker {
         if let Some(script_path) = tracker::ensure_tracker_script() {
-            let script_str = script_path.to_string_lossy().replace('\\', "/");
+            let script_str = normalize_player_path(&script_path.to_string_lossy());
             command.arg(format!("{prefix}script={script_str}"));
             if let Some(state_file) =
                 tracker::state_file_path(provider, subject_id, season, episode)
@@ -320,7 +320,7 @@ fn mpv_command(
         } else {
             "--sub-file"
         };
-        let sub_path = subtitle.replace('\\', "/");
+        let sub_path = normalize_player_path(subtitle);
         command.arg(format!("{opt}={sub_path}"));
     }
 
@@ -433,7 +433,7 @@ fn vlc_command(
         }
     }
     if let Some(subtitle) = subtitle {
-        let sub_path = subtitle.replace('\\', "/");
+        let sub_path = normalize_player_path(subtitle);
         command.arg(format!("--sub-file={sub_path}"));
     }
 
@@ -744,6 +744,14 @@ fn executable_on_path(name: &str) -> bool {
     find_in_path(name).is_some()
 }
 
+fn normalize_player_path(path: &str) -> String {
+    if path.starts_with(r"\\") || path.starts_with("//") {
+        path.to_string()
+    } else {
+        path.replace('\\', "/")
+    }
+}
+
 pub fn format_mpv_script_opts(
     provider: &str,
     subject_id: &str,
@@ -751,7 +759,7 @@ pub fn format_mpv_script_opts(
     episode: usize,
     state_file: &Path,
 ) -> String {
-    let state_file_str = state_file.to_string_lossy().replace('\\', "/");
+    let state_file_str = normalize_player_path(&state_file.to_string_lossy());
     format!(
         "moviebox-provider={provider},moviebox-subject_id={subject_id},moviebox-season={season},moviebox-episode={episode},moviebox-state_file={state_file_str}"
     )
@@ -830,6 +838,21 @@ mod tests {
                 &"--sub-file=C:/Users/User/AppData/Local/MovieBox-Tui/subs/sub.srt".into()
             )
         );
+    }
+    #[test]
+    fn vlc_command_preserves_unc_subtitle_paths() {
+        let command = vlc_command(
+            "https://example.test/video.mp4",
+            Some(r"\\server\share\subs\sub.srt"),
+            &[],
+            None,
+            None,
+        );
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(args.contains(&r"--sub-file=\\server\share\subs\sub.srt".into()));
     }
 
     #[test]

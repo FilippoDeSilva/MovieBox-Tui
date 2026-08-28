@@ -258,15 +258,10 @@ mod tests {
     }
 
     #[test]
-    fn test_update_asset_termux_arm64_selection() {
-        let release = sample_release_with_all_assets();
-        let termux_arm64 = TargetPlatform::detect("linux", "aarch64", true).unwrap();
-        assert_eq!(termux_arm64, TargetPlatform::LinuxArm64);
-
-        let asset = release.find_compatible_asset(termux_arm64).unwrap();
-        assert_eq!(asset.name, "MovieBox_Linux_arm64.tar.gz");
-
+    fn test_update_asset_termux_is_protected_from_glibc_binary() {
+        assert!(TargetPlatform::detect("linux", "aarch64", true).is_none());
         assert!(TargetPlatform::detect("linux", "x86_64", true).is_none());
+        assert!(TargetPlatform::detect("android", "aarch64", false).is_none());
     }
 
     #[test]
