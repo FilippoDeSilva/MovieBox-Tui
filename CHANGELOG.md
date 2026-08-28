@@ -2,46 +2,8 @@
 
 ## [Unreleased]
 
-### Fixed
-- **Search suggestions background halo artifact**: Suppressed landing favorites background rendering when search suggestions are active and cleanly aligned dropdown container bounds, eliminating 4-sided dark shadow artifacts around suggestion borders.
-- **Search Suggestions Overlay Bleed**: Wrapped search suggestions in an elevated, bordered card with opaque background clearing (`theme.surface0`), and gated terminal graphics poster rendering while typing suggestions, eliminating text and image collisions over background search results.
-- **Season Download Stream Error Recovery**: Prevented download queue stalls when resolving individual episode stream URLs fails; failed streams report diagnostics and allow the remaining queue to continue.
-- **Favorites & Watch History Corruption Recovery**: Corrupted JSON configuration and history state files now rotate to `.corrupt` backups instead of hard deletion, preserving recoverable user data.
-- **Details Screen Hit-Testing & Selector Alignment**: Aligned mouse hit-testing regions and season/episode selector column geometry across all compact, medium, and wide terminal tiers.
-- **Unicode Display Width in Input Widgets**: Single-line text input fields now compute column offsets using visual Unicode width instead of raw character counts, preventing CJK and multi-byte character overflow from wrapping box borders.
-- **M3U Playlist Channel Title Parsing**: Channel titles containing commas in `#EXTINF` metadata are now parsed without truncation, preserving complete channel display names.
-- **Subtitle Cache Purge Path Alignment**: Aligned `purge_stale_subtitles` with `resolve_subtitle_dir()` to ensure downloaded subtitle sidecars are cleaned automatically on startup.
-- **Android Termux Directory Resolution**: Added comprehensive fallback resolution for config, cache, and data directories when `dirs::*` returns `None` on Android Termux.
-- **Android Termux Self-Update Protection**: Added architecture guard preventing Termux from downloading incompatible glibc Linux ARM64 binaries that overwrite working Bionic installations.
-- **Windows UNC & Extended Path Escaping**: Preserved leading backslashes on Windows UNC (`\\server\share`) and extended-length (`\\?\`) paths when formatting player arguments.
-- **Windows Update Helper `find.exe` Qualification**: Explicitly qualified `%SystemRoot%\System32\find.exe` in the update helper `.bat` script to prevent shadowing by Git for Windows' `find.exe`.
-- **Windows NTFS Forbidden Character Sanitization**: Hardened tracker state file generation by stripping control characters and NTFS forbidden characters (`*`, `?`, `"`, `<`, `>`, `|`, `:`).
-- **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
-
-### Changed
-- **Clean search suggestion dropdown card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
-- **Streamlined search suggestions dropdown**: Removed redundant `[SUGGEST]` badges on regular title queries, replaced tree branch glyphs with clean `▌ ` / `> ` selection indicators, and added full-width active row background styling.
-- **Streams list tabular column alignment**: Standardized resolution badges to a uniform 7-column width and aligned file size, codec/media tags, duration, and uploader columns across all resolution tiers.
-- **Clean streams section headers**: Replaced solid block badges on stream quality group headers with clean typographic labels (`1080p · 1 option`) eliminating double-box visual clutter.
-- **Search card focus state differentiation**: Muted selection highlighting when search bar is in `Editing` mode to maintain clear visual hierarchy.
-- **Multi-column search results margin**: Added 1-column right margin on multi-column search results preventing overlap with the vertical scrollbar.
-- **Stabilized landing search deck width**: Standardized input deck layout width avoiding horizontal jitter while typing.
-- **Clean ghosted placeholder**: Rendered subtle `❯ █ Search movies and series...` prompt when search input is empty in editing mode.
-- **Grouped secondary stream media tags**: Secondary stream audio/video codec tags (`DV · ATMOS · HEVC`) now group with subtle `·` text separators rather than heavy boxes, preserving release title space.
-- **Responsive Mode Tabs**: Mode tabs on compact viewports dynamically abbreviate to `<76` (`[Ctrl+S] Stream`) and ultra-compact `<58` (`[S] Stream`), protecting them against collisions with the right-aligned utility bar.
-- **TV Mode Logo Responsiveness**: Terminal width `<80` triggers the narrower 33-column compact logo to render in TV mode, establishing clean margins on medium setups.
-- **Hitbox Splitting**: Synchronized horizontal clicks for mode tabs and the `[?] Help`/`[q] Quit` widgets by enforcing an exact `saturating_sub(19)` boundary layout.
-- **Bounded Hitbox**: Addressed dropdown autocompletion leakage. Mouse click events are now strictly clipped inside the computed dynamic bounds of the search suggestion dropdown list.
-- **Normal Mode Direct Clear Shortcut**: Pressing `c` or `C` in `InputMode::Normal` clears the active search query instantly and clears search view states when not in an active download.
-- **Single-Column Grid Sequencing**: Standardized `<Left>` and `<Right>` movement behaviors in single-column grids so that `jump = 1` enforces granular sequential traversal.
-- **Vertical Picker Scaling**: Budget capacity for Picker rows has shifted to `(height - 6).clamp(4, 14)`, effectively granting 14 visible rows on a standard 24-row height layout.
-- **Help Layout Rendering Safety**: Wide but vertically short environments safely fall back to scrollable single-column views instead of broken two-column layout.
-- **Update Component Layout**: Brought the auto-updater window entirely into parity via `ModalFrame`, granting background area clearing overlays and standard unified outlines.
-- **Confirmation Footer Buttons**: Dropped redundant confirmation footers to inject dynamic, formatted `[ Download ] [ Cancel ]` dialog responses seamlessly inside confirmation views.
-- **Synopsis Clean Formatting**: Wrapped synopses auto-strip trailing punctuations (`.`, `,`, `!`, `?`, `:`, `;`) before truncating with an ellipsis (`…`).
-- **NO_COLOR Adjustments**: Added standard `Modifier::REVERSED` rendering on active item rows across Pickers and Results where `ColorSupport::NoColor` is enforced.
-
 ### Added
+- **Details Screen Subtitles Shortcut (`[s]`)**: Added `s`/`S` keyboard shortcut on Details screen to open the subtitle language picker, matching mouse click and footer hints.
 - **Theme picker 3-point color swatches**: Rendered 3-point color swatches (`■ ■ ■` Accent | Surface | Base) previewing palette colors in `/theme`.
 - **Category origin pill badges**: Added `[MOVIES]`, `[SERIES]`, and `[DISCOVER]` category badges in the `/browse` preset dialog.
 - **Provider origin tags and resolution badges**: Displayed provider tags (`[MovieBox]`, `[4KHD]`, `[CircleFTP]`, `[DhakaFlix]`, `[Addon]`) and resolution badges (`[1080p]`, `[4K]`) on Home search result cards.
@@ -61,10 +23,6 @@
   In `Normal` mode on the search results screen, `Home` and `g` jump to the top result, `End` and `G`
   jump to the bottom result while automatically fetching the next page, and `PageDown`/`PageUp`
   page through results.
-- **Playback & stream resolve state-lock fix (`playback.rs`, `download.rs`)**: Fixed an issue
-  where failed or timed-out 4KHDHub/mirror resolutions left `is_resolving_playback` permanently set
-  to `true`, preventing subsequent playback attempts; added a 15-second resolution timeout and
-  enforced state resets on all error, cancellation, and modal dismissal paths.
 - **1-Key direct watch history resume (`Space` / `P`)**: Pressing `Space` or `P` on any item in
   `/history` immediately launches direct playback for the recorded season and episode without
   manual Details navigation. Opening Details from history (`Enter`) pre-seeds selection to the
@@ -170,15 +128,49 @@
   `/disable-*` commands into 4 primary toggles (`/toggle-tv`, `/toggle-addons`,
   `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
+### Changed
+- **Clean search suggestion dropdown card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
+- **Streamlined search suggestions dropdown**: Removed redundant `[SUGGEST]` badges on regular title queries, replaced tree branch glyphs with clean `▌ ` / `> ` selection indicators, and added full-width active row background styling.
+- **Streams list tabular column alignment**: Standardized resolution badges to a uniform 7-column width and aligned file size, codec/media tags, duration, and uploader columns across all resolution tiers.
+- **Clean streams section headers**: Replaced solid block badges on stream quality group headers with clean typographic labels (`1080p · 1 option`) eliminating double-box visual clutter.
+- **Search card focus state differentiation**: Muted selection highlighting when search bar is in `Editing` mode to maintain clear visual hierarchy.
+- **Multi-column search results margin**: Added 1-column right margin on multi-column search results preventing overlap with the vertical scrollbar.
+- **Stabilized landing search deck width**: Standardized input deck layout width avoiding horizontal jitter while typing.
+- **Clean ghosted placeholder**: Rendered subtle `❯ █ Search movies and series...` prompt when search input is empty in editing mode.
+- **Grouped secondary stream media tags**: Secondary stream audio/video codec tags (`DV · ATMOS · HEVC`) now group with subtle `·` text separators rather than heavy boxes, preserving release title space.
+- **Responsive Mode Tabs**: Mode tabs on compact viewports dynamically abbreviate to `<76` (`[Ctrl+S] Stream`) and ultra-compact `<58` (`[S] Stream`), protecting them against collisions with the right-aligned utility bar.
+- **TV Mode Logo Responsiveness**: Terminal width `<80` triggers the narrower 33-column compact logo to render in TV mode, establishing clean margins on medium setups.
+- **Hitbox Splitting**: Synchronized horizontal clicks for mode tabs and the `[?] Help`/`[q] Quit` widgets by enforcing an exact `saturating_sub(19)` boundary layout.
+- **Bounded Hitbox**: Addressed dropdown autocompletion leakage. Mouse click events are now strictly clipped inside the computed dynamic bounds of the search suggestion dropdown list.
+- **Normal Mode Direct Clear Shortcut (`c` / `C`)**: Pressing `c` or `C` in `InputMode::Normal` clears the active search query instantly and clears search view states when not in an active download.
+- **Single-Column Grid Sequencing**: Standardized `<Left>` and `<Right>` movement behaviors in single-column grids so that `jump = 1` enforces granular sequential traversal.
+- **Vertical Picker Scaling**: Budget capacity for Picker rows has shifted to `(height - 6).clamp(4, 14)`, effectively granting 14 visible rows on a standard 24-row height layout.
+- **Help Layout Rendering Safety**: Wide but vertically short environments safely fall back to scrollable single-column views instead of broken two-column layout.
+- **Update Component Layout**: Brought the auto-updater window entirely into parity via `ModalFrame`, granting background area clearing overlays and standard unified outlines.
+- **Confirmation Footer Buttons**: Dropped redundant confirmation footers to inject dynamic, formatted `[ Download ] [ Cancel ]` dialog responses seamlessly inside confirmation views.
+- **Synopsis Clean Formatting**: Wrapped synopses auto-strip trailing punctuations (`.`, `,`, `!`, `?`, `:`, `;`) before truncating with an ellipsis (`…`).
+- **NO_COLOR Adjustments**: Added standard `Modifier::REVERSED` rendering on active item rows across Pickers and Results where `ColorSupport::NoColor` is enforced.
+- **CI skip conditions**: `Publish to Crates.io` and `Update Homebrew Formula` now skip gracefully when a Release run completed without publishing a new version; the live-network acceptance test is opt-in via `MOVIEBOX_LIVE_TESTS=1 cargo test --test real_acceptance -- --ignored`.
+
 ### Fixed
-- **Poster placeholder overlap on loaded images**: Fixed a rendering bug on the Home
-  results screen where the fallback placeholder widget was unconditionally drawn on top
-  of loaded poster image protocols; the placeholder is now restricted to the `else` branch
-  when an image is still fetching or unavailable.
-- **Results view background bleed-through**: Added explicit area clearing for the results
-  chunk before rendering search cards, eliminating ghost text artifacts (such as ASCII
-  headers or landing row labels) bleeding through beneath unselected cards in multi-column grids.
-- **Modal key trapping & isolation**: structural modal gating prevents mode
+- **Search suggestions background halo artifact**: Suppressed landing favorites background rendering when search suggestions are active and cleanly aligned dropdown container bounds, eliminating 4-sided dark shadow artifacts around suggestion borders.
+- **Search Suggestions Overlay Bleed**: Wrapped search suggestions in an elevated, bordered card with opaque background clearing (`theme.surface0`), and gated terminal graphics poster rendering while typing suggestions, eliminating text and image collisions over background search results.
+- **Season Download Stream Error Recovery**: Prevented download queue stalls when resolving individual episode stream URLs fails; failed streams report diagnostics and allow the remaining queue to continue.
+- **Favorites & Watch History Corruption Recovery**: Corrupted JSON configuration and history state files now rotate to `.corrupt` backups instead of hard deletion, preserving recoverable user data.
+- **Details Screen Hit-Testing & Selector Alignment**: Aligned mouse hit-testing regions and season/episode selector column geometry across all compact, medium, and wide terminal tiers.
+- **Unicode Display Width in Input Widgets**: Single-line text input fields now compute column offsets using visual Unicode width instead of raw character counts, preventing CJK and multi-byte character overflow from wrapping box borders.
+- **M3U Playlist Channel Title Parsing**: Channel titles containing commas in `#EXTINF` metadata are now parsed without truncation, preserving complete channel display names.
+- **Subtitle Cache Purge Path Alignment**: Aligned `purge_stale_subtitles` with `resolve_subtitle_dir()` to ensure downloaded subtitle sidecars are cleaned automatically on startup.
+- **Android Termux Directory Resolution**: Added comprehensive fallback resolution for config, cache, and data directories when `dirs::*` returns `None` on Android Termux.
+- **Android Termux Self-Update Protection**: Added architecture guard preventing Termux from downloading incompatible glibc Linux ARM64 binaries that overwrite working Bionic installations.
+- **Windows UNC & Extended Path Escaping**: Preserved leading backslashes on Windows UNC (`\\server\share`) and extended-length (`\\?\`) paths when formatting player arguments.
+- **Windows Update Helper `find.exe` Qualification**: Explicitly qualified `%SystemRoot%\System32\find.exe` in the update helper `.bat` script to prevent shadowing by Git for Windows' `find.exe`.
+- **Windows NTFS Forbidden Character Sanitization**: Hardened tracker state file generation by stripping control characters and NTFS forbidden characters (`*`, `?`, `"`, `<`, `>`, `|`, `:`).
+- **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
+- **Playback & stream resolve state-lock fix (`playback.rs`, `download.rs`)**: Fixed an issue where failed or timed-out 4KHDHub/mirror resolutions left `is_resolving_playback` permanently set to `true`, preventing subsequent playback attempts; added a 15-second resolution timeout and enforced state resets on all error, cancellation, and modal dismissal paths.
+- **Poster placeholder overlap on loaded images**: Fixed a rendering bug on the Home results screen where the fallback placeholder widget was unconditionally drawn on top of loaded poster image protocols; the placeholder is now restricted to the `else` branch when an image is still fetching or unavailable.
+- **Results view background bleed-through**: Added explicit area clearing for the results chunk before rendering search cards, eliminating ghost text artifacts (such as ASCII headers or landing row labels) bleeding through beneath unselected cards in multi-column grids.
+- **Modal key trapping & isolation**: Structural modal gating prevents mode chords (`Ctrl+T`, `Ctrl+A`, `Ctrl+S`, `Ctrl+P`), download cancellation (`x`), and background pane navigation from leaking into open dialogs and inputs.
 - **Search dropdown alignment & bleed**: Pinned the suggestion dropdown position to the search bar for stability, fixed layout starvation edge cases allowing background colors to bleed, and padded visual pill badges to standard widths.
 - **Search bar view normalization**: Search bar correctly fills terminal width rather than floating when active in empty, No Results, and Error states.
 - **Centered text-aligned error cards**: Replaced per-line centering on multiline diagnostic error states with block-level centering containing cleanly left-aligned text, making diagnostics far more readable.
@@ -188,73 +180,21 @@
 - **TV & Addon Manager visual polish**: Aligned the selection cursor perfectly in TV playlist manager without introducing a visual shift, and switched the Addon Manager to `render_stateful_widget` enabling deep scrolling with vertical scrollbars.
 - **Dual-column Help overlay layout**: Implemented a responsive two-column Help layout for wide viewports (>=90 cols), fitting the entire Help guide on one screen without scrolling.
 - **Picker & Stream list mouse offsets**: Rectified a bounds calculation mapping `click_in_picker` to the popup height instead of the active screen area which restricted clicks, and repaired stream-row mouse tracking which was previously ignoring `stream_scroll` offsets.
-  chords (`Ctrl+T`, `Ctrl+A`, `Ctrl+S`, `Ctrl+P`), download cancellation (`x`),
-  and background pane navigation from leaking into open dialogs and inputs.
-- **Modal exact clears**: replaced 3-column halo clear with exact popup bounding box
-  clears, eliminating cutout artifacts on background cards and borders.
-- **Favorites landing navigation**: pressing `Up` from the top favorite item cleanly
-  returns focus to the search bar instead of getting stuck.
-- **Manager shortcut harmonization**: `Space` (toggle) and `Delete` (remove) are now
-  supported across both TV Playlist and Addon managers.
-- **Details synopsis & theme contrast**: synopsis text styled with `theme.subtext1`
-  for crisp readability; Nord overlay ramp and TokyoNight border luminance tuned.
-- **DNS resolution on Android/Termux and minimal containers**: Replaced the reqwest
-  `hickory-dns` feature flag with a custom resolver (`src/net.rs`) that reads the OS
-  DNS configuration first (`/etc/resolv.conf`, registry on Windows) and falls back to
-  embedded public resolvers (Cloudflare, Google, Quad9) when none exists. The previous
-  approach failed every lookup on platforms without `/etc/resolv.conf` (hickory reads
-  only the hardcoded `/etc/resolv.conf` path); the Termux `$PREFIX/etc/resolv.conf`
-  installer workaround it required is removed.
-- **Crash on multibyte titles**: Year stripping sliced remote HTML titles at a raw
-  byte offset and could abort the whole app on CJK/accented characters.
-- **Windows self-update never applied**: The staged binary lived inside a temporary
-  directory deleted before the detached `.bat` helper ran, so the update silently
-  never replaced the executable. Staging now persists beside the installed binary,
-  the helper consumes and cleans it, and stale staging artifacts are swept at startup.
-- **State file durability**: History/favorites/config writes fsync before rename and
-  never delete the existing destination unless a replacement has succeeded.
-- **install.sh correctness**: Install-directory fallback now happens outside the
-  spinner subshell (reported path and shell-rc PATH edits previously used the wrong
-  directory), INT/TERM exit cleanly instead of continuing, the version temp file is
-  cleaned up on failure, PATH/profile matching is literal (regex-safe paths), missing
-  `--version`/`--dir` values fail with clear errors, unknown arguments warn, trailing
-  slashes in `--dir` are normalized, and reinstalling over a running binary avoids
-  `ETXTBSY`.
-- **install.ps1 hardening**: TLS 1.2 is enabled independently so older .NET stacks
-  keep it even when TLS 1.3 is unavailable; User PATH updates are written through the
-  registry preserving REG_EXPAND_SZ variables and use exact segment matching; the
-  uninstaller removes its stale User PATH entry; `-Version 0.1.x` is accepted and
-  normalized to `v0.1.x`.
-- **Mouse click accuracy**: Search-result hit testing uses the real scroll offset
-  instead of deriving it from the selection, fixing clicks selecting or opening the
-  wrong title after sorting or scrolling partway.
-- **Popup geometry parity**: Picker, TV-config, addon-manager, and download-confirm
-  popups share one layout function between renderer and mouse handler, fixing
-  off-by-one-row TV clicks, missed confirmation buttons on short summaries, skewed
-  picker widths, and scroll-blind hit-testing on lists longer than eight rows.
-- **Text layout safety**: Details stream rows budget by display width rather than
-  byte length (CJK uploaders/languages no longer overflow); suggestion descriptions,
-  addon names, download gauge status, and playlist URLs truncate to their containers;
-  notification card width no longer panics below 40 columns; addon URL input edits by
-  grapheme clusters so CJK/emoji cursors stay aligned.
-- **Poster memory footprint**: Decoded posters are downscaled to ≤512px before
-  caching, decoded/encoded cache sizes were right-sized (roughly 10× less RAM on
-  low-end devices), failed posters retry after 10 minutes instead of being negatively
-  cached forever, and prefetch shares one concurrency limiter instead of creating a
-  new semaphore per scroll batch.
-- **Rendering & input polish**: The terminal graphics probe is capped at 400ms and
-  runs off the UI thread (previously up to 2s of blank screen at startup); resize
-  performs a single deferred clear instead of two flashes; grid poster width derives
-  from real terminal cell metrics; the input caret blink keeps animating while
-  typing; the mouse wheel scrolls contextually; `NO_COLOR` now overrides
-  `MOVIEBOX_THEME`; strict 256-color terminals receive quantized indexed palettes
-  rather than RGB sequences.
-
-### Changed
-- CI: `Publish to Crates.io` and `Update Homebrew Formula` now skip gracefully when a
-  Release run completed without publishing a new version; the live-network acceptance
-  test is opt-in via `MOVIEBOX_LIVE_TESTS=1 cargo test --test real_acceptance -- --ignored`.
-
+- **Modal exact clears**: Replaced 3-column halo clear with exact popup bounding box clears, eliminating cutout artifacts on background cards and borders.
+- **Favorites landing navigation**: Pressing `Up` from the top favorite item cleanly returns focus to the search bar instead of getting stuck.
+- **Manager shortcut harmonization**: `Space` (toggle) and `Delete` (remove) are now supported across both TV Playlist and Addon managers.
+- **Details synopsis & theme contrast**: Synopsis text styled with `theme.subtext1` for crisp readability; Nord overlay ramp and TokyoNight border luminance tuned.
+- **DNS resolution on Android/Termux and minimal containers**: Replaced the reqwest `hickory-dns` feature flag with a custom resolver (`src/net.rs`) that reads the OS DNS configuration first (`/etc/resolv.conf`, registry on Windows) and falls back to embedded public resolvers (Cloudflare, Google, Quad9) when none exists. The previous approach failed every lookup on platforms without `/etc/resolv.conf` (hickory reads only the hardcoded `/etc/resolv.conf` path); the Termux `$PREFIX/etc/resolv.conf` installer workaround it required is removed.
+- **Crash on multibyte titles**: Year stripping sliced remote HTML titles at a raw byte offset and could abort the whole app on CJK/accented characters.
+- **Windows self-update never applied**: The staged binary lived inside a temporary directory deleted before the detached `.bat` helper ran, so the update silently never replaced the executable. Staging now persists beside the installed binary, the helper consumes and cleans it, and stale staging artifacts are swept at startup.
+- **State file durability**: History/favorites/config writes fsync before rename and never delete the existing destination unless a replacement has succeeded.
+- **install.sh correctness**: Install-directory fallback now happens outside the spinner subshell (reported path and shell-rc PATH edits previously used the wrong directory), INT/TERM exit cleanly instead of continuing, the version temp file is cleaned up on failure, PATH/profile matching is literal (regex-safe paths), missing `--version`/`--dir` values fail with clear errors, unknown arguments warn, trailing slashes in `--dir` are normalized, and reinstalling over a running binary avoids `ETXTBSY`.
+- **install.ps1 hardening**: TLS 1.2 is enabled independently so older .NET stacks keep it even when TLS 1.3 is unavailable; User PATH updates are written through the registry preserving REG_EXPAND_SZ variables and use exact segment matching; the uninstaller removes its stale User PATH entry; `-Version 0.1.x` is accepted and normalized to `v0.1.x`.
+- **Mouse click accuracy**: Search-result hit testing uses the real scroll offset instead of deriving it from the selection, fixing clicks selecting or opening the wrong title after sorting or scrolling partway.
+- **Popup geometry parity**: Picker, TV-config, addon-manager, and download-confirm popups share one layout function between renderer and mouse handler, fixing off-by-one-row TV clicks, missed confirmation buttons on short summaries, skewed picker widths, and scroll-blind hit-testing on lists longer than eight rows.
+- **Text layout safety**: Details stream rows budget by display width rather than byte length (CJK uploaders/languages no longer overflow); suggestion descriptions, addon names, download gauge status, and playlist URLs truncate to their containers; notification card width no longer panics below 40 columns; addon URL input edits by grapheme clusters so CJK/emoji cursors stay aligned.
+- **Poster memory footprint**: Decoded posters are downscaled to ≤512px before caching, decoded/encoded cache sizes were right-sized (roughly 10× less RAM on low-end devices), failed posters retry after 10 minutes instead of being negatively cached forever, and prefetch shares one concurrency limiter instead of creating a new semaphore per scroll batch.
+- **Rendering & input polish**: The terminal graphics probe is capped at 400ms and runs off the UI thread (previously up to 2s of blank screen at startup); resize performs a single deferred clear instead of two flashes; grid poster width derives from real terminal cell metrics; the input caret blink keeps animating while typing; the mouse wheel scrolls contextually; `NO_COLOR` now overrides `MOVIEBOX_THEME`; strict 256-color terminals receive quantized indexed palettes rather than RGB sequences.
 ## [0.1.14] - 2026-08-26
 
 ### Added

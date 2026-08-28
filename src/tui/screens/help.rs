@@ -75,6 +75,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Delete Backward Word", theme.text),
         ]),
         Line::from(vec![
+            Span::styled("    [c]            ", theme.header),
+            Span::styled("Clear Search (Normal Mode)", theme.text),
+        ]),
+        Line::from(vec![
             Span::styled("    [Esc]          ", theme.header),
             Span::styled("Go Back / Clear Input / Dismiss", theme.text),
         ]),
@@ -148,6 +152,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Favorite / Unfavorite (Details)", theme.text),
         ]));
         help_text.push(Line::from(vec![
+            Span::styled("    [s]            ", theme.header),
+            Span::styled("Open Subtitles Picker (Details)", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
             Span::styled("    /favorites     ", theme.header),
             Span::styled("Favorited Titles", theme.text),
         ]));
@@ -198,6 +206,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         help_text.push(Line::from(vec![
             Span::styled("    [f]            ", theme.header),
             Span::styled("Favorite / Unfavorite (Details)", theme.text),
+        ]));
+        help_text.push(Line::from(vec![
+            Span::styled("    [s]            ", theme.header),
+            Span::styled("Open Subtitles Picker (Details)", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    /browse        ", theme.header),

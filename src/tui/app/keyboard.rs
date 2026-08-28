@@ -1154,6 +1154,17 @@ impl App {
                             self.action_sender.send(Action::ToggleFavorite).ok();
                         }
                     }
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        if !self.state.subtitle_popup
+                            && !self.state.player_picker_popup
+                            && !self.state.show_season_download_confirm
+                            && !self.state.show_episode_download_confirm
+                            && !self.state.subtitle_list.is_empty()
+                        {
+                            self.state.subtitle_popup = true;
+                            self.state.subtitle_list_state.select(Some(0));
+                        }
+                    }
 
                     KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
                         self.action_sender.send(Action::MoveUp).ok();
@@ -1344,5 +1355,48 @@ mod tests {
         app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
             .await;
         assert!(app.state.update_available.is_none());
+    }
+    #[tokio::test]
+    async fn test_normal_mode_c_clears_search_and_results() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.search_query.set_content("Inception");
+        app.state.search_results = vec![crate::models::SearchResult {
+            id: "1".to_string(),
+            title: "Inception".to_string(),
+            stype: 1,
+            release_year: "2010".to_string(),
+            provider: crate::models::ProviderKind::MovieBox,
+            cover_url: None,
+            season: 0,
+            episode: 0,
+        }];
+        app.state.search_list_state.select(Some(0));
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::empty()))
+            .await;
+
+        assert!(app.state.search_query.is_empty());
+        assert!(app.state.search_results.is_empty());
+        assert_eq!(app.state.search_list_state.selected(), None);
+    }
+
+    #[tokio::test]
+    async fn test_details_screen_s_key_opens_subtitles_popup() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Details;
+        app.state.input_mode = InputMode::Normal;
+        app.state.subtitle_list = vec![
+            ("English".to_string(), "http://sub/en.srt".to_string()),
+            ("Spanish".to_string(), "http://sub/es.srt".to_string()),
+        ];
+        app.state.subtitle_popup = false;
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::empty()))
+            .await;
+
+        assert!(app.state.subtitle_popup);
+        assert_eq!(app.state.subtitle_list_state.selected(), Some(0));
     }
 }

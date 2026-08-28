@@ -18,6 +18,7 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | **`Delete`** | Delete character at cursor in text inputs, or remove entry in TV/Addon managers |
 | **`Ctrl+U`** | Clear entire input line (Search, TV URL, Addon URL) |
 | **`Ctrl+W`** | Delete backward word in text inputs |
+| **`c`** | Clear active search query and return to landing screen (Normal mode) |
 | **`Ctrl+S`** | Switch to standard **Streaming Mode** |
 | **`Ctrl+T`** | Toggle / switch to **TV Mode** |
 | **`Ctrl+A`** | Toggle / switch to **Addon Mode** |
@@ -65,6 +66,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`r`**: Refresh search results / stream list.
 - **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
+- **`s`**: Open subtitle language picker on the Details screen.
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
 - **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
@@ -85,6 +87,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`r`**: Refresh addon catalog search results.
 - **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
+- **`s`**: Open subtitle language picker on the Details screen.
 - **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
 - **`/clear`**: Clear active search query and return to landing.
