@@ -17,6 +17,11 @@
 - **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
 
 ### Changed
+- **Search card focus state differentiation**: Muted selection highlighting when search bar is in `Editing` mode to maintain clear visual hierarchy.
+- **Multi-column search results margin**: Added 1-column right margin on multi-column search results preventing overlap with the vertical scrollbar.
+- **Stabilized landing search deck width**: Standardized input deck layout width avoiding horizontal jitter while typing.
+- **Clean ghosted placeholder**: Rendered subtle `❯ █ Search movies and series...` prompt when search input is empty in editing mode.
+- **Grouped secondary stream media tags**: Secondary stream audio/video codec tags (`DV · ATMOS · HEVC`) now group with subtle `·` text separators rather than heavy boxes, preserving release title space.
 - **Responsive Mode Tabs**: Mode tabs on compact viewports dynamically abbreviate to `<76` (`[Ctrl+S] Stream`) and ultra-compact `<58` (`[S] Stream`), protecting them against collisions with the right-aligned utility bar.
 - **TV Mode Logo Responsiveness**: Terminal width `<80` triggers the narrower 33-column compact logo to render in TV mode, establishing clean margins on medium setups.
 - **Hitbox Splitting**: Synchronized horizontal clicks for mode tabs and the `[?] Help`/`[q] Quit` widgets by enforcing an exact `saturating_sub(19)` boundary layout.
@@ -31,6 +36,12 @@
 - **NO_COLOR Adjustments**: Added standard `Modifier::REVERSED` rendering on active item rows across Pickers and Results where `ColorSupport::NoColor` is enforced.
 
 ### Added
+- **Theme picker 3-point color swatches**: Rendered 3-point color swatches (`■ ■ ■` Accent | Surface | Base) previewing palette colors in `/theme`.
+- **Category origin pill badges**: Added `[MOVIES]`, `[SERIES]`, and `[DISCOVER]` category badges in the `/browse` preset dialog.
+- **Provider origin tags and resolution badges**: Displayed provider tags (`[MovieBox]`, `[4KHD]`, `[CircleFTP]`, `[DhakaFlix]`, `[Addon]`) and resolution badges (`[1080p]`, `[4K]`) on Home search result cards.
+- **Result position and pagination indicator**: Added contextual item counter and page indicators (`Item X of Y • Page N/M`) on search results.
+- **Contextual Details footer action bar**: Context-aware footer action bar with pane-specific shortcuts, `[f] Favorite`, and `[s] Subtitles`.
+- **Fixed-width, zero-padded episode items**: Aligned episode numbers (`EP 01`, `EP 02`, `EP 10`) with fixed-width watch state indicators and timestamps.
 - **Centralized UI widgets subsystem (`src/tui/widgets`)**: Standardized single-line text input
   fields (`render_single_line_input`), viewport-accurate Ratatui scrollbars (`render_scrollbar`),
   modal dialog framing and footer action bars (`ModalFrame`, `render_modal_footer`), and unified

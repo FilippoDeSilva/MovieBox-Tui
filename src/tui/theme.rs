@@ -1,4 +1,7 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::Span,
+};
 
 pub const AVAILABLE_THEMES: [&str; 9] = [
     "Mocha",
@@ -267,6 +270,29 @@ impl Theme {
             ColorSupport::Color256 => base.quantized_to_256(),
             _ => base,
         }
+    }
+    /// Returns a 3-point color swatch (Accent, Surface, Base) for a given theme name/kind.
+    pub fn palette_swatch_spans(theme_name: &str, basic_terminal: bool) -> Vec<Span<'static>> {
+        let kind = ThemeKind::parse(theme_name);
+        let sample = Self::from_kind(kind);
+
+        if basic_terminal {
+            return vec![Span::styled("* * *", sample.text_dim)];
+        }
+
+        let accent_color = sample.accent.fg.unwrap_or(Color::Cyan);
+        let surface_color = sample
+            .surface0
+            .fg
+            .or(sample.surface1.fg)
+            .unwrap_or(Color::DarkGray);
+        let base_color = sample.base;
+
+        vec![
+            Span::styled("■ ", Style::default().fg(accent_color)),
+            Span::styled("■ ", Style::default().fg(surface_color)),
+            Span::styled("■", Style::default().fg(base_color)),
+        ]
     }
 }
 
@@ -993,6 +1019,21 @@ mod tests {
                     .map(|c| !matches!(c, Color::Rgb(..)))
                     .unwrap_or(true)
             );
+        }
+    }
+
+    #[test]
+    fn test_palette_swatch_spans() {
+        let basic_swatches = Theme::palette_swatch_spans("Mocha", true);
+        assert_eq!(basic_swatches.len(), 1);
+        assert_eq!(basic_swatches[0].content, "* * *");
+
+        if ColorSupport::current() != ColorSupport::NoColor {
+            let swatches = Theme::palette_swatch_spans("Mocha", false);
+            assert_eq!(swatches.len(), 3);
+            assert_eq!(swatches[0].content, "■ ");
+            assert_eq!(swatches[1].content, "■ ");
+            assert_eq!(swatches[2].content, "■");
         }
     }
 }

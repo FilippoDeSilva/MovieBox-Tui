@@ -108,43 +108,60 @@ pub fn picker(
     theme: &Theme,
     basic_terminal: bool,
 ) {
+    let lines: Vec<Line<'static>> = items.iter().map(|item| Line::from(item.clone())).collect();
+    picker_with_lines(
+        frame,
+        area,
+        &lines,
+        items,
+        state,
+        spec,
+        theme,
+        basic_terminal,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn picker_with_lines<'a>(
+    frame: &mut Frame,
+    area: Rect,
+    lines: &[Line<'a>],
+    raw_items: &[String],
+    state: &mut ListState,
+    spec: PickerSpec<'_>,
+    theme: &Theme,
+    basic_terminal: bool,
+) {
     let selected = state
         .selected()
         .unwrap_or(0)
-        .min(items.len().saturating_sub(1));
-    let visible_rows = items.len().clamp(1, max_picker_rows(area));
-    let popup = picker_layout(area, items, spec.confirm_label, spec.minimum_width);
+        .min(lines.len().saturating_sub(1));
+    let visible_rows = lines.len().clamp(1, max_picker_rows(area));
+    let popup = picker_layout(area, raw_items, spec.confirm_label, spec.minimum_width);
     let title = format!(
         "{} · {}/{}",
         spec.title,
         selected.saturating_add(1),
-        items.len().max(1)
+        lines.len().max(1)
     );
     let inner = crate::tui::widgets::ModalFrame::new(&title, theme, basic_terminal)
         .render(frame, popup, area);
 
     let sections = Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).split(inner);
-    let max_item_w = sections[0]
-        .width
-        .saturating_sub(if items.len() > visible_rows { 3 } else { 1 })
-        as usize;
-    let list_items = items
+    let list_items = lines
         .iter()
-        .map(|item| {
-            let truncated = crate::tui::text::truncate_width(item, max_item_w);
-            ListItem::new(truncated).style(theme.text)
-        })
+        .map(|line| ListItem::new(line.clone()).style(theme.text))
         .collect::<Vec<_>>();
     let list = List::new(list_items)
         .highlight_style(selection_style(theme, basic_terminal))
         .highlight_symbol(if basic_terminal { "> " } else { "▌ " });
     frame.render_stateful_widget(list, sections[0], state);
 
-    if items.len() > visible_rows {
+    if lines.len() > visible_rows {
         crate::tui::widgets::render_scrollbar(
             frame,
             sections[0],
-            items.len(),
+            lines.len(),
             visible_rows,
             selected,
             theme,
@@ -165,6 +182,33 @@ pub fn picker(
         key_hint("Esc", "Back", theme),
     ];
     crate::tui::widgets::render_modal_footer(frame, sections[1], footer, theme);
+}
+
+pub fn browse_category_badge<'a>(label: &str, theme: &'a Theme) -> (Span<'a>, &'static str) {
+    let lower = label.to_ascii_lowercase();
+    if lower.contains("movie")
+        || lower.contains("top rated (all-time)")
+        || lower.contains("top rated (recent")
+    {
+        (
+            Span::styled("[MOVIES]", theme.sapphire.add_modifier(Modifier::BOLD)),
+            "   ",
+        )
+    } else if lower.contains("series")
+        || lower.contains("airing")
+        || lower.contains("show")
+        || lower.contains("tv")
+    {
+        (
+            Span::styled("[SERIES]", theme.lavender.add_modifier(Modifier::BOLD)),
+            "   ",
+        )
+    } else {
+        (
+            Span::styled("[DISCOVER]", theme.teal.add_modifier(Modifier::BOLD)),
+            " ",
+        )
+    }
 }
 
 pub fn confirmation(
@@ -679,5 +723,72 @@ mod tests {
 
         assert!(popup.contains(ratatui::layout::Position::new(popup.x + 1, action_row)));
         assert!(action_row < popup.bottom() - 1); // Action row is inside inner area before footer/border
+    }
+
+    #[test]
+    fn test_browse_category_badges() {
+        let theme = Theme::mocha();
+
+        let (movies_badge, _) = browse_category_badge("Popular Movies", &theme);
+        assert_eq!(movies_badge.content, "[MOVIES]");
+
+        let (top_rated_badge, _) = browse_category_badge("Top Rated Movies", &theme);
+        assert_eq!(top_rated_badge.content, "[MOVIES]");
+
+        let (series_badge, _) = browse_category_badge("Popular Series", &theme);
+        assert_eq!(series_badge.content, "[SERIES]");
+
+        let (airing_badge, _) = browse_category_badge("Airing Today", &theme);
+        assert_eq!(airing_badge.content, "[SERIES]");
+
+        let (trending_badge, _) = browse_category_badge("Trending Today", &theme);
+        assert_eq!(trending_badge.content, "[DISCOVER]");
+
+        let (anime_badge, _) = browse_category_badge("Anime", &theme);
+        assert_eq!(anime_badge.content, "[DISCOVER]");
+    }
+
+    #[test]
+    fn test_picker_with_lines_rendering() {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let theme = Theme::mocha();
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
+
+        let raw_items = vec!["[MOVIES]   Popular Movies".to_string()];
+        let lines = vec![Line::from(vec![
+            Span::styled("[MOVIES]", theme.sapphire),
+            Span::raw("   "),
+            Span::styled("Popular Movies", theme.text),
+        ])];
+
+        terminal
+            .draw(|frame| {
+                picker_with_lines(
+                    frame,
+                    Rect::new(0, 0, 80, 24),
+                    &lines,
+                    &raw_items,
+                    &mut list_state,
+                    PickerSpec {
+                        title: "Browse",
+                        confirm_label: "Open",
+                        minimum_width: 36,
+                    },
+                    &theme,
+                    false,
+                );
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(content.contains("[MOVIES]"));
+        assert!(content.contains("Popular Movies"));
     }
 }

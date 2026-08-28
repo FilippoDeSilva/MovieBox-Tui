@@ -3,6 +3,7 @@ use ratatui::{
     text::Span,
 };
 
+use crate::providers::models::ProviderKind;
 use crate::tui::theme::Theme;
 
 fn theme_color(style: Style, fallback: Color) -> Color {
@@ -100,6 +101,79 @@ pub fn resolution_badge_spans<'a>(
     ]
 }
 
+pub fn provider_origin_tag(provider: ProviderKind) -> &'static str {
+    match provider {
+        ProviderKind::MovieBox => "[MovieBox]",
+        ProviderKind::FourKHdHub => "[4KHD]",
+        ProviderKind::BdixCircleFtp => "[CircleFTP]",
+        ProviderKind::BdixDhakaFlix => "[DhakaFlix]",
+        ProviderKind::Addons => "[Addon]",
+    }
+}
+
+pub fn provider_badge_span<'a>(
+    provider: ProviderKind,
+    theme: &'a Theme,
+    basic_terminal: bool,
+) -> Span<'a> {
+    let tag = provider_origin_tag(provider);
+    if basic_terminal {
+        Span::styled(tag, theme.text_dim)
+    } else {
+        let style = match provider {
+            ProviderKind::MovieBox => theme.lavender,
+            ProviderKind::FourKHdHub => theme.rating,
+            ProviderKind::BdixCircleFtp => theme.teal,
+            ProviderKind::BdixDhakaFlix => theme.sapphire,
+            ProviderKind::Addons => theme.accent,
+        };
+        Span::styled(tag, style)
+    }
+}
+
+pub fn extract_resolution(title: &str, quality: Option<&str>) -> Option<i64> {
+    if let Some(q) = quality {
+        let q_lower = q.trim().to_ascii_lowercase();
+        if q_lower.contains("2160") || q_lower.contains("4k") || q_lower.contains("uhd") {
+            return Some(2160);
+        } else if q_lower.contains("1080") || q_lower.contains("fhd") {
+            return Some(1080);
+        } else if q_lower.contains("720") || q_lower.contains("hd") {
+            return Some(720);
+        } else if q_lower.contains("480") || q_lower.contains("sd") {
+            return Some(480);
+        } else if q_lower.contains("576") {
+            return Some(576);
+        } else if q_lower.contains("360") {
+            return Some(360);
+        }
+    }
+
+    let title_lower = title.to_ascii_lowercase();
+    if title_lower.contains("2160p")
+        || title_lower.contains("2160")
+        || title_lower.contains("4k")
+        || title_lower.contains("uhd")
+    {
+        Some(2160)
+    } else if title_lower.contains("1080p")
+        || title_lower.contains("1080")
+        || title_lower.contains("fhd")
+    {
+        Some(1080)
+    } else if title_lower.contains("720p") || title_lower.contains("720") {
+        Some(720)
+    } else if title_lower.contains("480p") || title_lower.contains("480") {
+        Some(480)
+    } else if title_lower.contains("576p") || title_lower.contains("576") {
+        Some(576)
+    } else if title_lower.contains("360p") || title_lower.contains("360") {
+        Some(360)
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MediaTags {
     pub hdr: Option<&'static str>,
@@ -195,75 +269,44 @@ pub fn render_media_tag_spans<'a>(
     theme: &'a Theme,
     basic_terminal: bool,
 ) -> Vec<Span<'a>> {
-    let mut spans = Vec::new();
+    let mut tag_items = Vec::new();
 
     if let Some(hdr) = tags.hdr {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{hdr}] "),
-                theme.rating.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface1, Color::Rgb(73, 76, 94));
-            let fg = theme_color(theme.rating, Color::Yellow);
-            spans.push(Span::styled(
-                format!(" {hdr} "),
-                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::raw(" "));
-        }
+        tag_items.push(Span::styled(hdr, theme.rating.add_modifier(Modifier::BOLD)));
     }
 
     if let Some(audio) = tags.audio {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{audio}] "),
-                theme.sapphire.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
-            let fg = theme_color(theme.sapphire, Color::Cyan);
-            spans.push(Span::styled(
-                format!(" {audio} "),
-                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::raw(" "));
-        }
+        tag_items.push(Span::styled(
+            audio,
+            theme.sapphire.add_modifier(Modifier::BOLD),
+        ));
     }
 
     if let Some(codec) = tags.codec {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{codec}] "),
-                theme.teal.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
-            let fg = theme_color(theme.teal, Color::Rgb(148, 226, 213));
-            spans.push(Span::styled(
-                format!(" {codec} "),
-                Style::default().bg(bg).fg(fg),
-            ));
-            spans.push(Span::raw(" "));
-        }
+        tag_items.push(Span::styled(codec, theme.teal.add_modifier(Modifier::BOLD)));
     }
 
     if let Some(source) = tags.source {
-        if basic_terminal {
-            spans.push(Span::styled(
-                format!("[{source}] "),
-                theme.lavender.add_modifier(Modifier::BOLD),
-            ));
-        } else {
-            let bg = theme_color(theme.surface0, Color::Rgb(56, 58, 74));
-            let fg = theme_color(theme.lavender, Color::Rgb(180, 190, 254));
-            spans.push(Span::styled(
-                format!(" {source} "),
-                Style::default().bg(bg).fg(fg),
-            ));
-            spans.push(Span::raw(" "));
-        }
+        tag_items.push(Span::styled(
+            source,
+            theme.lavender.add_modifier(Modifier::BOLD),
+        ));
     }
+
+    if tag_items.is_empty() {
+        return Vec::new();
+    }
+
+    let mut spans = Vec::new();
+    let sep = if basic_terminal { " - " } else { " · " };
+
+    for (i, tag_span) in tag_items.into_iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(sep, theme.text_dim));
+        }
+        spans.push(tag_span);
+    }
+    spans.push(Span::raw("  "));
 
     spans
 }
@@ -306,5 +349,28 @@ mod tests {
         };
         let spans = render_media_tag_spans(&tags, &theme, false);
         assert_eq!(spans.len(), 8);
+    }
+    #[test]
+    fn test_provider_origin_tag() {
+        assert_eq!(provider_origin_tag(ProviderKind::MovieBox), "[MovieBox]");
+        assert_eq!(provider_origin_tag(ProviderKind::FourKHdHub), "[4KHD]");
+        assert_eq!(
+            provider_origin_tag(ProviderKind::BdixCircleFtp),
+            "[CircleFTP]"
+        );
+        assert_eq!(
+            provider_origin_tag(ProviderKind::BdixDhakaFlix),
+            "[DhakaFlix]"
+        );
+        assert_eq!(provider_origin_tag(ProviderKind::Addons), "[Addon]");
+    }
+
+    #[test]
+    fn test_extract_resolution() {
+        assert_eq!(extract_resolution("Movie 1080p BluRay", None), Some(1080));
+        assert_eq!(extract_resolution("Movie 4K UHD", None), Some(2160));
+        assert_eq!(extract_resolution("Movie 720p WEB", None), Some(720));
+        assert_eq!(extract_resolution("Movie", Some("2160p")), Some(2160));
+        assert_eq!(extract_resolution("Plain Title", None), None);
     }
 }

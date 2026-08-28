@@ -667,14 +667,37 @@ impl App {
 
     fn draw_theme_picker(&mut self, frame: &mut Frame, area: Rect) {
         if self.state.show_theme_popup {
-            let items: Vec<String> = crate::tui::theme::AVAILABLE_THEMES
+            use ratatui::text::{Line, Span};
+
+            let theme_names = crate::tui::theme::AVAILABLE_THEMES;
+            let raw_items: Vec<String> = theme_names
                 .iter()
-                .map(|s| s.to_string())
+                .map(|name| {
+                    if self.state.basic_terminal {
+                        format!("{name:<12} * * *")
+                    } else {
+                        format!("{name:<12} ■ ■ ■")
+                    }
+                })
                 .collect();
-            crate::tui::overlay::picker(
+
+            let lines: Vec<Line<'static>> = theme_names
+                .iter()
+                .map(|name| {
+                    let mut spans = vec![Span::styled(format!("{name:<12} "), self.theme.text)];
+                    spans.extend(crate::tui::theme::Theme::palette_swatch_spans(
+                        name,
+                        self.state.basic_terminal,
+                    ));
+                    Line::from(spans)
+                })
+                .collect();
+
+            crate::tui::overlay::picker_with_lines(
                 frame,
                 area,
-                &items,
+                &lines,
+                &raw_items,
                 &mut self.state.theme_list_state,
                 crate::tui::overlay::PickerSpec {
                     title: "Select Theme",

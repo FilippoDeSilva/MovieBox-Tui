@@ -794,8 +794,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let subject_id = state.active_subject_id.as_deref().unwrap_or("");
             let provider = subject_provider(state, subject_id).cache_key();
 
-            let check_sym = if state.basic_terminal { "[x] " } else { "✓ " };
-            let play_sym = if state.basic_terminal { "> " } else { "▶ " };
+            let check_sym = if state.basic_terminal {
+                "[x] "
+            } else {
+                "✓  "
+            };
+            let play_sym = if state.basic_terminal {
+                "[>] "
+            } else {
+                "▶  "
+            };
+            let unwatched_sym = if state.basic_terminal { "[ ] " } else { "·  " };
             ep_numbers
                 .iter()
                 .map(|&ep| {
@@ -805,26 +814,24 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get_item(provider, subject_id, se_num, ep, Some(&title))
                     {
                         if hist.completed {
-                            ListItem::new(format!("{}Episode {}", check_sym, ep))
-                                .style(theme.text_dim)
+                            ListItem::new(format!("{check_sym}EP {ep:02}")).style(theme.text_dim)
                         } else if hist.is_in_progress() {
-                            let pct = hist
-                                .progress_percentage()
-                                .map(|p| format!(" ({:.0}%)", p))
-                                .unwrap_or_default();
-                            let remaining = hist
-                                .formatted_remaining()
-                                .map(|r| format!(" • {r}"))
-                                .unwrap_or_default();
-                            ListItem::new(format!("{}Episode {}{pct}{remaining}", play_sym, ep))
+                            let progress_info =
+                                match (hist.progress_percentage(), hist.formatted_remaining()) {
+                                    (Some(p), Some(r)) => format!(" ({:.0}% · {r})", p),
+                                    (Some(p), None) => format!(" ({:.0}%)", p),
+                                    (None, Some(r)) => format!(" ({r})"),
+                                    (None, None) => String::new(),
+                                };
+                            ListItem::new(format!("{play_sym}EP {ep:02}{progress_info}"))
                                 .style(theme.accent)
                         } else {
-                            ListItem::new(format!("  Episode {}", ep)).style(theme.text)
+                            ListItem::new(format!("{unwatched_sym}EP {ep:02}")).style(theme.text)
                         }
                     } else if state.history.is_watched(provider, subject_id, se_num, ep) {
-                        ListItem::new(format!("{}Episode {}", check_sym, ep)).style(theme.text_dim)
+                        ListItem::new(format!("{check_sym}EP {ep:02}")).style(theme.text_dim)
                     } else {
-                        ListItem::new(format!("  Episode {}", ep)).style(theme.text)
+                        ListItem::new(format!("{unwatched_sym}EP {ep:02}")).style(theme.text)
                     }
                 })
                 .collect()
@@ -1287,6 +1294,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         primary_footer.extend(secondary_footer);
         Paragraph::new(Line::from(primary_footer))
     } else {
+        if let Some(last) = primary_footer.last_mut() {
+            *last = Span::raw("");
+        }
         Paragraph::new(vec![
             Line::from(primary_footer),
             Line::from(secondary_footer),
@@ -1726,73 +1736,55 @@ fn details_footer(
     width: u16,
 ) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
     let compact = width < 80;
-    let very_compact = width < 45;
-    let mut primary = footer_group(
-        if state.basic_terminal {
-            "Tab"
-        } else {
-            "Tab/←→"
-        },
-        if compact { "Pane" } else { "Next pane" },
-        false,
-        theme,
-    );
-    primary.extend(footer_group("↑↓", "Move", false, theme));
-    if !very_compact {
-        primary.extend(footer_group(
-            "Enter",
-            if state.details_pane == crate::tui::state::DetailsPane::Streams {
-                "Play"
-            } else {
-                "Select"
-            },
-            true,
-            theme,
-        ));
-    }
+    let is_streams = state.details_pane == crate::tui::state::DetailsPane::Streams;
+    let is_languages = state.details_pane == crate::tui::state::DetailsPane::Languages;
 
+    let mut primary = Vec::new();
     let mut secondary = Vec::new();
-    if very_compact {
-        secondary.extend(footer_group(
-            "Enter",
-            if state.details_pane == crate::tui::state::DetailsPane::Streams {
-                "Play"
-            } else {
-                "Select"
-            },
-            true,
+
+    if is_streams {
+        primary.extend(footer_group("Enter", "Play", true, theme));
+        primary.extend(footer_group(
+            "o",
+            if compact { "Open" } else { "Open With" },
+            false,
             theme,
         ));
+        primary.extend(footer_group(
+            "d",
+            if compact { "Save" } else { "Download" },
+            false,
+            theme,
+        ));
+        secondary.extend(footer_group("f", "Favorite", false, theme));
+        secondary.extend(footer_group(
+            "s",
+            if compact { "Subs" } else { "Subtitles" },
+            false,
+            theme,
+        ));
+        secondary.extend(footer_group("Esc", "Back", false, theme));
+    } else if is_languages {
+        primary.extend(footer_group("Enter", "Select", true, theme));
+        primary.extend(footer_group("f", "Favorite", false, theme));
+        secondary.extend(footer_group("Tab", "Streams", false, theme));
+        secondary.extend(footer_group("Esc", "Back", false, theme));
     } else {
-        if state.details_pane == crate::tui::state::DetailsPane::Streams {
-            secondary.extend(footer_group(
-                "o",
-                if compact { "Open" } else { "Open with" },
-                false,
-                theme,
-            ));
-        }
-        if !matches!(
-            state.details_pane,
-            crate::tui::state::DetailsPane::Languages
-        ) {
-            secondary.extend(footer_group(
-                "d",
-                if compact { "Save" } else { "Download" },
-                false,
-                theme,
-            ));
-        }
-        if !very_compact {
-            secondary.extend(footer_group(
-                "r",
-                if compact { "Retry" } else { "Refresh" },
-                false,
-                theme,
-            ));
-        }
+        primary.extend(footer_group("Enter", "Select", true, theme));
+        primary.extend(footer_group(
+            "d",
+            if compact {
+                "Download"
+            } else {
+                "Download Season"
+            },
+            false,
+            theme,
+        ));
+        primary.extend(footer_group("f", "Favorite", false, theme));
+        secondary.extend(footer_group("Tab", "Streams", false, theme));
+        secondary.extend(footer_group("Esc", "Back", false, theme));
     }
-    secondary.extend(footer_group("Esc", "Back", false, theme));
 
     if let Some(last) = secondary.last_mut() {
         *last = Span::raw("");
@@ -1887,7 +1879,7 @@ mod tests {
         let spans = render_media_tag_spans(&tags, &theme, false);
         assert!(!spans.is_empty());
         let basic_spans = render_media_tag_spans(&tags, &theme, true);
-        assert_eq!(basic_spans[0].content, "[HDR] ");
+        assert_eq!(basic_spans[0].content, "HDR");
     }
 
     #[test]
@@ -1935,5 +1927,71 @@ mod tests {
                 draw(frame, frame.area(), &mut state, &theme);
             })
             .unwrap();
+    }
+
+    #[test]
+    fn test_details_footer_contextual_hints() {
+        let theme = Theme::mocha();
+        let mut state = AppState::default();
+
+        // Streams pane
+        state.details_pane = crate::tui::state::DetailsPane::Streams;
+        let (primary, secondary) = details_footer(&state, &theme, 100);
+        let mut all_spans = primary;
+        all_spans.extend(secondary);
+        let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(footer_text.contains("[Enter] Play"));
+        assert!(footer_text.contains("[o] Open With"));
+        assert!(footer_text.contains("[d] Download"));
+        assert!(footer_text.contains("[f] Favorite"));
+        assert!(footer_text.contains("[s] Subtitles"));
+        assert!(footer_text.contains("[Esc] Back"));
+
+        // Seasons pane
+        state.details_pane = crate::tui::state::DetailsPane::Seasons;
+        let (primary, secondary) = details_footer(&state, &theme, 100);
+        let mut all_spans = primary;
+        all_spans.extend(secondary);
+        let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(footer_text.contains("[Enter] Select"));
+        assert!(footer_text.contains("[d] Download Season"));
+        assert!(footer_text.contains("[f] Favorite"));
+        assert!(footer_text.contains("[Tab] Streams"));
+        assert!(footer_text.contains("[Esc] Back"));
+    }
+
+    #[test]
+    fn test_episode_list_zero_padding_and_alignment() {
+        let backend = ratatui::backend::TestBackend::new(100, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            active_subject_id: Some("test_series".to_string()),
+            selected_details: Some(serde_json::json!({
+                "id": "test_series",
+                "title": "Test Series",
+                "subjectType": 2
+            })),
+            available_seasons: vec![serde_json::json!({ "se": 1, "maxEp": 12 })],
+            available_episode_numbers: vec![vec![1, 2, 10]],
+            details_pane: crate::tui::state::DetailsPane::Episodes,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(content.contains("EP 01"));
+        assert!(content.contains("EP 02"));
+        assert!(content.contains("EP 10"));
     }
 }

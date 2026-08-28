@@ -50,9 +50,16 @@ impl App {
         }
 
         if self.state.show_theme_popup {
-            let items: Vec<String> = crate::tui::theme::AVAILABLE_THEMES
+            let theme_names = crate::tui::theme::AVAILABLE_THEMES;
+            let items: Vec<String> = theme_names
                 .iter()
-                .map(|s| s.to_string())
+                .map(|name| {
+                    if self.state.basic_terminal {
+                        format!("{name:<12} * * *")
+                    } else {
+                        format!("{name:<12} ■ ■ ■")
+                    }
+                })
                 .collect();
             match click_in_picker(
                 crate::tui::overlay::picker_layout(area, &items, "Apply", 32),
@@ -64,7 +71,7 @@ impl App {
             ) {
                 Some(Some(clicked_idx)) => {
                     self.state.theme_list_state.select(Some(clicked_idx));
-                    if let Some(theme_name) = items.get(clicked_idx) {
+                    if let Some(&theme_name) = theme_names.get(clicked_idx) {
                         self.action_sender
                             .send(Action::SelectTheme(theme_name.to_string()))
                             .ok();
@@ -85,7 +92,7 @@ impl App {
 
         if self.state.show_browse_popup {
             let is_addon = self.state.mode() == crate::tui::state::AppMode::Addon;
-            let browse_items: Vec<String> = if is_addon {
+            let raw_labels: Vec<String> = if is_addon {
                 crate::providers::addons::models::curated_catalog_presets(
                     &self.state.installed_addons,
                 )
@@ -98,6 +105,26 @@ impl App {
                     .map(|preset| preset.label().to_string())
                     .collect()
             };
+            let browse_items: Vec<String> = raw_labels
+                .iter()
+                .map(|label| {
+                    let badge_str = if label.to_ascii_lowercase().contains("movie")
+                        || label.to_ascii_lowercase().contains("top rated (all-time)")
+                        || label.to_ascii_lowercase().contains("top rated (recent")
+                    {
+                        "[MOVIES]   "
+                    } else if label.to_ascii_lowercase().contains("series")
+                        || label.to_ascii_lowercase().contains("airing")
+                        || label.to_ascii_lowercase().contains("show")
+                        || label.to_ascii_lowercase().contains("tv")
+                    {
+                        "[SERIES]   "
+                    } else {
+                        "[DISCOVER] "
+                    };
+                    format!("{badge_str}{label}")
+                })
+                .collect();
             match click_in_picker(
                 crate::tui::overlay::picker_layout(area, &browse_items, "Open", 36),
                 col,
@@ -880,48 +907,44 @@ impl App {
         let is_seasons = self.state.details_pane == DetailsPane::Seasons;
         let is_languages = self.state.details_pane == DetailsPane::Languages;
         let compact = width < 80;
-        let very_compact = width < 45;
 
         enum FooterAction {
-            Tab,
-            Move,
             PlaySelect,
             OpenWith,
             Download,
-            Refresh,
+            Favorite,
+            Subtitles,
+            StreamsTab,
             Back,
         }
 
         let mut primary: Vec<(FooterAction, u16)> = Vec::new();
-        let tab_label_len = if compact { 4 } else { 9 };
-        primary.push((FooterAction::Tab, 5 + 1 + tab_label_len));
-        primary.push((FooterAction::Move, 4 + 1 + 4));
-
-        if !very_compact {
-            let enter_label_len = if is_streams { 4 } else { 6 };
-            primary.push((FooterAction::PlaySelect, 7 + 1 + enter_label_len));
-        }
-
         let mut secondary: Vec<(FooterAction, u16)> = Vec::new();
-        if very_compact {
-            let enter_label_len = if is_streams { 4 } else { 6 };
-            secondary.push((FooterAction::PlaySelect, 7 + 1 + enter_label_len));
-        } else {
-            if is_streams {
-                let o_label_len = if compact { 4 } else { 9 };
-                secondary.push((FooterAction::OpenWith, 3 + 1 + o_label_len));
-            }
-            if !is_languages {
-                let d_label_len = if compact { 4 } else { 8 };
-                secondary.push((FooterAction::Download, 3 + 1 + d_label_len));
-            }
-            if !very_compact {
-                let r_label_len = if compact { 5 } else { 7 };
-                secondary.push((FooterAction::Refresh, 3 + 1 + r_label_len));
-            }
-        }
-        secondary.push((FooterAction::Back, 5 + 1 + 4));
 
+        if is_streams {
+            primary.push((FooterAction::PlaySelect, 7 + 1 + 4));
+            let o_label_len = if compact { 4 } else { 9 };
+            primary.push((FooterAction::OpenWith, 3 + 1 + o_label_len));
+            let d_label_len = if compact { 4 } else { 8 };
+            primary.push((FooterAction::Download, 3 + 1 + d_label_len));
+
+            secondary.push((FooterAction::Favorite, 3 + 1 + 8));
+            let s_label_len = if compact { 4 } else { 9 };
+            secondary.push((FooterAction::Subtitles, 3 + 1 + s_label_len));
+            secondary.push((FooterAction::Back, 5 + 1 + 4));
+        } else if is_languages {
+            primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
+            primary.push((FooterAction::Favorite, 3 + 1 + 8));
+            secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
+            secondary.push((FooterAction::Back, 5 + 1 + 4));
+        } else {
+            primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
+            let d_label_len = if compact { 8 } else { 15 };
+            primary.push((FooterAction::Download, 3 + 1 + d_label_len));
+            primary.push((FooterAction::Favorite, 3 + 1 + 8));
+            secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
+            secondary.push((FooterAction::Back, 5 + 1 + 4));
+        }
         let active_buttons = if width >= 86 {
             if line_idx > 0 {
                 return;
@@ -945,12 +968,6 @@ impl App {
             let end = start + w;
             if col >= start && col < end + sep {
                 match action {
-                    FooterAction::Tab => {
-                        self.action_sender.send(Action::TabPane).ok();
-                    }
-                    FooterAction::Move => {
-                        self.action_sender.send(Action::MoveDown).ok();
-                    }
                     FooterAction::PlaySelect => {
                         if is_streams {
                             self.action_sender.send(Action::PlayStream(false)).ok();
@@ -968,8 +985,17 @@ impl App {
                             self.action_sender.send(Action::PromptDownloadEpisode).ok();
                         }
                     }
-                    FooterAction::Refresh => {
-                        self.action_sender.send(Action::Refresh).ok();
+                    FooterAction::Favorite => {
+                        self.action_sender.send(Action::ToggleFavorite).ok();
+                    }
+                    FooterAction::Subtitles => {
+                        if !self.state.subtitle_list.is_empty() {
+                            self.state.subtitle_popup = true;
+                            self.state.subtitle_list_state.select(Some(0));
+                        }
+                    }
+                    FooterAction::StreamsTab => {
+                        self.action_sender.send(Action::TabPane).ok();
                     }
                     FooterAction::Back => {
                         self.action_sender.send(Action::GoBack).ok();
