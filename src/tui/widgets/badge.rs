@@ -10,6 +10,24 @@ fn theme_color(style: Style, fallback: Color) -> Color {
     style.fg.unwrap_or(fallback)
 }
 
+pub fn resolution_label(resolution: i64) -> &'static str {
+    match resolution {
+        2160 | 4320 => "4K",
+        1080 => "1080p",
+        720 => "720p",
+        480 | 540 | 576 => "SD",
+        _ if resolution > 0 => match resolution {
+            2160 => "4K",
+            1080 => "1080p",
+            720 => "720p",
+            480 => "480p",
+            360 => "360p",
+            _ => "HD",
+        },
+        _ => "SD",
+    }
+}
+
 pub fn resolution_badge_spans<'a>(
     resolution: i64,
     theme: &'a Theme,
@@ -34,7 +52,7 @@ pub fn resolution_badge_spans<'a>(
             ),
             _ => ("[SD]", theme.text_dim),
         };
-        return vec![Span::styled(format!("{:<8}", label), style)];
+        return vec![Span::styled(format!("{:<7}", label), style), Span::raw(" ")];
     }
 
     let (badge_bg, contrast_fg, label) = match resolution {
@@ -45,7 +63,7 @@ pub fn resolution_badge_spans<'a>(
             } else {
                 theme_color(theme.crust, Color::Rgb(17, 17, 27))
             },
-            " 4K ",
+            "  4K   ",
         ),
         1080 => (
             theme_color(theme.sapphire, Color::Rgb(116, 199, 236)),
@@ -63,29 +81,29 @@ pub fn resolution_badge_spans<'a>(
             } else {
                 theme_color(theme.crust, Color::Rgb(17, 17, 27))
             },
-            " 720p ",
+            " 720p  ",
         ),
         480 | 540 | 576 => (
             theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
             theme_color(theme.text, Color::White),
-            " SD ",
+            "  SD   ",
         ),
         _ if resolution > 0 => (
             theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
             theme_color(theme.text, Color::White),
             match resolution {
-                2160 => " 4K ",
+                2160 => "  4K   ",
                 1080 => " 1080p ",
-                720 => " 720p ",
-                480 => " 480p ",
-                360 => " 360p ",
-                _ => " HD ",
+                720 => " 720p  ",
+                480 => " 480p  ",
+                360 => " 360p  ",
+                _ => "  HD   ",
             },
         ),
         _ => (
             theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
             theme_color(theme.text_dim, Color::Gray),
-            " SD ",
+            "  SD   ",
         ),
     };
 
@@ -332,12 +350,25 @@ mod tests {
         let theme = Theme::default();
         let spans_normal = resolution_badge_spans(2160, &theme, false);
         assert_eq!(spans_normal.len(), 2);
+        assert_eq!(spans_normal[0].content, "  4K   ");
 
         let spans_basic = resolution_badge_spans(2160, &theme, true);
-        assert_eq!(spans_basic.len(), 1);
+        assert_eq!(spans_basic.len(), 2);
         assert!(spans_basic[0].content.contains("[4K]"));
+        assert_eq!(spans_basic[0].content, "[4K]   ");
     }
 
+    #[test]
+    fn test_resolution_label() {
+        assert_eq!(resolution_label(4320), "4K");
+        assert_eq!(resolution_label(2160), "4K");
+        assert_eq!(resolution_label(1080), "1080p");
+        assert_eq!(resolution_label(720), "720p");
+        assert_eq!(resolution_label(480), "SD");
+        assert_eq!(resolution_label(576), "SD");
+        assert_eq!(resolution_label(360), "360p");
+        assert_eq!(resolution_label(0), "SD");
+    }
     #[test]
     fn test_render_media_tag_spans() {
         let theme = Theme::default();

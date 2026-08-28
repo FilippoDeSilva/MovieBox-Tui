@@ -1,5 +1,5 @@
 pub(crate) use crate::tui::widgets::{
-    extract_media_tags, render_media_tag_spans, resolution_badge_spans,
+    extract_media_tags, resolution_badge_spans, resolution_label,
 };
 use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
@@ -943,7 +943,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         .get("resolution")
                         .and_then(|value| value.as_i64())
                         .unwrap_or(0);
-                    *quality_counts.entry(resolution).or_insert(0usize) += 1;
+                    let label = resolution_label(resolution);
+                    *quality_counts.entry(label).or_insert(0usize) += 1;
                 }
 
                 let list_items: Vec<ListItem> = list
@@ -952,10 +953,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .map(|(i, file)| {
                         let resolution =
                             file.get("resolution").and_then(|r| r.as_i64()).unwrap_or(0);
-                        let quality_str = format!("{}p", resolution);
+                        let quality_label = resolution_label(resolution);
 
-                        let is_first_of_quality = quality_str != prev_quality;
-                        prev_quality = quality_str.clone();
+                        let is_first_of_quality = quality_label != prev_quality;
+                        prev_quality = quality_label.to_string();
 
                         let codec = file
                             .get("codecName")
@@ -989,10 +990,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             metadata_style(theme)
                         };
                         let marker_style = if is_selected && streams_focused {
-                            with_selection_surface(theme.lavender, state.basic_terminal, theme)
+                            with_selection_surface(theme.accent, state.basic_terminal, theme)
                                 .add_modifier(Modifier::BOLD)
                         } else if is_selected {
-                            theme.title
+                            theme.accent
                         } else {
                             metadata_style(theme)
                         };
@@ -1035,107 +1036,137 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .and_then(|value| value.as_u64())
                             .unwrap_or(0);
                         let stream_width = streams_area.width.saturating_sub(6) as usize;
-                        let codec_str = codec.to_uppercase();
-                        let tags = extract_media_tags(raw_release_title, &codec_str);
-                        let tag_spans = render_media_tag_spans(&tags, theme, state.basic_terminal);
 
+                        // 1. Pointer (2 chars)
                         let mut stream_spans = vec![Span::styled(pointer, marker_style)];
+
+                        // 2. Resolution Badge (7 chars + 1 space separator = 8 chars)
                         stream_spans.extend(resolution_badge_spans(
                             resolution,
                             theme,
                             state.basic_terminal,
                         ));
-                        stream_spans
-                            .push(Span::styled(format!("{size_formatted:<9} "), primary_style));
 
-                        if !tag_spans.is_empty() && stream_width >= 48 {
-                            stream_spans.extend(tag_spans);
-                        } else if tags.codec.is_none() && codec != "None" && !codec.is_empty() {
-                            stream_spans
-                                .push(Span::styled(format!("{codec_str:<8} "), secondary_style));
+                        // 3. File Size (format!("{:>8}  ") = 10 chars)
+                        stream_spans.push(Span::styled(
+                            format!("{size_formatted:>8}  "),
+                            primary_style,
+                        ));
+
+                        // 4. Codecs / Media Tags (format!("{:<14} ") = 15 chars)
+                        let codec_str = codec.to_uppercase();
+                        let tags = extract_media_tags(raw_release_title, &codec_str);
+                        let mut tag_parts = Vec::new();
+                        if let Some(hdr) = tags.hdr {
+                            tag_parts.push(hdr);
                         }
+                        if let Some(codec_tag) = tags.codec {
+                            tag_parts.push(codec_tag);
+                        } else if codec != "None" && !codec.is_empty() {
+                            tag_parts.push(codec_str.as_str());
+                        }
+                        if let Some(audio) = tags.audio {
+                            tag_parts.push(audio);
+                        }
+                        if let Some(source) = tags.source {
+                            tag_parts.push(source);
+                        }
+                        let sep = if state.basic_terminal { " - " } else { " · " };
+                        let tags_or_codec = tag_parts.join(sep);
+                        let tags_display = crate::tui::text::truncate_width(&tags_or_codec, 14);
+                        stream_spans.push(Span::styled(
+                            format!("{tags_display:<14} "),
+                            secondary_style,
+                        ));
 
+                        // 5. Duration / Info column (format!("{:<8} ") = 9 chars)
+                        let duration_col = if is_fourk && duration == 0 && source_count > 0 {
+                            format!(
+                                "{source_count} mirr{}",
+                                if source_count == 1 { " " } else { "s" }
+                            )
+                        } else {
+                            duration_str.clone()
+                        };
+                        let duration_display = crate::tui::text::truncate_width(&duration_col, 8);
+                        stream_spans.push(Span::styled(
+                            format!("{duration_display:<8} "),
+                            secondary_style,
+                        ));
+
+                        // 6. Uploader / Release Title (cleanly truncated to remaining width)
                         let used_prefix_width = stream_spans
                             .iter()
                             .map(|s| crate::tui::text::width(s.content.as_ref()))
                             .sum::<usize>();
                         let remaining = stream_width.saturating_sub(used_prefix_width);
 
-                        if is_addon {
-                            let has_lang = language != "Unknown" && !language.is_empty();
-                            let lang_str = if has_lang {
-                                format!("{} ", crate::tui::text::pad_to_width(&language, 12))
-                            } else {
-                                "".to_string()
-                            };
-                            let lang_len = crate::tui::text::width(&lang_str);
-                            let upload_width = crate::tui::text::width(upload_by.as_str());
-
-                            if remaining >= 35 {
-                                let title_avail =
-                                    remaining.saturating_sub(lang_len + upload_width + 2);
-                                let display_title = crate::tui::text::truncate_width(
-                                    &release_title,
-                                    title_avail.max(8),
-                                );
-                                if has_lang {
+                        if remaining > 0 {
+                            if is_addon {
+                                let has_lang = language != "Unknown" && !language.is_empty();
+                                if has_lang && remaining >= 24 {
+                                    let lang_str = format!(
+                                        "{} ",
+                                        crate::tui::text::pad_to_width(&language, 10)
+                                    );
+                                    let lang_len = crate::tui::text::width(&lang_str);
+                                    let title_avail = remaining.saturating_sub(lang_len);
+                                    let title_trunc = crate::tui::text::truncate_width(
+                                        &release_title,
+                                        title_avail,
+                                    );
                                     stream_spans.push(Span::styled(lang_str, secondary_style));
+                                    stream_spans.push(Span::styled(title_trunc, primary_style));
+                                } else {
+                                    let title_trunc =
+                                        crate::tui::text::truncate_width(&release_title, remaining);
+                                    stream_spans.push(Span::styled(title_trunc, primary_style));
                                 }
-                                stream_spans.push(Span::styled(
-                                    format!("{display_title}  "),
-                                    primary_style,
-                                ));
-                                stream_spans
-                                    .push(Span::styled(upload_by.to_string(), secondary_style));
-                            } else if remaining >= 20 {
-                                let title_avail = remaining.saturating_sub(upload_width + 2);
-                                let display_title = crate::tui::text::truncate_width(
-                                    &release_title,
-                                    title_avail.max(6),
-                                );
-                                stream_spans.push(Span::styled(
-                                    format!("{display_title}  "),
-                                    primary_style,
-                                ));
-                                stream_spans
-                                    .push(Span::styled(upload_by.to_string(), secondary_style));
+                            } else if is_fourk {
+                                let has_lang = language != "Unknown" && !language.is_empty();
+                                if has_lang {
+                                    let lang_trunc =
+                                        crate::tui::text::truncate_width(&language, remaining);
+                                    stream_spans.push(Span::styled(lang_trunc, secondary_style));
+                                }
                             } else {
-                                stream_spans
-                                    .push(Span::styled(upload_by.to_string(), secondary_style));
+                                let has_uploader = upload_by != "Unknown" && !upload_by.is_empty();
+                                let has_title =
+                                    !release_title.is_empty() && release_title != upload_by;
+
+                                if has_uploader && has_title && remaining >= 24 {
+                                    let uploader_width = crate::tui::text::width(&upload_by);
+                                    let title_avail = remaining.saturating_sub(uploader_width + 2);
+                                    if title_avail >= 8 {
+                                        let title_trunc = crate::tui::text::truncate_width(
+                                            &release_title,
+                                            title_avail,
+                                        );
+                                        stream_spans.push(Span::styled(
+                                            format!("{upload_by}  "),
+                                            secondary_style,
+                                        ));
+                                        stream_spans
+                                            .push(Span::styled(title_trunc, secondary_style));
+                                    } else {
+                                        let uploader_trunc =
+                                            crate::tui::text::truncate_width(&upload_by, remaining);
+                                        stream_spans
+                                            .push(Span::styled(uploader_trunc, secondary_style));
+                                    }
+                                } else if has_uploader {
+                                    let uploader_trunc =
+                                        crate::tui::text::truncate_width(&upload_by, remaining);
+                                    stream_spans
+                                        .push(Span::styled(uploader_trunc, secondary_style));
+                                } else if has_title {
+                                    let title_trunc =
+                                        crate::tui::text::truncate_width(&release_title, remaining);
+                                    stream_spans.push(Span::styled(title_trunc, secondary_style));
+                                }
                             }
-                        } else if is_fourk && remaining >= 28 {
-                            let mirror_str = format!(
-                                "{source_count} mirror{}",
-                                if source_count == 1 { "" } else { "s" }
-                            );
-                            let mirror_width = mirror_str.len() + 2;
-                            let max_lang_width = remaining.saturating_sub(mirror_width + 2);
-                            let display_lang =
-                                crate::tui::text::truncate_width(&language, max_lang_width.max(6));
-                            stream_spans.push(Span::styled(
-                                format!("{display_lang:<14}  "),
-                                secondary_style,
-                            ));
-                            stream_spans.push(Span::styled(mirror_str, secondary_style));
-                        } else if is_fourk && remaining >= 12 {
-                            let display_lang = crate::tui::text::truncate_width(
-                                &language,
-                                remaining.saturating_sub(2),
-                            );
-                            stream_spans
-                                .push(Span::styled(display_lang.to_string(), secondary_style));
-                        } else if !is_fourk && remaining >= 28 {
-                            let uploader_avail = remaining.saturating_sub(12);
-                            let uploader =
-                                crate::tui::text::truncate_width(&upload_by, uploader_avail.max(4));
-                            stream_spans.push(Span::styled(
-                                format!("{duration_str:<10}  "),
-                                secondary_style,
-                            ));
-                            stream_spans.push(Span::styled(uploader, secondary_style));
-                        } else if !is_fourk && remaining >= 10 {
-                            stream_spans.push(Span::styled(duration_str, secondary_style));
                         }
+
                         if is_selected {
                             let used_width = stream_spans
                                 .iter()
@@ -1155,22 +1186,22 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 lines.push(ratatui::text::Line::from(""));
                             }
                             let option_count =
-                                quality_counts.get(&resolution).copied().unwrap_or(1);
-                            let mut header_spans = Vec::new();
-                            header_spans.extend(resolution_badge_spans(
-                                resolution,
-                                theme,
-                                state.basic_terminal,
-                            ));
-                            header_spans.push(Span::styled(" · ", theme.overlay0));
-                            header_spans.push(Span::styled(
-                                format!(
-                                    "{} option{}",
-                                    option_count,
-                                    if option_count == 1 { "" } else { "s" }
+                                quality_counts.get(quality_label).copied().unwrap_or(1);
+                            let header_spans = vec![
+                                Span::styled(
+                                    quality_label,
+                                    theme.highlight.add_modifier(Modifier::BOLD),
                                 ),
-                                metadata_style(theme),
-                            ));
+                                Span::styled(" · ", theme.overlay0),
+                                Span::styled(
+                                    format!(
+                                        "{} option{}",
+                                        option_count,
+                                        if option_count == 1 { "" } else { "s" }
+                                    ),
+                                    metadata_style(theme),
+                                ),
+                            ];
                             lines.push(Line::from(header_spans));
                         }
                         lines.push(stream_line);
@@ -1184,15 +1215,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 frame.render_stateful_widget(l, streams_area, &mut state.resource_list_state);
                 let rendered_position = selected_idx.map_or(0, |selected| {
                     let mut headings = 0;
-                    let mut previous = None;
+                    let mut previous: Option<&'static str> = None;
                     for file in list.iter().take(selected.saturating_add(1)) {
                         let resolution = file
                             .get("resolution")
                             .and_then(|value| value.as_i64())
                             .unwrap_or(0);
-                        if previous != Some(resolution) {
+                        let label = resolution_label(resolution);
+                        if previous != Some(label) {
                             headings += 1;
-                            previous = Some(resolution);
+                            previous = Some(label);
                         }
                     }
                     selected + headings
@@ -1817,7 +1849,7 @@ fn render_scroll_indicator(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::widgets::MediaTags;
+    use crate::tui::widgets::{MediaTags, render_media_tag_spans};
     #[test]
     fn test_stream_loading_spinner_frames() {
         assert_eq!(stream_loading_spinner(0, false), "⠋");
@@ -1831,19 +1863,85 @@ mod tests {
     fn test_resolution_badge_spans() {
         let theme = Theme::mocha();
         let spans_4k = resolution_badge_spans(2160, &theme, false);
-        assert_eq!(spans_4k[0].content, " 4K ");
+        assert_eq!(spans_4k[0].content, "  4K   ");
 
         let spans_1080 = resolution_badge_spans(1080, &theme, false);
         assert_eq!(spans_1080[0].content, " 1080p ");
 
         let spans_720 = resolution_badge_spans(720, &theme, false);
-        assert_eq!(spans_720[0].content, " 720p ");
+        assert_eq!(spans_720[0].content, " 720p  ");
 
         let spans_sd = resolution_badge_spans(480, &theme, false);
-        assert_eq!(spans_sd[0].content, " SD ");
+        assert_eq!(spans_sd[0].content, "  SD   ");
 
         let basic_4k = resolution_badge_spans(2160, &theme, true);
         assert_eq!(basic_4k[0].content.trim(), "[4K]");
+    }
+
+    #[test]
+    fn test_stream_list_tabular_alignment_and_headers() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(serde_json::json!({
+                "title": "Dune: Part Two",
+                "subjectType": 1
+            })),
+            selected_resources: Some(serde_json::json!({
+                "list": [
+                    {
+                        "resolution": 1080,
+                        "size": "1073741824",
+                        "codecName": "hevc",
+                        "duration": 6533,
+                        "uploadBy": "Pahe.in",
+                        "fileName": "Dune.Part.Two.2024.1080p.WEBRip.x265"
+                    },
+                    {
+                        "resolution": 1080,
+                        "size": "250000000",
+                        "codecName": "h264",
+                        "duration": 6533,
+                        "uploadBy": "GalaxyRG",
+                        "fileName": "Dune.Part.Two.2024.1080p.WEBRip.x264"
+                    },
+                    {
+                        "resolution": 720,
+                        "size": "500000000",
+                        "codecName": "hevc",
+                        "duration": 6533,
+                        "uploadBy": "PSA",
+                        "fileName": "Dune.Part.Two.2024.720p.WEBRip.x265"
+                    }
+                ]
+            })),
+            details_pane: crate::tui::state::DetailsPane::Streams,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        // Section header clean styling
+        assert!(content.contains("1080p · 2 options"));
+        assert!(content.contains("720p · 1 option"));
+        // Stream rows content
+        assert!(content.contains("1080p"));
+        assert!(content.contains("1.0GB"));
+        assert!(content.contains("HEVC"));
+        assert!(content.contains("1:48:53"));
+        assert!(content.contains("Pahe.in"));
     }
 
     #[test]

@@ -17,6 +17,8 @@
 - **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
 
 ### Changed
+- **Streams list tabular column alignment**: Standardized resolution badges to a uniform 7-column width and aligned file size, codec/media tags, duration, and uploader columns across all resolution tiers.
+- **Clean streams section headers**: Replaced solid block badges on stream quality group headers with clean typographic labels (`1080p · 1 option`) eliminating double-box visual clutter.
 - **Search card focus state differentiation**: Muted selection highlighting when search bar is in `Editing` mode to maintain clear visual hierarchy.
 - **Multi-column search results margin**: Added 1-column right margin on multi-column search results preventing overlap with the vertical scrollbar.
 - **Stabilized landing search deck width**: Standardized input deck layout width avoiding horizontal jitter while typing.
