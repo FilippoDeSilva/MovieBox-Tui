@@ -119,7 +119,7 @@ pub(crate) fn landing_split(
     basic_terminal: bool,
 ) -> (HomeLayoutTier, LandingRows) {
     let tier = HomeLayoutTier::for_width(area.width);
-    let compact_logo = tier.is_compact();
+    let compact_logo = tier.is_compact() || (tv_mode && area.width < 80);
     let effective_basic = basic_terminal || compact_logo;
     let logo_height = if effective_basic { 2 } else { 6 };
     let logo_width = if effective_basic {
@@ -743,10 +743,32 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
         }
 
-        let ctrl_s = crate::tui::text::ctrl_key("S");
-        let ctrl_t = crate::tui::text::ctrl_key("T");
-        let ctrl_a = crate::tui::text::ctrl_key("A");
-        let ctrl_p = crate::tui::text::ctrl_key("P");
+        let compact_tabs = area.width < 76;
+        let ultra_compact_tabs = area.width < 58;
+
+        let ctrl_s = if ultra_compact_tabs {
+            "S".to_string()
+        } else {
+            crate::tui::text::ctrl_key("S")
+        };
+        let ctrl_t = if ultra_compact_tabs {
+            "T".to_string()
+        } else {
+            crate::tui::text::ctrl_key("T")
+        };
+        let ctrl_a = if ultra_compact_tabs {
+            "A".to_string()
+        } else {
+            crate::tui::text::ctrl_key("A")
+        };
+        let ctrl_p = if ultra_compact_tabs {
+            "P".to_string()
+        } else {
+            crate::tui::text::ctrl_key("P")
+        };
+
+        let stream_label = if compact_tabs { "Stream" } else { "Streaming" };
+        let addon_label = if compact_tabs { "Addon" } else { "Addons" };
 
         let current_mode = state.mode();
         let mut mode_tabs: Vec<Vec<Span>> = Vec::new();
@@ -765,7 +787,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 spans.push(Span::styled("[", theme.text_dim));
                 spans.push(Span::styled(&ctrl_s, theme.shortcut));
                 spans.push(Span::styled("] ", theme.text_dim));
-                spans.push(Span::styled("Streaming", theme.text_dim));
+                spans.push(Span::styled(stream_label, theme.text_dim));
             }
             mode_tabs.push(spans);
         }
@@ -793,7 +815,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             if current_mode == crate::tui::state::AppMode::Addon {
                 spans.push(Span::styled("[ ", theme.text_dim));
                 spans.push(Span::styled(
-                    "Addons",
+                    if compact_tabs { "Addon" } else { "Addons" },
                     theme.highlight.add_modifier(Modifier::BOLD),
                 ));
                 spans.push(Span::styled(" ]", theme.text_dim));
@@ -801,7 +823,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 spans.push(Span::styled("[", theme.text_dim));
                 spans.push(Span::styled(&ctrl_a, theme.shortcut));
                 spans.push(Span::styled("] ", theme.text_dim));
-                spans.push(Span::styled("Addons", theme.text_dim));
+                spans.push(Span::styled(addon_label, theme.text_dim));
             }
             mode_tabs.push(spans);
         }
@@ -809,7 +831,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let mut mode_spans = vec![];
         for (i, tab) in mode_tabs.into_iter().enumerate() {
             if i > 0 {
-                mode_spans.push(Span::raw(if tier.is_compact() { "   " } else { "     " }));
+                let separator = if compact_tabs {
+                    " • "
+                } else {
+                    if tier.is_compact() { "   " } else { "     " }
+                };
+                mode_spans.push(Span::raw(separator));
             }
             mode_spans.extend(tab);
         }

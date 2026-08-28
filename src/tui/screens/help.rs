@@ -261,7 +261,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     let content_width = help_text.iter().map(Line::width).max().unwrap_or(42) as u16;
     let capacity = area.height.saturating_sub(6).max(4) as usize;
 
-    let two_columns = area.width >= 90;
+    let mut two_columns = area.width >= 90;
+    if two_columns && capacity < help_text.len().div_ceil(2) {
+        two_columns = false;
+    }
 
     let required_lines = if two_columns {
         help_text.len().div_ceil(2)

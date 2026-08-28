@@ -11,7 +11,7 @@ use crate::tui::theme::Theme;
 const MAX_PICKER_ROWS_CAP: usize = 14;
 
 pub(crate) fn max_picker_rows(area: Rect) -> usize {
-    (area.height.saturating_sub(6) as usize / 2).clamp(4, MAX_PICKER_ROWS_CAP)
+    (area.height.saturating_sub(6) as usize).clamp(4, MAX_PICKER_ROWS_CAP)
 }
 
 pub use crate::models::{Notification, NotificationKind};
@@ -188,8 +188,7 @@ pub fn confirmation(
         .render(frame, popup, area);
     let sections = Layout::vertical([
         Constraint::Length(summary.len() as u16),
-        Constraint::Length(1),
-        Constraint::Length(1),
+        Constraint::Length(2),
     ])
     .split(inner);
     frame.render_widget(
@@ -198,7 +197,7 @@ pub fn confirmation(
     );
 
     let selected_style = selection_style(theme, basic_terminal);
-    let actions = Line::from(vec![
+    let actions = vec![
         Span::styled(
             " Download ",
             if confirm_selected {
@@ -216,32 +215,8 @@ pub fn confirmation(
                 selected_style
             },
         ),
-    ]);
-    frame.render_widget(
-        Paragraph::new(actions).alignment(Alignment::Center),
-        sections[1],
-    );
-    let footer = if sections[2].width < 44 {
-        Line::from(vec![
-            key_hint("←→", "Choose", theme),
-            Span::raw(" "),
-            key_hint("Enter", "OK", theme),
-            Span::raw(" "),
-            key_hint("Esc", "Back", theme),
-        ])
-    } else {
-        Line::from(vec![
-            key_hint("←→", "Choose", theme),
-            Span::raw("  "),
-            key_hint("Enter", "Confirm", theme),
-            Span::raw("  "),
-            key_hint("Esc", "Back", theme),
-        ])
-    };
-    frame.render_widget(
-        Paragraph::new(footer).alignment(Alignment::Center),
-        sections[2],
-    );
+    ];
+    crate::tui::widgets::render_modal_footer(frame, sections[1], actions, theme);
 }
 
 pub fn notifications(
@@ -405,7 +380,10 @@ pub(crate) fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> 
 }
 
 pub(crate) fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
-    let style = theme.text.add_modifier(Modifier::BOLD);
+    let mut style = theme.text.add_modifier(Modifier::BOLD);
+    if crate::tui::theme::ColorSupport::current() == crate::tui::theme::ColorSupport::NoColor {
+        style = style.add_modifier(Modifier::REVERSED);
+    }
     if basic_terminal {
         style.add_modifier(Modifier::UNDERLINED)
     } else {

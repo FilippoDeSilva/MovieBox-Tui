@@ -977,6 +977,13 @@ impl App {
                                 self.action_sender.send(Action::Refresh).ok();
                             }
                         }
+                        KeyCode::Char('c') | KeyCode::Char('C')
+                            if self.state.download_progress.is_none() =>
+                        {
+                            self.state.clear_search_state();
+                            self.state.input_mode = InputMode::Normal;
+                            self.state.set_status_default("Search cleared.");
+                        }
                         KeyCode::Char('o') | KeyCode::Char('O')
                             if self.state.input_mode == InputMode::Normal
                                 && self.state.is_tv_mode =>

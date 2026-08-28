@@ -376,10 +376,11 @@ impl App {
 
             if row == rows.rects[rows.mode_row].y {
                 if compact {
-                    if col < area.width / 2 {
-                        self.handle_home_mode_click(col, area.width, true);
+                    let util_split = area.width.saturating_sub(19);
+                    if col < util_split {
+                        self.handle_home_mode_click(col, util_split, true);
                     } else {
-                        self.handle_home_util_click(col, area.width, true);
+                        self.handle_home_util_click(col.saturating_sub(util_split), 19, true);
                     }
                 } else {
                     self.handle_home_mode_click(col, area.width, false);
@@ -430,7 +431,13 @@ impl App {
                 );
 
             let start_y = search_bar_area.bottom();
-            if row >= start_y && (row - start_y) < visible_count as u16 {
+            let container_w = search_bar_area.width.max(48);
+            let container_x = search_bar_area.x;
+            if col >= container_x
+                && col < container_x + container_w
+                && row >= start_y
+                && (row - start_y) < visible_count as u16
+            {
                 let clicked_idx = suggestion_offset + (row - start_y) as usize;
                 if let Some(query) = self.state.search_suggestions.get(clicked_idx).cloned() {
                     self.action_sender

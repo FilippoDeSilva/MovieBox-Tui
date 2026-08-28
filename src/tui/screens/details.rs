@@ -554,6 +554,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             if max_width >= ellipsis_w {
                 let trimmed =
                     crate::tui::text::truncate_width(last, max_width.saturating_sub(ellipsis_w));
+                let trimmed = trimmed
+                    .trim_end_matches(['.', ',', '!', '?', ':', ';'])
+                    .trim_end();
                 *last = format!("{trimmed}{ellipsis}");
             }
         }

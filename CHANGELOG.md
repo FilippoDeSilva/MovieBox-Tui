@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+- **Responsive Mode Tabs**: Mode tabs on compact viewports dynamically abbreviate to `<76` (`[Ctrl+S] Stream`) and ultra-compact `<58` (`[S] Stream`), protecting them against collisions with the right-aligned utility bar.
+- **TV Mode Logo Responsiveness**: Terminal width `<80` triggers the narrower 33-column compact logo to render in TV mode, establishing clean margins on medium setups.
+- **Hitbox Splitting**: Synchronized horizontal clicks for mode tabs and the `[?] Help`/`[q] Quit` widgets by enforcing an exact `saturating_sub(19)` boundary layout.
+- **Bounded Hitbox**: Addressed dropdown autocompletion leakage. Mouse click events are now strictly clipped inside the computed dynamic bounds of the search suggestion dropdown list.
+- **Normal Mode Direct Clear Shortcut**: Pressing `c` or `C` in `InputMode::Normal` clears the active search query instantly and clears search view states when not in an active download.
+- **Single-Column Grid Sequencing**: Standardized `<Left>` and `<Right>` movement behaviors in single-column grids so that `jump = 1` enforces granular sequential traversal.
+- **Vertical Picker Scaling**: Budget capacity for Picker rows has shifted to `(height - 6).clamp(4, 14)`, effectively granting 14 visible rows on a standard 24-row height layout.
+- **Help Layout Rendering Safety**: Wide but vertically short environments safely fall back to scrollable single-column views instead of broken two-column layout.
+- **Update Component Layout**: Brought the auto-updater window entirely into parity via `ModalFrame`, granting background area clearing overlays and standard unified outlines.
+- **Confirmation Footer Buttons**: Dropped redundant confirmation footers to inject dynamic, formatted `[ Download ] [ Cancel ]` dialog responses seamlessly inside confirmation views.
+- **Synopsis Clean Formatting**: Wrapped synopses auto-strip trailing punctuations (`.`, `,`, `!`, `?`, `:`, `;`) before truncating with an ellipsis (`…`).
+- **NO_COLOR Adjustments**: Added standard `Modifier::REVERSED` rendering on active item rows across Pickers and Results where `ColorSupport::NoColor` is enforced.
+
 ### Added
 - **Centralized UI widgets subsystem (`src/tui/widgets`)**: Standardized single-line text input
   fields (`render_single_line_input`), viewport-accurate Ratatui scrollbars (`render_scrollbar`),

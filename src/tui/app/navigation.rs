@@ -688,11 +688,7 @@ impl App {
             Action::MoveLeft => {
                 if self.state.active_screen == Screen::Home {
                     let current = self.state.search_list_state.selected().unwrap_or(0);
-                    let jump = if self.result_grid_columns() > 1 {
-                        1
-                    } else {
-                        self.state.effective_visible_items().max(1)
-                    };
+                    let jump = 1;
                     if current > jump {
                         self.state.search_list_state.select(Some(current - jump));
                     } else {
@@ -714,11 +710,7 @@ impl App {
             Action::MoveRight => {
                 if self.state.active_screen == Screen::Home {
                     let current = self.state.search_list_state.selected().unwrap_or(0);
-                    let jump = if self.result_grid_columns() > 1 {
-                        1
-                    } else {
-                        self.state.effective_visible_items().max(1)
-                    };
+                    let jump = 1;
                     let total = self.state.search_results.len();
                     if current + jump < total {
                         self.state.search_list_state.select(Some(current + jump));

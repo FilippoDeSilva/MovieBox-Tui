@@ -691,7 +691,7 @@ impl App {
         if let Some((version, notes)) = &self.state.update_available {
             use ratatui::layout::Alignment;
             use ratatui::text::{Line, Span};
-            use ratatui::widgets::{Block, Borders, Paragraph};
+            use ratatui::widgets::Paragraph;
 
             let layout = crate::tui::overlay::update_modal_layout(area, notes);
             let popup_area = layout.popup_area;
@@ -704,7 +704,12 @@ impl App {
                 .filter(|l| !l.is_empty())
                 .collect();
 
-            crate::tui::overlay::clear_modal_area(frame, area, popup_area, &self.theme);
+            let inner_area = crate::tui::widgets::ModalFrame::new(
+                "Update Available",
+                &self.theme,
+                self.state.basic_terminal,
+            )
+            .render(frame, popup_area, area);
 
             let mut text = vec![
                 Line::from(vec![Span::styled(
@@ -807,16 +812,8 @@ impl App {
                 .alignment(Alignment::Center),
             );
 
-            let block = Block::default()
-                .title(" Update Available ")
-                .title_alignment(Alignment::Center)
-                .title_style(self.theme.title)
-                .borders(Borders::ALL)
-                .border_type(crate::tui::overlay::border_type(self.state.basic_terminal))
-                .border_style(self.theme.border_focus);
-
-            let popup = Paragraph::new(text).block(block);
-            frame.render_widget(popup, popup_area);
+            let popup = Paragraph::new(text);
+            frame.render_widget(popup, inner_area);
         }
     }
 }
