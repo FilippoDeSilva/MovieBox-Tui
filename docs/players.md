@@ -32,11 +32,11 @@ by the image picker, then clamped to a fixed range.
 
 ## Headers
 
-Playback sources (for example 4KHD) may carry `Referer`/`User-Agent` headers.
-mpv/IINA send them via `http-header-fields` (`--http-header-fields=...` or
-`--mpv-http-header-fields=...`), while VLC maps them to `--http-referrer` /
-`--http-user-agent`. The `supports_headers` gate in `app/playback.rs` warns when a
-player cannot satisfy a source's headers.
+Playback sources (for example 4KHD and MovieBox) may carry `Referer`/`User-Agent` headers.
+MovieBox sources forward the client's spoofed Android/Cronet `User-Agent` to satisfy CDN
+stream requirements. mpv/IINA send them via `http-header-fields` (`--http-header-fields=...`
+or `--mpv-http-header-fields=...`), while VLC maps them to `--http-referrer` / `--http-user-agent`.
+The `supports_headers` gate in `app/playback.rs` warns when a player cannot satisfy a source's headers.
 
 ## Subtitles
 

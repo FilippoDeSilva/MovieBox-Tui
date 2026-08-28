@@ -15,6 +15,8 @@ and optional segmentation. Orchestration lives in `app/download.rs`.
   timeouts apply to streaming reads.
 - **Cancel**: an `AtomicBool` cancel flag pauses/resumes cleanly, preserving the
   partial file for a later resume.
+- **User-Agent**: the download HTTP client inherits the active provider's mobile `User-Agent`
+  to prevent CDN stream rejections when downloading media segments.
 
 ## File names and directories
 

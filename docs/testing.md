@@ -4,7 +4,7 @@ This document describes the testing architecture, quality assurance procedures, 
 
 ## 1. Test Architecture
 
-The test suite comprises **273 automated tests across 19 test suites** (144 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 129 integration tests across 16 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
+The test suite comprises **283 automated tests across 18 test suites** (150 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 133 integration tests across 17 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
 
 The MovieBox-TUI test architecture follows a strict separation of concerns:
 
@@ -35,7 +35,8 @@ MovieBox-TUI/
     ├── real_acceptance.rs         # Opt-in live artifact downloads, SHA256 integrity, & version verify
     ├── version_upgrade_e2e.rs     # Offline (mock-server) end-to-end upgrade execution
     ├── addons_manifest.rs         # Addon manifest deserialization & catalog checks
-    └── favorites_lifecycle.rs     # Favorites persistence, identity, and navigation lifecycle
+    ├── favorites_lifecycle.rs     # Favorites persistence, identity, and navigation lifecycle
+    └── live_stream_verification.rs # Live MovieBox CDN signed stream & resolution verification (opt-in)
 ```
 
 ### A. Inline Unit Tests (`src/**/*.rs`)
@@ -62,6 +63,7 @@ Integration tests live in the `tests/` directory and test externally observable 
 - **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
 - **`addons_manifest.rs`**: Validates deserialization of Cinemeta/Stremio addon manifests, series vs movie metadata classification, multi-season episode decomposition, episode stream isolation (`parse_season_episode`), token and codec parsing, and movie stream regressions.
 - **`url_security.rs`**: Validates HTTP/HTTPS URL detection and Windows reserved device stem sanitization (`CON`, `AUX`, `PRN`, `NUL`, `COM1-9`, `LPT1-9`).
+- **`live_stream_verification.rs`**: Validates real-world MovieBox CDN stream link resolution for movies and TV series, verifying that the backend returns valid signed MP4 streams and that legacy upgrade notice hashes (`1c7de0bd...`) are rejected. The tests are `#[ignore]`-gated for offline execution; opt in with `cargo test --test live_stream_verification -- --ignored`.
 
 ---
 

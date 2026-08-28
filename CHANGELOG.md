@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Live stream verification test suite (`tests/live_stream_verification.rs`)**: Integrated end-to-end verification verifying movie and series stream resolution against live backend endpoints and asserting absence of legacy notice hashes.
 - **Unified Command Hub landing design**: Redesigned the homepage landing screen into a single cohesive, proportional modal container seamlessly combining the search bar, embedded provider pill (`[MovieBox · Ctrl+P]`), live suggestions, recent favorites, and quick command shortcuts.
 - **Details Screen Subtitles Shortcut (`[s]`)**: Added `s`/`S` keyboard shortcut on Details screen to open the subtitle language picker, matching mouse click and footer hints.
 - **Theme picker 3-point color swatches**: Rendered 3-point color swatches (`■ ■ ■` Accent | Surface | Base) previewing palette colors in `/theme`.
@@ -131,6 +132,8 @@
 
 ### Changed
 - **Framed landing favorites deck**: Enclosed the landing Favorites list in a matching bordered card with embedded `★ Favorites` header, perfectly aligning item titles, `▌ ` pointer cursors, and right-aligned `YYYY Movie/Series` tags with the search deck above.
+- **MovieBox client version spoofing upgrade**: Updated MovieBox client identity spoofing to APK `v4.0.01.0813.03` with version codes `50020117..50020121` (`src/providers/moviebox/crypto.rs`), ensuring full backend compatibility and preventing notice video substitution.
+- **Explicit 480p and 360p resolution badges**: Standardized quality tags and badges for `480p` and `360p` across details stream tables and basic terminals, replacing generic `SD` labels.
 - **Homepage landing optical spacing & card separation**: Increased vertical breathing margin between ASCII header and search deck, separated search input into a dedicated 3-row framed card, and formatted favorites as an aligned standalone deck with proper vertical rhythm.
 - **Streamlined 1-line mode switcher**: Simplified bottom navigation bar to `[Ctrl+S] Stream · [Ctrl+T] TV · [Ctrl+A] Addon      [?] Help [q] Quit`, eliminating duplicate provider text.
 - **Clean search suggestion dropdown card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
@@ -161,6 +164,9 @@
 - **Search Suggestions Overlay Bleed**: Wrapped search suggestions in an elevated, bordered card with opaque background clearing (`theme.surface0`), and gated terminal graphics poster rendering while typing suggestions, eliminating text and image collisions over background search results.
 - **Season Download Stream Error Recovery**: Prevented download queue stalls when resolving individual episode stream URLs fails; failed streams report diagnostics and allow the remaining queue to continue.
 - **Favorites & Watch History Corruption Recovery**: Corrupted JSON configuration and history state files now rotate to `.corrupt` backups instead of hard deletion, preserving recoverable user data.
+- **MovieBox stream URL replacement with upgrade notice video**: Fixed an issue where the MovieBox backend substituted movie and TV episode stream URLs with a 22-second app upgrade notice video (`1c7de0bd3393702d9191801f15f88f8d.mp4`) when legacy client version headers (`3.0.03.0529.03`) were detected.
+- **Mobile User-Agent forwarding to media players & downloader**: Forwarded the spoofed mobile `User-Agent` to external players (`mpv`, `VLC`, `IINA`) and the download HTTP client, preventing HTTP 428/403 errors when streaming or downloading from `bcdn.hakunaymatata.com`.
+- **Series multi-resolution discovery fallback**: Enhanced `fetch_collection_resolutions()` to inspect `list` array items when `collectionResolutions` is empty, sorting discovered qualities descending and defaulting to `[1080, 720, 480, 360]`.
 - **Details Screen Hit-Testing & Selector Alignment**: Aligned mouse hit-testing regions and season/episode selector column geometry across all compact, medium, and wide terminal tiers.
 - **Unicode Display Width in Input Widgets**: Single-line text input fields now compute column offsets using visual Unicode width instead of raw character counts, preventing CJK and multi-byte character overflow from wrapping box borders.
 - **M3U Playlist Channel Title Parsing**: Channel titles containing commas in `#EXTINF` metadata are now parsed without truncation, preserving complete channel display names.
