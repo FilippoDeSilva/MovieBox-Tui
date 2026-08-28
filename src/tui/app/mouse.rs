@@ -396,6 +396,7 @@ impl App {
                 area,
                 self.state.is_tv_mode,
                 self.state.basic_terminal,
+                self.state.favorites_landing_visible(),
             ))
         } else {
             None
@@ -404,35 +405,12 @@ impl App {
         if let Some((_tier, ref rows)) = landing_layout {
             let card_width = crate::tui::screens::home::search_deck_width(area, &self.state, true);
             let card_x = area.x + area.width.saturating_sub(card_width) / 2;
-            let hub_y = rows.rects[rows.search].y;
-
-            let has_suggestions = self.state.input_mode == InputMode::Editing
-                && !self.state.search_suggestions.is_empty();
-            let favorites_items = self.state.favorites_landing_items();
-            let has_favorites = !favorites_items.is_empty();
-            let overflow = self
-                .state
-                .favorites
-                .items
-                .len()
-                .saturating_sub(favorites_items.len());
-
-            let content_rows = if has_suggestions {
-                self.state.search_suggestions.len().min(6) as u16
-            } else if has_favorites {
-                1 + favorites_items.len() as u16 + u16::from(overflow > 0) + 1
-            } else {
-                2
-            };
-
-            let total_card_height = (1 + 1 + 1 + content_rows + 1)
-                .min(rows.rects[rows.search].height)
-                .max(4);
-            let hub_card_area = Rect {
+            let search_y = rows.rects[rows.search].y;
+            let search_card_area = Rect {
                 x: card_x,
-                y: hub_y,
+                y: search_y,
                 width: card_width,
-                height: total_card_height,
+                height: rows.rects[rows.search].height,
             };
 
             if row == rows.rects[rows.mode_row].y {
@@ -440,135 +418,141 @@ impl App {
                 return None;
             }
 
-            if col >= hub_card_area.left()
-                && col < hub_card_area.right()
-                && row >= hub_card_area.top()
-                && row < hub_card_area.bottom()
+            if self.state.input_mode == InputMode::Editing
+                && !self.state.search_suggestions.is_empty()
             {
-                if row == hub_card_area.y + 1 {
-                    let is_ultra_compact = area.width < 58;
-                    let is_query_empty = self.state.search_query.is_empty();
-                    if is_query_empty {
-                        let pill_len = if self.state.is_tv_mode {
-                            if is_ultra_compact { 4 } else { 16 }
-                        } else if self.state.is_addon_mode {
-                            if is_ultra_compact { 8 } else { 16 }
-                        } else {
-                            let label_len =
-                                self.state.active_provider.label().chars().count() as u16;
-                            if is_ultra_compact {
-                                label_len + 2
-                            } else {
-                                label_len + 12
-                            }
-                        };
-                        if col >= hub_card_area.right().saturating_sub(pill_len + 2) {
-                            if self.state.mode() == crate::tui::state::AppMode::Streaming {
-                                self.cycle_provider();
-                            } else if self.state.mode() == crate::tui::state::AppMode::Tv {
-                                self.action_sender.send(Action::ToggleTvMode).ok();
-                            } else if self.state.mode() == crate::tui::state::AppMode::Addon {
-                                self.action_sender.send(Action::ToggleAddonMode).ok();
-                            }
-                            return None;
-                        }
+                let visible_count = self.state.search_suggestions.len().min(6);
+                let selected_index = self.state.suggest_index.unwrap_or(0);
+                let suggestion_offset = selected_index
+                    .saturating_add(1)
+                    .saturating_sub(visible_count)
+                    .min(
+                        self.state
+                            .search_suggestions
+                            .len()
+                            .saturating_sub(visible_count),
+                    );
+                let visible_slice_len = self
+                    .state
+                    .search_suggestions
+                    .len()
+                    .saturating_sub(suggestion_offset)
+                    .min(visible_count);
+
+                let (container_area, inner_area) =
+                    crate::tui::screens::home::search_suggestions_bounds(
+                        area,
+                        search_card_area,
+                        visible_slice_len,
+                    );
+
+                if col >= inner_area.left()
+                    && col < inner_area.right()
+                    && row >= inner_area.top()
+                    && row < inner_area.bottom()
+                {
+                    let clicked_idx = suggestion_offset + (row - inner_area.top()) as usize;
+                    if let Some(query) = self.state.search_suggestions.get(clicked_idx).cloned() {
+                        self.action_sender
+                            .send(Action::SelectSuggestion { query })
+                            .ok();
                     }
-                    self.state.input_mode = InputMode::Editing;
-                    self.state.favorites_focus = false;
-                    self.state.favorites_landing_state.select(None);
                     return None;
                 }
 
-                if row == hub_card_area.y + 2 {
-                    self.state.input_mode = InputMode::Editing;
-                    self.state.favorites_focus = false;
-                    self.state.favorites_landing_state.select(None);
+                if col >= container_area.left()
+                    && col < container_area.right()
+                    && row >= container_area.top()
+                    && row < container_area.bottom()
+                {
                     return None;
                 }
+            }
 
-                let content_start_y = hub_card_area.y + 3;
-                if row >= content_start_y && row < hub_card_area.bottom().saturating_sub(1) {
-                    let rel_row = row - content_start_y;
-
-                    if has_suggestions {
-                        let visible_count = self.state.search_suggestions.len().min(6);
-                        let selected_index = self.state.suggest_index.unwrap_or(0);
-                        let suggestion_offset = selected_index
-                            .saturating_add(1)
-                            .saturating_sub(visible_count)
-                            .min(
-                                self.state
-                                    .search_suggestions
-                                    .len()
-                                    .saturating_sub(visible_count),
-                            );
-                        if (rel_row as usize) < visible_count {
-                            let clicked_idx = suggestion_offset + rel_row as usize;
-                            if let Some(query) =
-                                self.state.search_suggestions.get(clicked_idx).cloned()
-                            {
-                                self.action_sender
-                                    .send(Action::SelectSuggestion { query })
-                                    .ok();
-                            }
-                        }
-                        return None;
-                    } else if has_favorites {
-                        let items_len = favorites_items.len() as u16;
-                        if rel_row == 0 {
-                            self.state.favorites_focus = true;
-                            self.state.input_mode = InputMode::Normal;
-                        } else if rel_row >= 1 && rel_row <= items_len {
-                            let idx = (rel_row - 1) as usize;
-                            let prev_selected = if self.state.favorites_focus {
-                                self.state.favorites_landing_state.selected()
-                            } else {
-                                None
-                            };
-                            self.state.favorites_focus = true;
-                            self.state.input_mode = InputMode::Normal;
-                            self.state.favorites_landing_state.select(Some(idx));
-                            if prev_selected == Some(idx) {
-                                self.action_sender.send(Action::OpenFavorite(idx)).ok();
-                            }
-                        } else if overflow > 0 && rel_row == items_len + 1 {
-                            self.action_sender.send(Action::ShowFavorites).ok();
-                        } else {
-                            if col < hub_card_area.x + hub_card_area.width / 2 {
-                                self.action_sender
-                                    .send(Action::SelectSuggestion {
-                                        query: "/browse".to_string(),
-                                    })
-                                    .ok();
-                            } else {
-                                self.action_sender
-                                    .send(Action::SelectSuggestion {
-                                        query: "/history".to_string(),
-                                    })
-                                    .ok();
-                            }
-                        }
-                        return None;
+            if col >= search_card_area.left()
+                && col < search_card_area.right()
+                && row >= search_card_area.top()
+                && row < search_card_area.bottom()
+            {
+                let is_ultra_compact = area.width < 58;
+                let is_query_empty = self.state.search_query.is_empty();
+                if is_query_empty {
+                    let pill_len = if self.state.is_tv_mode {
+                        if is_ultra_compact { 4 } else { 16 }
+                    } else if self.state.is_addon_mode {
+                        if is_ultra_compact { 8 } else { 16 }
                     } else {
-                        if rel_row == 0 {
-                            self.action_sender
-                                .send(Action::SelectSuggestion {
-                                    query: "/browse".to_string(),
-                                })
-                                .ok();
-                        } else if rel_row == 1 {
-                            if col < hub_card_area.x + 35 {
-                                self.action_sender
-                                    .send(Action::SelectSuggestion {
-                                        query: "/theme".to_string(),
-                                    })
-                                    .ok();
-                            } else {
-                                self.action_sender.send(Action::ToggleHelp).ok();
-                            }
+                        let label_len = self.state.active_provider.label().chars().count() as u16;
+                        if is_ultra_compact {
+                            label_len + 2
+                        } else {
+                            label_len + 12
+                        }
+                    };
+                    if col >= search_card_area.right().saturating_sub(pill_len + 2) {
+                        if self.state.mode() == crate::tui::state::AppMode::Streaming {
+                            self.cycle_provider();
+                        } else if self.state.mode() == crate::tui::state::AppMode::Tv {
+                            self.action_sender.send(Action::ToggleTvMode).ok();
+                        } else if self.state.mode() == crate::tui::state::AppMode::Addon {
+                            self.action_sender.send(Action::ToggleAddonMode).ok();
                         }
                         return None;
                     }
+                }
+                self.state.input_mode = InputMode::Editing;
+                self.state.favorites_focus = false;
+                self.state.favorites_landing_state.select(None);
+                return None;
+            }
+
+            if self.state.favorites_landing_visible() {
+                let fav_y = rows.rects[rows.favorites].y;
+                let favorites_items = self.state.favorites_landing_items();
+                let fav_count = favorites_items.len() as u16;
+                let overflow = self
+                    .state
+                    .favorites
+                    .items
+                    .len()
+                    .saturating_sub(favorites_items.len());
+                let overflow_row = u16::from(overflow > 0);
+                let fav_height =
+                    (1 + fav_count + overflow_row).min(rows.rects[rows.favorites].height);
+
+                let fav_card_area = Rect {
+                    x: card_x,
+                    y: fav_y,
+                    width: card_width,
+                    height: fav_height,
+                };
+
+                if col >= fav_card_area.left()
+                    && col < fav_card_area.right()
+                    && row >= fav_card_area.top()
+                    && row < fav_card_area.bottom()
+                {
+                    let rel_row = row - fav_card_area.top();
+                    if rel_row == 0 {
+                        self.state.favorites_focus = true;
+                        self.state.input_mode = InputMode::Normal;
+                    } else if rel_row >= 1 && rel_row <= fav_count {
+                        let idx = (rel_row - 1) as usize;
+                        let prev_selected = if self.state.favorites_focus {
+                            self.state.favorites_landing_state.selected()
+                        } else {
+                            None
+                        };
+                        self.state.favorites_focus = true;
+                        self.state.input_mode = InputMode::Normal;
+                        self.state.favorites_landing_state.select(Some(idx));
+                        if prev_selected == Some(idx) {
+                            self.action_sender.send(Action::OpenFavorite(idx)).ok();
+                        }
+                    } else if overflow > 0 && rel_row == fav_count + 1 {
+                        self.action_sender.send(Action::ShowFavorites).ok();
+                    }
+                    return None;
                 }
             }
 

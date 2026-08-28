@@ -98,7 +98,6 @@ pub struct LandingRows {
     pub logo: usize,
     pub version: usize,
     pub search: usize,
-    #[allow(dead_code)]
     pub favorites: usize,
     pub mode_row: usize,
     #[allow(dead_code)]
@@ -110,6 +109,7 @@ pub fn landing_split(
     area: Rect,
     tv_mode: bool,
     basic_terminal: bool,
+    favorites_visible: bool,
 ) -> (HomeLayoutTier, LandingRows) {
     let tier = HomeLayoutTier::for_width(area.width);
     let compact_logo = tier.is_compact() || (tv_mode && area.width < 80);
@@ -122,19 +122,19 @@ pub fn landing_split(
     } else {
         73
     };
-    let top_pad = if effective_basic || area.height < 24 {
-        1
-    } else {
-        2
-    };
+    let top_pad = if area.height < 24 { 1 } else { 2 };
+    let header_gap = if area.height < 24 { 1 } else { 2 };
+    let favorites_gap = if favorites_visible { 1 } else { 0 };
     let rects = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(top_pad),
             Constraint::Length(logo_height),
             Constraint::Length(1), // version
-            Constraint::Length(1), // gap
-            Constraint::Min(4),    // unified hub card
+            Constraint::Length(header_gap),
+            Constraint::Length(3), // search
+            Constraint::Length(favorites_gap),
+            Constraint::Min(0),    // favorites deck
             Constraint::Length(1), // streamlined bottom bar
         ])
         .split(area);
@@ -145,8 +145,8 @@ pub fn landing_split(
             logo: 1,
             version: 2,
             search: 4,
-            favorites: 4,
-            mode_row: 5,
+            favorites: 6,
+            mode_row: 7,
             util_row: None,
             logo_width,
         },
@@ -365,8 +365,12 @@ fn render_search_state(
 
     frame.render_widget(Paragraph::new(lines).alignment(alignment), card);
 }
-#[cfg(test)]
-fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
+pub(crate) fn render_favorites_landing(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    theme: &Theme,
+) {
     if area.height < 2 || area.width < 20 {
         return;
     }
@@ -381,11 +385,7 @@ fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, the
     }
 
     let overflow = state.favorites.items.len().saturating_sub(items.len());
-    let card_width = if HomeLayoutTier::for_width(area.width).is_compact() {
-        area.width.clamp(20, 44)
-    } else {
-        area.width.clamp(20, 56)
-    };
+    let card_width = search_deck_width(area, state, true);
     let row_count = items.len() as u16;
     let overflow_row = u16::from(overflow > 0);
     let content_height = (1 + row_count + overflow_row).min(area.height);
@@ -402,27 +402,24 @@ fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, the
         frame.render_widget(Block::default().style(Style::default().bg(bg)), card);
     }
 
-    let mut constraints = vec![Constraint::Length(1)];
-    constraints.extend(std::iter::repeat_n(Constraint::Length(1), items.len()));
-    if overflow > 0 {
-        constraints.push(Constraint::Length(1));
-    }
-    let sections = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
-        .split(card);
-
+    let mut curr_y = card.y;
+    let star = if state.basic_terminal { "*" } else { "★" };
     let header_style = if state.favorites_focus {
-        theme.title
+        theme.title.add_modifier(Modifier::BOLD)
     } else {
         theme.subtext1
     };
+    let header_area = Rect {
+        x: card.x,
+        y: curr_y,
+        width: card.width,
+        height: 1,
+    };
     frame.render_widget(
-        Paragraph::new("Favorites")
-            .style(header_style)
-            .alignment(Alignment::Center),
-        sections[0],
+        Paragraph::new(format!("  {star} Favorites")).style(header_style),
+        header_area,
     );
+    curr_y += 1;
 
     let selected = if state.favorites_focus {
         state.favorites_landing_state.selected()
@@ -431,49 +428,79 @@ fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, the
     };
 
     for (i, item) in items.iter().enumerate() {
-        let Some(row_area) = sections.get(1 + i) else {
+        if curr_y >= card.bottom() {
             break;
-        };
+        }
         let is_selected = selected == Some(i);
         let type_tag = if item.stype == 2 { "Series" } else { "Movie" };
+        let right_tag = if item.release_year.is_empty() {
+            type_tag.to_string()
+        } else {
+            format!("{} {type_tag}", item.release_year)
+        };
+
         let prefix = if is_selected {
             if state.basic_terminal { "> " } else { "▌ " }
         } else {
             "  "
         };
+
         let title_style = if is_selected {
             theme.title.add_modifier(Modifier::BOLD)
         } else {
             theme.text
         };
-        let max_title_width = row_area.width.saturating_sub(14) as usize;
+
+        let row_style = if is_selected {
+            Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+        } else {
+            Style::default()
+        };
+
+        let tag_len = crate::tui::text::width(&right_tag) + 2;
+        let max_title_width = (card.width as usize).saturating_sub(2 + tag_len);
+        let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
+        let title_width = crate::tui::text::width(&truncated_title);
+        let pad_len = (card.width as usize).saturating_sub(2 + title_width + tag_len);
+
         let line = Line::from(vec![
             Span::styled(prefix, theme.accent),
-            Span::styled(
-                crate::tui::text::truncate_width(&item.title, max_title_width),
-                title_style,
-            ),
-            Span::styled(format!("  {type_tag}"), theme.text_dim),
+            Span::styled(truncated_title, title_style),
+            Span::raw(" ".repeat(pad_len)),
+            Span::styled(format!("  {right_tag}"), theme.text_dim),
         ]);
-        frame.render_widget(Paragraph::new(line), *row_area);
+
+        let row_area = Rect {
+            x: card.x,
+            y: curr_y,
+            width: card.width,
+            height: 1,
+        };
+        frame.render_widget(Paragraph::new(line).style(row_style), row_area);
+        curr_y += 1;
     }
 
-    if overflow > 0 {
-        if let Some(row_area) = sections.last() {
-            let pill_text = format!("[ +{overflow} more · /favorites ]");
-            let pill_style = if state.basic_terminal {
-                theme.sapphire
-            } else {
-                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
-                let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
-                Style::default().bg(bg).fg(fg)
-            };
-            frame.render_widget(
-                Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
-                    .alignment(Alignment::Center),
-                *row_area,
-            );
-        }
+    if overflow > 0 && curr_y < card.bottom() {
+        let sep = if state.basic_terminal { "-" } else { "·" };
+        let pill_text = format!("[ +{overflow} more {sep} /favorites ]");
+        let pill_style = if state.basic_terminal {
+            theme.sapphire
+        } else {
+            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+            let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
+            Style::default().bg(bg).fg(fg)
+        };
+        let pill_area = Rect {
+            x: card.x,
+            y: curr_y,
+            width: card.width,
+            height: 1,
+        };
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
+                .alignment(Alignment::Center),
+            pill_area,
+        );
     }
 }
 
@@ -539,513 +566,6 @@ fn search_content(
     }
 }
 
-fn render_unified_command_hub(
-    frame: &mut Frame,
-    area: Rect,
-    state: &AppState,
-    theme: &Theme,
-    view: SearchViewState,
-    show_cursor: bool,
-) -> (Rect, Rect) {
-    if area.height < 3 || area.width < 20 {
-        return (Rect::default(), Rect::default());
-    }
-
-    let card_width = search_deck_width(area, state, true);
-    let has_suggestions =
-        state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
-    let favorites_items = state.favorites_landing_items();
-    let has_favorites = !favorites_items.is_empty();
-    let overflow = state
-        .favorites
-        .items
-        .len()
-        .saturating_sub(favorites_items.len());
-
-    let content_rows = if has_suggestions {
-        state.search_suggestions.len().min(6) as u16
-    } else if has_favorites {
-        1 + favorites_items.len() as u16 + u16::from(overflow > 0) + 1
-    } else {
-        2
-    };
-
-    let total_card_height = (1 + 1 + 1 + content_rows + 1).min(area.height).max(4);
-    let card_x = area.x + area.width.saturating_sub(card_width) / 2;
-    let card_area = Rect {
-        x: card_x,
-        y: area.y,
-        width: card_width,
-        height: total_card_height,
-    };
-
-    let border_style = if state.input_mode == InputMode::Editing {
-        theme.border_focus
-    } else {
-        theme.surface1
-    };
-
-    let card_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-        .border_style(border_style);
-    frame.render_widget(card_block, card_area);
-
-    let inner_width = card_area.width.saturating_sub(2);
-    let search_row_area = Rect {
-        x: card_area.x + 1,
-        y: card_area.y + 1,
-        width: inner_width,
-        height: 1,
-    };
-
-    let is_ultra_compact = area.width < 58;
-    let ctrl_p = if is_ultra_compact {
-        "P".to_string()
-    } else {
-        crate::tui::text::ctrl_key("P")
-    };
-    let ctrl_t = if is_ultra_compact {
-        "T".to_string()
-    } else {
-        crate::tui::text::ctrl_key("T")
-    };
-
-    let is_query_empty = state.search_query.is_empty();
-    let (pill_text, pill_style) = if !is_query_empty {
-        if is_ultra_compact {
-            ("[Enter]".to_string(), theme.accent)
-        } else {
-            ("[Enter] Search".to_string(), theme.accent)
-        }
-    } else if state.is_tv_mode {
-        let text = if is_ultra_compact {
-            "[TV]".to_string()
-        } else {
-            let sep = if state.basic_terminal { "-" } else { "·" };
-            format!("[Live TV {sep} {ctrl_t}]")
-        };
-        let style = if state.basic_terminal {
-            theme.lavender
-        } else {
-            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
-            let fg = theme.lavender.fg.unwrap_or(Color::Rgb(180, 190, 254));
-            Style::default().bg(bg).fg(fg)
-        };
-        (text, style)
-    } else if state.is_addon_mode {
-        let text = if is_ultra_compact {
-            "[Addons]".to_string()
-        } else {
-            let sep = if state.basic_terminal { "-" } else { "·" };
-            format!("[Addons {sep} {ctrl_p}]")
-        };
-        let style = if state.basic_terminal {
-            theme.teal
-        } else {
-            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
-            let fg = theme.teal.fg.unwrap_or(Color::Rgb(148, 226, 213));
-            Style::default().bg(bg).fg(fg)
-        };
-        (text, style)
-    } else {
-        let label = state.active_provider.label();
-        let text = if is_ultra_compact {
-            format!("[{label}]")
-        } else {
-            let sep = if state.basic_terminal { "-" } else { "·" };
-            format!("[{label} {sep} {ctrl_p}]")
-        };
-        let style = if state.basic_terminal {
-            theme.sapphire
-        } else {
-            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
-            let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
-            Style::default().bg(bg).fg(fg)
-        };
-        (text, style)
-    };
-
-    let pill_width = crate::tui::text::width(&pill_text) as u16;
-    let search_split = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(pill_width.saturating_add(1)),
-        ])
-        .split(search_row_area);
-
-    let prefix = if state.basic_terminal { "> " } else { "❯ " };
-    let prefix_width = crate::tui::text::width(prefix) as u16;
-    let editing = view == SearchViewState::Editing;
-    let real_cursor = editing && show_cursor && !state.basic_terminal;
-
-    let search_line = if is_query_empty {
-        let placeholder_text = if state.is_tv_mode {
-            "Search live channels…"
-        } else if state.is_addon_mode {
-            "Search movies and series via addons…"
-        } else {
-            "Search movies and series…"
-        };
-
-        if editing {
-            let cursor_str = if show_cursor { "█" } else { " " };
-            Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(cursor_str, theme.accent),
-                Span::raw(" "),
-                Span::styled(placeholder_text, theme.text_dim),
-            ])
-        } else {
-            Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(placeholder_text, theme.text_dim),
-            ])
-        }
-    } else if editing && !real_cursor {
-        let segments = state.search_query.graphemes();
-        let cursor = state.search_query.cursor();
-        let cursor_char = if show_cursor {
-            "█"
-        } else if cursor < segments.len() {
-            segments[cursor]
-        } else {
-            " "
-        };
-        let before: String = segments.iter().take(cursor).copied().collect();
-        let after: String = if cursor < segments.len() {
-            segments.iter().skip(cursor + 1).copied().collect()
-        } else {
-            String::new()
-        };
-        Line::from(vec![
-            Span::styled(prefix, theme.accent),
-            Span::styled(before, theme.text),
-            Span::styled(cursor_char, theme.accent),
-            Span::styled(after, theme.text),
-        ])
-    } else {
-        Line::from(vec![
-            Span::styled(prefix, theme.accent),
-            Span::styled(state.search_query.as_str(), theme.text),
-        ])
-    };
-
-    frame.render_widget(Paragraph::new(search_line), search_split[0]);
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
-            .alignment(Alignment::Right),
-        search_split[1],
-    );
-
-    if real_cursor {
-        let cx = if is_query_empty {
-            search_split[0].x + prefix_width
-        } else {
-            let segments = state.search_query.graphemes();
-            let cursor = state.search_query.cursor();
-            let before_cursor: String = segments.into_iter().take(cursor).collect();
-            let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
-            (search_split[0].x + prefix_width + before_cursor_width)
-                .min(search_split[0].right().saturating_sub(1))
-        };
-        frame.set_cursor_position((cx, search_split[0].y));
-    }
-
-    if card_area.height >= 4 {
-        let divider_y = card_area.y + 2;
-        let divider_text = if state.basic_terminal {
-            format!("+{}+", "-".repeat(inner_width as usize))
-        } else {
-            format!("├{}┤", "─".repeat(inner_width as usize))
-        };
-        let divider_area = Rect {
-            x: card_area.x,
-            y: divider_y,
-            width: card_area.width,
-            height: 1,
-        };
-        frame.render_widget(
-            Paragraph::new(divider_text).style(border_style),
-            divider_area,
-        );
-    }
-
-    let content_start_y = card_area.y + 3;
-
-    if has_suggestions {
-        let visible_count = state.search_suggestions.len().min(6);
-        let selected_index = state.suggest_index.unwrap_or(0);
-        let suggestion_offset = selected_index
-            .saturating_add(1)
-            .saturating_sub(visible_count)
-            .min(state.search_suggestions.len().saturating_sub(visible_count));
-
-        let visible_slice: Vec<(usize, &String)> = state
-            .search_suggestions
-            .iter()
-            .enumerate()
-            .skip(suggestion_offset)
-            .take(visible_count)
-            .collect();
-
-        for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
-            let row_y = content_start_y + row_idx as u16;
-            if row_y >= card_area.bottom().saturating_sub(1) {
-                break;
-            }
-
-            let is_selected = Some(orig_idx) == state.suggest_index;
-            let indicator_symbol = if is_selected {
-                if state.basic_terminal { "> " } else { "▌ " }
-            } else {
-                "  "
-            };
-
-            let indicator_style = if is_selected {
-                theme.accent.add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            };
-
-            let is_slash_cmd = suggestion.starts_with('/');
-            let display_name = if is_slash_cmd {
-                suggestion.strip_prefix('/').unwrap_or(suggestion)
-            } else {
-                suggestion.as_str()
-            };
-
-            let desc = slash_command_description(suggestion, state);
-
-            let row_style = if is_selected {
-                Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
-            } else {
-                Style::default()
-            };
-
-            let text_style = if is_selected {
-                theme.highlight.add_modifier(Modifier::BOLD)
-            } else {
-                theme.text
-            };
-
-            let desc_style = if is_selected {
-                theme.subtext1.add_modifier(Modifier::BOLD)
-            } else {
-                theme.text_dim
-            };
-
-            let badge_span =
-                suggestion_source_badge(suggestion, state, theme, state.basic_terminal);
-            let badge_width = badge_span
-                .as_ref()
-                .map_or(0, |b| crate::tui::text::width(&b.content));
-
-            let mut spans = vec![Span::styled(indicator_symbol, indicator_style)];
-            if let Some(badge) = badge_span {
-                spans.push(badge);
-            }
-            spans.push(Span::styled(display_name, text_style));
-
-            if let Some(description) = desc {
-                let name_len = crate::tui::text::width(display_name) + badge_width;
-                let pad = 24usize.saturating_sub(name_len).max(2);
-                spans.push(Span::raw(" ".repeat(pad)));
-                let indicator_width = crate::tui::text::width(indicator_symbol);
-                let desc_budget =
-                    (inner_width as usize).saturating_sub(indicator_width + name_len + pad);
-                if desc_budget > 0 {
-                    spans.push(Span::styled(
-                        crate::tui::text::truncate_width(description, desc_budget),
-                        desc_style,
-                    ));
-                }
-            }
-
-            let row_area = Rect {
-                x: card_area.x + 1,
-                y: row_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(Paragraph::new(Line::from(spans)).style(row_style), row_area);
-        }
-    } else if has_favorites {
-        let mut curr_y = content_start_y;
-
-        if curr_y < card_area.bottom().saturating_sub(1) {
-            let star = if state.basic_terminal { "*" } else { "★" };
-            let header_style = if state.favorites_focus {
-                theme.title.add_modifier(Modifier::BOLD)
-            } else {
-                theme.subtext1
-            };
-            let header_area = Rect {
-                x: card_area.x + 1,
-                y: curr_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(
-                Paragraph::new(format!("  {star} RECENT FAVORITES")).style(header_style),
-                header_area,
-            );
-            curr_y += 1;
-        }
-
-        let selected = if state.favorites_focus {
-            state.favorites_landing_state.selected()
-        } else {
-            None
-        };
-
-        for (i, item) in favorites_items.iter().enumerate() {
-            if curr_y >= card_area.bottom().saturating_sub(1) {
-                break;
-            }
-            let is_selected = selected == Some(i);
-            let type_tag = if item.stype == 2 { "Series" } else { "Movie" };
-            let right_tag = if item.release_year.is_empty() {
-                type_tag.to_string()
-            } else {
-                format!("{} {type_tag}", item.release_year)
-            };
-
-            let prefix = if is_selected {
-                if state.basic_terminal { "> " } else { "▌ " }
-            } else {
-                "  "
-            };
-
-            let title_style = if is_selected {
-                theme.title.add_modifier(Modifier::BOLD)
-            } else {
-                theme.text
-            };
-
-            let row_style = if is_selected {
-                Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
-            } else {
-                Style::default()
-            };
-
-            let tag_len = crate::tui::text::width(&right_tag) + 2;
-            let max_title_width = (inner_width as usize).saturating_sub(2 + tag_len);
-            let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
-            let title_width = crate::tui::text::width(&truncated_title);
-
-            let pad_len = (inner_width as usize).saturating_sub(2 + title_width + tag_len);
-
-            let line = Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(truncated_title, title_style),
-                Span::raw(" ".repeat(pad_len)),
-                Span::styled(format!("  {right_tag}"), theme.text_dim),
-            ]);
-
-            let row_area = Rect {
-                x: card_area.x + 1,
-                y: curr_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(Paragraph::new(line).style(row_style), row_area);
-            curr_y += 1;
-        }
-
-        if overflow > 0 && curr_y < card_area.bottom().saturating_sub(1) {
-            let sep = if state.basic_terminal { "-" } else { "·" };
-            let pill_text = format!("[ +{overflow} more {sep} /favorites ]");
-            let pill_style = if state.basic_terminal {
-                theme.sapphire
-            } else {
-                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
-                let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
-                Style::default().bg(bg).fg(fg)
-            };
-            let row_area = Rect {
-                x: card_area.x + 1,
-                y: curr_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(
-                Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
-                    .alignment(Alignment::Center),
-                row_area,
-            );
-            curr_y += 1;
-        }
-
-        if curr_y < card_area.bottom() {
-            let sep = if state.basic_terminal { "-" } else { "·" };
-            let bolt = if state.basic_terminal { ">" } else { "⚡" };
-            let footer_line = if inner_width < 56 {
-                Line::from(vec![
-                    Span::styled(format!(" {bolt} QUICK: "), theme.subtext1),
-                    Span::styled("/browse", theme.shortcut),
-                    Span::styled(format!(" {sep} "), theme.text_dim),
-                    Span::styled("/history", theme.shortcut),
-                ])
-            } else {
-                Line::from(vec![
-                    Span::styled(format!(" {bolt} QUICK COMMANDS:  "), theme.subtext1),
-                    Span::styled("/browse", theme.shortcut),
-                    Span::styled(format!(" {sep} Discover Releases    "), theme.text_dim),
-                    Span::styled("/history", theme.shortcut),
-                ])
-            };
-            let row_area = Rect {
-                x: card_area.x + 1,
-                y: curr_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(Paragraph::new(footer_line), row_area);
-        }
-    } else {
-        let bolt = if state.basic_terminal { ">" } else { "⚡" };
-        let sep = if state.basic_terminal { "-" } else { "·" };
-
-        let row1_y = content_start_y;
-        if row1_y < card_area.bottom().saturating_sub(1) {
-            let line1 = Line::from(vec![
-                Span::styled(format!("  {bolt} Discover:  "), theme.subtext1),
-                Span::styled("/browse", theme.shortcut),
-                Span::styled(format!(" {sep} Popular & Top Rated"), theme.text_dim),
-            ]);
-            let row1_area = Rect {
-                x: card_area.x + 1,
-                y: row1_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(Paragraph::new(line1), row1_area);
-        }
-
-        let row2_y = content_start_y + 1;
-        if row2_y < card_area.bottom().saturating_sub(1) {
-            let line2 = Line::from(vec![
-                Span::raw("               "),
-                Span::styled("/theme", theme.shortcut),
-                Span::styled(format!(" {sep} Themes    "), theme.text_dim),
-                Span::styled("?", theme.shortcut),
-                Span::styled(format!(" {sep} Help"), theme.text_dim),
-            ]);
-            let row2_area = Rect {
-                x: card_area.x + 1,
-                y: row2_y,
-                width: inner_width,
-                height: 1,
-            };
-            frame.render_widget(Paragraph::new(line2), row2_area);
-        }
-    }
-
-    (card_area, search_row_area)
-}
-
 fn render_search_bar(
     frame: &mut Frame,
     area: Rect,
@@ -1053,178 +573,331 @@ fn render_search_bar(
     theme: &Theme,
     view: SearchViewState,
     show_cursor: bool,
-    centered: bool,
+    landing: bool,
 ) {
-    let result_status = if view == SearchViewState::Results && !state.search_results.is_empty() {
-        let total = state.search_results.len();
-        let selected_idx = state
-            .search_list_state
-            .selected()
-            .unwrap_or(0)
-            .min(total.saturating_sub(1));
-        let selected_num = selected_idx + 1;
-        let visible_items = state
-            .last_result_metrics
-            .map(|m| m.visible_items)
-            .unwrap_or(8)
-            .max(1);
-        let total_pages = (total.saturating_sub(1) / visible_items) + 1;
-        let page = (selected_idx / visible_items) + 1;
+    if landing {
+        let border_style = if state.input_mode == InputMode::Editing {
+            theme.border_focus
+        } else {
+            theme.surface1
+        };
 
-        if total_pages > 1 {
-            if area.width < 58 {
-                Some(format!(
-                    "{}/{} • p{}/{}",
-                    selected_num, total, page, total_pages
-                ))
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+            .border_style(border_style);
+        frame.render_widget(block, area);
+
+        let inner_width = area.width.saturating_sub(2);
+        let inner_row_area = Rect {
+            x: area.x + 1,
+            y: area.y + 1,
+            width: inner_width,
+            height: 1,
+        };
+
+        let is_ultra_compact = area.width < 58;
+        let ctrl_p = if is_ultra_compact {
+            "P".to_string()
+        } else {
+            crate::tui::text::ctrl_key("P")
+        };
+        let ctrl_t = if is_ultra_compact {
+            "T".to_string()
+        } else {
+            crate::tui::text::ctrl_key("T")
+        };
+
+        let is_query_empty = state.search_query.is_empty();
+        let (pill_text, pill_style) = if !is_query_empty {
+            if is_ultra_compact {
+                ("[Enter]".to_string(), theme.accent)
             } else {
-                Some(format!(
-                    "Item {} of {} • Page {}/{}",
-                    selected_num, total, page, total_pages
-                ))
+                ("[Enter] Search".to_string(), theme.accent)
             }
-        } else if total == 1 {
-            Some("1 result".to_string())
-        } else if area.width < 45 {
-            Some(format!("{}/{}", selected_num, total))
-        } else {
-            Some(format!("Item {} of {}", selected_num, total))
-        }
-    } else {
-        None
-    };
-
-    let status_width = result_status
-        .as_deref()
-        .map(crate::tui::text::width)
-        .unwrap_or(0) as u16;
-    let content_row = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(status_width.saturating_add(u16::from(status_width > 0) * 2)),
-        ])
-        .split(area);
-
-    let editing = view == SearchViewState::Editing;
-    let real_cursor = editing && show_cursor && !state.basic_terminal;
-    let has_status = state.status_timer > 0
-        && !state.status_message.is_empty()
-        && state.search_query.is_empty()
-        && !editing;
-
-    let prefix = if state.basic_terminal { "> " } else { "❯ " };
-    let prefix_width = crate::tui::text::width(prefix) as u16;
-
-    let search_line = if state.search_query.is_empty() {
-        let placeholder_text = if has_status {
-            state.status_message.as_str()
         } else if state.is_tv_mode {
-            "Search live channels…"
+            let text = if is_ultra_compact {
+                "[TV]".to_string()
+            } else {
+                let sep = if state.basic_terminal { "-" } else { "·" };
+                format!("[Live TV {sep} {ctrl_t}]")
+            };
+            let style = if state.basic_terminal {
+                theme.lavender
+            } else {
+                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+                let fg = theme.lavender.fg.unwrap_or(Color::Rgb(180, 190, 254));
+                Style::default().bg(bg).fg(fg)
+            };
+            (text, style)
         } else if state.is_addon_mode {
-            "Search movies and series via addons…"
+            let text = if is_ultra_compact {
+                "[Addons]".to_string()
+            } else {
+                let sep = if state.basic_terminal { "-" } else { "·" };
+                format!("[Addons {sep} {ctrl_p}]")
+            };
+            let style = if state.basic_terminal {
+                theme.teal
+            } else {
+                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+                let fg = theme.teal.fg.unwrap_or(Color::Rgb(148, 226, 213));
+                Style::default().bg(bg).fg(fg)
+            };
+            (text, style)
         } else {
-            "Search movies and series…"
+            let label = state.active_provider.label();
+            let text = if is_ultra_compact {
+                format!("[{label}]")
+            } else {
+                let sep = if state.basic_terminal { "-" } else { "·" };
+                format!("[{label} {sep} {ctrl_p}]")
+            };
+            let style = if state.basic_terminal {
+                theme.sapphire
+            } else {
+                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+                let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
+                Style::default().bg(bg).fg(fg)
+            };
+            (text, style)
         };
 
-        if editing {
-            let cursor_str = if show_cursor { "█" } else { " " };
-            Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(cursor_str, theme.accent),
-                Span::raw(" "),
-                Span::styled(placeholder_text, theme.text_dim),
+        let pill_width = crate::tui::text::width(&pill_text) as u16;
+        let search_split = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Min(1),
+                Constraint::Length(pill_width.saturating_add(1)),
             ])
-        } else if has_status {
-            Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(placeholder_text, theme.accent),
-            ])
-        } else {
-            Line::from(vec![
-                Span::styled(prefix, theme.text_dim),
-                Span::styled(placeholder_text, theme.text_dim),
-            ])
-        }
-    } else if editing && !real_cursor {
-        let segments = state.search_query.graphemes();
-        let cursor = state.search_query.cursor();
-        let cursor_char = if show_cursor {
-            "█"
-        } else if cursor < segments.len() {
-            segments[cursor]
-        } else {
-            " "
-        };
-        let before: String = segments.iter().take(cursor).copied().collect();
-        let after: String = if cursor < segments.len() {
-            segments.iter().skip(cursor + 1).copied().collect()
-        } else {
-            String::new()
-        };
-        Line::from(vec![
-            Span::styled(prefix, theme.accent),
-            Span::styled(before, theme.text),
-            Span::styled(cursor_char, theme.accent),
-            Span::styled(after, theme.text),
-        ])
-    } else {
-        Line::from(vec![
-            Span::styled(prefix, if editing { theme.accent } else { theme.text }),
-            Span::styled(state.search_query.as_str(), theme.text),
-        ])
-    };
+            .split(inner_row_area);
 
-    let mut paragraph = Paragraph::new(search_line);
-    if centered {
-        paragraph = paragraph.alignment(Alignment::Center);
-    }
-    frame.render_widget(paragraph, content_row[0]);
+        let prefix = if state.basic_terminal { "> " } else { "❯ " };
+        let prefix_width = crate::tui::text::width(prefix) as u16;
+        let editing = view == SearchViewState::Editing;
+        let real_cursor = editing && show_cursor && !state.basic_terminal;
 
-    if real_cursor {
-        let (cursor_x, cursor_y) = if state.search_query.is_empty() {
-            let placeholder_width = crate::tui::text::width(if state.is_tv_mode {
+        let search_line = if is_query_empty {
+            let placeholder_text = if state.is_tv_mode {
                 "Search live channels…"
             } else if state.is_addon_mode {
                 "Search movies and series via addons…"
             } else {
                 "Search movies and series…"
-            }) as u16;
-            let total_len = prefix_width + 2 + placeholder_width;
-            let line_offset = if centered {
-                content_row[0].width.saturating_sub(total_len) / 2
-            } else {
-                0
             };
-            let cx = (content_row[0].x + line_offset + prefix_width)
-                .min(content_row[0].right().saturating_sub(1));
-            (cx, content_row[0].y)
-        } else {
+
+            if editing {
+                let cursor_str = if show_cursor { "█" } else { " " };
+                Line::from(vec![
+                    Span::styled(prefix, theme.accent),
+                    Span::styled(cursor_str, theme.accent),
+                    Span::raw(" "),
+                    Span::styled(placeholder_text, theme.text_dim),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(prefix, theme.accent),
+                    Span::styled(placeholder_text, theme.text_dim),
+                ])
+            }
+        } else if editing && !real_cursor {
             let segments = state.search_query.graphemes();
             let cursor = state.search_query.cursor();
-            let before_cursor: String = segments.into_iter().take(cursor).collect();
-            let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
-            let total_text_width = crate::tui::text::width(state.search_query.as_str()) as u16;
-            let shown = total_text_width.min(content_row[0].width.saturating_sub(6));
-            let line_offset = if centered {
-                (content_row[0].width.saturating_sub(prefix_width + shown)) / 2
+            let cursor_char = if show_cursor {
+                "█"
+            } else if cursor < segments.len() {
+                segments[cursor]
             } else {
-                0
+                " "
             };
-            let cx = (content_row[0].x + line_offset + prefix_width + before_cursor_width)
-                .min(content_row[0].right().saturating_sub(1));
-            (cx, content_row[0].y)
+            let before: String = segments.iter().take(cursor).copied().collect();
+            let after: String = if cursor < segments.len() {
+                segments.iter().skip(cursor + 1).copied().collect()
+            } else {
+                String::new()
+            };
+            Line::from(vec![
+                Span::styled(prefix, theme.accent),
+                Span::styled(before, theme.text),
+                Span::styled(cursor_char, theme.accent),
+                Span::styled(after, theme.text),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(prefix, theme.accent),
+                Span::styled(state.search_query.as_str(), theme.text),
+            ])
         };
-        frame.set_cursor_position((cursor_x, cursor_y));
-    }
 
-    if let Some(status) = result_status {
+        frame.render_widget(Paragraph::new(search_line), search_split[0]);
         frame.render_widget(
-            Paragraph::new(status)
-                .style(theme.accent)
+            Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
                 .alignment(Alignment::Right),
-            content_row[1],
+            search_split[1],
         );
+
+        if real_cursor {
+            let cx = if is_query_empty {
+                search_split[0].x + prefix_width
+            } else {
+                let segments = state.search_query.graphemes();
+                let cursor = state.search_query.cursor();
+                let before_cursor: String = segments.into_iter().take(cursor).collect();
+                let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
+                (search_split[0].x + prefix_width + before_cursor_width)
+                    .min(search_split[0].right().saturating_sub(1))
+            };
+            frame.set_cursor_position((cx, search_split[0].y));
+        }
+    } else {
+        let result_status = if view == SearchViewState::Results && !state.search_results.is_empty()
+        {
+            let total = state.search_results.len();
+            let selected_idx = state
+                .search_list_state
+                .selected()
+                .unwrap_or(0)
+                .min(total.saturating_sub(1));
+            let selected_num = selected_idx + 1;
+            let visible_items = state
+                .last_result_metrics
+                .map(|m| m.visible_items)
+                .unwrap_or(8)
+                .max(1);
+            let total_pages = (total.saturating_sub(1) / visible_items) + 1;
+            let page = (selected_idx / visible_items) + 1;
+
+            if total_pages > 1 {
+                if area.width < 58 {
+                    Some(format!(
+                        "{}/{} • p{}/{}",
+                        selected_num, total, page, total_pages
+                    ))
+                } else {
+                    Some(format!(
+                        "Item {} of {} • Page {}/{}",
+                        selected_num, total, page, total_pages
+                    ))
+                }
+            } else if total == 1 {
+                Some("1 result".to_string())
+            } else if area.width < 45 {
+                Some(format!("{}/{}", selected_num, total))
+            } else {
+                Some(format!("Item {} of {}", selected_num, total))
+            }
+        } else {
+            None
+        };
+
+        let status_width = result_status
+            .as_deref()
+            .map(crate::tui::text::width)
+            .unwrap_or(0) as u16;
+        let content_row = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Min(1),
+                Constraint::Length(status_width.saturating_add(u16::from(status_width > 0) * 2)),
+            ])
+            .split(area);
+
+        let editing = view == SearchViewState::Editing;
+        let real_cursor = editing && show_cursor && !state.basic_terminal;
+        let has_status = state.status_timer > 0
+            && !state.status_message.is_empty()
+            && state.search_query.is_empty()
+            && !editing;
+
+        let prefix = if state.basic_terminal { "> " } else { "❯ " };
+        let prefix_width = crate::tui::text::width(prefix) as u16;
+
+        let search_line = if state.search_query.is_empty() {
+            let placeholder_text = if has_status {
+                state.status_message.as_str()
+            } else if state.is_tv_mode {
+                "Search live channels…"
+            } else if state.is_addon_mode {
+                "Search movies and series via addons…"
+            } else {
+                "Search movies and series…"
+            };
+
+            if editing {
+                let cursor_str = if show_cursor { "█" } else { " " };
+                Line::from(vec![
+                    Span::styled(prefix, theme.accent),
+                    Span::styled(cursor_str, theme.accent),
+                    Span::raw(" "),
+                    Span::styled(placeholder_text, theme.text_dim),
+                ])
+            } else if has_status {
+                Line::from(vec![
+                    Span::styled(prefix, theme.accent),
+                    Span::styled(placeholder_text, theme.accent),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(prefix, theme.text_dim),
+                    Span::styled(placeholder_text, theme.text_dim),
+                ])
+            }
+        } else if editing && !real_cursor {
+            let segments = state.search_query.graphemes();
+            let cursor = state.search_query.cursor();
+            let cursor_char = if show_cursor {
+                "█"
+            } else if cursor < segments.len() {
+                segments[cursor]
+            } else {
+                " "
+            };
+            let before: String = segments.iter().take(cursor).copied().collect();
+            let after: String = if cursor < segments.len() {
+                segments.iter().skip(cursor + 1).copied().collect()
+            } else {
+                String::new()
+            };
+            Line::from(vec![
+                Span::styled(prefix, theme.accent),
+                Span::styled(before, theme.text),
+                Span::styled(cursor_char, theme.accent),
+                Span::styled(after, theme.text),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(prefix, if editing { theme.accent } else { theme.text }),
+                Span::styled(state.search_query.as_str(), theme.text),
+            ])
+        };
+
+        frame.render_widget(Paragraph::new(search_line), content_row[0]);
+
+        if real_cursor {
+            let (cursor_x, cursor_y) = if state.search_query.is_empty() {
+                let cx =
+                    (content_row[0].x + prefix_width).min(content_row[0].right().saturating_sub(1));
+                (cx, content_row[0].y)
+            } else {
+                let segments = state.search_query.graphemes();
+                let cursor = state.search_query.cursor();
+                let before_cursor: String = segments.into_iter().take(cursor).collect();
+                let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
+                let cx = (content_row[0].x + prefix_width + before_cursor_width)
+                    .min(content_row[0].right().saturating_sub(1));
+                (cx, content_row[0].y)
+            };
+            frame.set_cursor_position((cursor_x, cursor_y));
+        }
+
+        if let Some(status) = result_status {
+            frame.render_widget(
+                Paragraph::new(status)
+                    .style(theme.accent)
+                    .alignment(Alignment::Right),
+                content_row[1],
+            );
+        }
     }
 }
 
@@ -1237,7 +910,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         || (view == SearchViewState::Editing && state.search_results.is_empty())
     {
         let basic_terminal = state.basic_terminal;
-        let (tier, rows) = landing_split(area, state.is_tv_mode, basic_terminal);
+        let (tier, rows) = landing_split(
+            area,
+            state.is_tv_mode,
+            basic_terminal,
+            state.favorites_landing_visible(),
+        );
         let vertical_chunks = rows.rects.clone();
 
         let logo_text = if basic_terminal || tier.is_compact() {
@@ -1295,20 +973,31 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .style(theme.text_dim);
         frame.render_widget(version, version_chunks[1]);
 
-        let (_hub_card_area, inner_search_area) = if !state.tv_config_popup {
-            render_unified_command_hub(
+        let card_width = search_deck_width(area, state, true);
+        let card_x = area.x + area.width.saturating_sub(card_width) / 2;
+        let search_card_area = Rect {
+            x: card_x,
+            y: vertical_chunks[rows.search].y,
+            width: card_width,
+            height: vertical_chunks[rows.search].height,
+        };
+
+        if !state.tv_config_popup {
+            render_search_bar(
                 frame,
-                vertical_chunks[rows.search],
+                search_card_area,
                 state,
                 theme,
                 view,
                 show_cursor,
-            )
-        } else {
-            (Rect::default(), Rect::default())
-        };
-        search_bar_area = inner_search_area;
+                true,
+            );
+        }
+        search_bar_area = search_card_area;
 
+        if state.favorites_landing_visible() && !state.tv_config_popup {
+            render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
+        }
         let compact_tabs = area.width < 76;
         let ultra_compact_tabs = area.width < 58;
 
@@ -1888,7 +1577,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
     }
 
-    if !state.search_results.is_empty() {
+    if !state.tv_config_popup {
         render_search_suggestions(frame, area, search_bar_area, state, theme, view);
     }
     if state.tv_config_popup {
@@ -2276,22 +1965,15 @@ pub fn search_suggestions_bounds(area: Rect, search_bar_area: Rect, count: usize
         return (Rect::default(), Rect::default());
     }
 
-    let start_y = search_bar_area.y + 1;
+    let start_y = search_bar_area.bottom();
     let max_h = area.bottom().saturating_sub(start_y);
     let container_h = ((count as u16).saturating_add(2)).min(max_h);
 
-    let is_centered = search_bar_area.x > area.x;
     let container_w = search_bar_area
         .width
         .min(area.width.saturating_sub(2))
-        .max(40);
-    let x = if is_centered {
-        search_bar_area.x + search_bar_area.width.saturating_sub(container_w) / 2
-    } else {
-        search_bar_area
-            .x
-            .min(area.right().saturating_sub(container_w))
-    };
+        .max(24);
+    let x = search_bar_area.x;
 
     let container_area = Rect {
         x,
@@ -2577,11 +2259,11 @@ mod tests {
         let search_bar = Rect::new(10, 2, 60, 3);
         let (container, inner) = search_suggestions_bounds(area, search_bar, 3);
         assert_eq!(container.x, 10);
-        assert_eq!(container.y, 3);
+        assert_eq!(container.y, 5);
         assert_eq!(container.width, 60);
         assert_eq!(container.height, 5);
         assert_eq!(inner.x, 11);
-        assert_eq!(inner.y, 4);
+        assert_eq!(inner.y, 6);
         assert_eq!(inner.width, 58);
         assert_eq!(inner.height, 3);
     }
@@ -2709,7 +2391,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unified_command_hub_rendering_empty_landing() {
+    fn test_landing_rendering_empty() {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut state = AppState {
@@ -2738,19 +2420,11 @@ mod tests {
             }
             rendered.push('\n');
         }
-        // Hub Card Frame & Prompt
+        // 3-Row Search Card Frame & Prompt
         assert!(rendered.contains('❯'));
         assert!(rendered.contains("Search movies and series…"));
         assert!(rendered.contains("[MovieBox"));
         assert!(rendered.contains(&crate::tui::text::ctrl_key("P")));
-        assert!(rendered.contains('├'));
-        assert!(rendered.contains('┤'));
-
-        // State C: Empty landing discover guide
-        assert!(rendered.contains("Discover:"));
-        assert!(rendered.contains("/browse"));
-        assert!(rendered.contains("/theme"));
-        assert!(rendered.contains("Help"));
 
         // Streamlined 1-line Bottom Bar
         assert!(rendered.contains("Stream"));
@@ -2760,7 +2434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unified_command_hub_rendering_with_favorites() {
+    fn test_landing_rendering_with_favorites() {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut state = AppState {
@@ -2798,20 +2472,16 @@ mod tests {
             rendered.push('\n');
         }
 
-        // State A: Header & Favorite items
-        assert!(rendered.contains("RECENT FAVORITES"));
+        // Header & Favorite items
+        assert!(rendered.contains("Favorites"));
         assert!(rendered.contains("Interstellar"));
         assert!(rendered.contains("2014 Movie") || rendered.contains("2014 Series"));
         // Overflow
         assert!(rendered.contains("more · /favorites"));
-        // Quick action footer row
-        assert!(rendered.contains("QUICK COMMANDS:"));
-        assert!(rendered.contains("/browse"));
-        assert!(rendered.contains("/history"));
     }
 
     #[test]
-    fn test_unified_command_hub_typing_transitions_pill() {
+    fn test_search_card_typing_transitions_pill() {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut state = AppState {
@@ -2842,7 +2512,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unified_command_hub_modes_pill_labels() {
+    fn test_search_card_modes_pill_labels() {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
         let theme = Theme::mocha();

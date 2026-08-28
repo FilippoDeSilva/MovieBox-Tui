@@ -192,6 +192,7 @@ async fn test_mouse_click_search_input_mode() {
         area,
         app.state().is_tv_mode,
         app.state().basic_terminal,
+        app.state().favorites_landing_visible(),
     );
     let card_w = moviebox_tui::tui::screens::home::search_deck_width(area, app.state(), true);
     let card_x = area.x + area.width.saturating_sub(card_w) / 2;
@@ -203,7 +204,7 @@ async fn test_mouse_click_search_input_mode() {
 }
 
 #[tokio::test]
-async fn test_mouse_click_unified_hub_favorites_item_focuses_and_selects() {
+async fn test_mouse_click_favorites_item_focuses_and_selects() {
     let mut app = App::new();
     app.state_mut()
         .favorites
@@ -224,11 +225,12 @@ async fn test_mouse_click_unified_hub_favorites_item_focuses_and_selects() {
         area,
         app.state().is_tv_mode,
         app.state().basic_terminal,
+        app.state().favorites_landing_visible(),
     );
     let card_w = moviebox_tui::tui::screens::home::search_deck_width(area, app.state(), true);
     let card_x = area.x + area.width.saturating_sub(card_w) / 2;
-    // Header is search_y + 2, item 0 is search_y + 3 (hub_y + 4)
-    let item_0_y = landing_rows.rects[landing_rows.search].y + 4;
+    // Header is fav_y + 0, item 0 is fav_y + 1
+    let item_0_y = landing_rows.rects[landing_rows.favorites].y + 1;
 
     app.handle_action(Action::MouseClick(card_x + 5, item_0_y))
         .await;

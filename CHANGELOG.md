@@ -130,6 +130,7 @@
   `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
 ### Changed
+- **Homepage landing optical spacing & card separation**: Increased vertical breathing margin between ASCII header and search deck, separated search input into a dedicated 3-row framed card, and formatted favorites as an aligned standalone deck with proper vertical rhythm.
 - **Streamlined 1-line mode switcher**: Simplified bottom navigation bar to `[Ctrl+S] Stream · [Ctrl+T] TV · [Ctrl+A] Addon      [?] Help [q] Quit`, eliminating duplicate provider text.
 - **Clean search suggestion dropdown card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
 - **Streamlined search suggestions dropdown**: Removed redundant `[SUGGEST]` badges on regular title queries, replaced tree branch glyphs with clean `▌ ` / `> ` selection indicators, and added full-width active row background styling.
