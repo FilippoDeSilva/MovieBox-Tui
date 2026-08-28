@@ -131,7 +131,10 @@
   `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
 ### Changed
-- **Framed landing favorites deck**: Enclosed the landing Favorites list in a matching bordered card with embedded `★ Favorites` header, perfectly aligning item titles, `▌ ` pointer cursors, and right-aligned `YYYY Movie/Series` tags with the search deck above.
+- **Framed landing favorites deck styling & alignment**: Enclosed the landing Favorites list in a matching bordered card with:
+  - Header border offset (`╭─ ★  Favorites ──╮` / `+- *  Favorites --+` on basic) with double-space icon breathing room.
+  - 1:1 vertical column alignment between header star `★` and selection pointer `▌` (col x0 + 3), and header text `Favorites` and item titles (col x0 + 6).
+  - 1-character right breathing margin for item year/type tags (`2024 Movie `).
 - **MovieBox client version spoofing upgrade**: Updated MovieBox client identity spoofing to APK `v4.0.01.0813.03` with version codes `50020117..50020121` (`src/providers/moviebox/crypto.rs`), ensuring full backend compatibility and preventing notice video substitution.
 - **Explicit 480p and 360p resolution badges**: Standardized quality tags and badges for `480p` and `360p` across details stream tables and basic terminals, replacing generic `SD` labels.
 - **Homepage landing optical spacing & card separation**: Increased vertical breathing margin between ASCII header and search deck, separated search input into a dedicated 3-row framed card, and formatted favorites as an aligned standalone deck with proper vertical rhythm.

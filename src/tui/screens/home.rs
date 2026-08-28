@@ -397,13 +397,17 @@ pub(crate) fn render_favorites_landing(
         height: content_height,
     };
 
-    let star = if state.basic_terminal { "*" } else { "★" };
+    let (bar, star) = if state.basic_terminal {
+        ("-", "*")
+    } else {
+        ("─", "★")
+    };
     let border_style = if state.favorites_focus {
         theme.border_focus
     } else {
         theme.surface1
     };
-    let title = format!(" {star} Favorites ");
+    let title = format!("{bar} {star}  Favorites ");
     let block = Block::default()
         .title(title)
         .title_style(if state.favorites_focus {
@@ -446,9 +450,9 @@ pub(crate) fn render_favorites_landing(
         };
 
         let pointer = if is_selected {
-            if state.basic_terminal { "> " } else { "▌ " }
+            if state.basic_terminal { ">  " } else { "▌  " }
         } else {
-            "  "
+            "   "
         };
 
         let title_style = if is_selected {
@@ -463,17 +467,26 @@ pub(crate) fn render_favorites_landing(
             Style::default()
         };
 
+        let left_margin = "  ";
+        let right_margin = " ";
         let tag_len = crate::tui::text::width(&right_tag);
-        let max_title_width = (inner_area.width as usize).saturating_sub(2 + tag_len + 1);
+        let pointer_len = 3; // "▌  " or ">  " or "   "
+        let margins_len = 2 + 1; // left_margin (2) + right_margin (1)
+        let fixed_overhead = margins_len + pointer_len + tag_len; // 6 + tag_len
+
+        let max_title_width = (inner_area.width as usize).saturating_sub(fixed_overhead + 1);
         let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
         let title_width = crate::tui::text::width(&truncated_title);
-        let pad_len = (inner_area.width as usize).saturating_sub(2 + title_width + tag_len);
+        let pad_len = (inner_area.width as usize)
+            .saturating_sub(margins_len + pointer_len + title_width + tag_len);
 
         let line = Line::from(vec![
+            Span::raw(left_margin),
             Span::styled(pointer, theme.accent),
             Span::styled(truncated_title, title_style),
             Span::raw(" ".repeat(pad_len)),
             Span::styled(right_tag, theme.text_dim),
+            Span::raw(right_margin),
         ]);
 
         let row_area = Rect {
@@ -2356,13 +2369,13 @@ mod tests {
         }
 
         // Block framing header with star
-        assert!(rendered.contains("★ Favorites"));
-        // First selected item has pointer and title
-        assert!(rendered.contains("▌ Favorite Movie 0"));
-        // Unselected items have leading spaces
-        assert!(rendered.contains("  Favorite Movie 1"));
-        // Right tag is rendered
-        assert!(rendered.contains("2024 Movie"));
+        assert!(rendered.contains("─ ★  Favorites"));
+        // First selected item has leading margin, pointer, and title aligned under header
+        assert!(rendered.contains("  ▌  Favorite Movie 0"));
+        // Unselected items have leading margin and spaces
+        assert!(rendered.contains("     Favorite Movie 1"));
+        // Right tag is rendered with trailing margin before border
+        assert!(rendered.contains("2024 Movie "));
         // Overflow pill is rendered
         assert!(rendered.contains("[ +5 more · /favorites ]"));
     }
@@ -2407,13 +2420,13 @@ mod tests {
         }
 
         // Basic terminal header with ASCII asterisk
-        assert!(rendered.contains("* Favorites"));
-        // First selected item has ASCII pointer
-        assert!(rendered.contains("> Favorite Movie 0"));
-        // Unselected items have leading spaces
-        assert!(rendered.contains("  Favorite Movie 1"));
-        // Right tag is rendered
-        assert!(rendered.contains("2024 Movie"));
+        assert!(rendered.contains("- *  Favorites"));
+        // First selected item has leading margin, ASCII pointer, and title aligned under header
+        assert!(rendered.contains("  >  Favorite Movie 0"));
+        // Unselected items have leading margin and spaces
+        assert!(rendered.contains("     Favorite Movie 1"));
+        // Right tag is rendered with trailing margin before border
+        assert!(rendered.contains("2024 Movie "));
         // Overflow pill uses ASCII hyphen separator
         assert!(rendered.contains("[ +5 more - /favorites ]"));
     }
