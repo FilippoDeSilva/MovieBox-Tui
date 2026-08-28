@@ -15,15 +15,9 @@ pub fn resolution_label(resolution: i64) -> &'static str {
         2160 | 4320 => "4K",
         1080 => "1080p",
         720 => "720p",
-        480 | 540 | 576 => "SD",
-        _ if resolution > 0 => match resolution {
-            2160 => "4K",
-            1080 => "1080p",
-            720 => "720p",
-            480 => "480p",
-            360 => "360p",
-            _ => "HD",
-        },
+        480 | 540 | 576 => "480p",
+        360 => "360p",
+        _ if resolution > 0 => "HD",
         _ => "SD",
     }
 }
@@ -38,18 +32,9 @@ pub fn resolution_badge_spans<'a>(
             2160 | 4320 => ("[4K]", theme.rating.add_modifier(Modifier::BOLD)),
             1080 => ("[1080p]", theme.highlight.add_modifier(Modifier::BOLD)),
             720 => ("[720p]", theme.teal.add_modifier(Modifier::BOLD)),
-            480 | 540 | 576 => ("[SD]", theme.text_dim.add_modifier(Modifier::BOLD)),
-            _ if resolution > 0 => (
-                match resolution {
-                    2160 => "[4K]",
-                    1080 => "[1080p]",
-                    720 => "[720p]",
-                    480 => "[480p]",
-                    360 => "[360p]",
-                    _ => "[HD]",
-                },
-                theme.text.add_modifier(Modifier::BOLD),
-            ),
+            480 | 540 | 576 => ("[480p]", theme.text_dim.add_modifier(Modifier::BOLD)),
+            360 => ("[360p]", theme.text_dim.add_modifier(Modifier::BOLD)),
+            _ if resolution > 0 => ("[HD]", theme.text.add_modifier(Modifier::BOLD)),
             _ => ("[SD]", theme.text_dim),
         };
         return vec![Span::styled(format!("{:<7}", label), style), Span::raw(" ")];
@@ -86,19 +71,17 @@ pub fn resolution_badge_spans<'a>(
         480 | 540 | 576 => (
             theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
             theme_color(theme.text, Color::White),
-            "  SD   ",
+            " 480p  ",
+        ),
+        360 => (
+            theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
+            theme_color(theme.text, Color::White),
+            " 360p  ",
         ),
         _ if resolution > 0 => (
             theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
             theme_color(theme.text, Color::White),
-            match resolution {
-                2160 => "  4K   ",
-                1080 => " 1080p ",
-                720 => " 720p  ",
-                480 => " 480p  ",
-                360 => " 360p  ",
-                _ => "  HD   ",
-            },
+            "  HD   ",
         ),
         _ => (
             theme_color(theme.surface2, Color::Rgb(88, 91, 112)),
@@ -364,8 +347,8 @@ mod tests {
         assert_eq!(resolution_label(2160), "4K");
         assert_eq!(resolution_label(1080), "1080p");
         assert_eq!(resolution_label(720), "720p");
-        assert_eq!(resolution_label(480), "SD");
-        assert_eq!(resolution_label(576), "SD");
+        assert_eq!(resolution_label(480), "480p");
+        assert_eq!(resolution_label(576), "480p");
         assert_eq!(resolution_label(360), "360p");
         assert_eq!(resolution_label(0), "SD");
     }

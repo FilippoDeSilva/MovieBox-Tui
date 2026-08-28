@@ -124,9 +124,11 @@ impl App {
 
         let cancel = self.state.cancel_download.clone();
         let sender = self.action_sender.clone();
+        let user_agent = self.service.client.user_agent().to_string();
         let client = crate::net::http_client_builder()
             .connect_timeout(std::time::Duration::from_secs(15))
             .tcp_keepalive(std::time::Duration::from_secs(30))
+            .user_agent(user_agent)
             .build()
             .unwrap_or_else(|err| {
                 log::warn!(

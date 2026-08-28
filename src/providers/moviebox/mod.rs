@@ -169,7 +169,22 @@ impl MovieBoxClient {
         if let Some(cols) = res.get("collectionResolutions").and_then(|c| c.as_array()) {
             for col in cols {
                 if let Some(r) = col.get("resolution").and_then(|v| v.as_u64()) {
-                    resolutions.push(r as u32);
+                    if r > 0 {
+                        resolutions.push(r as u32);
+                    }
+                }
+            }
+        }
+
+        if resolutions.is_empty() {
+            if let Some(list) = res.get("list").and_then(|l| l.as_array()) {
+                for item in list {
+                    if let Some(r) = item.get("resolution").and_then(|v| v.as_u64()) {
+                        let res_u32 = r as u32;
+                        if res_u32 > 0 && !resolutions.contains(&res_u32) {
+                            resolutions.push(res_u32);
+                        }
+                    }
                 }
             }
         }
@@ -179,7 +194,6 @@ impl MovieBoxClient {
         if resolutions.is_empty() {
             resolutions = vec![1080, 720, 480, 360];
         }
-
         Ok(resolutions)
     }
 

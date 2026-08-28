@@ -644,7 +644,11 @@ impl App {
                 self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
                 self.state.last_playback_launch = std::time::Instant::now();
-                self.launch_player(kind, link, sub, Vec::new());
+                let headers = vec![(
+                    "User-Agent".to_string(),
+                    self.service.client.user_agent().to_string(),
+                )];
+                self.launch_player(kind, link, sub, headers);
             }
             Action::LaunchPlayback(kind, source) => {
                 self.state.is_resolving_playback = false;

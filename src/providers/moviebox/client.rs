@@ -74,6 +74,10 @@ impl MovieBoxClient {
         &self.client
     }
 
+    pub fn user_agent(&self) -> &str {
+        &self.user_agent
+    }
+
     pub async fn init(&self) -> Result<(), ScraperError> {
         let path = "/wefeed-mobile-bff/tab-operating?page=1&tabId=0&version=";
         let _ = self.request_hosts("GET", path, None).await?;

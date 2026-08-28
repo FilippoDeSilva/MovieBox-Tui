@@ -1872,7 +1872,7 @@ mod tests {
         assert_eq!(spans_720[0].content, " 720p  ");
 
         let spans_sd = resolution_badge_spans(480, &theme, false);
-        assert_eq!(spans_sd[0].content, "  SD   ");
+        assert_eq!(spans_sd[0].content, " 480p  ");
 
         let basic_4k = resolution_badge_spans(2160, &theme, true);
         assert_eq!(basic_4k[0].content.trim(), "[4K]");
