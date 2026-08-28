@@ -4,7 +4,7 @@ use crate::tui::{
 };
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
@@ -371,7 +371,7 @@ pub(crate) fn render_favorites_landing(
     state: &AppState,
     theme: &Theme,
 ) {
-    if area.height < 2 || area.width < 20 {
+    if area.height < 3 || area.width < 20 {
         return;
     }
 
@@ -388,38 +388,44 @@ pub(crate) fn render_favorites_landing(
     let card_width = search_deck_width(area, state, true);
     let row_count = items.len() as u16;
     let overflow_row = u16::from(overflow > 0);
-    let content_height = (1 + row_count + overflow_row).min(area.height);
+    let content_height = (row_count + overflow_row + 2).min(area.height);
 
-    let card = Rect {
+    let card_area = Rect {
         x: area.x + area.width.saturating_sub(card_width) / 2,
         y: area.y,
         width: card_width,
         height: content_height,
     };
 
-    if state.favorites_focus {
-        let bg = theme.surface0.fg.unwrap_or(theme.base);
-        frame.render_widget(Block::default().style(Style::default().bg(bg)), card);
+    let star = if state.basic_terminal { "*" } else { "★" };
+    let border_style = if state.favorites_focus {
+        theme.border_focus
+    } else {
+        theme.surface1
+    };
+    let title = format!(" {star} Favorites ");
+    let block = Block::default()
+        .title(title)
+        .title_style(if state.favorites_focus {
+            theme.title.add_modifier(Modifier::BOLD)
+        } else {
+            theme.subtext1
+        })
+        .borders(Borders::ALL)
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+        .border_style(border_style);
+
+    frame.render_widget(block, card_area);
+
+    let inner_area = card_area.inner(Margin {
+        vertical: 1,
+        horizontal: 1,
+    });
+    if inner_area.height == 0 || inner_area.width == 0 {
+        return;
     }
 
-    let mut curr_y = card.y;
-    let star = if state.basic_terminal { "*" } else { "★" };
-    let header_style = if state.favorites_focus {
-        theme.title.add_modifier(Modifier::BOLD)
-    } else {
-        theme.subtext1
-    };
-    let header_area = Rect {
-        x: card.x,
-        y: curr_y,
-        width: card.width,
-        height: 1,
-    };
-    frame.render_widget(
-        Paragraph::new(format!("  {star} Favorites")).style(header_style),
-        header_area,
-    );
-    curr_y += 1;
+    let mut curr_y = inner_area.y;
 
     let selected = if state.favorites_focus {
         state.favorites_landing_state.selected()
@@ -428,7 +434,7 @@ pub(crate) fn render_favorites_landing(
     };
 
     for (i, item) in items.iter().enumerate() {
-        if curr_y >= card.bottom() {
+        if curr_y >= inner_area.bottom() {
             break;
         }
         let is_selected = selected == Some(i);
@@ -439,7 +445,7 @@ pub(crate) fn render_favorites_landing(
             format!("{} {type_tag}", item.release_year)
         };
 
-        let prefix = if is_selected {
+        let pointer = if is_selected {
             if state.basic_terminal { "> " } else { "▌ " }
         } else {
             "  "
@@ -457,30 +463,30 @@ pub(crate) fn render_favorites_landing(
             Style::default()
         };
 
-        let tag_len = crate::tui::text::width(&right_tag) + 2;
-        let max_title_width = (card.width as usize).saturating_sub(2 + tag_len);
+        let tag_len = crate::tui::text::width(&right_tag);
+        let max_title_width = (inner_area.width as usize).saturating_sub(2 + tag_len + 1);
         let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
         let title_width = crate::tui::text::width(&truncated_title);
-        let pad_len = (card.width as usize).saturating_sub(2 + title_width + tag_len);
+        let pad_len = (inner_area.width as usize).saturating_sub(2 + title_width + tag_len);
 
         let line = Line::from(vec![
-            Span::styled(prefix, theme.accent),
+            Span::styled(pointer, theme.accent),
             Span::styled(truncated_title, title_style),
             Span::raw(" ".repeat(pad_len)),
-            Span::styled(format!("  {right_tag}"), theme.text_dim),
+            Span::styled(right_tag, theme.text_dim),
         ]);
 
         let row_area = Rect {
-            x: card.x,
+            x: inner_area.x,
             y: curr_y,
-            width: card.width,
+            width: inner_area.width,
             height: 1,
         };
         frame.render_widget(Paragraph::new(line).style(row_style), row_area);
         curr_y += 1;
     }
 
-    if overflow > 0 && curr_y < card.bottom() {
+    if overflow > 0 && curr_y < inner_area.bottom() {
         let sep = if state.basic_terminal { "-" } else { "·" };
         let pill_text = format!("[ +{overflow} more {sep} /favorites ]");
         let pill_style = if state.basic_terminal {
@@ -491,9 +497,9 @@ pub(crate) fn render_favorites_landing(
             Style::default().bg(bg).fg(fg)
         };
         let pill_area = Rect {
-            x: card.x,
+            x: inner_area.x,
             y: curr_y,
-            width: card.width,
+            width: inner_area.width,
             height: 1,
         };
         frame.render_widget(
@@ -2315,8 +2321,11 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let mut state = AppState {
             favorites_focus: true,
+            basic_terminal: false,
             ..Default::default()
         };
+        state.favorites.items.clear();
+        state.favorites_landing_state.select(Some(0));
         for i in 0..10 {
             state.favorites.items.push(crate::favorites::FavoriteItem {
                 provider: "moviebox".to_string(),
@@ -2325,7 +2334,7 @@ mod tests {
                 cover_url: None,
                 stype: 1,
                 release_year: "2024".to_string(),
-                added_at: 0,
+                added_at: 10 - i as u64,
             });
         }
         let theme = Theme::mocha();
@@ -2336,6 +2345,77 @@ mod tests {
                 render_favorites_landing(frame, area, &state, &theme);
             })
             .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        // Block framing header with star
+        assert!(rendered.contains("★ Favorites"));
+        // First selected item has pointer and title
+        assert!(rendered.contains("▌ Favorite Movie 0"));
+        // Unselected items have leading spaces
+        assert!(rendered.contains("  Favorite Movie 1"));
+        // Right tag is rendered
+        assert!(rendered.contains("2024 Movie"));
+        // Overflow pill is rendered
+        assert!(rendered.contains("[ +5 more · /favorites ]"));
+    }
+    #[test]
+    fn test_favorites_landing_rendering_basic_terminal() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            favorites_focus: true,
+            basic_terminal: true,
+            ..Default::default()
+        };
+        state.favorites.items.clear();
+        state.favorites_landing_state.select(Some(0));
+        for i in 0..10 {
+            state.favorites.items.push(crate::favorites::FavoriteItem {
+                provider: "moviebox".to_string(),
+                subject_id: format!("fav-{i}"),
+                title: format!("Favorite Movie {i}"),
+                cover_url: None,
+                stype: 1,
+                release_year: "2024".to_string(),
+                added_at: 10 - i as u64,
+            });
+        }
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                render_favorites_landing(frame, area, &state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        // Basic terminal header with ASCII asterisk
+        assert!(rendered.contains("* Favorites"));
+        // First selected item has ASCII pointer
+        assert!(rendered.contains("> Favorite Movie 0"));
+        // Unselected items have leading spaces
+        assert!(rendered.contains("  Favorite Movie 1"));
+        // Right tag is rendered
+        assert!(rendered.contains("2024 Movie"));
+        // Overflow pill uses ASCII hyphen separator
+        assert!(rendered.contains("[ +5 more - /favorites ]"));
     }
 
     #[test]

@@ -518,7 +518,7 @@ impl App {
                     .saturating_sub(favorites_items.len());
                 let overflow_row = u16::from(overflow > 0);
                 let fav_height =
-                    (1 + fav_count + overflow_row).min(rows.rects[rows.favorites].height);
+                    (fav_count + overflow_row + 2).min(rows.rects[rows.favorites].height);
 
                 let fav_card_area = Rect {
                     x: card_x,
@@ -533,10 +533,7 @@ impl App {
                     && row < fav_card_area.bottom()
                 {
                     let rel_row = row - fav_card_area.top();
-                    if rel_row == 0 {
-                        self.state.favorites_focus = true;
-                        self.state.input_mode = InputMode::Normal;
-                    } else if rel_row >= 1 && rel_row <= fav_count {
+                    if rel_row >= 1 && rel_row <= fav_count {
                         let idx = (rel_row - 1) as usize;
                         let prev_selected = if self.state.favorites_focus {
                             self.state.favorites_landing_state.selected()
@@ -551,6 +548,9 @@ impl App {
                         }
                     } else if overflow > 0 && rel_row == fav_count + 1 {
                         self.action_sender.send(Action::ShowFavorites).ok();
+                    } else {
+                        self.state.favorites_focus = true;
+                        self.state.input_mode = InputMode::Normal;
                     }
                     return None;
                 }
