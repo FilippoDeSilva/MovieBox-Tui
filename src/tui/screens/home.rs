@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Cell, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -511,6 +511,7 @@ fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, the
     }
 }
 
+#[cfg(test)]
 fn search_content(
     state: &AppState,
     view: SearchViewState,
@@ -1833,13 +1834,45 @@ fn suggestion_source_badge<'a>(
     }
 }
 
+pub fn search_suggestions_bounds(area: Rect, search_bar_area: Rect, count: usize) -> (Rect, Rect) {
+    if count == 0 || search_bar_area.width == 0 {
+        return (Rect::default(), Rect::default());
+    }
+
+    let start_y = search_bar_area.bottom();
+    let max_h = area.bottom().saturating_sub(start_y);
+    let container_h = ((count as u16).saturating_add(2)).min(max_h);
+
+    let max_w = area
+        .right()
+        .saturating_sub(search_bar_area.x)
+        .saturating_sub(1);
+    let container_w = search_bar_area.width.max(48).min(max_w);
+
+    let container_area = Rect {
+        x: search_bar_area.x,
+        y: start_y,
+        width: container_w,
+        height: container_h,
+    };
+
+    let inner_area = Rect {
+        x: container_area.x.saturating_add(1),
+        y: container_area.y.saturating_add(1),
+        width: container_area.width.saturating_sub(2),
+        height: container_area.height.saturating_sub(2),
+    };
+
+    (container_area, inner_area)
+}
+
 fn render_search_suggestions(
     frame: &mut Frame,
     area: Rect,
     search_bar_area: Rect,
     state: &AppState,
     theme: &Theme,
-    view: SearchViewState,
+    _view: SearchViewState,
 ) {
     if state.input_mode != InputMode::Editing
         || state.search_suggestions.is_empty()
@@ -1855,24 +1888,6 @@ fn render_search_suggestions(
         .saturating_sub(visible_count)
         .min(state.search_suggestions.len().saturating_sub(visible_count));
 
-    let is_centered = state.search_results.is_empty();
-
-    let search_text_len = if is_centered {
-        let content_sample = search_content(state, view, false, search_bar_area.width, false);
-        crate::tui::text::width(&content_sample) as u16
-    } else {
-        0
-    };
-
-    let prompt_x = if is_centered {
-        search_bar_area.x + search_bar_area.width.saturating_sub(search_text_len) / 2
-    } else {
-        search_bar_area.x
-    };
-
-    let available_width = area.right().saturating_sub(prompt_x).saturating_sub(2);
-    let start_y = search_bar_area.bottom();
-
     let visible_slice: Vec<(usize, &String)> = state
         .search_suggestions
         .iter()
@@ -1885,22 +1900,24 @@ fn render_search_suggestions(
         return;
     }
 
-    let container_h = (visible_slice.len() as u16).min(area.bottom().saturating_sub(start_y));
-    let container_w = available_width.min(search_bar_area.width.max(48));
-    let container_area = Rect {
-        x: prompt_x.saturating_sub(1).max(area.x),
-        y: start_y,
-        width: container_w.min(area.right().saturating_sub(prompt_x)),
-        height: container_h,
-    };
+    let (container_area, inner_area) =
+        search_suggestions_bounds(area, search_bar_area, visible_slice.len());
+
+    if container_area.width == 0 || container_area.height <= 2 || inner_area.height == 0 {
+        return;
+    }
 
     crate::tui::clear_area(frame, container_area, theme);
-    let container_block = Block::default().style(theme.surface0);
+    let container_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+        .border_style(theme.border_focus)
+        .style(Style::default().bg(theme.surface0.fg.unwrap_or(theme.base)));
     frame.render_widget(container_block, container_area);
 
     for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
-        let current_y = start_y + row_idx as u16;
-        if current_y >= area.bottom() {
+        let current_y = inner_area.y + row_idx as u16;
+        if current_y >= inner_area.bottom() {
             break;
         }
 
@@ -1928,6 +1945,13 @@ fn render_search_suggestions(
         };
 
         let desc = slash_command_description(suggestion, state);
+
+        let row_bg = if is_selected {
+            theme.surface1.fg.unwrap_or(theme.base)
+        } else {
+            theme.surface0.fg.unwrap_or(theme.base)
+        };
+        let row_style = Style::default().bg(row_bg);
 
         let branch_style = if is_selected {
             theme.lavender.add_modifier(Modifier::BOLD)
@@ -1960,23 +1984,25 @@ fn render_search_suggestions(
             let name_len = crate::tui::text::width(display_name) + badge_width;
             let pad = 28usize.saturating_sub(name_len).max(2);
             spans.push(Span::raw(" ".repeat(pad)));
-            let desc_budget = (available_width as usize)
-                .saturating_sub(3 + name_len + pad)
-                .max(6);
-            spans.push(Span::styled(
-                crate::tui::text::truncate_width(description, desc_budget),
-                desc_style,
-            ));
+            let branch_width = crate::tui::text::width(branch_symbol);
+            let desc_budget =
+                (inner_area.width as usize).saturating_sub(branch_width + name_len + pad);
+            if desc_budget > 0 {
+                spans.push(Span::styled(
+                    crate::tui::text::truncate_width(description, desc_budget),
+                    desc_style,
+                ));
+            }
         }
 
         let row_area = Rect {
-            x: prompt_x,
+            x: inner_area.x,
             y: current_y,
-            width: available_width,
+            width: inner_area.width,
             height: 1,
         };
 
-        frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
+        frame.render_widget(Paragraph::new(Line::from(spans)).style(row_style), row_area);
     }
 }
 
@@ -2033,6 +2059,36 @@ mod tests {
                 );
             })
             .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+        assert!(rendered.contains("help"));
+        assert!(rendered.contains("history"));
+        assert!(rendered.contains("Inception"));
+        assert!(rendered.contains("[CMD]"));
+        assert!(rendered.contains("[HISTORY]"));
+        assert!(rendered.contains("[SUGGEST]"));
+    }
+
+    #[test]
+    fn test_search_suggestions_bounds() {
+        let area = Rect::new(0, 0, 80, 24);
+        let search_bar = Rect::new(10, 2, 60, 3);
+        let (container, inner) = search_suggestions_bounds(area, search_bar, 3);
+        assert_eq!(container.x, 10);
+        assert_eq!(container.y, 5);
+        assert_eq!(container.width, 60);
+        assert_eq!(container.height, 5);
+        assert_eq!(inner.x, 11);
+        assert_eq!(inner.y, 6);
+        assert_eq!(inner.width, 58);
+        assert_eq!(inner.height, 3);
     }
 
     #[test]

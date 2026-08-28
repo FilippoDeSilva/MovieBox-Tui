@@ -191,6 +191,31 @@ async fn test_mouse_click_search_input_mode() {
 }
 
 #[tokio::test]
+async fn test_mouse_click_search_suggestion_selects_query() {
+    let mut app = App::new();
+    app.state_mut().input_mode = InputMode::Editing;
+    app.state_mut().search_suggestions = vec![
+        "Deewaniyat".to_string(),
+        "Ek Deewane Ki Deewaniyat".to_string(),
+    ];
+
+    let area = ratatui::layout::Rect::new(0, 0, 80, 24);
+    let search_bar_area = ratatui::layout::Rect::new(10, 5, 60, 3);
+    let (_container, inner) =
+        moviebox_tui::tui::screens::home::search_suggestions_bounds(area, search_bar_area, 2);
+
+    app.handle_action(Action::MouseClick(inner.x, inner.y))
+        .await;
+    app.handle_action(Action::SelectSuggestion {
+        query: "Deewaniyat".to_string(),
+    })
+    .await;
+    assert_eq!(app.state().search_query.as_str(), "Deewaniyat");
+    assert_eq!(app.state().input_mode, InputMode::Normal);
+    assert!(app.state().search_suggestions.is_empty());
+}
+
+#[tokio::test]
 async fn test_mouse_scroll_maps_to_key_actions() {
     let mut app = App::new();
     app.state_mut().active_screen = Screen::Home;

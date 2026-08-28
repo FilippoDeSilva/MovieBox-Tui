@@ -457,20 +457,38 @@ impl App {
                         .saturating_sub(visible_count),
                 );
 
-            let start_y = search_bar_area.bottom();
-            let container_w = search_bar_area.width.max(48);
-            let container_x = search_bar_area.x;
-            if col >= container_x
-                && col < container_x + container_w
-                && row >= start_y
-                && (row - start_y) < visible_count as u16
+            let visible_slice_len = self
+                .state
+                .search_suggestions
+                .len()
+                .saturating_sub(suggestion_offset)
+                .min(visible_count);
+
+            let (container_area, inner_area) = crate::tui::screens::home::search_suggestions_bounds(
+                area,
+                search_bar_area,
+                visible_slice_len,
+            );
+
+            if col >= inner_area.left()
+                && col < inner_area.right()
+                && row >= inner_area.top()
+                && row < inner_area.bottom()
             {
-                let clicked_idx = suggestion_offset + (row - start_y) as usize;
+                let clicked_idx = suggestion_offset + (row - inner_area.top()) as usize;
                 if let Some(query) = self.state.search_suggestions.get(clicked_idx).cloned() {
                     self.action_sender
                         .send(Action::SelectSuggestion { query })
                         .ok();
                 }
+                return None;
+            }
+
+            if col >= container_area.left()
+                && col < container_area.right()
+                && row >= container_area.top()
+                && row < container_area.bottom()
+            {
                 return None;
             }
         }

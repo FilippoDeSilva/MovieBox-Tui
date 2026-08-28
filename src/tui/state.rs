@@ -544,6 +544,7 @@ impl AppState {
             || self.show_season_download_confirm
             || self.show_episode_download_confirm
             || self.update_available.is_some()
+            || (self.input_mode == InputMode::Editing && !self.search_suggestions.is_empty())
     }
 
     pub fn clear_search_state(&mut self) {
@@ -808,6 +809,13 @@ mod tests {
         state.update_available = Some(("v2.0.0".to_string(), "Notes".to_string()));
         assert!(state.has_active_modal());
         state.update_available = None;
+
+        state.input_mode = InputMode::Editing;
+        state.search_suggestions = vec!["suggestion".to_string()];
+        assert!(state.has_active_modal());
+        state.search_suggestions.clear();
+        assert!(!state.has_active_modal());
+        state.input_mode = InputMode::Normal;
 
         assert!(!state.has_active_modal());
     }

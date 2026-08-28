@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **Search Suggestions Overlay Bleed**: Wrapped search suggestions in an elevated, bordered card with opaque background clearing (`theme.surface0`), and gated terminal graphics poster rendering while typing suggestions, eliminating text and image collisions over background search results.
 - **Season Download Stream Error Recovery**: Prevented download queue stalls when resolving individual episode stream URLs fails; failed streams report diagnostics and allow the remaining queue to continue.
 - **Favorites & Watch History Corruption Recovery**: Corrupted JSON configuration and history state files now rotate to `.corrupt` backups instead of hard deletion, preserving recoverable user data.
 - **Details Screen Hit-Testing & Selector Alignment**: Aligned mouse hit-testing regions and season/episode selector column geometry across all compact, medium, and wide terminal tiers.
