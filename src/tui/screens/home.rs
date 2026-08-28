@@ -44,15 +44,6 @@ fn search_view_state(state: &AppState) -> SearchViewState {
     }
 }
 
-fn centered_width(area: Rect, maximum: u16) -> Rect {
-    let width = area.width.min(maximum).max(1);
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        width,
-        ..area
-    }
-}
-
 pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&'static str> {
     crate::tui::commands::SlashCommand::description_for(cmd, state)
 }
@@ -102,18 +93,20 @@ impl HomeLayoutTier {
     }
 }
 
-pub(crate) struct LandingRows {
+pub struct LandingRows {
     pub rects: std::rc::Rc<[Rect]>,
     pub logo: usize,
     pub version: usize,
     pub search: usize,
+    #[allow(dead_code)]
     pub favorites: usize,
     pub mode_row: usize,
+    #[allow(dead_code)]
     pub util_row: Option<usize>,
     pub logo_width: u16,
 }
 
-pub(crate) fn landing_split(
+pub fn landing_split(
     area: Rect,
     tv_mode: bool,
     basic_terminal: bool,
@@ -129,71 +122,43 @@ pub(crate) fn landing_split(
     } else {
         73
     };
-    if compact_logo {
-        let rects = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(12),
-                Constraint::Length(logo_height),
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ])
-            .split(area);
-        (
-            tier,
-            LandingRows {
-                rects,
-                logo: 1,
-                version: 2,
-                search: 4,
-                favorites: 6,
-                mode_row: 7,
-                util_row: None,
-                logo_width,
-            },
-        )
+    let top_pad = if effective_basic || area.height < 24 {
+        1
     } else {
-        let rects = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(16),
-                Constraint::Length(logo_height),
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
-            .split(area);
-        (
-            tier,
-            LandingRows {
-                rects,
-                logo: 1,
-                version: 2,
-                search: 4,
-                favorites: 6,
-                mode_row: 7,
-                util_row: Some(8),
-                logo_width,
-            },
-        )
-    }
+        2
+    };
+    let rects = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(top_pad),
+            Constraint::Length(logo_height),
+            Constraint::Length(1), // version
+            Constraint::Length(1), // gap
+            Constraint::Min(4),    // unified hub card
+            Constraint::Length(1), // streamlined bottom bar
+        ])
+        .split(area);
+    (
+        tier,
+        LandingRows {
+            rects,
+            logo: 1,
+            version: 2,
+            search: 4,
+            favorites: 4,
+            mode_row: 5,
+            util_row: None,
+            logo_width,
+        },
+    )
 }
 
-pub(crate) fn search_deck_width(area: Rect, _state: &AppState, landing: bool) -> u16 {
+pub fn search_deck_width(area: Rect, _state: &AppState, landing: bool) -> u16 {
     let tier = HomeLayoutTier::for_width(area.width);
     if landing {
         let target_width = match tier {
             HomeLayoutTier::Compact => 54,
-            HomeLayoutTier::Normal => 68,
-            HomeLayoutTier::Wide => 80,
+            HomeLayoutTier::Normal | HomeLayoutTier::Wide => 64,
         };
         target_width.min(area.width.saturating_sub(4)).max(24)
     } else {
@@ -400,6 +365,7 @@ fn render_search_state(
 
     frame.render_widget(Paragraph::new(lines).alignment(alignment), card);
 }
+#[cfg(test)]
 fn render_favorites_landing(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     if area.height < 2 || area.width < 20 {
         return;
@@ -571,6 +537,513 @@ fn search_content(
         let content = crate::tui::text::truncate_width(state.search_query.as_str(), available);
         format!("{prefix}{content}")
     }
+}
+
+fn render_unified_command_hub(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    theme: &Theme,
+    view: SearchViewState,
+    show_cursor: bool,
+) -> (Rect, Rect) {
+    if area.height < 3 || area.width < 20 {
+        return (Rect::default(), Rect::default());
+    }
+
+    let card_width = search_deck_width(area, state, true);
+    let has_suggestions =
+        state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
+    let favorites_items = state.favorites_landing_items();
+    let has_favorites = !favorites_items.is_empty();
+    let overflow = state
+        .favorites
+        .items
+        .len()
+        .saturating_sub(favorites_items.len());
+
+    let content_rows = if has_suggestions {
+        state.search_suggestions.len().min(6) as u16
+    } else if has_favorites {
+        1 + favorites_items.len() as u16 + u16::from(overflow > 0) + 1
+    } else {
+        2
+    };
+
+    let total_card_height = (1 + 1 + 1 + content_rows + 1).min(area.height).max(4);
+    let card_x = area.x + area.width.saturating_sub(card_width) / 2;
+    let card_area = Rect {
+        x: card_x,
+        y: area.y,
+        width: card_width,
+        height: total_card_height,
+    };
+
+    let border_style = if state.input_mode == InputMode::Editing {
+        theme.border_focus
+    } else {
+        theme.surface1
+    };
+
+    let card_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+        .border_style(border_style);
+    frame.render_widget(card_block, card_area);
+
+    let inner_width = card_area.width.saturating_sub(2);
+    let search_row_area = Rect {
+        x: card_area.x + 1,
+        y: card_area.y + 1,
+        width: inner_width,
+        height: 1,
+    };
+
+    let is_ultra_compact = area.width < 58;
+    let ctrl_p = if is_ultra_compact {
+        "P".to_string()
+    } else {
+        crate::tui::text::ctrl_key("P")
+    };
+    let ctrl_t = if is_ultra_compact {
+        "T".to_string()
+    } else {
+        crate::tui::text::ctrl_key("T")
+    };
+
+    let is_query_empty = state.search_query.is_empty();
+    let (pill_text, pill_style) = if !is_query_empty {
+        if is_ultra_compact {
+            ("[Enter]".to_string(), theme.accent)
+        } else {
+            ("[Enter] Search".to_string(), theme.accent)
+        }
+    } else if state.is_tv_mode {
+        let text = if is_ultra_compact {
+            "[TV]".to_string()
+        } else {
+            let sep = if state.basic_terminal { "-" } else { "·" };
+            format!("[Live TV {sep} {ctrl_t}]")
+        };
+        let style = if state.basic_terminal {
+            theme.lavender
+        } else {
+            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+            let fg = theme.lavender.fg.unwrap_or(Color::Rgb(180, 190, 254));
+            Style::default().bg(bg).fg(fg)
+        };
+        (text, style)
+    } else if state.is_addon_mode {
+        let text = if is_ultra_compact {
+            "[Addons]".to_string()
+        } else {
+            let sep = if state.basic_terminal { "-" } else { "·" };
+            format!("[Addons {sep} {ctrl_p}]")
+        };
+        let style = if state.basic_terminal {
+            theme.teal
+        } else {
+            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+            let fg = theme.teal.fg.unwrap_or(Color::Rgb(148, 226, 213));
+            Style::default().bg(bg).fg(fg)
+        };
+        (text, style)
+    } else {
+        let label = state.active_provider.label();
+        let text = if is_ultra_compact {
+            format!("[{label}]")
+        } else {
+            let sep = if state.basic_terminal { "-" } else { "·" };
+            format!("[{label} {sep} {ctrl_p}]")
+        };
+        let style = if state.basic_terminal {
+            theme.sapphire
+        } else {
+            let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+            let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
+            Style::default().bg(bg).fg(fg)
+        };
+        (text, style)
+    };
+
+    let pill_width = crate::tui::text::width(&pill_text) as u16;
+    let search_split = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(1),
+            Constraint::Length(pill_width.saturating_add(1)),
+        ])
+        .split(search_row_area);
+
+    let prefix = if state.basic_terminal { "> " } else { "❯ " };
+    let prefix_width = crate::tui::text::width(prefix) as u16;
+    let editing = view == SearchViewState::Editing;
+    let real_cursor = editing && show_cursor && !state.basic_terminal;
+
+    let search_line = if is_query_empty {
+        let placeholder_text = if state.is_tv_mode {
+            "Search live channels…"
+        } else if state.is_addon_mode {
+            "Search movies and series via addons…"
+        } else {
+            "Search movies and series…"
+        };
+
+        if editing {
+            let cursor_str = if show_cursor { "█" } else { " " };
+            Line::from(vec![
+                Span::styled(prefix, theme.accent),
+                Span::styled(cursor_str, theme.accent),
+                Span::raw(" "),
+                Span::styled(placeholder_text, theme.text_dim),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(prefix, theme.accent),
+                Span::styled(placeholder_text, theme.text_dim),
+            ])
+        }
+    } else if editing && !real_cursor {
+        let segments = state.search_query.graphemes();
+        let cursor = state.search_query.cursor();
+        let cursor_char = if show_cursor {
+            "█"
+        } else if cursor < segments.len() {
+            segments[cursor]
+        } else {
+            " "
+        };
+        let before: String = segments.iter().take(cursor).copied().collect();
+        let after: String = if cursor < segments.len() {
+            segments.iter().skip(cursor + 1).copied().collect()
+        } else {
+            String::new()
+        };
+        Line::from(vec![
+            Span::styled(prefix, theme.accent),
+            Span::styled(before, theme.text),
+            Span::styled(cursor_char, theme.accent),
+            Span::styled(after, theme.text),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(prefix, theme.accent),
+            Span::styled(state.search_query.as_str(), theme.text),
+        ])
+    };
+
+    frame.render_widget(Paragraph::new(search_line), search_split[0]);
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
+            .alignment(Alignment::Right),
+        search_split[1],
+    );
+
+    if real_cursor {
+        let cx = if is_query_empty {
+            search_split[0].x + prefix_width
+        } else {
+            let segments = state.search_query.graphemes();
+            let cursor = state.search_query.cursor();
+            let before_cursor: String = segments.into_iter().take(cursor).collect();
+            let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
+            (search_split[0].x + prefix_width + before_cursor_width)
+                .min(search_split[0].right().saturating_sub(1))
+        };
+        frame.set_cursor_position((cx, search_split[0].y));
+    }
+
+    if card_area.height >= 4 {
+        let divider_y = card_area.y + 2;
+        let divider_text = if state.basic_terminal {
+            format!("+{}+", "-".repeat(inner_width as usize))
+        } else {
+            format!("├{}┤", "─".repeat(inner_width as usize))
+        };
+        let divider_area = Rect {
+            x: card_area.x,
+            y: divider_y,
+            width: card_area.width,
+            height: 1,
+        };
+        frame.render_widget(
+            Paragraph::new(divider_text).style(border_style),
+            divider_area,
+        );
+    }
+
+    let content_start_y = card_area.y + 3;
+
+    if has_suggestions {
+        let visible_count = state.search_suggestions.len().min(6);
+        let selected_index = state.suggest_index.unwrap_or(0);
+        let suggestion_offset = selected_index
+            .saturating_add(1)
+            .saturating_sub(visible_count)
+            .min(state.search_suggestions.len().saturating_sub(visible_count));
+
+        let visible_slice: Vec<(usize, &String)> = state
+            .search_suggestions
+            .iter()
+            .enumerate()
+            .skip(suggestion_offset)
+            .take(visible_count)
+            .collect();
+
+        for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
+            let row_y = content_start_y + row_idx as u16;
+            if row_y >= card_area.bottom().saturating_sub(1) {
+                break;
+            }
+
+            let is_selected = Some(orig_idx) == state.suggest_index;
+            let indicator_symbol = if is_selected {
+                if state.basic_terminal { "> " } else { "▌ " }
+            } else {
+                "  "
+            };
+
+            let indicator_style = if is_selected {
+                theme.accent.add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+
+            let is_slash_cmd = suggestion.starts_with('/');
+            let display_name = if is_slash_cmd {
+                suggestion.strip_prefix('/').unwrap_or(suggestion)
+            } else {
+                suggestion.as_str()
+            };
+
+            let desc = slash_command_description(suggestion, state);
+
+            let row_style = if is_selected {
+                Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+            } else {
+                Style::default()
+            };
+
+            let text_style = if is_selected {
+                theme.highlight.add_modifier(Modifier::BOLD)
+            } else {
+                theme.text
+            };
+
+            let desc_style = if is_selected {
+                theme.subtext1.add_modifier(Modifier::BOLD)
+            } else {
+                theme.text_dim
+            };
+
+            let badge_span =
+                suggestion_source_badge(suggestion, state, theme, state.basic_terminal);
+            let badge_width = badge_span
+                .as_ref()
+                .map_or(0, |b| crate::tui::text::width(&b.content));
+
+            let mut spans = vec![Span::styled(indicator_symbol, indicator_style)];
+            if let Some(badge) = badge_span {
+                spans.push(badge);
+            }
+            spans.push(Span::styled(display_name, text_style));
+
+            if let Some(description) = desc {
+                let name_len = crate::tui::text::width(display_name) + badge_width;
+                let pad = 24usize.saturating_sub(name_len).max(2);
+                spans.push(Span::raw(" ".repeat(pad)));
+                let indicator_width = crate::tui::text::width(indicator_symbol);
+                let desc_budget =
+                    (inner_width as usize).saturating_sub(indicator_width + name_len + pad);
+                if desc_budget > 0 {
+                    spans.push(Span::styled(
+                        crate::tui::text::truncate_width(description, desc_budget),
+                        desc_style,
+                    ));
+                }
+            }
+
+            let row_area = Rect {
+                x: card_area.x + 1,
+                y: row_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(Line::from(spans)).style(row_style), row_area);
+        }
+    } else if has_favorites {
+        let mut curr_y = content_start_y;
+
+        if curr_y < card_area.bottom().saturating_sub(1) {
+            let star = if state.basic_terminal { "*" } else { "★" };
+            let header_style = if state.favorites_focus {
+                theme.title.add_modifier(Modifier::BOLD)
+            } else {
+                theme.subtext1
+            };
+            let header_area = Rect {
+                x: card_area.x + 1,
+                y: curr_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(
+                Paragraph::new(format!("  {star} RECENT FAVORITES")).style(header_style),
+                header_area,
+            );
+            curr_y += 1;
+        }
+
+        let selected = if state.favorites_focus {
+            state.favorites_landing_state.selected()
+        } else {
+            None
+        };
+
+        for (i, item) in favorites_items.iter().enumerate() {
+            if curr_y >= card_area.bottom().saturating_sub(1) {
+                break;
+            }
+            let is_selected = selected == Some(i);
+            let type_tag = if item.stype == 2 { "Series" } else { "Movie" };
+            let right_tag = if item.release_year.is_empty() {
+                type_tag.to_string()
+            } else {
+                format!("{} {type_tag}", item.release_year)
+            };
+
+            let prefix = if is_selected {
+                if state.basic_terminal { "> " } else { "▌ " }
+            } else {
+                "  "
+            };
+
+            let title_style = if is_selected {
+                theme.title.add_modifier(Modifier::BOLD)
+            } else {
+                theme.text
+            };
+
+            let row_style = if is_selected {
+                Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+            } else {
+                Style::default()
+            };
+
+            let tag_len = crate::tui::text::width(&right_tag) + 2;
+            let max_title_width = (inner_width as usize).saturating_sub(2 + tag_len);
+            let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
+            let title_width = crate::tui::text::width(&truncated_title);
+
+            let pad_len = (inner_width as usize).saturating_sub(2 + title_width + tag_len);
+
+            let line = Line::from(vec![
+                Span::styled(prefix, theme.accent),
+                Span::styled(truncated_title, title_style),
+                Span::raw(" ".repeat(pad_len)),
+                Span::styled(format!("  {right_tag}"), theme.text_dim),
+            ]);
+
+            let row_area = Rect {
+                x: card_area.x + 1,
+                y: curr_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(line).style(row_style), row_area);
+            curr_y += 1;
+        }
+
+        if overflow > 0 && curr_y < card_area.bottom().saturating_sub(1) {
+            let sep = if state.basic_terminal { "-" } else { "·" };
+            let pill_text = format!("[ +{overflow} more {sep} /favorites ]");
+            let pill_style = if state.basic_terminal {
+                theme.sapphire
+            } else {
+                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+                let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
+                Style::default().bg(bg).fg(fg)
+            };
+            let row_area = Rect {
+                x: card_area.x + 1,
+                y: curr_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(
+                Paragraph::new(Line::from(vec![Span::styled(pill_text, pill_style)]))
+                    .alignment(Alignment::Center),
+                row_area,
+            );
+            curr_y += 1;
+        }
+
+        if curr_y < card_area.bottom() {
+            let sep = if state.basic_terminal { "-" } else { "·" };
+            let bolt = if state.basic_terminal { ">" } else { "⚡" };
+            let footer_line = if inner_width < 56 {
+                Line::from(vec![
+                    Span::styled(format!(" {bolt} QUICK: "), theme.subtext1),
+                    Span::styled("/browse", theme.shortcut),
+                    Span::styled(format!(" {sep} "), theme.text_dim),
+                    Span::styled("/history", theme.shortcut),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(format!(" {bolt} QUICK COMMANDS:  "), theme.subtext1),
+                    Span::styled("/browse", theme.shortcut),
+                    Span::styled(format!(" {sep} Discover Releases    "), theme.text_dim),
+                    Span::styled("/history", theme.shortcut),
+                ])
+            };
+            let row_area = Rect {
+                x: card_area.x + 1,
+                y: curr_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(footer_line), row_area);
+        }
+    } else {
+        let bolt = if state.basic_terminal { ">" } else { "⚡" };
+        let sep = if state.basic_terminal { "-" } else { "·" };
+
+        let row1_y = content_start_y;
+        if row1_y < card_area.bottom().saturating_sub(1) {
+            let line1 = Line::from(vec![
+                Span::styled(format!("  {bolt} Discover:  "), theme.subtext1),
+                Span::styled("/browse", theme.shortcut),
+                Span::styled(format!(" {sep} Popular & Top Rated"), theme.text_dim),
+            ]);
+            let row1_area = Rect {
+                x: card_area.x + 1,
+                y: row1_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(line1), row1_area);
+        }
+
+        let row2_y = content_start_y + 1;
+        if row2_y < card_area.bottom().saturating_sub(1) {
+            let line2 = Line::from(vec![
+                Span::raw("               "),
+                Span::styled("/theme", theme.shortcut),
+                Span::styled(format!(" {sep} Themes    "), theme.text_dim),
+                Span::styled("?", theme.shortcut),
+                Span::styled(format!(" {sep} Help"), theme.text_dim),
+            ]);
+            let row2_area = Rect {
+                x: card_area.x + 1,
+                y: row2_y,
+                width: inner_width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(line2), row2_area);
+        }
+    }
+
+    (card_area, search_row_area)
 }
 
 fn render_search_bar(
@@ -822,164 +1295,123 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .style(theme.text_dim);
         frame.render_widget(version, version_chunks[1]);
 
-        let search_width = search_deck_width(area, state, true);
-        search_bar_area = centered_width(vertical_chunks[rows.search], search_width);
-
-        if !state.tv_config_popup {
-            render_search_bar(
+        let (_hub_card_area, inner_search_area) = if !state.tv_config_popup {
+            render_unified_command_hub(
                 frame,
-                search_bar_area,
+                vertical_chunks[rows.search],
                 state,
                 theme,
                 view,
                 show_cursor,
-                true,
-            );
-        }
-
-        if state.favorites_landing_visible() {
-            render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
-        }
+            )
+        } else {
+            (Rect::default(), Rect::default())
+        };
+        search_bar_area = inner_search_area;
 
         let compact_tabs = area.width < 76;
         let ultra_compact_tabs = area.width < 58;
 
-        let ctrl_s = if ultra_compact_tabs {
+        let ctrl_s = if ultra_compact_tabs || compact_tabs {
             "S".to_string()
         } else {
             crate::tui::text::ctrl_key("S")
         };
-        let ctrl_t = if ultra_compact_tabs {
+        let ctrl_t = if ultra_compact_tabs || compact_tabs {
             "T".to_string()
         } else {
             crate::tui::text::ctrl_key("T")
         };
-        let ctrl_a = if ultra_compact_tabs {
+        let ctrl_a = if ultra_compact_tabs || compact_tabs {
             "A".to_string()
         } else {
             crate::tui::text::ctrl_key("A")
         };
-        let ctrl_p = if ultra_compact_tabs {
-            "P".to_string()
-        } else {
-            crate::tui::text::ctrl_key("P")
-        };
-
-        let stream_label = if compact_tabs { "Stream" } else { "Streaming" };
-        let addon_label = if compact_tabs { "Addon" } else { "Addons" };
 
         let current_mode = state.mode();
-        let mut mode_tabs: Vec<Vec<Span>> = Vec::new();
+        let mut bar_spans: Vec<Span> = Vec::new();
 
         if state.streaming_enabled {
-            let mut spans = vec![];
-            if current_mode == crate::tui::state::AppMode::Streaming {
-                spans.push(Span::styled("[", theme.text_dim));
-                spans.push(Span::styled(&ctrl_p, theme.shortcut));
-                spans.push(Span::styled("] ", theme.text_dim));
-                spans.push(Span::styled(
-                    state.active_provider.label(),
-                    theme.highlight.add_modifier(Modifier::BOLD),
-                ));
-            } else {
-                spans.push(Span::styled("[", theme.text_dim));
-                spans.push(Span::styled(&ctrl_s, theme.shortcut));
-                spans.push(Span::styled("] ", theme.text_dim));
-                spans.push(Span::styled(stream_label, theme.text_dim));
-            }
-            mode_tabs.push(spans);
+            let is_active = current_mode == crate::tui::state::AppMode::Streaming;
+            bar_spans.push(Span::styled("[", theme.text_dim));
+            bar_spans.push(Span::styled(&ctrl_s, theme.shortcut));
+            bar_spans.push(Span::styled("] ", theme.text_dim));
+            bar_spans.push(Span::styled(
+                "Stream",
+                if is_active {
+                    theme.highlight.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text_dim
+                },
+            ));
         }
 
+        let sep = if state.basic_terminal {
+            " - "
+        } else if compact_tabs {
+            " · "
+        } else {
+            "  ·  "
+        };
+
         if state.tv_enabled {
-            let mut spans = vec![];
-            if current_mode == crate::tui::state::AppMode::Tv {
-                spans.push(Span::styled("[ ", theme.text_dim));
-                spans.push(Span::styled(
-                    "TV",
-                    theme.highlight.add_modifier(Modifier::BOLD),
-                ));
-                spans.push(Span::styled(" ]", theme.text_dim));
-            } else {
-                spans.push(Span::styled("[", theme.text_dim));
-                spans.push(Span::styled(&ctrl_t, theme.shortcut));
-                spans.push(Span::styled("] ", theme.text_dim));
-                spans.push(Span::styled("TV", theme.text_dim));
+            if !bar_spans.is_empty() {
+                bar_spans.push(Span::raw(sep));
             }
-            mode_tabs.push(spans);
+            let is_active = current_mode == crate::tui::state::AppMode::Tv;
+            bar_spans.push(Span::styled("[", theme.text_dim));
+            bar_spans.push(Span::styled(&ctrl_t, theme.shortcut));
+            bar_spans.push(Span::styled("] ", theme.text_dim));
+            bar_spans.push(Span::styled(
+                "TV",
+                if is_active {
+                    theme.highlight.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text_dim
+                },
+            ));
         }
 
         if state.addons_enabled {
-            let mut spans = vec![];
-            if current_mode == crate::tui::state::AppMode::Addon {
-                spans.push(Span::styled("[ ", theme.text_dim));
-                spans.push(Span::styled(
-                    if compact_tabs { "Addon" } else { "Addons" },
-                    theme.highlight.add_modifier(Modifier::BOLD),
-                ));
-                spans.push(Span::styled(" ]", theme.text_dim));
-            } else {
-                spans.push(Span::styled("[", theme.text_dim));
-                spans.push(Span::styled(&ctrl_a, theme.shortcut));
-                spans.push(Span::styled("] ", theme.text_dim));
-                spans.push(Span::styled(addon_label, theme.text_dim));
+            if !bar_spans.is_empty() {
+                bar_spans.push(Span::raw(sep));
             }
-            mode_tabs.push(spans);
-        }
-
-        let mut mode_spans = vec![];
-        for (i, tab) in mode_tabs.into_iter().enumerate() {
-            if i > 0 {
-                let separator = if compact_tabs {
-                    " • "
+            let is_active = current_mode == crate::tui::state::AppMode::Addon;
+            bar_spans.push(Span::styled("[", theme.text_dim));
+            bar_spans.push(Span::styled(&ctrl_a, theme.shortcut));
+            bar_spans.push(Span::styled("] ", theme.text_dim));
+            bar_spans.push(Span::styled(
+                "Addon",
+                if is_active {
+                    theme.highlight.add_modifier(Modifier::BOLD)
                 } else {
-                    if tier.is_compact() { "   " } else { "     " }
-                };
-                mode_spans.push(Span::raw(separator));
-            }
-            mode_spans.extend(tab);
+                    theme.text_dim
+                },
+            ));
         }
 
-        let util_spans = vec![
-            Span::styled("[", theme.text_dim),
-            Span::styled("?", theme.shortcut),
-            Span::styled("] ", theme.text_dim),
-            Span::styled("Help", theme.text_dim),
-            Span::raw("     "),
-            Span::styled("[", theme.text_dim),
-            Span::styled("q", theme.shortcut),
-            Span::styled("] ", theme.text_dim),
-            Span::styled("Quit", theme.text_dim),
-        ];
+        let util_gap = if compact_tabs { "    " } else { "       " };
+        bar_spans.push(Span::raw(util_gap));
 
-        match rows.util_row {
-            Some(util_idx) => {
-                frame.render_widget(
-                    Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Center),
-                    vertical_chunks[rows.mode_row],
-                );
-                frame.render_widget(
-                    Paragraph::new(Line::from(util_spans)).alignment(Alignment::Center),
-                    vertical_chunks[util_idx],
-                );
-            }
-            None => {
-                let row_rect = vertical_chunks[rows.mode_row];
-                let util_width = 19u16;
-                let sub_chunks = Layout::horizontal([
-                    Constraint::Min(1),
-                    Constraint::Length(util_width.min(row_rect.width)),
-                ])
-                .split(row_rect);
-                frame.render_widget(
-                    Paragraph::new(Line::from(mode_spans)).alignment(Alignment::Left),
-                    sub_chunks[0],
-                );
-                frame.render_widget(
-                    Paragraph::new(Line::from(util_spans)).alignment(Alignment::Right),
-                    sub_chunks[1],
-                );
-            }
+        bar_spans.push(Span::styled("[", theme.text_dim));
+        bar_spans.push(Span::styled("?", theme.shortcut));
+        bar_spans.push(Span::styled("] ", theme.text_dim));
+        if !ultra_compact_tabs {
+            bar_spans.push(Span::styled("Help", theme.text_dim));
+            bar_spans.push(Span::raw("  "));
         }
+        bar_spans.push(Span::styled("[", theme.text_dim));
+        bar_spans.push(Span::styled("q", theme.shortcut));
+        bar_spans.push(Span::styled("] ", theme.text_dim));
+        if !ultra_compact_tabs {
+            bar_spans.push(Span::styled("Quit", theme.text_dim));
+        }
+
+        let bottom_bar_area = vertical_chunks[rows.mode_row];
+        frame.render_widget(
+            Paragraph::new(Line::from(bar_spans)).alignment(Alignment::Center),
+            bottom_bar_area,
+        );
     } else {
         if state.is_loading && state.search_results.is_empty() {
             render_search_state(frame, area, state, theme, SearchViewState::Loading);
@@ -1456,7 +1888,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         }
     }
 
-    render_search_suggestions(frame, area, search_bar_area, state, theme, view);
+    if !state.search_results.is_empty() {
+        render_search_suggestions(frame, area, search_bar_area, state, theme, view);
+    }
     if state.tv_config_popup {
         let rows = state.tv_manager_rows();
         let total_rows = rows.len();
@@ -2159,19 +2593,19 @@ mod tests {
         let normal_area = Rect::new(0, 0, 90, 24);
         let wide_area = Rect::new(0, 0, 120, 24);
 
-        // Landing widths
+        // Landing widths (54 on compact, 64 on standard/wide)
         let w_compact_empty = search_deck_width(compact_area, &state, true);
         let w_normal_empty = search_deck_width(normal_area, &state, true);
         let w_wide_empty = search_deck_width(wide_area, &state, true);
         assert_eq!(w_compact_empty, 54);
-        assert_eq!(w_normal_empty, 68);
-        assert_eq!(w_wide_empty, 80);
+        assert_eq!(w_normal_empty, 64);
+        assert_eq!(w_wide_empty, 64);
 
         // Changing query does NOT jump landing search deck width
         state.search_query = "Inception 2010 1080p".into();
         assert_eq!(search_deck_width(compact_area, &state, true), 54);
-        assert_eq!(search_deck_width(normal_area, &state, true), 68);
-        assert_eq!(search_deck_width(wide_area, &state, true), 80);
+        assert_eq!(search_deck_width(normal_area, &state, true), 64);
+        assert_eq!(search_deck_width(wide_area, &state, true), 64);
     }
 
     #[test]
@@ -2272,5 +2706,189 @@ mod tests {
                 draw(frame, area, &mut state, &theme);
             })
             .unwrap();
+    }
+
+    #[test]
+    fn test_unified_command_hub_rendering_empty_landing() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            streaming_enabled: true,
+            tv_enabled: true,
+            addons_enabled: true,
+            basic_terminal: false,
+            ..Default::default()
+        };
+        state.favorites.items.clear();
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+        // Hub Card Frame & Prompt
+        assert!(rendered.contains('❯'));
+        assert!(rendered.contains("Search movies and series…"));
+        assert!(rendered.contains("[MovieBox"));
+        assert!(rendered.contains(&crate::tui::text::ctrl_key("P")));
+        assert!(rendered.contains('├'));
+        assert!(rendered.contains('┤'));
+
+        // State C: Empty landing discover guide
+        assert!(rendered.contains("Discover:"));
+        assert!(rendered.contains("/browse"));
+        assert!(rendered.contains("/theme"));
+        assert!(rendered.contains("Help"));
+
+        // Streamlined 1-line Bottom Bar
+        assert!(rendered.contains("Stream"));
+        assert!(rendered.contains("TV"));
+        assert!(rendered.contains("Addon"));
+        assert!(rendered.contains("Quit"));
+    }
+
+    #[test]
+    fn test_unified_command_hub_rendering_with_favorites() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            streaming_enabled: true,
+            basic_terminal: false,
+            ..Default::default()
+        };
+        for i in 1..=6 {
+            state.favorites.items.push(crate::favorites::FavoriteItem {
+                provider: "moviebox".to_string(),
+                subject_id: format!("fav-{i}"),
+                title: format!("Interstellar {i}"),
+                cover_url: None,
+                stype: if i % 2 == 0 { 2 } else { 1 },
+                release_year: "2014".to_string(),
+                added_at: i as u64,
+            });
+        }
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        // State A: Header & Favorite items
+        assert!(rendered.contains("RECENT FAVORITES"));
+        assert!(rendered.contains("Interstellar"));
+        assert!(rendered.contains("2014 Movie") || rendered.contains("2014 Series"));
+        // Overflow
+        assert!(rendered.contains("more · /favorites"));
+        // Quick action footer row
+        assert!(rendered.contains("QUICK COMMANDS:"));
+        assert!(rendered.contains("/browse"));
+        assert!(rendered.contains("/history"));
+    }
+
+    #[test]
+    fn test_unified_command_hub_typing_transitions_pill() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Editing,
+            search_query: "Inception".into(),
+            basic_terminal: false,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("[Enter] Search"));
+    }
+
+    #[test]
+    fn test_unified_command_hub_modes_pill_labels() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let theme = Theme::mocha();
+
+        // TV Mode
+        let mut tv_state = AppState {
+            is_tv_mode: true,
+            basic_terminal: false,
+            ..Default::default()
+        };
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                draw(frame, area, &mut tv_state, &theme);
+            })
+            .unwrap();
+        let mut tv_rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                tv_rendered.push_str(terminal.backend().buffer()[(x, y)].symbol());
+            }
+            tv_rendered.push('\n');
+        }
+        assert!(tv_rendered.contains("[Live TV"));
+        assert!(tv_rendered.contains("Search live channels…"));
+
+        // Addon Mode
+        let mut addon_state = AppState {
+            is_addon_mode: true,
+            basic_terminal: false,
+            ..Default::default()
+        };
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                draw(frame, area, &mut addon_state, &theme);
+            })
+            .unwrap();
+        let mut addon_rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                addon_rendered.push_str(terminal.backend().buffer()[(x, y)].symbol());
+            }
+            addon_rendered.push('\n');
+        }
+        assert!(addon_rendered.contains("[Addons"));
+        assert!(addon_rendered.contains("Search movies and series via addons…"));
     }
 }

@@ -186,10 +186,55 @@ async fn test_mouse_click_search_input_mode() {
     let mut app = App::new();
     assert_eq!(app.state().input_mode, InputMode::Normal);
 
-    app.handle_action(Action::MouseClick(5, 5)).await;
-    let _ = app.state().input_mode;
+    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    let area = ratatui::layout::Rect::new(0, 0, cols, rows);
+    let (_, landing_rows) = moviebox_tui::tui::screens::home::landing_split(
+        area,
+        app.state().is_tv_mode,
+        app.state().basic_terminal,
+    );
+    let card_w = moviebox_tui::tui::screens::home::search_deck_width(area, app.state(), true);
+    let card_x = area.x + area.width.saturating_sub(card_w) / 2;
+    let search_y = landing_rows.rects[landing_rows.search].y + 1;
+
+    app.handle_action(Action::MouseClick(card_x + 5, search_y))
+        .await;
+    assert_eq!(app.state().input_mode, InputMode::Editing);
 }
 
+#[tokio::test]
+async fn test_mouse_click_unified_hub_favorites_item_focuses_and_selects() {
+    let mut app = App::new();
+    app.state_mut()
+        .favorites
+        .items
+        .push(moviebox_tui::favorites::FavoriteItem {
+            provider: "moviebox".to_string(),
+            subject_id: "fav-1".to_string(),
+            title: "Inception".to_string(),
+            cover_url: None,
+            stype: 1,
+            release_year: "2010".to_string(),
+            added_at: 100,
+        });
+
+    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    let area = ratatui::layout::Rect::new(0, 0, cols, rows);
+    let (_, landing_rows) = moviebox_tui::tui::screens::home::landing_split(
+        area,
+        app.state().is_tv_mode,
+        app.state().basic_terminal,
+    );
+    let card_w = moviebox_tui::tui::screens::home::search_deck_width(area, app.state(), true);
+    let card_x = area.x + area.width.saturating_sub(card_w) / 2;
+    // Header is search_y + 2, item 0 is search_y + 3 (hub_y + 4)
+    let item_0_y = landing_rows.rects[landing_rows.search].y + 4;
+
+    app.handle_action(Action::MouseClick(card_x + 5, item_0_y))
+        .await;
+    assert!(app.state().favorites_focus);
+    assert_eq!(app.state().favorites_landing_state.selected(), Some(0));
+}
 #[tokio::test]
 async fn test_mouse_click_search_suggestion_selects_query() {
     let mut app = App::new();

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Unified Command Hub landing design**: Redesigned the homepage landing screen into a single cohesive, proportional modal container seamlessly combining the search bar, embedded provider pill (`[MovieBox · Ctrl+P]`), live suggestions, recent favorites, and quick command shortcuts.
 - **Details Screen Subtitles Shortcut (`[s]`)**: Added `s`/`S` keyboard shortcut on Details screen to open the subtitle language picker, matching mouse click and footer hints.
 - **Theme picker 3-point color swatches**: Rendered 3-point color swatches (`■ ■ ■` Accent | Surface | Base) previewing palette colors in `/theme`.
 - **Category origin pill badges**: Added `[MOVIES]`, `[SERIES]`, and `[DISCOVER]` category badges in the `/browse` preset dialog.
@@ -129,6 +130,7 @@
   `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
 ### Changed
+- **Streamlined 1-line mode switcher**: Simplified bottom navigation bar to `[Ctrl+S] Stream · [Ctrl+T] TV · [Ctrl+A] Addon      [?] Help [q] Quit`, eliminating duplicate provider text.
 - **Clean search suggestion dropdown card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
 - **Streamlined search suggestions dropdown**: Removed redundant `[SUGGEST]` badges on regular title queries, replaced tree branch glyphs with clean `▌ ` / `> ` selection indicators, and added full-width active row background styling.
 - **Streams list tabular column alignment**: Standardized resolution badges to a uniform 7-column width and aligned file size, codec/media tags, duration, and uploader columns across all resolution tiers.
