@@ -1812,7 +1812,7 @@ fn suggestion_source_badge<'a>(
     state: &AppState,
     theme: &'a Theme,
     basic_terminal: bool,
-) -> Span<'a> {
+) -> Option<Span<'a>> {
     let (tag, style) = if suggestion.starts_with('/') {
         if suggestion.eq_ignore_ascii_case("/history") {
             ("[HISTORY]", theme.sapphire)
@@ -1824,13 +1824,16 @@ fn suggestion_source_badge<'a>(
     } else if state.is_tv_mode {
         ("[TV]", theme.lavender)
     } else {
-        ("[SUGGEST]", theme.overlay1)
+        return None;
     };
 
     if basic_terminal {
-        Span::styled(format!("{tag} "), style.add_modifier(Modifier::BOLD))
+        Some(Span::styled(
+            format!("{tag} "),
+            style.add_modifier(Modifier::BOLD),
+        ))
     } else {
-        Span::styled(format!("{tag} "), style)
+        Some(Span::styled(format!("{tag} "), style))
     }
 }
 
@@ -1922,19 +1925,17 @@ fn render_search_suggestions(
         }
 
         let is_selected = Some(orig_idx) == state.suggest_index;
-        let is_last = row_idx + 1 == visible_slice.len()
-            && suggestion_offset + visible_count >= state.search_suggestions.len();
 
-        let branch_symbol = if is_last {
-            if state.basic_terminal {
-                "\\- "
-            } else {
-                "└─ "
-            }
-        } else if state.basic_terminal {
-            "|- "
+        let indicator_symbol = if is_selected {
+            if state.basic_terminal { "> " } else { "▌ " }
         } else {
-            "├─ "
+            "  "
+        };
+
+        let indicator_style = if is_selected {
+            theme.accent.add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
         };
 
         let is_slash_cmd = suggestion.starts_with('/');
@@ -1953,12 +1954,6 @@ fn render_search_suggestions(
         };
         let row_style = Style::default().bg(row_bg);
 
-        let branch_style = if is_selected {
-            theme.lavender.add_modifier(Modifier::BOLD)
-        } else {
-            theme.overlay0
-        };
-
         let text_style = if is_selected {
             theme.highlight.add_modifier(Modifier::BOLD)
         } else {
@@ -1972,21 +1967,23 @@ fn render_search_suggestions(
         };
 
         let badge_span = suggestion_source_badge(suggestion, state, theme, state.basic_terminal);
-        let badge_width = crate::tui::text::width(&badge_span.content);
+        let badge_width = badge_span
+            .as_ref()
+            .map_or(0, |b| crate::tui::text::width(&b.content));
 
-        let mut spans = vec![
-            Span::styled(branch_symbol, branch_style),
-            badge_span,
-            Span::styled(display_name, text_style),
-        ];
+        let mut spans = vec![Span::styled(indicator_symbol, indicator_style)];
+        if let Some(badge) = badge_span {
+            spans.push(badge);
+        }
+        spans.push(Span::styled(display_name, text_style));
 
         if let Some(description) = desc {
             let name_len = crate::tui::text::width(display_name) + badge_width;
             let pad = 28usize.saturating_sub(name_len).max(2);
             spans.push(Span::raw(" ".repeat(pad)));
-            let branch_width = crate::tui::text::width(branch_symbol);
+            let indicator_width = crate::tui::text::width(indicator_symbol);
             let desc_budget =
-                (inner_area.width as usize).saturating_sub(branch_width + name_len + pad);
+                (inner_area.width as usize).saturating_sub(indicator_width + name_len + pad);
             if desc_budget > 0 {
                 spans.push(Span::styled(
                     crate::tui::text::truncate_width(description, desc_budget),
@@ -2017,16 +2014,27 @@ mod tests {
         let state = AppState::default();
 
         let badge_cmd = suggestion_source_badge("/help", &state, &theme, false);
-        assert!(badge_cmd.content.contains("[CMD]"));
+        assert!(badge_cmd.is_some());
+        assert!(badge_cmd.unwrap().content.contains("[CMD]"));
 
         let badge_hist = suggestion_source_badge("/history", &state, &theme, false);
-        assert!(badge_hist.content.contains("[HISTORY]"));
+        assert!(badge_hist.is_some());
+        assert!(badge_hist.unwrap().content.contains("[HISTORY]"));
 
         let badge_fav = suggestion_source_badge("/favorites", &state, &theme, false);
-        assert!(badge_fav.content.contains("[FAVORITES]"));
+        assert!(badge_fav.is_some());
+        assert!(badge_fav.unwrap().content.contains("[FAVORITES]"));
 
         let badge_sug = suggestion_source_badge("Breaking Bad", &state, &theme, false);
-        assert!(badge_sug.content.contains("[SUGGEST]"));
+        assert!(badge_sug.is_none());
+
+        let tv_state = AppState {
+            is_tv_mode: true,
+            ..Default::default()
+        };
+        let badge_tv = suggestion_source_badge("CNN", &tv_state, &theme, false);
+        assert!(badge_tv.is_some());
+        assert!(badge_tv.unwrap().content.contains("[TV]"));
     }
 
     #[test]
@@ -2041,6 +2049,7 @@ mod tests {
                 "Inception".to_string(),
             ],
             suggest_index: Some(0),
+            basic_terminal: false,
             ..Default::default()
         };
         let theme = Theme::mocha();
@@ -2073,7 +2082,10 @@ mod tests {
         assert!(rendered.contains("Inception"));
         assert!(rendered.contains("[CMD]"));
         assert!(rendered.contains("[HISTORY]"));
-        assert!(rendered.contains("[SUGGEST]"));
+        assert!(!rendered.contains("[SUGGEST]"));
+        assert!(rendered.contains('▌'));
+        assert!(!rendered.contains('├'));
+        assert!(!rendered.contains('└'));
     }
 
     #[test]
