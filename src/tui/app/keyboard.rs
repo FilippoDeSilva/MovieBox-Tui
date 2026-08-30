@@ -215,6 +215,24 @@ impl App {
             }
             return None;
         }
+        if self.state.player_picker_popup {
+            match key.code {
+                KeyCode::Esc => {
+                    self.action_sender.send(Action::GoBack).ok();
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.action_sender.send(Action::MoveUp).ok();
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.action_sender.send(Action::MoveDown).ok();
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    self.action_sender.send(Action::Submit).ok();
+                }
+                _ => {}
+            }
+            return None;
+        }
 
         if self.state.show_theme_popup {
             match key.code {
@@ -299,6 +317,99 @@ impl App {
                     self.state.show_theme_popup = false;
                     self.state.original_theme_kind = None;
                     self.persist_config();
+                }
+                _ => {}
+            }
+            return None;
+        }
+        if self.state.show_settings_popup {
+            if let Some(input) = &mut self.state.settings_download_dir_input {
+                match key.code {
+                    KeyCode::Esc => {
+                        self.state.settings_download_dir_input = None;
+                    }
+                    KeyCode::Enter => {
+                        self.action_sender.send(Action::SettingsActivateRow).ok();
+                    }
+                    KeyCode::Left => {
+                        input.move_left();
+                    }
+                    KeyCode::Right => {
+                        input.move_right();
+                    }
+                    KeyCode::Home => {
+                        input.move_home();
+                    }
+                    KeyCode::End => {
+                        input.move_end();
+                    }
+                    KeyCode::Backspace => {
+                        input.delete_backwards();
+                    }
+                    KeyCode::Delete => {
+                        input.delete_forwards();
+                    }
+                    KeyCode::Char('u') | KeyCode::Char('U')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        input.clear();
+                    }
+                    KeyCode::Char('w') | KeyCode::Char('W')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        input.delete_word_backwards();
+                    }
+                    KeyCode::Char(c) if !c.is_control() => {
+                        input.insert(c);
+                    }
+                    _ => {}
+                }
+                return None;
+            }
+
+            match key.code {
+                KeyCode::Esc => {
+                    self.state.show_settings_popup = false;
+                    self.state.settings_download_dir_input = None;
+                    self.persist_config();
+                }
+                KeyCode::Tab => {
+                    self.state.settings_next_category();
+                }
+                KeyCode::BackTab => {
+                    self.state.settings_previous_category();
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.state.settings_row_up();
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.state.settings_row_down();
+                }
+                KeyCode::Left | KeyCode::Char('h') => {
+                    self.action_sender
+                        .send(Action::SettingsAdjustValue(false))
+                        .ok();
+                }
+                KeyCode::Right | KeyCode::Char('l') => {
+                    self.action_sender
+                        .send(Action::SettingsAdjustValue(true))
+                        .ok();
+                }
+                KeyCode::Char(' ') | KeyCode::Enter => {
+                    self.action_sender.send(Action::SettingsActivateRow).ok();
+                }
+                KeyCode::Char('d') | KeyCode::Char('D')
+                    if self.state.settings_category
+                        == crate::tui::state::SettingsCategory::General
+                        && self.state.settings_selected_row == 2 =>
+                {
+                    self.action_sender
+                        .send(Action::SettingsResetDownloadDir)
+                        .ok();
                 }
                 _ => {}
             }
@@ -1239,17 +1350,7 @@ impl App {
     }
 
     fn has_active_modal(&self) -> bool {
-        self.state.show_help
-            || self.state.show_theme_popup
-            || self.state.show_browse_popup
-            || self.state.addon_manager_popup
-            || self.state.tv_config_popup
-            || self.state.update_available.is_some()
-            || self.state.player_picker_popup
-            || self.state.subtitle_popup
-            || self.state.is_download_subtitle_popup
-            || self.state.show_season_download_confirm
-            || self.state.show_episode_download_confirm
+        self.state.has_active_modal()
     }
 }
 
@@ -1297,21 +1398,17 @@ mod tests {
         ];
         app.state.search_list_state.select(Some(0));
 
-        // Jump to End
         app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(2));
 
-        // Jump to Home
         app.handle_key(KeyEvent::new(KeyCode::Home, KeyModifiers::empty()))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(0));
 
-        // Jump to End with G
         app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(2));
-        // Jump to Home with g
         app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(0));
@@ -1347,11 +1444,9 @@ mod tests {
         ];
         app.state.search_list_state.select(Some(0));
 
-        // End key should fall through and jump to end of search list
         app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()))
             .await;
         assert_eq!(app.state.search_list_state.selected(), Some(1));
-        // Esc should dismiss the update modal
         app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
             .await;
         assert!(app.state.update_available.is_none());

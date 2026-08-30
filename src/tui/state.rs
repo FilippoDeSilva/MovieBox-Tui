@@ -30,6 +30,78 @@ pub enum InputMode {
     Normal,
     Editing,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SettingsCategory {
+    #[default]
+    General,
+    ContentModes,
+    Appearance,
+    StorageInfo,
+}
+
+impl SettingsCategory {
+    pub const ALL: [Self; 4] = [
+        Self::General,
+        Self::ContentModes,
+        Self::Appearance,
+        Self::StorageInfo,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::General => "General",
+            Self::ContentModes => "Content Modes",
+            Self::Appearance => "Appearance",
+            Self::StorageInfo => "Maintenance",
+        }
+    }
+
+    pub fn badge(self) -> &'static str {
+        match self {
+            Self::General => "GEN",
+            Self::ContentModes => "MODES",
+            Self::Appearance => "THEME",
+            Self::StorageInfo => "MAINT",
+        }
+    }
+
+    pub fn row_count(self) -> usize {
+        match self {
+            Self::General => 3,
+            Self::ContentModes => 4,
+            Self::Appearance => 1,
+            Self::StorageInfo => 3,
+        }
+    }
+    pub fn next(self) -> Self {
+        match self {
+            Self::General => Self::ContentModes,
+            Self::ContentModes => Self::Appearance,
+            Self::Appearance => Self::StorageInfo,
+            Self::StorageInfo => Self::General,
+        }
+    }
+
+    pub fn previous(self) -> Self {
+        match self {
+            Self::General => Self::StorageInfo,
+            Self::ContentModes => Self::General,
+            Self::Appearance => Self::ContentModes,
+            Self::StorageInfo => Self::Appearance,
+        }
+    }
+}
+
+pub fn settings_player_label(choice: Option<&str>) -> &'static str {
+    match choice {
+        None | Some("auto") => "None",
+        Some("mpv") => "mpv",
+        Some("vlc") => "VLC",
+        Some("iina") => "IINA",
+        Some("android") => "Android Player",
+        Some(_) => "Custom",
+    }
+}
 
 pub use crate::models::{
     BrowseMetric, BrowseMetrics, BrowsePreset, Notification, NotificationKind, SearchResult,
@@ -129,6 +201,10 @@ pub struct AppState {
     pub active_browse_preset: Option<BrowsePreset>,
     pub active_addon_catalog: Option<crate::providers::addons::models::AddonCatalogTarget>,
     pub browse_metrics: std::collections::HashMap<String, BrowseMetrics>,
+    pub show_settings_popup: bool,
+    pub settings_category: SettingsCategory,
+    pub settings_selected_row: usize,
+    pub settings_download_dir_input: Option<crate::tui::text::TextInputBuffer>,
 
     pub poster_protocol: Option<(ratatui::layout::Rect, ratatui_image::protocol::Protocol)>,
     pub image_picker: Option<ratatui_image::picker::Picker>,
@@ -157,6 +233,7 @@ pub struct AppState {
     pub player_picker_link: Option<String>,
     pub player_picker_subtitle: Option<String>,
     pub player_picker_playback: Option<crate::providers::models::PlaybackSource>,
+    pub settings_player_picker: bool,
     pub available_players: Vec<PlayerKind>,
     pub default_player: Option<String>,
     pub is_loading: bool,
@@ -286,6 +363,11 @@ impl Default for AppState {
             active_browse_preset: None,
             active_addon_catalog: None,
             browse_metrics: std::collections::HashMap::new(),
+            show_settings_popup: false,
+            settings_category: SettingsCategory::General,
+            settings_selected_row: 0,
+            settings_download_dir_input: None,
+
             poster_protocol: None,
             image_picker: None,
             image_supported: crate::tui::terminal::should_query_images(),
@@ -311,6 +393,7 @@ impl Default for AppState {
             player_picker_link: None,
             player_picker_subtitle: None,
             player_picker_playback: None,
+            settings_player_picker: false,
             available_players: Vec::new(),
             default_player: None,
             dirty: true,
@@ -522,8 +605,6 @@ impl AppState {
 
     const FAILED_POSTER_TTL_SECS: u64 = 600;
 
-    /// Returns true when this poster failed recently; expired failures are
-    /// evicted so the fetch can be retried.
     pub fn failed_poster_recently(&mut self, id: &str) -> bool {
         match self.failed_posters.peek(id) {
             Some(failed_at) if failed_at.elapsed().as_secs() < Self::FAILED_POSTER_TTL_SECS => true,
@@ -538,6 +619,7 @@ impl AppState {
         self.show_help
             || self.show_theme_popup
             || self.show_browse_popup
+            || self.show_settings_popup
             || self.addon_manager_popup
             || self.tv_config_popup
             || self.player_picker_popup
@@ -614,6 +696,138 @@ impl AppState {
             2 => "..",
             _ => "...",
         }
+    }
+    pub fn settings_next_category(&mut self) {
+        self.settings_category = self.settings_category.next();
+        self.settings_selected_row = 0;
+        self.settings_download_dir_input = None;
+    }
+
+    pub fn settings_previous_category(&mut self) {
+        self.settings_category = self.settings_category.previous();
+        self.settings_selected_row = 0;
+        self.settings_download_dir_input = None;
+    }
+
+    pub fn settings_select_category(&mut self, cat: SettingsCategory) {
+        if self.settings_category != cat {
+            self.settings_category = cat;
+            self.settings_selected_row = 0;
+            self.settings_download_dir_input = None;
+        }
+    }
+
+    pub fn settings_row_up(&mut self) {
+        let count = self.settings_category.row_count();
+        if count > 0 {
+            self.settings_selected_row = (self.settings_selected_row + count - 1) % count;
+        }
+    }
+
+    pub fn settings_row_down(&mut self) {
+        let count = self.settings_category.row_count();
+        if count > 0 {
+            self.settings_selected_row = (self.settings_selected_row + 1) % count;
+        }
+    }
+
+    pub fn ensure_default_player(&mut self) {
+        if (self.default_player.is_none() || self.default_player.as_deref() == Some("auto"))
+            && let Some(first) = self.available_players.first()
+        {
+            self.default_player = Some(first.config_key().to_string());
+        }
+    }
+
+    pub fn settings_player_choices(&self) -> Vec<&str> {
+        let mut choices: Vec<&str> = Vec::with_capacity(self.available_players.len());
+        for player in &self.available_players {
+            let key = player.config_key();
+            if !choices.iter().any(|&c| c.eq_ignore_ascii_case(key)) {
+                choices.push(key);
+            }
+        }
+        choices
+    }
+
+    pub fn cycle_settings_player(&mut self, forward: bool) {
+        let choices = self.settings_player_choices();
+        if choices.is_empty() {
+            return;
+        }
+        let current_key = self.default_player.as_deref();
+        let current_idx = current_key
+            .and_then(|k| choices.iter().position(|&opt| opt.eq_ignore_ascii_case(k)))
+            .unwrap_or(0);
+
+        let total = choices.len();
+        let next_idx = if forward {
+            (current_idx + 1) % total
+        } else {
+            (current_idx + total - 1) % total
+        };
+
+        self.default_player = Some(choices[next_idx].to_string());
+    }
+
+    pub fn cycle_settings_theme(&mut self, forward: bool) -> String {
+        let themes = crate::tui::theme::AVAILABLE_THEMES;
+        let total = themes.len();
+        let current_idx = themes
+            .iter()
+            .position(|&t| t.eq_ignore_ascii_case(&self.active_theme_kind))
+            .unwrap_or(0);
+
+        let next_idx = if forward {
+            (current_idx + 1) % total
+        } else {
+            (current_idx + total - 1) % total
+        };
+
+        let next_theme = themes[next_idx].to_string();
+        self.active_theme_kind = next_theme.clone();
+        self.theme_is_auto = false;
+        next_theme
+    }
+
+    pub fn can_disable_streaming_mode(&self) -> bool {
+        self.tv_enabled || self.addons_enabled
+    }
+
+    pub fn can_disable_tv_mode(&self) -> bool {
+        self.streaming_enabled || self.addons_enabled
+    }
+
+    pub fn can_disable_addons_mode(&self) -> bool {
+        self.streaming_enabled || self.tv_enabled
+    }
+    pub fn expand_download_path(raw: &str) -> Option<std::path::PathBuf> {
+        let clean = raw.trim_matches(|c| c == '\'' || c == '"').trim();
+        if clean.is_empty()
+            || clean.eq_ignore_ascii_case("default")
+            || clean.eq_ignore_ascii_case("reset")
+            || clean == "<path>"
+            || clean == "path"
+            || clean == "<dir>"
+            || clean == "dir"
+        {
+            return None;
+        }
+        let pb = if let Some(stripped) = clean
+            .strip_prefix("~/")
+            .or_else(|| clean.strip_prefix("~\\"))
+        {
+            if let Some(home) = dirs::home_dir() {
+                home.join(stripped)
+            } else {
+                std::path::PathBuf::from(clean)
+            }
+        } else if clean == "~" {
+            dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(clean))
+        } else {
+            std::path::PathBuf::from(clean)
+        };
+        Some(pb)
     }
 }
 
@@ -857,5 +1071,24 @@ mod tests {
         state.search_suggestions = vec!["suggestion".to_string()];
         state.input_mode = InputMode::Normal;
         assert!(state.favorites_landing_visible());
+    }
+
+    #[test]
+    fn test_cycle_settings_player_dynamic_detection() {
+        let mut state = AppState {
+            available_players: vec![PlayerKind::Mpv],
+            ..Default::default()
+        };
+        assert_eq!(state.settings_player_choices(), vec!["mpv"]);
+
+        state.default_player = None;
+        state.cycle_settings_player(true);
+        assert_eq!(state.default_player.as_deref(), Some("mpv"));
+
+        state.cycle_settings_player(true);
+        assert_eq!(state.default_player.as_deref(), Some("mpv"));
+
+        state.cycle_settings_player(false);
+        assert_eq!(state.default_player.as_deref(), Some("mpv"));
     }
 }

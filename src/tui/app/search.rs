@@ -126,6 +126,12 @@ impl App {
         let ctrl_a = crate::tui::text::ctrl_key("A");
 
         match parsed {
+            crate::tui::commands::ParsedCommand::Settings => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.action_sender.send(Action::ToggleSettingsPopup).ok();
+                Some(true)
+            }
             crate::tui::commands::ParsedCommand::ClearCache => {
                 self.state.search_query.clear();
                 self.state.input_mode = InputMode::Normal;
@@ -136,6 +142,12 @@ impl App {
                 self.state.clear_search_state();
                 self.state.input_mode = InputMode::Normal;
                 self.state.set_status_default("Search cleared.");
+                Some(true)
+            }
+            crate::tui::commands::ParsedCommand::Help => {
+                self.state.search_query.clear();
+                self.state.input_mode = InputMode::Normal;
+                self.action_sender.send(Action::ToggleHelp).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Github => {
@@ -250,15 +262,9 @@ impl App {
                 } else if current_mode == crate::tui::state::AppMode::Addon {
                     self.action_sender.send(Action::ShowAddonManager).ok();
                 } else {
-                    let ctrl_t = crate::tui::text::ctrl_key("T");
-                    let ctrl_a = crate::tui::text::ctrl_key("A");
                     self.state.search_query.clear();
                     self.state.input_mode = InputMode::Normal;
-                    self.state.notify(
-                        NotificationKind::Info,
-                        "Configuration",
-                        format!("Command /config is available in TV Mode ({ctrl_t}) or Addon Mode ({ctrl_a})."),
-                    );
+                    self.action_sender.send(Action::ToggleSettingsPopup).ok();
                 }
                 Some(true)
             }
@@ -306,20 +312,8 @@ impl App {
                     );
                     return Some(true);
                 }
-                let expanded_path = if let Some(stripped) = clean_arg
-                    .strip_prefix("~/")
-                    .or_else(|| clean_arg.strip_prefix("~\\"))
-                {
-                    if let Some(home) = dirs::home_dir() {
-                        home.join(stripped)
-                    } else {
-                        std::path::PathBuf::from(clean_arg)
-                    }
-                } else if clean_arg == "~" {
-                    dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(clean_arg))
-                } else {
-                    std::path::PathBuf::from(clean_arg)
-                };
+                let expanded_path = crate::tui::state::AppState::expand_download_path(clean_arg)
+                    .unwrap_or_else(|| std::path::PathBuf::from(clean_arg));
 
                 match std::fs::create_dir_all(&expanded_path) {
                     Ok(_) => {

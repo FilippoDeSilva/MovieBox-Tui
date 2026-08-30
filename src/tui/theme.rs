@@ -130,6 +130,14 @@ impl ColorSupport {
         let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
         classify_terminal(&colorterm, &term, &term_program)
     }
+    pub fn label(&self) -> &'static str {
+        match self {
+            ColorSupport::Truecolor => "TrueColor (24-bit RGB)",
+            ColorSupport::Color256 => "256 Colors (8-bit ANSI)",
+            ColorSupport::Basic => "Basic (16 Colors)",
+            ColorSupport::NoColor => "No Color (Monochrome)",
+        }
+    }
 }
 
 pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str) -> ColorSupport {

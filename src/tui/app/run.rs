@@ -46,6 +46,12 @@ impl App {
         self.state.active_screen = Screen::Home;
 
         self.state.available_players = crate::tui::player::detect();
+        if (self.state.default_player.is_none()
+            || self.state.default_player.as_deref() == Some("auto"))
+            && let Some(first) = self.state.available_players.first()
+        {
+            self.state.default_player = Some(first.config_key().to_string());
+        }
         let preferred = std::env::var("MOVIEBOX_PLAYER")
             .ok()
             .and_then(|value| crate::tui::state::PlayerKind::parse(&value))
@@ -382,7 +388,14 @@ impl App {
             | Action::UpdateAvailable(..)
             | Action::StartSelfUpdate
             | Action::SelfUpdateProgress(..)
-            | Action::SelfUpdateComplete(..) => {
+            | Action::SelfUpdateComplete(..)
+            | Action::ToggleSettingsPopup
+            | Action::ShowSettingsPopup
+            | Action::CloseSettingsPopup
+            | Action::SelectSettingsCategory(..)
+            | Action::SettingsAdjustValue(..)
+            | Action::SettingsActivateRow
+            | Action::SettingsResetDownloadDir => {
                 self.handle_system(action).await;
             }
 
@@ -523,7 +536,9 @@ impl App {
         }
 
         self.draw_download_gauge(frame, download_area);
+        self.draw_settings_modal(frame, area);
         self.draw_theme_picker(frame, area);
+        self.draw_player_picker(frame, area);
         self.draw_update_modal(frame, area);
 
         crate::tui::overlay::notifications(
@@ -703,6 +718,39 @@ impl App {
                     title: "Select Theme",
                     confirm_label: "Apply",
                     minimum_width: 32,
+                },
+                &self.theme,
+                self.state.basic_terminal,
+            );
+        }
+    }
+    fn draw_settings_modal(&mut self, frame: &mut Frame, area: Rect) {
+        if self.state.show_settings_popup {
+            crate::tui::widgets::settings::draw(frame, area, &mut self.state, &self.theme);
+        }
+    }
+    fn draw_player_picker(&mut self, frame: &mut Frame, area: Rect) {
+        if self.state.player_picker_popup {
+            let items = self
+                .state
+                .available_players
+                .iter()
+                .map(|k| k.label().to_string())
+                .collect::<Vec<_>>();
+            let (title, confirm_label) = if self.state.settings_player_picker {
+                ("Default Media Player", "Select")
+            } else {
+                ("Open with", "Open")
+            };
+            crate::tui::overlay::picker(
+                frame,
+                area,
+                &items,
+                &mut self.state.player_picker_state,
+                crate::tui::overlay::PickerSpec {
+                    title,
+                    confirm_label,
+                    minimum_width: 24,
                 },
                 &self.theme,
                 self.state.basic_terminal,

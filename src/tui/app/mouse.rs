@@ -9,6 +9,8 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 impl App {
     pub(super) fn handle_mouse(&mut self, col: u16, row: u16) -> Option<Action> {
         let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+        let cols = if cols == 0 { 80 } else { cols };
+        let rows = if rows == 0 { 24 } else { rows };
         let area = Rect::new(0, 0, cols, rows);
 
         if self.handle_overlay_mouse(col, row, area) {
@@ -47,6 +49,38 @@ impl App {
                 self.action_sender.send(Action::CancelDownload).ok();
                 return true;
             }
+        }
+        if self.state.player_picker_popup {
+            let items = self
+                .state
+                .available_players
+                .iter()
+                .map(|k| k.label().to_string())
+                .collect::<Vec<_>>();
+            let confirm_label = if self.state.settings_player_picker {
+                "Select"
+            } else {
+                "Open"
+            };
+            match click_in_picker(
+                crate::tui::overlay::picker_layout(area, &items, confirm_label, 24),
+                col,
+                row,
+                &self.state.player_picker_state,
+                items.len(),
+                area,
+            ) {
+                Some(Some(clicked_idx)) => {
+                    self.state.player_picker_state.select(Some(clicked_idx));
+                    self.action_sender.send(Action::Submit).ok();
+                }
+                Some(None) => {}
+                None => {
+                    self.state.player_picker_popup = false;
+                    self.state.settings_player_picker = false;
+                }
+            }
+            return true;
         }
 
         if self.state.show_theme_popup {
@@ -87,6 +121,40 @@ impl App {
                     self.state.theme_list_state.select(None);
                 }
             }
+            return true;
+        }
+        if self.state.show_settings_popup {
+            let popup =
+                crate::tui::overlay::settings_modal_layout(area, self.state.settings_category);
+            if !popup.contains(ratatui::layout::Position::new(col, row)) {
+                self.state.show_settings_popup = false;
+                self.state.settings_download_dir_input = None;
+                self.persist_config();
+                return true;
+            }
+
+            if let Some(cat) = crate::tui::widgets::settings::settings_category_tab_at(
+                popup,
+                col,
+                row,
+                self.state.basic_terminal,
+                self.state.settings_category,
+            ) {
+                self.state.settings_select_category(cat);
+                return true;
+            }
+
+            if let Some(clicked_row) = crate::tui::widgets::settings::settings_row_at(
+                popup,
+                self.state.settings_category,
+                col,
+                row,
+            ) {
+                self.state.settings_selected_row = clicked_row;
+                self.action_sender.send(Action::SettingsActivateRow).ok();
+                return true;
+            }
+
             return true;
         }
 
@@ -182,33 +250,6 @@ impl App {
                 }
             } else {
                 self.state.update_available = None;
-            }
-            return true;
-        }
-
-        if self.state.player_picker_popup {
-            let items = self
-                .state
-                .available_players
-                .iter()
-                .map(|k| k.label().to_string())
-                .collect::<Vec<_>>();
-            match click_in_picker(
-                crate::tui::overlay::picker_layout(area, &items, "Open", 24),
-                col,
-                row,
-                &self.state.player_picker_state,
-                items.len(),
-                area,
-            ) {
-                Some(Some(clicked_idx)) => {
-                    self.state.player_picker_state.select(Some(clicked_idx));
-                    self.action_sender.send(Action::Submit).ok();
-                }
-                Some(None) => {}
-                None => {
-                    self.state.player_picker_popup = false;
-                }
             }
             return true;
         }
@@ -693,27 +734,36 @@ impl App {
             Addon,
         }
 
+        let current_mode = self.state.mode();
         let mut buttons: Vec<(BottomBtn, u16)> = Vec::new();
 
-        if self.state.streaming_enabled {
+        if self.state.streaming_enabled && current_mode != crate::tui::state::AppMode::Streaming {
             let len = (3 + ctrl_s.len() + 6) as u16;
             buttons.push((BottomBtn::Stream, len));
         }
-        if self.state.tv_enabled {
+        if self.state.tv_enabled && current_mode != crate::tui::state::AppMode::Tv {
             let len = (3 + ctrl_t.len() + 2) as u16;
             buttons.push((BottomBtn::Tv, len));
         }
-        if self.state.addons_enabled {
+        if self.state.addons_enabled && current_mode != crate::tui::state::AppMode::Addon {
             let len = (3 + ctrl_a.len() + 5) as u16;
             buttons.push((BottomBtn::Addon, len));
         }
 
         let mode_count = buttons.len();
         let sep_len = if compact { 3 } else { 5 };
-        let modes_total_w: u16 = buttons.iter().map(|(_, w)| *w).sum::<u16>()
-            + (mode_count.saturating_sub(1) as u16) * sep_len;
+        let modes_total_w: u16 = if mode_count > 0 {
+            buttons.iter().map(|(_, w)| *w).sum::<u16>()
+                + (mode_count.saturating_sub(1) as u16) * sep_len
+        } else {
+            0
+        };
 
-        let util_gap = if compact { 4 } else { 7 };
+        let util_gap = if modes_total_w > 0 {
+            if compact { 4 } else { 7 }
+        } else {
+            0
+        };
         let help_w = if ultra_compact { 3 } else { 8 };
         let quit_w = if ultra_compact { 3 } else { 8 };
         let util_sep = 2;

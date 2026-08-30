@@ -1056,17 +1056,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         let is_wide = streams_area.width > 110;
                         let stream_width = streams_area.width.saturating_sub(6) as usize;
 
-                        // 1. Pointer (2 chars)
                         let mut stream_spans = vec![Span::styled(pointer, marker_style)];
 
-                        // 2. Resolution Badge (7 chars + 1 space separator = 8 chars)
                         stream_spans.extend(resolution_badge_spans(
                             resolution,
                             theme,
                             state.basic_terminal,
                         ));
 
-                        // 3. File Size (format!("{:>7}  ") = 9 chars)
                         stream_spans.push(Span::styled(
                             format!("{size_formatted:>7}  "),
                             primary_style,
@@ -1102,14 +1099,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         };
 
                         if is_compact {
-                            // 4. Codec (format!("{:<5} ") = 6 chars)
                             let codec_display = crate::tui::text::truncate_width(&codec_str, 5);
                             stream_spans.push(Span::styled(
                                 format!("{codec_display:<5} "),
                                 secondary_style,
                             ));
 
-                            // 5. Title (Flex Min 20)
                             let used_prefix = stream_spans
                                 .iter()
                                 .map(|s| crate::tui::text::width(s.content.as_ref()))
@@ -1121,14 +1116,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 stream_spans.push(Span::styled(title_trunc, primary_style));
                             }
                         } else if is_wide {
-                            // 4. Extended Tags (format!("{:<22} ") = 23 chars)
                             let tags_display = crate::tui::text::truncate_width(&tags_or_codec, 22);
                             stream_spans.push(Span::styled(
                                 format!("{tags_display:<22} "),
                                 secondary_style,
                             ));
 
-                            // 5. Duration (format!("{:<8} ") = 9 chars)
                             let duration_display =
                                 crate::tui::text::truncate_width(&duration_col, 8);
                             stream_spans.push(Span::styled(
@@ -1136,7 +1129,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 secondary_style,
                             ));
 
-                            // 6. Uploader (format!("{:<14}  ") = 16 chars)
                             let uploader_display =
                                 if upload_by != "Unknown" && !upload_by.is_empty() {
                                     format!(
@@ -1148,7 +1140,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 };
                             stream_spans.push(Span::styled(uploader_display, secondary_style));
 
-                            // 7. Title (Flex)
                             let used_prefix = stream_spans
                                 .iter()
                                 .map(|s| crate::tui::text::width(s.content.as_ref()))
@@ -1160,15 +1151,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 stream_spans.push(Span::styled(title_trunc, primary_style));
                             }
                         } else {
-                            // Standard (76..=110 cols)
-                            // 4. Media Tags (format!("{:<14} ") = 15 chars)
                             let tags_display = crate::tui::text::truncate_width(&tags_or_codec, 14);
                             stream_spans.push(Span::styled(
                                 format!("{tags_display:<14} "),
                                 secondary_style,
                             ));
 
-                            // 5. Duration (format!("{:<8} ") = 9 chars)
                             let duration_display =
                                 crate::tui::text::truncate_width(&duration_col, 8);
                             stream_spans.push(Span::styled(
@@ -1176,7 +1164,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 secondary_style,
                             ));
 
-                            // 6. Uploader / Release Title (cleanly truncated to remaining width)
                             let used_prefix_width = stream_spans
                                 .iter()
                                 .map(|s| crate::tui::text::width(s.content.as_ref()))
@@ -1465,27 +1452,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     "Use"
                 },
                 minimum_width: 32,
-            },
-            theme,
-            state.basic_terminal,
-        );
-    }
-
-    if state.player_picker_popup {
-        let items = state
-            .available_players
-            .iter()
-            .map(|k| k.label().to_string())
-            .collect::<Vec<_>>();
-        crate::tui::overlay::picker(
-            frame,
-            area,
-            &items,
-            &mut state.player_picker_state,
-            crate::tui::overlay::PickerSpec {
-                title: "Open with",
-                confirm_label: "Open",
-                minimum_width: 24,
             },
             theme,
             state.basic_terminal,
@@ -2150,10 +2116,8 @@ mod tests {
             .map(|cell| cell.symbol())
             .collect::<String>();
 
-        // Section header clean styling
         assert!(content.contains("1080p · 2 options"));
         assert!(content.contains("720p · 1 option"));
-        // Stream rows content
         assert!(content.contains("1080p"));
         assert!(content.contains("1.0GB"));
         assert!(content.contains("HEVC"));
@@ -2249,7 +2213,6 @@ mod tests {
         let theme = Theme::mocha();
         let mut state = AppState::default();
 
-        // Streams pane with subtitles
         state.details_pane = crate::tui::state::DetailsPane::Streams;
         state.subtitle_list = vec![("English".to_string(), "http://sub".to_string())];
         let (primary, secondary) = details_footer(&state, &theme, 100);
@@ -2263,7 +2226,6 @@ mod tests {
         assert!(footer_text.contains("[s] Subtitles"));
         assert!(footer_text.contains("[Esc] Back"));
 
-        // Seasons pane
         state.details_pane = crate::tui::state::DetailsPane::Seasons;
         let (primary, secondary) = details_footer(&state, &theme, 100);
         let mut all_spans = primary;
@@ -2275,7 +2237,6 @@ mod tests {
         assert!(footer_text.contains("[Tab] Streams"));
         assert!(footer_text.contains("[Esc] Back"));
 
-        // Episodes pane
         state.details_pane = crate::tui::state::DetailsPane::Episodes;
         let (primary, secondary) = details_footer(&state, &theme, 100);
         let mut all_spans = primary;

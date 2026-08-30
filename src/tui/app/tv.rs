@@ -6,10 +6,14 @@ impl App {
         self.state.show_help = false;
         self.state.show_theme_popup = false;
         self.state.show_browse_popup = false;
+        self.state.show_settings_popup = false;
+        self.state.settings_download_dir_input = None;
         self.state.player_picker_popup = false;
         self.state.player_picker_link = None;
         self.state.player_picker_subtitle = None;
         self.state.player_picker_playback = None;
+        self.state.settings_player_picker = false;
+
         self.state.subtitle_popup = false;
         self.state.is_download_subtitle_popup = false;
         self.state.pending_play_link = None;

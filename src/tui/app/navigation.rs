@@ -391,6 +391,7 @@ impl App {
                     self.state.player_picker_subtitle = None;
                     self.state.player_picker_playback = None;
                     self.state.player_picker_state.select(None);
+                    self.state.settings_player_picker = false;
                     return None;
                 }
                 if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
@@ -749,6 +750,7 @@ impl App {
                         }
                         self.state.player_picker_popup = false;
                         self.remember_player_preference(player);
+                        self.state.settings_player_picker = false;
                         if let Some(source) = self.state.player_picker_playback.take() {
                             self.action_sender
                                 .send(Action::LaunchPlayback(player, source))

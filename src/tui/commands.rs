@@ -2,18 +2,20 @@ use crate::tui::state::AppState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SlashCommand {
+    Settings,
     Browse,
     History,
     Favorites,
+    Theme,
+    Clear,
+    Help,
     List,
     Config,
     DownloadDir,
-    Theme,
     Update,
-    ToggleUpdate,
     ClearCache,
-    Clear,
     Github,
+    ToggleUpdate,
     ToggleBdix,
     ToggleStreaming,
     ToggleTv,
@@ -23,18 +25,20 @@ pub enum SlashCommand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedCommand<'a> {
+    Settings,
     Browse,
     History,
     Favorites,
+    Theme,
+    Clear,
+    Help,
     List,
     Config,
     DownloadDir(&'a str),
-    Theme,
     Update,
-    ToggleUpdate,
     ClearCache,
-    Clear,
     Github,
+    ToggleUpdate,
     ToggleBdix,
     ToggleStreaming,
     ToggleTv,
@@ -43,40 +47,56 @@ pub enum ParsedCommand<'a> {
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 13] = [
+        Self::Settings,
         Self::Browse,
         Self::History,
         Self::Favorites,
+        Self::Theme,
+        Self::Clear,
+        Self::Help,
         Self::List,
         Self::Config,
         Self::DownloadDir,
-        Self::Theme,
         Self::Update,
-        Self::ToggleUpdate,
         Self::ClearCache,
-        Self::Clear,
         Self::Github,
+    ];
+
+    pub const PRIMARY: [Self; 7] = [
+        Self::Settings,
+        Self::Browse,
+        Self::History,
+        Self::Favorites,
+        Self::Theme,
+        Self::Clear,
+        Self::Help,
+    ];
+
+    pub const TOGGLE_COMMANDS: [Self; 5] = [
+        Self::ToggleUpdate,
         Self::ToggleBdix,
         Self::ToggleStreaming,
         Self::ToggleTv,
         Self::ToggleAddons,
-        Self::Probe,
     ];
 
     pub fn name(self) -> &'static str {
         match self {
+            Self::Settings => "/settings",
             Self::Browse => "/browse",
             Self::History => "/history",
             Self::Favorites => "/favorites",
+            Self::Theme => "/theme",
+            Self::Clear => "/clear",
+            Self::Help => "/help",
             Self::List => "/list",
             Self::Config => "/config",
             Self::DownloadDir => "/download-dir",
-            Self::Theme => "/theme",
             Self::Update => "/update",
-            Self::ToggleUpdate => "/toggle-update",
             Self::ClearCache => "/clear-cache",
-            Self::Clear => "/clear",
             Self::Github => "/github",
+            Self::ToggleUpdate => "/toggle-update",
             Self::ToggleBdix => "/toggle-bdix",
             Self::ToggleStreaming => "/toggle-streaming",
             Self::ToggleTv => "/toggle-tv",
@@ -87,24 +107,28 @@ impl SlashCommand {
 
     pub fn description(self, state: &AppState) -> &'static str {
         match self {
+            Self::Settings => "Interactive preferences, content modes & configuration",
             Self::Browse => "Curated, rated & most-watched views",
             Self::History => "Watch history",
             Self::Favorites => "Starred titles",
+            Self::Theme => "Theme picker",
+            Self::Clear => "Clear search results and return to landing",
+            Self::Help => "Open interactive keybinding help menu",
             Self::List => "Show all TV channels",
             Self::Config => {
                 if state.is_addon_mode {
                     "Configure HTTP addons"
-                } else {
+                } else if state.is_tv_mode {
                     "Configure IPTV playlists"
+                } else {
+                    "Interactive preferences and configuration"
                 }
             }
             Self::DownloadDir => "View or change download folder",
-            Self::Theme => "Theme picker",
             Self::Update => "Check for newer release",
-            Self::ToggleUpdate => "Toggle automatic update checks",
             Self::ClearCache => "Clear cached data",
-            Self::Clear => "Clear search results and return to landing",
             Self::Github => "Open project repository",
+            Self::ToggleUpdate => "Toggle automatic update checks",
             Self::ToggleBdix => "Toggle BDIX FTP sources",
             Self::ToggleStreaming => "Toggle Streaming mode navigation",
             Self::ToggleTv => "Toggle TV mode navigation",
@@ -115,6 +139,7 @@ impl SlashCommand {
 
     pub fn is_available(self, state: &AppState) -> bool {
         match self {
+            Self::Settings => true,
             Self::Browse => {
                 (state.streaming_enabled && !state.is_tv_mode && !state.is_addon_mode)
                     || (state.addons_enabled && state.is_addon_mode)
@@ -125,21 +150,19 @@ impl SlashCommand {
             }
             Self::Favorites => state.favorites_available(),
             Self::List => state.tv_enabled && state.is_tv_mode,
-            Self::Config => {
-                (state.tv_enabled && state.is_tv_mode)
-                    || (state.addons_enabled && state.is_addon_mode)
-            }
+            Self::Config => true,
             Self::ToggleBdix => !state.is_tv_mode && !state.is_addon_mode,
-            Self::ToggleStreaming
+            Self::Theme
+            | Self::Clear
+            | Self::Help
+            | Self::DownloadDir
+            | Self::Update
+            | Self::ClearCache
+            | Self::Github
+            | Self::ToggleUpdate
+            | Self::ToggleStreaming
             | Self::ToggleTv
             | Self::ToggleAddons
-            | Self::DownloadDir
-            | Self::Theme
-            | Self::Update
-            | Self::ToggleUpdate
-            | Self::ClearCache
-            | Self::Clear
-            | Self::Github
             | Self::Probe => true,
         }
     }
@@ -148,24 +171,35 @@ impl SlashCommand {
         let lower = query.to_ascii_lowercase();
         let mut results = Vec::new();
 
-        for cmd in Self::ALL {
+        if lower.starts_with("/toggle-") {
+            for cmd in Self::TOGGLE_COMMANDS {
+                if !cmd.is_available(state) {
+                    continue;
+                }
+                let name = cmd.name();
+                if name.starts_with(&lower) {
+                    results.push(name.to_string());
+                }
+            }
+            return results;
+        }
+
+        let primary_suggestions: [(&str, Self); 7] = [
+            ("/settings", Self::Settings),
+            ("/browse", Self::Browse),
+            ("/history", Self::History),
+            ("/favorites", Self::Favorites),
+            ("/theme", Self::Theme),
+            ("/clear", Self::Clear),
+            ("/help", Self::Help),
+        ];
+
+        for (name, cmd) in primary_suggestions {
             if !cmd.is_available(state) {
                 continue;
             }
-            let name = cmd.name();
             if name.starts_with(&lower) {
                 results.push(name.to_string());
-                if cmd == Self::DownloadDir
-                    && state.download_dir.is_some()
-                    && "/download-dir reset".starts_with(&lower)
-                {
-                    results.push("/download-dir reset".to_string());
-                }
-            } else if cmd == Self::DownloadDir
-                && state.download_dir.is_some()
-                && "/download-dir reset".starts_with(&lower)
-            {
-                results.push("/download-dir reset".to_string());
             }
         }
 
@@ -182,13 +216,35 @@ impl SlashCommand {
         if trimmed == "/download-dir reset" {
             return Some("Reset download folder to default");
         }
-
-        for cmd in Self::ALL {
-            if cmd.name() == trimmed {
-                return Some(cmd.description(state));
-            }
+        if trimmed == "/pref" || trimmed == "/preferences" || trimmed == "/options" {
+            return Some("Interactive preferences, content modes & configuration");
         }
-        None
+        if trimmed == "/?" {
+            return Some("Open interactive keybinding help menu");
+        }
+
+        match trimmed {
+            "/settings" => Some(Self::Settings.description(state)),
+            "/browse" => Some(Self::Browse.description(state)),
+            "/history" => Some(Self::History.description(state)),
+            "/favorites" => Some(Self::Favorites.description(state)),
+            "/theme" => Some(Self::Theme.description(state)),
+            "/clear" => Some(Self::Clear.description(state)),
+            "/help" => Some(Self::Help.description(state)),
+            "/list" => Some(Self::List.description(state)),
+            "/config" => Some(Self::Config.description(state)),
+            "/download-dir" => Some(Self::DownloadDir.description(state)),
+            "/update" => Some(Self::Update.description(state)),
+            "/clear-cache" => Some(Self::ClearCache.description(state)),
+            "/github" => Some(Self::Github.description(state)),
+            "/toggle-update" => Some(Self::ToggleUpdate.description(state)),
+            "/toggle-bdix" => Some(Self::ToggleBdix.description(state)),
+            "/toggle-streaming" => Some(Self::ToggleStreaming.description(state)),
+            "/toggle-tv" => Some(Self::ToggleTv.description(state)),
+            "/toggle-addons" => Some(Self::ToggleAddons.description(state)),
+            "/probe" => Some(Self::Probe.description(state)),
+            _ => None,
+        }
     }
 
     pub fn parse(input: &str) -> Option<ParsedCommand<'_>> {
@@ -202,18 +258,20 @@ impl SlashCommand {
         let arg = parts.next().unwrap_or("").trim();
 
         match command_name.to_ascii_lowercase().as_str() {
+            "/settings" | "/pref" | "/preferences" | "/options" => Some(ParsedCommand::Settings),
             "/browse" => Some(ParsedCommand::Browse),
             "/history" => Some(ParsedCommand::History),
             "/favorites" => Some(ParsedCommand::Favorites),
+            "/theme" => Some(ParsedCommand::Theme),
+            "/clear" => Some(ParsedCommand::Clear),
+            "/help" | "/?" => Some(ParsedCommand::Help),
             "/list" => Some(ParsedCommand::List),
             "/config" => Some(ParsedCommand::Config),
             "/download-dir" => Some(ParsedCommand::DownloadDir(arg)),
-            "/theme" => Some(ParsedCommand::Theme),
             "/update" => Some(ParsedCommand::Update),
-            "/toggle-update" => Some(ParsedCommand::ToggleUpdate),
             "/clear-cache" => Some(ParsedCommand::ClearCache),
-            "/clear" => Some(ParsedCommand::Clear),
             "/github" => Some(ParsedCommand::Github),
+            "/toggle-update" => Some(ParsedCommand::ToggleUpdate),
             "/toggle-bdix" | "/enable-bdix" | "/disable-bdix" => Some(ParsedCommand::ToggleBdix),
             "/toggle-streaming" | "/enable-streaming" | "/disable-streaming" => {
                 Some(ParsedCommand::ToggleStreaming)
@@ -231,71 +289,35 @@ impl SlashCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
     #[test]
-    fn test_download_dir_suggest_default_state() {
+    fn test_primary_commands_suggest() {
         let state = AppState::default();
-        assert!(state.download_dir.is_none());
+        let suggestions = SlashCommand::suggest(&state, "/");
+        assert_eq!(
+            suggestions,
+            vec![
+                "/settings".to_string(),
+                "/browse".to_string(),
+                "/history".to_string(),
+                "/favorites".to_string(),
+                "/theme".to_string(),
+                "/clear".to_string(),
+                "/help".to_string(),
+            ]
+        );
 
-        let suggestions = SlashCommand::suggest(&state, "/download-dir");
-        assert!(suggestions.contains(&"/download-dir".to_string()));
-        assert!(!suggestions.contains(&"/download-dir reset".to_string()));
+        let s_sug = SlashCommand::suggest(&state, "/s");
+        assert_eq!(s_sug, vec!["/settings".to_string()]);
+
+        let c_sug = SlashCommand::suggest(&state, "/c");
+        assert_eq!(c_sug, vec!["/clear".to_string()]);
+
+        let p_sug = SlashCommand::suggest(&state, "/p");
+        assert!(p_sug.is_empty());
+
+        let d_sug = SlashCommand::suggest(&state, "/download-dir");
+        assert!(d_sug.is_empty());
     }
-
-    #[test]
-    fn test_download_dir_suggest_custom_state() {
-        let state = AppState {
-            download_dir: Some(PathBuf::from("/custom/downloads")),
-            ..Default::default()
-        };
-
-        let suggestions = SlashCommand::suggest(&state, "/download-dir");
-        assert!(suggestions.contains(&"/download-dir".to_string()));
-        assert!(suggestions.contains(&"/download-dir reset".to_string()));
-
-        let d_suggestions = SlashCommand::suggest(&state, "/d");
-        assert!(d_suggestions.contains(&"/download-dir".to_string()));
-        assert!(d_suggestions.contains(&"/download-dir reset".to_string()));
-    }
-
-    #[test]
-    fn test_download_dir_suggest_subcommand_prefix() {
-        let state = AppState {
-            download_dir: Some(PathBuf::from("/custom/downloads")),
-            ..Default::default()
-        };
-
-        let suggestions = SlashCommand::suggest(&state, "/download-dir r");
-        assert_eq!(suggestions, vec!["/download-dir reset".to_string()]);
-
-        let suggestions_space = SlashCommand::suggest(&state, "/download-dir ");
-        assert_eq!(suggestions_space, vec!["/download-dir reset".to_string()]);
-    }
-
-    #[test]
-    fn test_download_dir_suggest_mode_parity() {
-        let mut state = AppState {
-            download_dir: Some(PathBuf::from("/custom/downloads")),
-            ..Default::default()
-        };
-
-        state.is_addon_mode = false;
-        state.is_tv_mode = false;
-        let stream_sug = SlashCommand::suggest(&state, "/download-dir");
-        assert!(stream_sug.contains(&"/download-dir reset".to_string()));
-
-        state.is_addon_mode = true;
-        state.is_tv_mode = false;
-        let addon_sug = SlashCommand::suggest(&state, "/download-dir");
-        assert!(addon_sug.contains(&"/download-dir reset".to_string()));
-
-        state.is_addon_mode = false;
-        state.is_tv_mode = true;
-        let tv_sug = SlashCommand::suggest(&state, "/download-dir");
-        assert!(tv_sug.contains(&"/download-dir reset".to_string()));
-    }
-
     #[test]
     fn test_favorites_command_parses_and_is_available_by_default() {
         let state = AppState::default();
@@ -319,10 +341,15 @@ mod tests {
     #[test]
     fn test_toggle_commands_and_aliases_parse() {
         let state = AppState::default();
-        assert_eq!(SlashCommand::ALL.len(), 17);
+        assert_eq!(SlashCommand::ALL.len(), 13);
         assert_eq!(SlashCommand::parse("/clear"), Some(ParsedCommand::Clear));
         assert!(SlashCommand::Clear.is_available(&state));
         assert_eq!(SlashCommand::Clear.name(), "/clear");
+        assert_eq!(SlashCommand::parse("/help"), Some(ParsedCommand::Help));
+        assert_eq!(SlashCommand::parse("/?"), Some(ParsedCommand::Help));
+        assert!(SlashCommand::Help.is_available(&state));
+        assert_eq!(SlashCommand::Help.name(), "/help");
+
         assert_eq!(
             SlashCommand::parse("/toggle-tv"),
             Some(ParsedCommand::ToggleTv)
@@ -349,12 +376,15 @@ mod tests {
             Some(ParsedCommand::ToggleAddons)
         );
 
+        let toggle_no_dash = SlashCommand::suggest(&state, "/toggle");
+        assert!(toggle_no_dash.is_empty());
+
         let toggle_sug = SlashCommand::suggest(&state, "/toggle-");
-        assert!(toggle_sug.contains(&"/toggle-tv".to_string()));
-        assert!(toggle_sug.contains(&"/toggle-addons".to_string()));
+        assert!(toggle_sug.contains(&"/toggle-update".to_string()));
         assert!(toggle_sug.contains(&"/toggle-bdix".to_string()));
-        assert!(toggle_sug.contains(&"/toggle-streaming".to_string()));
-        assert!(!toggle_sug.contains(&"/enable-tv".to_string()));
+
+        let probe_sug = SlashCommand::suggest(&state, "/probe");
+        assert!(probe_sug.is_empty());
     }
 
     #[test]

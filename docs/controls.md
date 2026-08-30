@@ -67,11 +67,11 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
 - **`f`**: Favorite / unfavorite the open title on the Details screen.
 - **`s`**: Open subtitle language picker on the Details screen.
+- **`/settings`**: Open interactive Settings & Preferences Hub.
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
 - **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
 - **`/clear`**: Clear active search query and return to landing.
-### TV Mode (Live IPTV)
 - **`Enter`**: Play selected TV channel immediately.
 - **`o`**: Open player selection picker for the channel.
 - **`r`**: Reload all active M3U playlist sources.
@@ -111,22 +111,24 @@ Type these commands directly into the search bar:
 
 | Command | Applicable Mode | Action |
 | :--- | :--- | :--- |
+| `/settings` | All | Open interactive Settings & Preferences Hub |
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
 | `/history` | Streaming / Addon | View watch history with latest progress |
 | `/favorites` | Streaming / Addon | View all starred titles |
+| `/theme` | All | Open visual theme swatch picker |
+| `/clear` | All | Clear search results and return to landing |
+| `/help` | All | Open interactive keybinding help menu |
 | `/list` | TV | View live TV channels |
-| `/config` | TV / Addon | Manage IPTV playlists (TV Mode) or configure HTTP addons (Addon Mode) |
 | `/download-dir` | All | View, change, or reset the download directory |
-| `/theme` | All | Open theme picker (Mocha, Latte, Macchiato, Frappe, Nord, TokyoNight, Dracula, Gruvbox, RosePine) |
-| `/clear-cache` | All | Clear temporary cache files |
 | `/update` | All | Check if a new release is available on GitHub |
-| `/toggle-update` | All | Toggle automatic startup update checks |
-| `/toggle-streaming` | All | Toggle Streaming Mode navigation in bottom dock (aliases: `/enable-streaming`, `/disable-streaming`) |
-| `/toggle-tv` | All | Toggle TV Mode navigation in bottom dock (aliases: `/enable-tv`, `/disable-tv`) |
-| `/toggle-addons` | All | Toggle Addon Mode navigation in bottom dock (aliases: `/enable-addons`, `/disable-addons`) |
-| `/toggle-bdix` | Streaming | Toggle BDIX FTP sources (aliases: `/enable-bdix`, `/disable-bdix`) |
-| `/probe` | All | Re-run terminal graphics detection and report the result |
+| `/clear-cache` | All | Clear temporary cache files |
 | `/github` | All | Open the project repository |
+| `/toggle-update` | All | Toggle automatic startup update checks |
+| `/toggle-streaming` | All | Toggle Streaming Mode navigation in bottom dock |
+| `/toggle-tv` | All | Toggle TV Mode navigation in bottom dock |
+| `/toggle-addons` | All | Toggle Addon Mode navigation in bottom dock |
+| `/toggle-bdix` | Streaming | Toggle BDIX FTP sources |
+| `/probe` | All | Re-run terminal graphics detection and report the result |
 
 ## Help Overlay
 

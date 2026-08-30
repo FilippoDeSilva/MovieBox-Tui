@@ -19,6 +19,14 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
 | `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
 
+## Interactive Settings Hub (`/settings`)
+
+All settings in `config.json` can be configured interactively inside the application by typing `/settings` into the search bar.
+
+- **General**: Toggle automatic update checks, choose default media player (`mpv`, `VLC`, `IINA`, `Android`), and edit download folder path.
+- **Content Modes**: Enable or disable Streaming Mode, BDIX FTP sources, Live TV (IPTV), and HTTP Addons with safety guards (preventing 0 active modes).
+- **Appearance**: Cycle color themes live with real-time palette swatches or launch the visual theme swatch picker.
+- **Maintenance**: Purge disk cache, query GitHub for release updates, and view repository information.
 ## Other persisted files
 
 - `addons_config.json` — list of installed HTTP addons in the config directory (see [addons-mode.md](addons-mode.md)).

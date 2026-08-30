@@ -130,12 +130,12 @@ pub fn landing_split(
         .constraints([
             Constraint::Length(top_pad),
             Constraint::Length(logo_height),
-            Constraint::Length(1), // version
+            Constraint::Length(1),
             Constraint::Length(header_gap),
-            Constraint::Length(3), // search
+            Constraint::Length(3),
             Constraint::Length(favorites_gap),
-            Constraint::Min(0),    // favorites deck
-            Constraint::Length(1), // streamlined bottom bar
+            Constraint::Min(0),
+            Constraint::Length(1),
         ])
         .split(area);
     (
@@ -523,9 +523,9 @@ pub(crate) fn render_favorites_landing(
         let left_margin = "  ";
         let right_margin = " ";
         let tag_len = crate::tui::text::width(&right_tag);
-        let pointer_len = 3; // "▌  " or ">  " or "   "
-        let margins_len = 2 + 1; // left_margin (2) + right_margin (1)
-        let fixed_overhead = margins_len + pointer_len + tag_len; // 6 + tag_len
+        let pointer_len = 3;
+        let margins_len = 3;
+        let fixed_overhead = margins_len + pointer_len + tag_len;
 
         let max_title_width = (inner_area.width as usize).saturating_sub(fixed_overhead + 1);
         let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
@@ -648,7 +648,10 @@ fn render_search_bar(
     landing: bool,
 ) {
     if landing {
-        let border_style = if state.input_mode == InputMode::Editing {
+        let modal_active = state.has_active_modal();
+        let border_style = if modal_active {
+            theme.muted
+        } else if state.input_mode == InputMode::Editing {
             theme.border_focus
         } else {
             theme.surface1
@@ -681,7 +684,38 @@ fn render_search_bar(
         };
 
         let is_query_empty = state.search_query.is_empty();
-        let (pill_text, pill_style) = if !is_query_empty {
+        let (pill_text, pill_style) = if modal_active {
+            let text = if !is_query_empty {
+                if is_ultra_compact {
+                    "[Enter]".to_string()
+                } else {
+                    "[Enter] Search".to_string()
+                }
+            } else if state.is_tv_mode {
+                if is_ultra_compact {
+                    "[TV]".to_string()
+                } else {
+                    let sep = if state.basic_terminal { "-" } else { "·" };
+                    format!("[Live TV {sep} {ctrl_t}]")
+                }
+            } else if state.is_addon_mode {
+                if is_ultra_compact {
+                    "[Addons]".to_string()
+                } else {
+                    let sep = if state.basic_terminal { "-" } else { "·" };
+                    format!("[Addons {sep} {ctrl_p}]")
+                }
+            } else {
+                let label = state.active_provider.label();
+                if is_ultra_compact {
+                    format!("[{label}]")
+                } else {
+                    let sep = if state.basic_terminal { "-" } else { "·" };
+                    format!("[{label} {sep} {ctrl_p}]")
+                }
+            };
+            (text, theme.text_dim)
+        } else if !is_query_empty {
             if is_ultra_compact {
                 ("[Enter]".to_string(), theme.accent)
             } else {
@@ -747,7 +781,14 @@ fn render_search_bar(
         let prefix = if state.basic_terminal { "> " } else { "❯ " };
         let prefix_width = crate::tui::text::width(prefix) as u16;
         let editing = view == SearchViewState::Editing;
-        let real_cursor = editing && show_cursor && !state.basic_terminal;
+        let real_cursor = editing && show_cursor && !state.basic_terminal && !modal_active;
+        let prefix_style = if modal_active {
+            theme.text_dim
+        } else if editing {
+            theme.accent
+        } else {
+            theme.text_dim
+        };
 
         let search_line = if is_query_empty {
             let placeholder_text = if state.is_tv_mode {
@@ -758,21 +799,21 @@ fn render_search_bar(
                 "Search movies and series…"
             };
 
-            if editing {
+            if editing && !modal_active {
                 let cursor_str = if show_cursor { "█" } else { " " };
                 Line::from(vec![
-                    Span::styled(prefix, theme.accent),
+                    Span::styled(prefix, prefix_style),
                     Span::styled(cursor_str, theme.accent),
                     Span::raw(" "),
                     Span::styled(placeholder_text, theme.text_dim),
                 ])
             } else {
                 Line::from(vec![
-                    Span::styled(prefix, theme.accent),
+                    Span::styled(prefix, prefix_style),
                     Span::styled(placeholder_text, theme.text_dim),
                 ])
             }
-        } else if editing && !real_cursor {
+        } else if editing && !real_cursor && !modal_active {
             let segments = state.search_query.graphemes();
             let cursor = state.search_query.cursor();
             let cursor_char = if show_cursor {
@@ -789,15 +830,20 @@ fn render_search_bar(
                 String::new()
             };
             Line::from(vec![
-                Span::styled(prefix, theme.accent),
+                Span::styled(prefix, prefix_style),
                 Span::styled(before, theme.text),
                 Span::styled(cursor_char, theme.accent),
                 Span::styled(after, theme.text),
             ])
         } else {
+            let text_style = if modal_active {
+                theme.text_dim
+            } else {
+                theme.text
+            };
             Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(state.search_query.as_str(), theme.text),
+                Span::styled(prefix, prefix_style),
+                Span::styled(state.search_query.as_str(), text_style),
             ])
         };
 
@@ -1035,14 +1081,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ])
             .split(vertical_chunks[rows.version]);
 
+        let modal_active = state.has_active_modal() || state.show_settings_popup;
+        let logo_style = if modal_active {
+            theme.overlay0
+        } else {
+            theme.title
+        };
         let title_art = Paragraph::new(logo_text)
             .alignment(Alignment::Left)
-            .style(theme.title);
+            .style(logo_style);
         frame.render_widget(title_art, horizontal_chunks[1]);
 
+        let version_style = if modal_active {
+            theme.muted
+        } else {
+            theme.text_dim
+        };
         let version = Paragraph::new(format!("v{}", env!("CARGO_PKG_VERSION")))
             .alignment(Alignment::Right)
-            .style(theme.text_dim);
+            .style(version_style);
         frame.render_widget(version, version_chunks[1]);
 
         let card_width = search_deck_width(area, state, true);
@@ -1091,21 +1148,21 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let current_mode = state.mode();
         let mut bar_spans: Vec<Span> = Vec::new();
-
-        if state.streaming_enabled {
-            let is_active = current_mode == crate::tui::state::AppMode::Streaming;
-            bar_spans.push(Span::styled("[", theme.text_dim));
-            bar_spans.push(Span::styled(&ctrl_s, theme.shortcut));
-            bar_spans.push(Span::styled("] ", theme.text_dim));
-            bar_spans.push(Span::styled(
-                "Stream",
-                if is_active {
-                    theme.highlight.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text_dim
-                },
-            ));
-        }
+        let shortcut_style = if modal_active {
+            theme.muted
+        } else {
+            theme.shortcut
+        };
+        let bracket_style = if modal_active {
+            theme.muted
+        } else {
+            theme.text_dim
+        };
+        let text_style = if modal_active {
+            theme.muted
+        } else {
+            theme.text_dim
+        };
 
         let sep = if state.basic_terminal {
             " - "
@@ -1115,57 +1172,50 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             "  ·  "
         };
 
-        if state.tv_enabled {
+        if state.streaming_enabled && current_mode != crate::tui::state::AppMode::Streaming {
+            bar_spans.push(Span::styled("[", bracket_style));
+            bar_spans.push(Span::styled(&ctrl_s, shortcut_style));
+            bar_spans.push(Span::styled("] ", bracket_style));
+            bar_spans.push(Span::styled("Stream", text_style));
+        }
+
+        if state.tv_enabled && current_mode != crate::tui::state::AppMode::Tv {
             if !bar_spans.is_empty() {
                 bar_spans.push(Span::raw(sep));
             }
-            let is_active = current_mode == crate::tui::state::AppMode::Tv;
-            bar_spans.push(Span::styled("[", theme.text_dim));
-            bar_spans.push(Span::styled(&ctrl_t, theme.shortcut));
-            bar_spans.push(Span::styled("] ", theme.text_dim));
-            bar_spans.push(Span::styled(
-                "TV",
-                if is_active {
-                    theme.highlight.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text_dim
-                },
-            ));
+            bar_spans.push(Span::styled("[", bracket_style));
+            bar_spans.push(Span::styled(&ctrl_t, shortcut_style));
+            bar_spans.push(Span::styled("] ", bracket_style));
+            bar_spans.push(Span::styled("TV", text_style));
         }
 
-        if state.addons_enabled {
+        if state.addons_enabled && current_mode != crate::tui::state::AppMode::Addon {
             if !bar_spans.is_empty() {
                 bar_spans.push(Span::raw(sep));
             }
-            let is_active = current_mode == crate::tui::state::AppMode::Addon;
-            bar_spans.push(Span::styled("[", theme.text_dim));
-            bar_spans.push(Span::styled(&ctrl_a, theme.shortcut));
-            bar_spans.push(Span::styled("] ", theme.text_dim));
-            bar_spans.push(Span::styled(
-                "Addon",
-                if is_active {
-                    theme.highlight.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text_dim
-                },
-            ));
+            bar_spans.push(Span::styled("[", bracket_style));
+            bar_spans.push(Span::styled(&ctrl_a, shortcut_style));
+            bar_spans.push(Span::styled("] ", bracket_style));
+            bar_spans.push(Span::styled("Addon", text_style));
         }
 
-        let util_gap = if compact_tabs { "    " } else { "       " };
-        bar_spans.push(Span::raw(util_gap));
+        if !bar_spans.is_empty() {
+            let util_gap = if compact_tabs { "    " } else { "       " };
+            bar_spans.push(Span::raw(util_gap));
+        }
 
-        bar_spans.push(Span::styled("[", theme.text_dim));
-        bar_spans.push(Span::styled("?", theme.shortcut));
-        bar_spans.push(Span::styled("] ", theme.text_dim));
+        bar_spans.push(Span::styled("[", bracket_style));
+        bar_spans.push(Span::styled("?", shortcut_style));
+        bar_spans.push(Span::styled("] ", bracket_style));
         if !ultra_compact_tabs {
-            bar_spans.push(Span::styled("Help", theme.text_dim));
+            bar_spans.push(Span::styled("Help", text_style));
             bar_spans.push(Span::raw("  "));
         }
-        bar_spans.push(Span::styled("[", theme.text_dim));
-        bar_spans.push(Span::styled("q", theme.shortcut));
-        bar_spans.push(Span::styled("] ", theme.text_dim));
+        bar_spans.push(Span::styled("[", bracket_style));
+        bar_spans.push(Span::styled("q", shortcut_style));
+        bar_spans.push(Span::styled("] ", bracket_style));
         if !ultra_compact_tabs {
-            bar_spans.push(Span::styled("Quit", theme.text_dim));
+            bar_spans.push(Span::styled("Quit", text_style));
         }
 
         let bottom_bar_area = vertical_chunks[rows.mode_row];
@@ -1477,7 +1527,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     type_tag = "Unknown".to_string();
                 }
 
-                // Row 1: Title + Right-pinned Resolution Badge
                 let res_badge = if !is_history {
                     crate::tui::widgets::badge::extract_resolution(&res.title, None)
                 } else {
@@ -1536,7 +1585,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     );
                 }
 
-                // Row 2 & Row 3 Metadata
                 let mut row2_spans = vec![ratatui::text::Span::raw(" ")];
                 let mut row3_spans = vec![ratatui::text::Span::raw(" ")];
 
@@ -2048,27 +2096,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             state.basic_terminal,
         );
     }
-
-    if state.player_picker_popup {
-        let items = state
-            .available_players
-            .iter()
-            .map(|k| k.label().to_string())
-            .collect::<Vec<_>>();
-        crate::tui::overlay::picker(
-            frame,
-            area,
-            &items,
-            &mut state.player_picker_state,
-            crate::tui::overlay::PickerSpec {
-                title: "Open with",
-                confirm_label: "Open",
-                minimum_width: 24,
-            },
-            theme,
-            state.basic_terminal,
-        );
-    }
 }
 fn suggestion_source_badge<'a>(
     suggestion: &str,
@@ -2081,6 +2108,13 @@ fn suggestion_source_badge<'a>(
             ("[HISTORY]", theme.sapphire)
         } else if suggestion.eq_ignore_ascii_case("/favorites") {
             ("[FAVORITES]", theme.rating)
+        } else if suggestion.eq_ignore_ascii_case("/settings")
+            || suggestion.eq_ignore_ascii_case("/config")
+            || suggestion.eq_ignore_ascii_case("/preferences")
+            || suggestion.eq_ignore_ascii_case("/pref")
+            || suggestion.eq_ignore_ascii_case("/options")
+        {
+            ("[SETTINGS]", theme.teal)
         } else {
             ("[CMD]", theme.teal)
         }
@@ -2468,7 +2502,6 @@ mod tests {
         let normal_area = Rect::new(0, 0, 90, 24);
         let wide_area = Rect::new(0, 0, 120, 24);
 
-        // Landing widths (54 on compact, 64 on standard/wide)
         let w_compact_empty = search_deck_width(compact_area, &state, true);
         let w_normal_empty = search_deck_width(normal_area, &state, true);
         let w_wide_empty = search_deck_width(wide_area, &state, true);
@@ -2476,7 +2509,6 @@ mod tests {
         assert_eq!(w_normal_empty, 64);
         assert_eq!(w_wide_empty, 64);
 
-        // Changing query does NOT jump landing search deck width
         state.search_query = "Inception 2010 1080p".into();
         assert_eq!(search_deck_width(compact_area, &state, true), 54);
         assert_eq!(search_deck_width(normal_area, &state, true), 64);
@@ -2542,15 +2574,10 @@ mod tests {
             rendered.push('\n');
         }
 
-        // Block framing header with star
         assert!(rendered.contains("─ ★  Favorites"));
-        // First selected item has leading margin, pointer, and title aligned under header
         assert!(rendered.contains("  ▌  Favorite Movie 0"));
-        // Unselected items have leading margin and spaces
         assert!(rendered.contains("     Favorite Movie 1"));
-        // Right tag is rendered with trailing margin before border
         assert!(rendered.contains("2024 Movie "));
-        // Overflow pill is rendered
         assert!(rendered.contains("[ +5 more · /favorites ]"));
     }
     #[test]
@@ -2593,15 +2620,10 @@ mod tests {
             rendered.push('\n');
         }
 
-        // Basic terminal header with ASCII asterisk
         assert!(rendered.contains("- *  Favorites"));
-        // First selected item has leading margin, ASCII pointer, and title aligned under header
         assert!(rendered.contains("  >  Favorite Movie 0"));
-        // Unselected items have leading margin and spaces
         assert!(rendered.contains("     Favorite Movie 1"));
-        // Right tag is rendered with trailing margin before border
         assert!(rendered.contains("2024 Movie "));
-        // Overflow pill uses ASCII hyphen separator
         assert!(rendered.contains("[ +5 more - /favorites ]"));
     }
 
@@ -2639,7 +2661,6 @@ mod tests {
         state.search_list_state.select(Some(0));
         let theme = Theme::mocha();
 
-        // Normal mode drawing (active highlight)
         terminal
             .draw(|frame| {
                 let area = Rect::new(0, 0, 100, 30);
@@ -2647,7 +2668,6 @@ mod tests {
             })
             .unwrap();
 
-        // Editing mode drawing (dimmed selection)
         state.input_mode = InputMode::Editing;
         terminal
             .draw(|frame| {
@@ -2687,14 +2707,12 @@ mod tests {
             }
             rendered.push('\n');
         }
-        // 3-Row Search Card Frame & Prompt
         assert!(rendered.contains('❯'));
         assert!(rendered.contains("Search movies and series…"));
         assert!(rendered.contains("[MovieBox"));
         assert!(rendered.contains(&crate::tui::text::ctrl_key("P")));
 
-        // Streamlined 1-line Bottom Bar
-        assert!(rendered.contains("Stream"));
+        assert!(!rendered.contains("Stream"));
         assert!(rendered.contains("TV"));
         assert!(rendered.contains("Addon"));
         assert!(rendered.contains("Quit"));
@@ -2739,11 +2757,9 @@ mod tests {
             rendered.push('\n');
         }
 
-        // Header & Favorite items
         assert!(rendered.contains("Favorites"));
         assert!(rendered.contains("Interstellar"));
         assert!(rendered.contains("2014 Movie") || rendered.contains("2014 Series"));
-        // Overflow
         assert!(rendered.contains("more · /favorites"));
     }
 
@@ -2784,7 +2800,6 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let theme = Theme::mocha();
 
-        // TV Mode
         let mut tv_state = AppState {
             is_tv_mode: true,
             basic_terminal: false,
@@ -2806,7 +2821,6 @@ mod tests {
         assert!(tv_rendered.contains("[Live TV"));
         assert!(tv_rendered.contains("Search live channels…"));
 
-        // Addon Mode
         let mut addon_state = AppState {
             is_addon_mode: true,
             basic_terminal: false,

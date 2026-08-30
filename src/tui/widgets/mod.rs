@@ -2,6 +2,7 @@ pub mod badge;
 pub mod input;
 pub mod modal;
 pub mod scrollbar;
+pub mod settings;
 
 pub use badge::{
     MediaTags, extract_media_tags, render_media_tag_spans, resolution_badge_spans, resolution_label,

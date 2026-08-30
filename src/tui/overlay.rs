@@ -79,6 +79,13 @@ pub fn addon_manager_layout(area: Rect, addons_count: usize, input_active: bool)
     };
     centered(area, popup_width, popup_height, 36, 80)
 }
+pub fn settings_modal_layout(area: Rect, category: crate::tui::state::SettingsCategory) -> Rect {
+    let popup_width = 76u16.min(area.width.saturating_sub(4)).max(52);
+    let content_height = (category.row_count() as u16 * 2).max(4);
+    let desired_height = 2 + 1 + content_height + 2 + 2;
+    let popup_height = desired_height.min(area.height.saturating_sub(2)).max(11);
+    centered(area, popup_width, popup_height, 52, 76)
+}
 
 pub fn download_confirm_layout(
     area: Rect,
@@ -431,7 +438,11 @@ pub fn border_type(basic_terminal: bool) -> BorderType {
 }
 
 pub(crate) fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> {
-    Span::styled(format!("[{key}] {action}"), theme.text_dim)
+    if action.is_empty() {
+        Span::styled(format!("[{key}]"), theme.text_dim)
+    } else {
+        Span::styled(format!("[{key}] {action}"), theme.text_dim)
+    }
 }
 
 pub(crate) fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
@@ -718,8 +729,6 @@ mod tests {
         let summary_lines = 3;
         let action_row = download_confirm_action_row(popup, summary_lines);
 
-        // Borders = 1 (top border at popup.y), Summary = 3 lines (popup.y + 1 .. popup.y + 4)
-        // Action row = popup.y + 1 + 3 = popup.y + 4
         assert_eq!(action_row, popup.y + 4);
         assert!(popup.contains(ratatui::layout::Position::new(popup.x + 2, action_row)));
     }
@@ -733,7 +742,7 @@ mod tests {
         let action_row = download_confirm_action_row(popup, summary_lines);
 
         assert!(popup.contains(ratatui::layout::Position::new(popup.x + 1, action_row)));
-        assert!(action_row < popup.bottom() - 1); // Action row is inside inner area before footer/border
+        assert!(action_row < popup.bottom() - 1);
     }
 
     #[test]

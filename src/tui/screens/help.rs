@@ -236,6 +236,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         theme.header.add_modifier(ratatui::style::Modifier::BOLD),
     )]));
     help_text.push(Line::from(vec![
+        Span::styled("    /settings      ", theme.header),
+        Span::styled("Preferences, Modes & Configuration", theme.text),
+    ]));
+    help_text.push(Line::from(vec![
         Span::styled("    /theme         ", theme.header),
         Span::styled("Change Color Theme", theme.text),
     ]));
