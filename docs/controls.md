@@ -111,25 +111,14 @@ Type these commands directly into the search bar:
 
 | Command | Applicable Mode | Action |
 | :--- | :--- | :--- |
-| `/settings` | All | Open interactive Settings & Preferences Hub |
+| `/settings` | All | Open interactive Settings & Preferences Hub (configuration, modes, players, maintenance) |
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
 | `/history` | Streaming / Addon | View watch history with latest progress |
 | `/favorites` | Streaming / Addon | View all starred titles |
-| `/theme` | All | Open visual theme swatch picker |
+| `/theme` | All | Open visual theme palette swatch picker |
 | `/clear` | All | Clear search results and return to landing |
 | `/help` | All | Open interactive keybinding help menu |
 | `/list` | TV | View live TV channels |
-| `/download-dir` | All | View, change, or reset the download directory |
-| `/update` | All | Check if a new release is available on GitHub |
-| `/clear-cache` | All | Clear temporary cache files |
-| `/github` | All | Open the project repository |
-| `/toggle-update` | All | Toggle automatic startup update checks |
-| `/toggle-streaming` | All | Toggle Streaming Mode navigation in bottom dock |
-| `/toggle-tv` | All | Toggle TV Mode navigation in bottom dock |
-| `/toggle-addons` | All | Toggle Addon Mode navigation in bottom dock |
-| `/toggle-bdix` | Streaming | Toggle BDIX FTP sources |
-| `/probe` | All | Re-run terminal graphics detection and report the result |
-
 ## Help Overlay
 
 - Open with `?`; close with `?`, `Esc`, or `q`.

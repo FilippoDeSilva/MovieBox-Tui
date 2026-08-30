@@ -141,31 +141,9 @@ Start the app:
 ```bash
 moviebox-tui
 ```
-
-
-### Key Shortcuts
-
-| Key | Context | Action |
-| :--- | :--- | :--- |
-| **`?`** | Global | Open interactive in-app help menu |
-| **`↑` / `↓` / `k` / `j`** | Global | Navigate lists, search results, and modal pickers |
-| **`←` / `→` / `h` / `l`** | Details | Switch details panes (Audio / Seasons / Episodes / Streams) |
-| **`Enter`** | Search / Details | Submit query / Play selected stream or TV channel |
-| **`o`** | Streams / TV | Open alternative player selection picker |
-| **`d`** | Details | Download current episode or full season batch |
-| **`f`** / **`*`** | Home | Favorite / unfavorite selected title |
-| **`f`** | Details | Favorite / unfavorite currently viewed title |
-| **`s`** | Details | Open subtitle language picker |
-| **`c`** | Normal Mode | Clear active search query and return to landing |
-| **`Space`** / **`P`** | `/history` | Instant 1-key direct resume for recorded episode |
-| **`Ctrl+S`** / **`Ctrl+T`** / **`Ctrl+A`** | Global | Switch to Streaming / TV / Addon Mode |
-| **`Ctrl+P`** | Streaming / Addon | Switch content provider or open Addon Manager |
-| **`Esc`** | Global | Focus search bar / Dismiss popup dialog / Return to landing |
-| **`q`** / **`Ctrl+C`** | Global | Quit application |
-- **Interactive Help:** Press `?` inside the app anytime to view all keyboard shortcuts and mouse actions.
+- **Interactive Help:** Press `?` inside the app anytime to view contextual keyboard shortcuts and mouse controls.
 - **Mouse & Keyboard:** Full mouse navigation and keyboard controls are supported throughout the application.
-- **Full Reference:** See [Controls & Shortcuts](docs/controls.md) for the complete list of keybindings and slash commands.
-
+- **Complete Reference:** See [Controls & Shortcuts](docs/controls.md) for the full list of keybindings, mouse actions, and slash commands.
 ## Documentation
 
 All in-depth guides and technical details are available in the [`docs/`](docs/) directory:

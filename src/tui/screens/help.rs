@@ -232,7 +232,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     help_text.push(Line::from(vec![]));
 
     help_text.push(Line::from(vec![Span::styled(
-        "  System & Settings",
+        "  System & Commands",
         theme.header.add_modifier(ratatui::style::Modifier::BOLD),
     )]));
     help_text.push(Line::from(vec![
@@ -241,37 +241,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     ]));
     help_text.push(Line::from(vec![
         Span::styled("    /theme         ", theme.header),
-        Span::styled("Change Color Theme", theme.text),
+        Span::styled("Open Visual Theme Swatch Picker", theme.text),
     ]));
     help_text.push(Line::from(vec![
-        Span::styled("    /download-dir  ", theme.header),
-        Span::styled("Configure Download Directory", theme.text),
+        Span::styled("    /clear         ", theme.header),
+        Span::styled("Clear Search & Return to Landing", theme.text),
     ]));
     help_text.push(Line::from(vec![
-        Span::styled("    /clear-cache   ", theme.header),
-        Span::styled("Clear Application Cache", theme.text),
-    ]));
-    help_text.push(Line::from(vec![
-        Span::styled("    /update        ", theme.header),
-        Span::styled("Check for GitHub Updates", theme.text),
-    ]));
-    help_text.push(Line::from(vec![
-        Span::styled("    /toggle-update ", theme.header),
-        Span::styled("Toggle Auto Updates on Startup", theme.text),
-    ]));
-    if !state.is_tv_mode && !state.is_addon_mode {
-        help_text.push(Line::from(vec![
-            Span::styled("    /toggle-bdix   ", theme.header),
-            Span::styled("Toggle BDIX FTP Providers", theme.text),
-        ]));
-    }
-    help_text.push(Line::from(vec![
-        Span::styled("    /probe         ", theme.header),
-        Span::styled("Re-detect Terminal Graphics", theme.text),
-    ]));
-    help_text.push(Line::from(vec![
-        Span::styled("    /github        ", theme.header),
-        Span::styled("Open GitHub Repository", theme.text),
+        Span::styled("    /help          ", theme.header),
+        Span::styled("Toggle Interactive Help Menu", theme.text),
     ]));
 
     let content_width = help_text.iter().map(Line::width).max().unwrap_or(42) as u16;
