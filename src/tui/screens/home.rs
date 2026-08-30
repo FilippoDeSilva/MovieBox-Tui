@@ -660,9 +660,9 @@ fn render_search_bar(
             .border_style(border_style);
         frame.render_widget(block, area);
 
-        let inner_width = area.width.saturating_sub(2);
+        let inner_width = area.width.saturating_sub(4);
         let inner_row_area = Rect {
-            x: area.x + 1,
+            x: area.x + 2,
             y: area.y + 1,
             width: inner_width,
             height: 1,
