@@ -757,15 +757,17 @@ async fn test_no_results_and_error_state_rendering_hints() {
     app.state_mut().active_screen = Screen::Home;
     app.state_mut().input_mode = InputMode::Normal;
     app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Streaming);
+    app.state_mut().active_provider = moviebox_tui::providers::models::ProviderKind::MovieBox;
+    app.state_mut()
         .search_query
         .set_content("nonexistent_movie_xyz");
     app.state_mut().search_results.clear();
-
     terminal.draw(|frame| app.draw(frame)).unwrap();
     let content = terminal.backend().buffer().content();
     let text: String = content.iter().map(|c| c.symbol()).collect();
-    assert!(text.contains("Switch provider"));
-    assert!(text.contains("Browse categories"));
+    assert!(text.contains("Switch Provider"));
+    assert!(text.contains("Categories"));
     assert!(text.contains("Clear"));
 
     // Error view
@@ -774,7 +776,7 @@ async fn test_no_results_and_error_state_rendering_hints() {
     terminal.draw(|frame| app.draw(frame)).unwrap();
     let content_err = terminal.backend().buffer().content();
     let text_err: String = content_err.iter().map(|c| c.symbol()).collect();
-    assert!(text_err.contains("Retry request"));
-    assert!(text_err.contains("Switch provider"));
+    assert!(text_err.contains("Retry"));
+    assert!(text_err.contains("Switch Provider"));
     assert!(text_err.contains("Back"));
 }

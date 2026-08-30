@@ -73,9 +73,42 @@ impl DetailsLayoutTier {
         let content_rows = metadata_rows + title_rows.saturating_sub(1) + synopsis_rows;
         (content_rows as u16 + 2).clamp(minimum, maximum)
     }
-
     pub(crate) fn footer_height(self, width: u16) -> u16 {
-        if width >= 86 { 1 } else { 2 }
+        if width >= DETAILS_FOOTER_SPLIT_THRESHOLD {
+            1
+        } else {
+            2
+        }
+    }
+}
+
+pub const DETAILS_FOOTER_SPLIT_THRESHOLD: u16 = 80;
+
+pub(crate) fn selector_pane_constraints(
+    visible_panes: &[crate::tui::state::DetailsPane],
+) -> Vec<Constraint> {
+    use crate::tui::state::DetailsPane;
+    match visible_panes.len() {
+        0 => Vec::new(),
+        1 => vec![Constraint::Min(20)],
+        2 => {
+            if visible_panes.contains(&DetailsPane::Languages) {
+                vec![Constraint::Length(18), Constraint::Min(26)]
+            } else if visible_panes.contains(&DetailsPane::Seasons)
+                && visible_panes.contains(&DetailsPane::Episodes)
+            {
+                vec![Constraint::Length(16), Constraint::Min(30)]
+            } else {
+                vec![Constraint::Length(18), Constraint::Min(24)]
+            }
+        }
+        _ => {
+            vec![
+                Constraint::Length(18),
+                Constraint::Length(14),
+                Constraint::Min(26),
+            ]
+        }
     }
 }
 
@@ -486,16 +519,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
         }
     }
-    if state.favorites_available() {
-        metadata.push(
-            if is_favorited {
-                "[f] Unfavorite"
-            } else {
-                "[f] Favorite"
-            }
-            .to_string(),
-        );
-    }
     metadata.retain(|s| !s.trim().is_empty());
     let meta_line = Line::from(vec![Span::styled(
         metadata.join(" • "),
@@ -638,15 +661,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let selector_chunks = if visible_selector_panes.is_empty() {
         Vec::new()
     } else {
-        Layout::horizontal(vec![
-            Constraint::Ratio(
-                1,
-                visible_selector_panes.len() as u32
-            );
-            visible_selector_panes.len()
-        ])
-        .split(selector_area)
-        .to_vec()
+        Layout::horizontal(selector_pane_constraints(&visible_selector_panes))
+            .split(selector_area)
+            .to_vec()
     };
 
     let mut lang_area = None;
@@ -1035,6 +1052,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("sourceCount")
                             .and_then(|value| value.as_u64())
                             .unwrap_or(0);
+                        let is_compact = streams_area.width < 76;
+                        let is_wide = streams_area.width > 110;
                         let stream_width = streams_area.width.saturating_sub(6) as usize;
 
                         // 1. Pointer (2 chars)
@@ -1047,13 +1066,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             state.basic_terminal,
                         ));
 
-                        // 3. File Size (format!("{:>8}  ") = 10 chars)
+                        // 3. File Size (format!("{:>7}  ") = 9 chars)
                         stream_spans.push(Span::styled(
-                            format!("{size_formatted:>8}  "),
+                            format!("{size_formatted:>7}  "),
                             primary_style,
                         ));
 
-                        // 4. Codecs / Media Tags (format!("{:<14} ") = 15 chars)
                         let codec_str = codec.to_uppercase();
                         let tags = extract_media_tags(raw_release_title, &codec_str);
                         let mut tag_parts = Vec::new();
@@ -1073,13 +1091,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         }
                         let sep = if state.basic_terminal { " - " } else { " · " };
                         let tags_or_codec = tag_parts.join(sep);
-                        let tags_display = crate::tui::text::truncate_width(&tags_or_codec, 14);
-                        stream_spans.push(Span::styled(
-                            format!("{tags_display:<14} "),
-                            secondary_style,
-                        ));
 
-                        // 5. Duration / Info column (format!("{:<8} ") = 9 chars)
                         let duration_col = if is_fourk && duration == 0 && source_count > 0 {
                             format!(
                                 "{source_count} mirr{}",
@@ -1088,81 +1100,163 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         } else {
                             duration_str.clone()
                         };
-                        let duration_display = crate::tui::text::truncate_width(&duration_col, 8);
-                        stream_spans.push(Span::styled(
-                            format!("{duration_display:<8} "),
-                            secondary_style,
-                        ));
 
-                        // 6. Uploader / Release Title (cleanly truncated to remaining width)
-                        let used_prefix_width = stream_spans
-                            .iter()
-                            .map(|s| crate::tui::text::width(s.content.as_ref()))
-                            .sum::<usize>();
-                        let remaining = stream_width.saturating_sub(used_prefix_width);
+                        if is_compact {
+                            // 4. Codec (format!("{:<5} ") = 6 chars)
+                            let codec_display = crate::tui::text::truncate_width(&codec_str, 5);
+                            stream_spans.push(Span::styled(
+                                format!("{codec_display:<5} "),
+                                secondary_style,
+                            ));
 
-                        if remaining > 0 {
-                            if is_addon {
-                                let has_lang = language != "Unknown" && !language.is_empty();
-                                if has_lang && remaining >= 24 {
-                                    let lang_str = format!(
-                                        "{} ",
-                                        crate::tui::text::pad_to_width(&language, 10)
-                                    );
-                                    let lang_len = crate::tui::text::width(&lang_str);
-                                    let title_avail = remaining.saturating_sub(lang_len);
-                                    let title_trunc = crate::tui::text::truncate_width(
-                                        &release_title,
-                                        title_avail,
-                                    );
-                                    stream_spans.push(Span::styled(lang_str, secondary_style));
-                                    stream_spans.push(Span::styled(title_trunc, primary_style));
+                            // 5. Title (Flex Min 20)
+                            let used_prefix = stream_spans
+                                .iter()
+                                .map(|s| crate::tui::text::width(s.content.as_ref()))
+                                .sum::<usize>();
+                            let remaining = stream_width.saturating_sub(used_prefix);
+                            if remaining > 0 {
+                                let title_trunc =
+                                    crate::tui::text::truncate_width(&release_title, remaining);
+                                stream_spans.push(Span::styled(title_trunc, primary_style));
+                            }
+                        } else if is_wide {
+                            // 4. Extended Tags (format!("{:<22} ") = 23 chars)
+                            let tags_display = crate::tui::text::truncate_width(&tags_or_codec, 22);
+                            stream_spans.push(Span::styled(
+                                format!("{tags_display:<22} "),
+                                secondary_style,
+                            ));
+
+                            // 5. Duration (format!("{:<8} ") = 9 chars)
+                            let duration_display =
+                                crate::tui::text::truncate_width(&duration_col, 8);
+                            stream_spans.push(Span::styled(
+                                format!("{duration_display:<8} "),
+                                secondary_style,
+                            ));
+
+                            // 6. Uploader (format!("{:<14}  ") = 16 chars)
+                            let uploader_display =
+                                if upload_by != "Unknown" && !upload_by.is_empty() {
+                                    format!(
+                                        "{:<14}  ",
+                                        crate::tui::text::truncate_width(&upload_by, 14)
+                                    )
                                 } else {
-                                    let title_trunc =
-                                        crate::tui::text::truncate_width(&release_title, remaining);
-                                    stream_spans.push(Span::styled(title_trunc, primary_style));
-                                }
-                            } else if is_fourk {
-                                let has_lang = language != "Unknown" && !language.is_empty();
-                                if has_lang {
-                                    let lang_trunc =
-                                        crate::tui::text::truncate_width(&language, remaining);
-                                    stream_spans.push(Span::styled(lang_trunc, secondary_style));
-                                }
-                            } else {
-                                let has_uploader = upload_by != "Unknown" && !upload_by.is_empty();
-                                let has_title =
-                                    !release_title.is_empty() && release_title != upload_by;
+                                    format!("{:<16}", "")
+                                };
+                            stream_spans.push(Span::styled(uploader_display, secondary_style));
 
-                                if has_uploader && has_title && remaining >= 24 {
-                                    let uploader_width = crate::tui::text::width(&upload_by);
-                                    let title_avail = remaining.saturating_sub(uploader_width + 2);
-                                    if title_avail >= 8 {
+                            // 7. Title (Flex)
+                            let used_prefix = stream_spans
+                                .iter()
+                                .map(|s| crate::tui::text::width(s.content.as_ref()))
+                                .sum::<usize>();
+                            let remaining = stream_width.saturating_sub(used_prefix);
+                            if remaining > 0 {
+                                let title_trunc =
+                                    crate::tui::text::truncate_width(&release_title, remaining);
+                                stream_spans.push(Span::styled(title_trunc, primary_style));
+                            }
+                        } else {
+                            // Standard (76..=110 cols)
+                            // 4. Media Tags (format!("{:<14} ") = 15 chars)
+                            let tags_display = crate::tui::text::truncate_width(&tags_or_codec, 14);
+                            stream_spans.push(Span::styled(
+                                format!("{tags_display:<14} "),
+                                secondary_style,
+                            ));
+
+                            // 5. Duration (format!("{:<8} ") = 9 chars)
+                            let duration_display =
+                                crate::tui::text::truncate_width(&duration_col, 8);
+                            stream_spans.push(Span::styled(
+                                format!("{duration_display:<8} "),
+                                secondary_style,
+                            ));
+
+                            // 6. Uploader / Release Title (cleanly truncated to remaining width)
+                            let used_prefix_width = stream_spans
+                                .iter()
+                                .map(|s| crate::tui::text::width(s.content.as_ref()))
+                                .sum::<usize>();
+                            let remaining = stream_width.saturating_sub(used_prefix_width);
+
+                            if remaining > 0 {
+                                if is_addon {
+                                    let has_lang = language != "Unknown" && !language.is_empty();
+                                    if has_lang && remaining >= 24 {
+                                        let lang_str = format!(
+                                            "{} ",
+                                            crate::tui::text::pad_to_width(&language, 10)
+                                        );
+                                        let lang_len = crate::tui::text::width(&lang_str);
+                                        let title_avail = remaining.saturating_sub(lang_len);
                                         let title_trunc = crate::tui::text::truncate_width(
                                             &release_title,
                                             title_avail,
                                         );
-                                        stream_spans.push(Span::styled(
-                                            format!("{upload_by}  "),
-                                            secondary_style,
-                                        ));
-                                        stream_spans
-                                            .push(Span::styled(title_trunc, secondary_style));
+                                        stream_spans.push(Span::styled(lang_str, secondary_style));
+                                        stream_spans.push(Span::styled(title_trunc, primary_style));
                                     } else {
+                                        let title_trunc = crate::tui::text::truncate_width(
+                                            &release_title,
+                                            remaining,
+                                        );
+                                        stream_spans.push(Span::styled(title_trunc, primary_style));
+                                    }
+                                } else if is_fourk {
+                                    let has_lang = language != "Unknown" && !language.is_empty();
+                                    if has_lang {
+                                        let lang_trunc =
+                                            crate::tui::text::truncate_width(&language, remaining);
+                                        stream_spans
+                                            .push(Span::styled(lang_trunc, secondary_style));
+                                    }
+                                } else {
+                                    let has_uploader =
+                                        upload_by != "Unknown" && !upload_by.is_empty();
+                                    let has_title =
+                                        !release_title.is_empty() && release_title != upload_by;
+
+                                    if has_uploader && has_title && remaining >= 24 {
+                                        let uploader_width = crate::tui::text::width(&upload_by);
+                                        let title_avail =
+                                            remaining.saturating_sub(uploader_width + 2);
+                                        if title_avail >= 8 {
+                                            let title_trunc = crate::tui::text::truncate_width(
+                                                &release_title,
+                                                title_avail,
+                                            );
+                                            stream_spans.push(Span::styled(
+                                                format!("{upload_by}  "),
+                                                secondary_style,
+                                            ));
+                                            stream_spans
+                                                .push(Span::styled(title_trunc, secondary_style));
+                                        } else {
+                                            let uploader_trunc = crate::tui::text::truncate_width(
+                                                &upload_by, remaining,
+                                            );
+                                            stream_spans.push(Span::styled(
+                                                uploader_trunc,
+                                                secondary_style,
+                                            ));
+                                        }
+                                    } else if has_uploader {
                                         let uploader_trunc =
                                             crate::tui::text::truncate_width(&upload_by, remaining);
                                         stream_spans
                                             .push(Span::styled(uploader_trunc, secondary_style));
+                                    } else if has_title {
+                                        let title_trunc = crate::tui::text::truncate_width(
+                                            &release_title,
+                                            remaining,
+                                        );
+                                        stream_spans
+                                            .push(Span::styled(title_trunc, secondary_style));
                                     }
-                                } else if has_uploader {
-                                    let uploader_trunc =
-                                        crate::tui::text::truncate_width(&upload_by, remaining);
-                                    stream_spans
-                                        .push(Span::styled(uploader_trunc, secondary_style));
-                                } else if has_title {
-                                    let title_trunc =
-                                        crate::tui::text::truncate_width(&release_title, remaining);
-                                    stream_spans.push(Span::styled(title_trunc, secondary_style));
                                 }
                             }
                         }
@@ -1203,6 +1297,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 ),
                             ];
                             lines.push(Line::from(header_spans));
+                            if i == 0 {
+                                lines.push(Line::from(stream_table_header_spans(
+                                    streams_area.width,
+                                    theme,
+                                )));
+                            }
                         }
                         lines.push(stream_line);
                         ListItem::new(lines)
@@ -1216,7 +1316,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let rendered_position = selected_idx.map_or(0, |selected| {
                     let mut headings = 0;
                     let mut previous: Option<&'static str> = None;
-                    for file in list.iter().take(selected.saturating_add(1)) {
+                    for (i, file) in list.iter().take(selected.saturating_add(1)).enumerate() {
                         let resolution = file
                             .get("resolution")
                             .and_then(|value| value.as_i64())
@@ -1224,6 +1324,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         let label = resolution_label(resolution);
                         if previous != Some(label) {
                             headings += 1;
+                            if i == 0 {
+                                headings += 1;
+                            }
                             previous = Some(label);
                         }
                     }
@@ -1322,7 +1425,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     let (mut primary_footer, secondary_footer) = details_footer(state, theme, area.width);
-    let footer_p = if area.width >= 70 {
+    let footer_p = if area.width >= DETAILS_FOOTER_SPLIT_THRESHOLD {
         primary_footer.extend(secondary_footer);
         Paragraph::new(Line::from(primary_footer))
     } else {
@@ -1427,19 +1530,50 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 }
 
 pub(crate) fn season_confirm_summary(state: &AppState) -> Vec<String> {
+    let title = state
+        .selected_details
+        .as_ref()
+        .and_then(|d| d.get("title"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("Series");
     let season_idx = state.selected_season;
     let eps_count = if season_idx > 0 && season_idx <= state.available_episode_numbers.len() {
         state.available_episode_numbers[season_idx - 1].len()
     } else {
         0
     };
-    vec![
-        format!("Season {season_idx}"),
-        format!("{eps_count} episodes"),
-    ]
+    let mut summary = vec![format!(
+        "{title} • Season {season_idx} ({eps_count} Episodes)"
+    )];
+    if let Some(stream) = selected_stream_summary(state) {
+        summary.push(format!("Quality: {stream}"));
+    }
+    let dest = state
+        .download_dir
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| {
+            crate::service::resolve_download_dir(None)
+                .to_string_lossy()
+                .to_string()
+        });
+    summary.push(format!("Save to: {dest}"));
+    summary
 }
 
 pub(crate) fn episode_confirm_summary(state: &AppState) -> Vec<String> {
+    let title = state
+        .selected_details
+        .as_ref()
+        .and_then(|d| d.get("title"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("Media");
+    let year = state
+        .selected_details
+        .as_ref()
+        .and_then(|d| d.get("releaseDate").or_else(|| d.get("year")))
+        .and_then(|y| y.as_str())
+        .unwrap_or("");
     let season_idx = state.selected_season;
     let ep_idx = state.selected_episode;
     let type_val = state
@@ -1448,13 +1582,25 @@ pub(crate) fn episode_confirm_summary(state: &AppState) -> Vec<String> {
         .map(crate::tui::state::stype)
         .unwrap_or(1);
     let mut summary = if type_val == 2 {
-        vec![format!("Season {season_idx} · Episode {ep_idx}")]
+        vec![format!("{title} • Season {season_idx} Episode {ep_idx}")]
+    } else if !year.is_empty() && year != "N/A" {
+        vec![format!("{title} ({year}) • Movie")]
     } else {
-        vec!["Download this movie".to_string()]
+        vec![format!("{title} • Movie")]
     };
     if let Some(stream) = selected_stream_summary(state) {
-        summary.push(stream);
+        summary.push(format!("Quality: {stream}"));
     }
+    let dest = state
+        .download_dir
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| {
+            crate::service::resolve_download_dir(None)
+                .to_string_lossy()
+                .to_string()
+        });
+    summary.push(format!("Save to: {dest}"));
     summary
 }
 
@@ -1740,9 +1886,29 @@ fn render_workflow(
     );
 }
 
+fn stream_table_header_spans(width: u16, theme: &Theme) -> Vec<Span<'static>> {
+    let header_style = theme.overlay0.add_modifier(Modifier::BOLD);
+    if width < 76 {
+        vec![Span::styled(
+            "  RES     SIZE     CODEC RELEASE",
+            header_style,
+        )]
+    } else if width > 110 {
+        vec![Span::styled(
+            "  RES     SIZE     MEDIA TAGS             DURATION UPLOADER        RELEASE",
+            header_style,
+        )]
+    } else {
+        vec![Span::styled(
+            "  RES     SIZE     MEDIA TAGS     DURATION UPLOADER / RELEASE",
+            header_style,
+        )]
+    }
+}
+
 fn footer_group(
     key: &'static str,
-    action: &'static str,
+    action: &str,
     prominent: bool,
     theme: &Theme,
 ) -> Vec<Span<'static>> {
@@ -1751,7 +1917,7 @@ fn footer_group(
         Span::styled(key, theme.shortcut),
         Span::styled("] ", theme.overlay0),
         Span::styled(
-            action,
+            action.to_string(),
             if prominent {
                 theme.text
             } else {
@@ -1767,9 +1933,39 @@ fn details_footer(
     theme: &Theme,
     width: u16,
 ) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
-    let compact = width < 80;
+    let compact = width < DETAILS_FOOTER_SPLIT_THRESHOLD;
     let is_streams = state.details_pane == crate::tui::state::DetailsPane::Streams;
     let is_languages = state.details_pane == crate::tui::state::DetailsPane::Languages;
+    let is_seasons = state.details_pane == crate::tui::state::DetailsPane::Seasons;
+    let is_episodes = state.details_pane == crate::tui::state::DetailsPane::Episodes;
+
+    let is_favorited = if let Some(details) = &state.selected_details {
+        let details_subject_id = state.active_subject_id.as_deref().unwrap_or("");
+        let title = details.get("title").and_then(|t| t.as_str()).unwrap_or("");
+        let type_val = crate::tui::state::stype(details);
+        let year = details
+            .get("releaseDate")
+            .or_else(|| details.get("year"))
+            .or_else(|| details.get("releaseInfo"))
+            .and_then(|y| y.as_str())
+            .unwrap_or("N/A");
+        state
+            .favorites
+            .is_favorite(&crate::models::SubjectIdentity {
+                provider: subject_provider(state, details_subject_id).cache_key(),
+                subject_id: details_subject_id,
+                title,
+                stype: type_val,
+                release_year: year,
+            })
+    } else {
+        false
+    };
+    let fav_label = if is_favorited {
+        "Unfavorite"
+    } else {
+        "Favorite"
+    };
 
     let mut primary = Vec::new();
     let mut secondary = Vec::new();
@@ -1788,20 +1984,22 @@ fn details_footer(
             false,
             theme,
         ));
-        secondary.extend(footer_group("f", "Favorite", false, theme));
-        secondary.extend(footer_group(
-            "s",
-            if compact { "Subs" } else { "Subtitles" },
-            false,
-            theme,
-        ));
+        secondary.extend(footer_group("f", fav_label, false, theme));
+        if !state.subtitle_list.is_empty() {
+            secondary.extend(footer_group(
+                "s",
+                if compact { "Subs" } else { "Subtitles" },
+                false,
+                theme,
+            ));
+        }
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_languages {
         primary.extend(footer_group("Enter", "Select", true, theme));
-        primary.extend(footer_group("f", "Favorite", false, theme));
+        primary.extend(footer_group("f", fav_label, false, theme));
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
-    } else {
+    } else if is_seasons {
         primary.extend(footer_group("Enter", "Select", true, theme));
         primary.extend(footer_group(
             "d",
@@ -1813,11 +2011,30 @@ fn details_footer(
             false,
             theme,
         ));
-        primary.extend(footer_group("f", "Favorite", false, theme));
+        primary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group("Tab", "Streams", false, theme));
+        secondary.extend(footer_group("Esc", "Back", false, theme));
+    } else if is_episodes {
+        primary.extend(footer_group("Enter", "Select", true, theme));
+        primary.extend(footer_group(
+            "d",
+            if compact {
+                "Download"
+            } else {
+                "Download Episode"
+            },
+            false,
+            theme,
+        ));
+        primary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group("Tab", "Streams", false, theme));
+        secondary.extend(footer_group("Esc", "Back", false, theme));
+    } else {
+        primary.extend(footer_group("Enter", "Select", true, theme));
+        primary.extend(footer_group("f", fav_label, false, theme));
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     }
-
     if let Some(last) = secondary.last_mut() {
         *last = Span::raw("");
     }
@@ -2032,8 +2249,9 @@ mod tests {
         let theme = Theme::mocha();
         let mut state = AppState::default();
 
-        // Streams pane
+        // Streams pane with subtitles
         state.details_pane = crate::tui::state::DetailsPane::Streams;
+        state.subtitle_list = vec![("English".to_string(), "http://sub".to_string())];
         let (primary, secondary) = details_footer(&state, &theme, 100);
         let mut all_spans = primary;
         all_spans.extend(secondary);
@@ -2053,6 +2271,18 @@ mod tests {
         let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(footer_text.contains("[Enter] Select"));
         assert!(footer_text.contains("[d] Download Season"));
+        assert!(footer_text.contains("[f] Favorite"));
+        assert!(footer_text.contains("[Tab] Streams"));
+        assert!(footer_text.contains("[Esc] Back"));
+
+        // Episodes pane
+        state.details_pane = crate::tui::state::DetailsPane::Episodes;
+        let (primary, secondary) = details_footer(&state, &theme, 100);
+        let mut all_spans = primary;
+        all_spans.extend(secondary);
+        let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(footer_text.contains("[Enter] Select"));
+        assert!(footer_text.contains("[d] Download Episode"));
         assert!(footer_text.contains("[f] Favorite"));
         assert!(footer_text.contains("[Tab] Streams"));
         assert!(footer_text.contains("[Esc] Back"));

@@ -224,7 +224,7 @@ impl App {
                         self.action_sender.send(Action::SelectTheme(orig)).ok();
                     }
                 }
-                KeyCode::Up => {
+                KeyCode::Up | KeyCode::Char('k') => {
                     crate::tui::state::cycle_list_selection(
                         &mut self.state.theme_list_state,
                         crate::tui::theme::AVAILABLE_THEMES.len(),
@@ -237,7 +237,7 @@ impl App {
                             .ok();
                     }
                 }
-                KeyCode::Down => {
+                KeyCode::Down | KeyCode::Char('j') => {
                     crate::tui::state::cycle_list_selection(
                         &mut self.state.theme_list_state,
                         crate::tui::theme::AVAILABLE_THEMES.len(),

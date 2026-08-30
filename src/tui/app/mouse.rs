@@ -642,7 +642,9 @@ impl App {
             let row_height = metrics.row_height;
             let clicked_relative_row = row.saturating_sub(results_y);
             let visual_row = (clicked_relative_row / row_height) as usize;
-            let clicked_column = ((col.saturating_sub(area.x)) / metrics.col_width.max(1)) as usize;
+            let col_step = (metrics.col_width + 1).max(1);
+            let clicked_column = (((col.saturating_sub(area.x)) / col_step) as usize)
+                .min(metrics.columns.saturating_sub(1) as usize);
 
             let page_start = self.state.result_scroll;
 
@@ -850,14 +852,9 @@ impl App {
         if !visible_selector_panes.is_empty()
             && selector_area.contains(ratatui::layout::Position::new(col, row))
         {
-            let selector_chunks = Layout::horizontal(vec![
-                Constraint::Ratio(
-                    1,
-                    visible_selector_panes.len() as u32
-                );
-                visible_selector_panes.len()
-            ])
-            .split(selector_area);
+            let selector_constraints =
+                crate::tui::screens::details::selector_pane_constraints(&visible_selector_panes);
+            let selector_chunks = Layout::horizontal(selector_constraints).split(selector_area);
 
             for (pane, pane_rect) in visible_selector_panes
                 .into_iter()
@@ -946,6 +943,9 @@ impl App {
                             line_offset += 1;
                         }
                         line_offset += 1;
+                        if i == 0 {
+                            line_offset += 1;
+                        }
                         prev_resolution = Some(resolution);
                     }
                     if clicked_stream_row == line_offset {
@@ -985,8 +985,40 @@ impl App {
     fn handle_details_footer_click(&mut self, col: u16, line_idx: u16, width: u16) {
         let is_streams = self.state.details_pane == DetailsPane::Streams;
         let is_seasons = self.state.details_pane == DetailsPane::Seasons;
+        let is_episodes = self.state.details_pane == DetailsPane::Episodes;
         let is_languages = self.state.details_pane == DetailsPane::Languages;
-        let compact = width < 80;
+        let compact = width < crate::tui::screens::details::DETAILS_FOOTER_SPLIT_THRESHOLD;
+
+        let is_favorited = if let Some(details) = &self.state.selected_details {
+            let details_subject_id = self.state.active_subject_id.as_deref().unwrap_or("");
+            let title = details.get("title").and_then(|t| t.as_str()).unwrap_or("");
+            let type_val = crate::tui::state::stype(details);
+            let year = details
+                .get("releaseDate")
+                .or_else(|| details.get("year"))
+                .or_else(|| details.get("releaseInfo"))
+                .and_then(|y| y.as_str())
+                .unwrap_or("N/A");
+            let provider = self
+                .state
+                .search_results
+                .iter()
+                .find(|r| r.id == details_subject_id)
+                .map(|r| r.provider)
+                .unwrap_or(self.state.active_provider);
+            self.state
+                .favorites
+                .is_favorite(&crate::models::SubjectIdentity {
+                    provider: provider.cache_key(),
+                    subject_id: details_subject_id,
+                    title,
+                    stype: type_val,
+                    release_year: year,
+                })
+        } else {
+            false
+        };
+        let fav_label_len = if is_favorited { 10 } else { 8 };
 
         enum FooterAction {
             PlaySelect,
@@ -1008,35 +1040,50 @@ impl App {
             let d_label_len = if compact { 4 } else { 8 };
             primary.push((FooterAction::Download, 3 + 1 + d_label_len));
 
-            secondary.push((FooterAction::Favorite, 3 + 1 + 8));
-            let s_label_len = if compact { 4 } else { 9 };
-            secondary.push((FooterAction::Subtitles, 3 + 1 + s_label_len));
+            secondary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
+            if !self.state.subtitle_list.is_empty() {
+                let s_label_len = if compact { 4 } else { 9 };
+                secondary.push((FooterAction::Subtitles, 3 + 1 + s_label_len));
+            }
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else if is_languages {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
-            primary.push((FooterAction::Favorite, 3 + 1 + 8));
+            primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
+            secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
+            secondary.push((FooterAction::Back, 5 + 1 + 4));
+        } else if is_seasons {
+            primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
+            let d_label_len = if compact { 8 } else { 15 };
+            primary.push((FooterAction::Download, 3 + 1 + d_label_len));
+            primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
+            secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
+            secondary.push((FooterAction::Back, 5 + 1 + 4));
+        } else if is_episodes {
+            primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
+            let d_label_len = if compact { 8 } else { 16 };
+            primary.push((FooterAction::Download, 3 + 1 + d_label_len));
+            primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
             secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
-            let d_label_len = if compact { 8 } else { 15 };
-            primary.push((FooterAction::Download, 3 + 1 + d_label_len));
-            primary.push((FooterAction::Favorite, 3 + 1 + 8));
+            primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
             secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         }
-        let active_buttons = if width >= 86 {
-            if line_idx > 0 {
-                return;
-            }
-            let mut combined = primary;
-            combined.extend(secondary);
-            combined
-        } else if line_idx == 0 {
-            primary
-        } else {
-            secondary
-        };
+        let active_buttons =
+            if width >= crate::tui::screens::details::DETAILS_FOOTER_SPLIT_THRESHOLD {
+                if line_idx > 0 {
+                    return;
+                }
+                let mut combined = primary;
+                combined.extend(secondary);
+                combined
+            } else if line_idx == 0 {
+                primary
+            } else {
+                secondary
+            };
 
         let sep = 3_u16;
         let total_w: u16 = active_buttons.iter().map(|(_, w)| *w).sum::<u16>()

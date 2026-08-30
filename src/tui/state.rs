@@ -47,17 +47,17 @@ pub struct ResultMetrics {
 }
 
 pub fn result_columns_for(width: u16) -> u16 {
-    if width < 75 {
-        return 1;
-    }
-    let by_width = if width >= 160 {
-        3
-    } else if width >= 110 {
-        2
-    } else {
+    if width < 110 {
         1
-    };
-    by_width.clamp(1, width / 40).max(1)
+    } else if width < 160 {
+        2
+    } else if width < 220 {
+        3
+    } else if width < 280 {
+        4
+    } else {
+        5
+    }
 }
 
 pub struct AppState {
@@ -459,7 +459,9 @@ impl AppState {
         let poster_rows_eff = self.poster_rows.max(3).min(max_rows);
         let row_height = poster_rows_eff.saturating_add(1).max(4);
         let columns = crate::tui::state::result_columns_for(results_width);
-        let col_width = results_width / columns;
+        let total_gutters = columns.saturating_sub(1);
+        let usable_width = results_width.saturating_sub(total_gutters);
+        let col_width = (usable_width / columns.max(1)).max(1);
         let visible_rows = (results_height as usize / row_height as usize).max(1);
         let visible_items = visible_rows * columns as usize;
         ResultMetrics {
@@ -711,10 +713,16 @@ mod tests {
 
     #[test]
     fn columns_follow_width_tiers() {
+        assert_eq!(result_columns_for(60), 1);
         assert_eq!(result_columns_for(80), 1);
         assert_eq!(result_columns_for(110), 2);
+        assert_eq!(result_columns_for(159), 2);
         assert_eq!(result_columns_for(160), 3);
-        assert_eq!(result_columns_for(60), 1);
+        assert_eq!(result_columns_for(219), 3);
+        assert_eq!(result_columns_for(220), 4);
+        assert_eq!(result_columns_for(279), 4);
+        assert_eq!(result_columns_for(280), 5);
+        assert_eq!(result_columns_for(320), 5);
     }
 
     #[test]

@@ -189,7 +189,6 @@ fn render_search_state(
     );
 
     let ctrl_p = crate::tui::text::ctrl_key("P");
-    let ctrl_u = crate::tui::text::ctrl_key("U");
     let bullet = if state.basic_terminal {
         " - "
     } else {
@@ -244,6 +243,10 @@ fn render_search_state(
                 format!("No items found for {}", catalog.label)
             } else if state.search_query.trim().eq_ignore_ascii_case("/history") {
                 "No watch history found".to_string()
+            } else if state.search_query.trim().eq_ignore_ascii_case("/favorites")
+                || state.search_query.trim().eq_ignore_ascii_case("/fav")
+            {
+                "No favorites saved yet".to_string()
             } else if !state.search_query.trim().is_empty() {
                 format!("No matches for “{query}”")
             } else {
@@ -251,46 +254,64 @@ fn render_search_state(
             };
             lines.push(Line::from(vec![
                 Span::styled(format!("{symbol} "), theme.text_dim),
-                Span::styled(msg, theme.text),
+                Span::styled(msg, theme.text.add_modifier(Modifier::BOLD)),
             ]));
             lines.push(Line::from(""));
-            if area.width < 76 {
-                lines.push(Line::from(vec![
+
+            let pills = if state.is_tv_mode {
+                vec![
+                    Span::styled("[", theme.text_dim),
+                    Span::styled("/tv", theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Playlists", theme.subtext1),
+                    Span::styled(bullet, theme.text_dim),
+                    Span::styled("[", theme.text_dim),
+                    Span::styled("r", theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Reload Playlist", theme.subtext1),
+                    Span::styled(bullet, theme.text_dim),
+                    Span::styled("[", theme.text_dim),
+                    Span::styled("c", theme.shortcut),
+                    Span::styled("] ", theme.text_dim),
+                    Span::styled("Clear", theme.subtext1),
+                ]
+            } else if state.is_addon_mode {
+                vec![
                     Span::styled("[", theme.text_dim),
                     Span::styled(&ctrl_p, theme.shortcut),
                     Span::styled("] ", theme.text_dim),
-                    Span::styled("Switch provider", theme.text_dim),
-                ]));
-                lines.push(Line::from(vec![
+                    Span::styled("Change Catalog", theme.subtext1),
+                    Span::styled(bullet, theme.text_dim),
                     Span::styled("[", theme.text_dim),
-                    Span::styled("/browse", theme.shortcut),
+                    Span::styled("/addons", theme.shortcut),
                     Span::styled("] ", theme.text_dim),
-                    Span::styled("Browse categories", theme.text_dim),
-                ]));
-                lines.push(Line::from(vec![
+                    Span::styled("Manage Addons", theme.subtext1),
+                    Span::styled(bullet, theme.text_dim),
                     Span::styled("[", theme.text_dim),
-                    Span::styled(&ctrl_u, theme.shortcut),
+                    Span::styled("c", theme.shortcut),
                     Span::styled("] ", theme.text_dim),
-                    Span::styled("Clear", theme.text_dim),
-                ]));
+                    Span::styled("Clear", theme.subtext1),
+                ]
             } else {
-                lines.push(Line::from(vec![
+                vec![
                     Span::styled("[", theme.text_dim),
                     Span::styled(&ctrl_p, theme.shortcut),
                     Span::styled("] ", theme.text_dim),
-                    Span::styled("Switch provider", theme.text_dim),
+                    Span::styled("Switch Provider", theme.subtext1),
                     Span::styled(bullet, theme.text_dim),
                     Span::styled("[", theme.text_dim),
                     Span::styled("/browse", theme.shortcut),
                     Span::styled("] ", theme.text_dim),
-                    Span::styled("Browse categories", theme.text_dim),
+                    Span::styled("Categories", theme.subtext1),
                     Span::styled(bullet, theme.text_dim),
                     Span::styled("[", theme.text_dim),
-                    Span::styled(&ctrl_u, theme.shortcut),
+                    Span::styled("c", theme.shortcut),
                     Span::styled("] ", theme.text_dim),
-                    Span::styled("Clear", theme.text_dim),
-                ]));
-            }
+                    Span::styled("Clear", theme.subtext1),
+                ]
+            };
+
+            lines.push(Line::from(pills));
         }
         SearchViewState::Error => {
             let symbol = if state.basic_terminal { "!" } else { "×" };
@@ -301,44 +322,42 @@ fn render_search_state(
                     "Search request failed"
                 }
             });
-            let wrap_width = card_width.saturating_sub(6).max(10) as usize;
+            let wrap_width = card_width.saturating_sub(8).max(10) as usize;
             let wrapped_err_lines = crate::tui::text::wrap_text(err_text, wrap_width);
-            if wrapped_err_lines.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::styled(format!("{symbol} "), theme.error),
-                    Span::styled("Search request failed", theme.error),
-                ]));
-            } else {
-                for (idx, eline) in wrapped_err_lines.into_iter().enumerate() {
-                    if idx == 0 {
-                        lines.push(Line::from(vec![
-                            Span::styled(format!("{symbol} "), theme.error),
-                            Span::styled(eline, theme.error),
-                        ]));
-                    } else {
-                        lines.push(Line::from(vec![
-                            Span::styled("  ", theme.error),
-                            Span::styled(eline, theme.error),
-                        ]));
-                    }
+
+            lines.push(Line::from(vec![
+                Span::styled(format!("{symbol} "), theme.error),
+                Span::styled(
+                    "Search Request Error",
+                    theme.error.add_modifier(Modifier::BOLD),
+                ),
+            ]));
+            if !wrapped_err_lines.is_empty() {
+                for eline in wrapped_err_lines {
+                    lines.push(Line::from(vec![Span::styled(eline, theme.subtext1)]));
                 }
+            } else {
+                lines.push(Line::from(vec![Span::styled(
+                    "Unable to complete search request with the current provider.",
+                    theme.subtext1,
+                )]));
             }
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled("[", theme.text_dim),
                 Span::styled("r", theme.shortcut),
                 Span::styled("] ", theme.text_dim),
-                Span::styled("Retry request", theme.text_dim),
+                Span::styled("Retry", theme.subtext1),
                 Span::styled(bullet, theme.text_dim),
                 Span::styled("[", theme.text_dim),
                 Span::styled(&ctrl_p, theme.shortcut),
                 Span::styled("] ", theme.text_dim),
-                Span::styled("Switch provider", theme.text_dim),
+                Span::styled("Switch Provider", theme.subtext1),
                 Span::styled(bullet, theme.text_dim),
                 Span::styled("[", theme.text_dim),
                 Span::styled("Esc", theme.shortcut),
                 Span::styled("] ", theme.text_dim),
-                Span::styled("Back", theme.text_dim),
+                Span::styled("Back", theme.subtext1),
             ]));
         }
         _ => return,
@@ -346,10 +365,17 @@ fn render_search_state(
 
     let max_line_width = lines.iter().map(|l| l.width()).max().unwrap_or(0) as u16;
     if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
-        card_width = max_line_width.clamp(20, area.width.min(64));
+        card_width = (max_line_width + 4)
+            .clamp(32, area.width.saturating_sub(2))
+            .min(72);
     }
 
-    let card_height = (lines.len() as u16).min(area.height);
+    let is_boxed = matches!(view, SearchViewState::Error | SearchViewState::NoResults);
+    let card_height = if is_boxed {
+        (lines.len() as u16 + 2).min(area.height)
+    } else {
+        (lines.len() as u16).min(area.height)
+    };
     let card = Rect {
         x: area.x + area.width.saturating_sub(card_width) / 2,
         y: area.y + area.height.saturating_sub(card_height) / 2,
@@ -357,13 +383,40 @@ fn render_search_state(
         height: card_height,
     };
 
-    let alignment = if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
-        Alignment::Left
+    if is_boxed && card.height >= 3 {
+        let (border_style, title_text, title_style) = if view == SearchViewState::Error {
+            (
+                theme.error,
+                " Error ",
+                theme.error.add_modifier(Modifier::BOLD),
+            )
+        } else {
+            (
+                theme.muted,
+                " No Results ",
+                theme.subtext1.add_modifier(Modifier::BOLD),
+            )
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+            .border_style(border_style)
+            .title(Line::from(vec![Span::styled(title_text, title_style)]))
+            .padding(ratatui::widgets::Padding::horizontal(1));
+        frame.render_widget(
+            Paragraph::new(lines)
+                .block(block)
+                .alignment(Alignment::Left),
+            card,
+        );
     } else {
-        Alignment::Center
-    };
-
-    frame.render_widget(Paragraph::new(lines).alignment(alignment), card);
+        let alignment = if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
+            Alignment::Left
+        } else {
+            Alignment::Center
+        };
+        frame.render_widget(Paragraph::new(lines).alignment(alignment), card);
+    }
 }
 pub(crate) fn render_favorites_landing(
     frame: &mut Frame,
@@ -1231,14 +1284,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let current_y =
                     inner_area.y + (visible_index as u16 * row_height).min(inner_area.height);
 
+                let gutter = 1_u16;
+                let col_x = inner_area.x + column * (metrics.col_width + gutter);
+                let col_w = if column + 1 == metrics.columns {
+                    inner_area
+                        .width
+                        .saturating_sub(column * (metrics.col_width + gutter))
+                } else {
+                    metrics.col_width
+                };
                 let item_area = Rect {
-                    x: inner_area.x + column * metrics.col_width,
+                    x: col_x,
                     y: current_y,
-                    width: if column + 1 == metrics.columns {
-                        inner_area.width.saturating_sub(column * metrics.col_width)
-                    } else {
-                        metrics.col_width
-                    },
+                    width: col_w,
                     height: metrics.poster_rows_eff,
                 };
 
@@ -1352,16 +1410,37 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     frame.render_widget(placeholder, p_area);
                 }
 
-                let text_top_padding = text_area.height.saturating_sub(2) / 2;
-                let text_layout = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(text_top_padding),
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Min(0),
-                    ])
-                    .split(text_area);
+                let text_height = text_area.height;
+                let (text_top_padding, use_three_rows) = if text_height >= 4 {
+                    ((text_height.saturating_sub(3)) / 2, true)
+                } else if text_height == 3 {
+                    (0, true)
+                } else {
+                    ((text_height.saturating_sub(2)) / 2, false)
+                };
+
+                let text_layout = if use_three_rows {
+                    Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(text_top_padding),
+                            Constraint::Length(1),
+                            Constraint::Length(1),
+                            Constraint::Length(1),
+                            Constraint::Min(0),
+                        ])
+                        .split(text_area)
+                } else {
+                    Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(text_top_padding),
+                            Constraint::Length(1),
+                            Constraint::Length(1),
+                            Constraint::Min(0),
+                        ])
+                        .split(text_area)
+                };
 
                 let title_style = if is_selected {
                     if is_editing {
@@ -1382,9 +1461,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             stype: res.stype,
                             release_year: &res.release_year,
                         });
-                let title_reserved = if is_favorited { 6 } else { 4 };
-                let max_title_width = text_area.width.saturating_sub(title_reserved) as usize;
-                let display_title = crate::tui::text::truncate_width(&res.title, max_title_width);
 
                 let mut type_tag = if state.is_tv_mode || res.stype == 3 {
                     "TV Channel".to_string()
@@ -1401,32 +1477,80 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     type_tag = "Unknown".to_string();
                 }
 
-                let mut title_spans = vec![ratatui::text::Span::raw(" ")];
+                // Row 1: Title + Right-pinned Resolution Badge
+                let res_badge = if !is_history {
+                    crate::tui::widgets::badge::extract_resolution(&res.title, None)
+                } else {
+                    None
+                };
+                let badge_spans = res_badge.map(|r| {
+                    crate::tui::widgets::badge::resolution_badge_spans(
+                        r,
+                        theme,
+                        state.basic_terminal,
+                    )
+                });
+                let badge_width = badge_spans.as_ref().map_or(0, |spans| {
+                    spans
+                        .iter()
+                        .map(|s| crate::tui::text::width(s.content.as_ref()))
+                        .sum::<usize>()
+                });
+
+                let title_reserved = if is_favorited { 3 } else { 1 }
+                    + badge_width
+                    + if badge_width > 0 { 1 } else { 0 };
+                let max_title_width = (text_area.width as usize)
+                    .saturating_sub(title_reserved)
+                    .max(4);
+                let display_title = crate::tui::text::truncate_width(&res.title, max_title_width);
+
+                let mut row1_spans = vec![ratatui::text::Span::raw(" ")];
                 if is_favorited {
-                    title_spans.push(ratatui::text::Span::styled(
+                    row1_spans.push(ratatui::text::Span::styled(
                         if state.basic_terminal { "* " } else { "★ " },
                         theme.rating,
                     ));
                 }
-                title_spans.push(ratatui::text::Span::styled(display_title, title_style));
-                let title_line = ratatui::text::Line::from(title_spans);
-                if text_layout[1].height > 0 {
-                    frame.render_widget(Paragraph::new(title_line), text_layout[1]);
+                row1_spans.push(ratatui::text::Span::styled(
+                    display_title.clone(),
+                    title_style,
+                ));
+
+                if let Some(b_spans) = badge_spans {
+                    let title_actual_w = 1
+                        + if is_favorited { 2 } else { 0 }
+                        + crate::tui::text::width(&display_title);
+                    let gap =
+                        (text_area.width as usize).saturating_sub(title_actual_w + badge_width);
+                    if gap > 0 {
+                        row1_spans.push(ratatui::text::Span::raw(" ".repeat(gap)));
+                    }
+                    row1_spans.extend(b_spans);
                 }
 
-                let mut info_spans = vec![];
+                if text_layout[1].height > 0 {
+                    frame.render_widget(
+                        Paragraph::new(ratatui::text::Line::from(row1_spans)),
+                        text_layout[1],
+                    );
+                }
+
+                // Row 2 & Row 3 Metadata
+                let mut row2_spans = vec![ratatui::text::Span::raw(" ")];
+                let mut row3_spans = vec![ratatui::text::Span::raw(" ")];
 
                 if is_history {
                     if !type_tag.is_empty() {
-                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        row2_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                        row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                     }
                     if res.season > 0 {
-                        info_spans.push(ratatui::text::Span::styled(
+                        row2_spans.push(ratatui::text::Span::styled(
                             format!("S{:02}E{:02}", res.season, res.episode),
                             theme.text,
                         ));
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                     }
 
                     if let Some(hist) = state.history.get_item(
@@ -1438,87 +1562,78 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     ) {
                         if hist.is_in_progress() {
                             let (filled, empty) = hist.progress_bar_parts(8);
-                            info_spans.push(ratatui::text::Span::styled(
-                                filled,
-                                theme.accent.add_modifier(ratatui::style::Modifier::BOLD),
-                            ));
-                            info_spans.push(ratatui::text::Span::styled(empty, theme.text_dim));
-
+                            let mut progress_spans = vec![
+                                ratatui::text::Span::styled(
+                                    filled,
+                                    theme.accent.add_modifier(ratatui::style::Modifier::BOLD),
+                                ),
+                                ratatui::text::Span::styled(empty, theme.text_dim),
+                            ];
                             let pct = hist
                                 .progress_percentage()
                                 .map(|p| format!(" {:.0}%", p))
                                 .unwrap_or_default();
-                            info_spans.push(ratatui::text::Span::styled(pct, theme.text));
+                            progress_spans.push(ratatui::text::Span::styled(pct, theme.text));
 
                             if let Some(r) = hist.formatted_remaining() {
-                                info_spans.push(ratatui::text::Span::styled(
+                                progress_spans.push(ratatui::text::Span::styled(
                                     format!(" ({r})"),
                                     theme.text_dim,
                                 ));
                             }
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                            info_spans.push(ratatui::text::Span::styled(
-                                format!("Watched {}", hist.formatted_relative_time()),
-                                theme.text_dim,
-                            ));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+
+                            if use_three_rows {
+                                row3_spans.extend(progress_spans);
+                                row3_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                                row3_spans.push(ratatui::text::Span::styled(
+                                    format!("Watched {}", hist.formatted_relative_time()),
+                                    theme.text_dim,
+                                ));
+                            } else {
+                                row2_spans.extend(progress_spans);
+                                row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            }
                         } else if hist.completed {
-                            info_spans.push(ratatui::text::Span::styled(
+                            let comp_span = ratatui::text::Span::styled(
                                 if state.basic_terminal {
                                     "[Completed]"
                                 } else {
                                     "[✓ Completed]"
                                 },
                                 theme.text_dim,
-                            ));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                            info_spans.push(ratatui::text::Span::styled(
-                                format!("Watched {}", hist.formatted_relative_time()),
-                                theme.text_dim,
-                            ));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            );
+                            if use_three_rows {
+                                row3_spans.push(comp_span);
+                                row3_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                                row3_spans.push(ratatui::text::Span::styled(
+                                    format!("Watched {}", hist.formatted_relative_time()),
+                                    theme.text_dim,
+                                ));
+                            } else {
+                                row2_spans.push(comp_span);
+                                row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                            }
                         }
                     }
 
-                    info_spans.push(crate::tui::widgets::badge::provider_badge_span(
+                    row2_spans.push(crate::tui::widgets::badge::provider_badge_span(
                         res.provider,
                         theme,
                         state.basic_terminal,
                     ));
                 } else {
-                    if let Some(resolution) =
-                        crate::tui::widgets::badge::extract_resolution(&res.title, None)
-                    {
-                        info_spans.extend(crate::tui::widgets::badge::resolution_badge_spans(
-                            resolution,
-                            theme,
-                            state.basic_terminal,
-                        ));
-                    }
-
-                    macro_rules! push_year {
-                        () => {
-                            if res.release_year != "Unknown" && !res.release_year.is_empty() {
-                                info_spans
-                                    .push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                                info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                            }
-                        };
-                    }
-
-                    if is_selected {
-                        if let Some(meta) = &state.search_preview {
+                    if let Some(meta) = &state.search_preview {
+                        if is_selected {
                             let rating = meta
                                 .get("imdbRating")
                                 .or_else(|| meta.get("imdbRatingValue"))
                                 .and_then(|v| v.as_str());
                             if let Some(r) = rating {
                                 let star = if state.basic_terminal { "* " } else { "★ " };
-                                info_spans.push(ratatui::text::Span::styled(star, theme.rating));
-                                info_spans.push(ratatui::text::Span::styled(r, theme.text));
-                                info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                                row2_spans.push(ratatui::text::Span::styled(star, theme.rating));
+                                row2_spans.push(ratatui::text::Span::styled(r, theme.text));
+                                row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                             }
-                            push_year!();
 
                             let mut g_names = vec![];
                             if let Some(genres) = meta.get("genres").and_then(|g| g.as_array()) {
@@ -1532,52 +1647,58 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                     .collect();
                             }
                             if !g_names.is_empty() {
-                                info_spans.push(ratatui::text::Span::styled(
-                                    g_names.join(" • "),
-                                    theme.text,
-                                ));
-                                info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                                let g_str = g_names.join(", ");
+                                let g_trunc = crate::tui::text::truncate_width(
+                                    &g_str,
+                                    text_area.width.saturating_sub(2) as usize,
+                                );
+                                row3_spans
+                                    .push(ratatui::text::Span::styled(g_trunc, theme.subtext1));
                             }
-                            info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                        } else if state.preview_loading {
-                            push_year!();
-                            info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                            info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-                            let dots = match (state.tick_count / 4) % 4 {
-                                0 => "",
-                                1 => ".",
-                                2 => "..",
-                                _ => "...",
-                            };
-                            info_spans.push(ratatui::text::Span::styled(
-                                format!("Loading{dots}"),
-                                theme.text_dim,
-                            ));
-                        } else {
-                            push_year!();
-                            info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
                         }
-                    } else {
-                        push_year!();
-                        info_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                    } else if is_selected && state.preview_loading {
+                        let dots = match (state.tick_count / 4) % 4 {
+                            0 => "",
+                            1 => ".",
+                            2 => "..",
+                            _ => "...",
+                        };
+                        row3_spans.push(ratatui::text::Span::styled(
+                            format!("Loading{dots}"),
+                            theme.text_dim,
+                        ));
                     }
 
-                    if !info_spans.is_empty() {
-                        info_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                    if res.release_year != "Unknown" && !res.release_year.is_empty() {
+                        row2_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
+                        row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                     }
-                    info_spans.push(crate::tui::widgets::badge::provider_badge_span(
+
+                    row2_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                    row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+
+                    row2_spans.push(crate::tui::widgets::badge::provider_badge_span(
                         res.provider,
                         theme,
                         state.basic_terminal,
                     ));
                 }
 
-                if text_layout[2].height > 0 && !info_spans.is_empty() {
-                    let mut padded = vec![ratatui::text::Span::raw(" ")];
-                    padded.extend(info_spans);
+                if text_layout[2].height > 0 && row2_spans.len() > 1 {
                     frame.render_widget(
-                        Paragraph::new(ratatui::text::Line::from(padded)),
+                        Paragraph::new(ratatui::text::Line::from(row2_spans)),
                         text_layout[2],
+                    );
+                }
+
+                if use_three_rows
+                    && text_layout.len() > 3
+                    && text_layout[3].height > 0
+                    && row3_spans.len() > 1
+                {
+                    frame.render_widget(
+                        Paragraph::new(ratatui::text::Line::from(row3_spans)),
+                        text_layout[3],
                     );
                 }
             }
@@ -2053,10 +2174,25 @@ fn render_search_suggestions(
     }
 
     crate::tui::clear_area(frame, container_area, theme);
-    let container_block = Block::default()
+    let remaining_below = state
+        .search_suggestions
+        .len()
+        .saturating_sub(suggestion_offset + visible_count);
+    let mut container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
         .border_style(theme.border_focus);
+
+    if remaining_below > 0 {
+        let hint_text = if state.basic_terminal {
+            format!(" v (+{} more) ", remaining_below)
+        } else {
+            format!(" ▼ (+{} more) ", remaining_below)
+        };
+        container_block = container_block.title_bottom(
+            Line::from(vec![Span::styled(hint_text, theme.overlay1)]).alignment(Alignment::Right),
+        );
+    }
     frame.render_widget(container_block, container_area);
 
     for (row_idx, &(orig_idx, suggestion)) in visible_slice.iter().enumerate() {
@@ -2226,6 +2362,44 @@ mod tests {
         assert!(rendered.contains('▌'));
         assert!(!rendered.contains('├'));
         assert!(!rendered.contains('└'));
+    }
+    #[test]
+    fn test_render_search_suggestions_overflow_cue() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let state = AppState {
+            input_mode: InputMode::Editing,
+            search_suggestions: (1..=10).map(|i| format!("Movie Title {i}")).collect(),
+            suggest_index: Some(0),
+            basic_terminal: false,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                let search_bar = Rect::new(10, 2, 60, 3);
+                render_search_suggestions(
+                    frame,
+                    area,
+                    search_bar,
+                    &state,
+                    &theme,
+                    SearchViewState::Empty,
+                );
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+        assert!(rendered.contains("▼ (+4 more)"));
     }
 
     #[test]

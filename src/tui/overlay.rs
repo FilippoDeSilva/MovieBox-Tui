@@ -239,26 +239,37 @@ pub fn confirmation(
         Paragraph::new(summary.to_vec()).alignment(Alignment::Center),
         sections[0],
     );
+    use ratatui::style::Color;
+    let confirm_btn_style = if confirm_selected {
+        if basic_terminal {
+            theme.text.add_modifier(Modifier::REVERSED | Modifier::BOLD)
+        } else {
+            Style::default()
+                .bg(theme.accent.fg.unwrap_or(Color::Cyan))
+                .fg(theme.crust.fg.unwrap_or(Color::Black))
+                .add_modifier(Modifier::BOLD)
+        }
+    } else {
+        theme.subtext1
+    };
 
-    let selected_style = selection_style(theme, basic_terminal);
+    let cancel_btn_style = if !confirm_selected {
+        if basic_terminal {
+            theme.text.add_modifier(Modifier::REVERSED | Modifier::BOLD)
+        } else {
+            Style::default()
+                .bg(theme.surface1.fg.unwrap_or(Color::DarkGray))
+                .fg(theme.text.fg.unwrap_or(Color::White))
+                .add_modifier(Modifier::BOLD)
+        }
+    } else {
+        theme.subtext1
+    };
+
     let actions = vec![
-        Span::styled(
-            " Download ",
-            if confirm_selected {
-                selected_style
-            } else {
-                theme.text_dim
-            },
-        ),
+        Span::styled(" [ Download ] ", confirm_btn_style),
         Span::raw("    "),
-        Span::styled(
-            " Cancel ",
-            if confirm_selected {
-                theme.text_dim
-            } else {
-                selected_style
-            },
-        ),
+        Span::styled(" [ Cancel ] ", cancel_btn_style),
     ];
     crate::tui::widgets::render_modal_footer(frame, sections[1], actions, theme);
 }
