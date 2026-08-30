@@ -45,7 +45,7 @@ Text editing across Search, TV Playlist Manager, and Addon Manager uses a unifie
 
 All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, Addon Manager, Download Confirmation) support standard keyboard controls:
 
-- **`↑` / `↓`**: Move selection up / down by one item.
+- **`↑` / `↓` / `k` / `j`**: Move selection up / down by one item (vim keys `k`/`j` supported in pickers such as `/theme`).
 - **`Home` / `End`**: Jump immediately to the first or last item in the list.
 - **`PageUp` / `PageDown`**: Step up or down by 5 items.
 - **`Enter`**: Confirm selection, activate entry, or submit dialog.

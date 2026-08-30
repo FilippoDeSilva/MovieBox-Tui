@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- **Stream list tabular column headers (`stream_table_header_spans`)**: Rendered aligned header row (`Quality`, `Size`, `Codecs`, `Duration`, `Release / Source`) at the top of stream results in the Details view on viewports $\ge 76$ columns.
+- **Vim navigation in Theme picker (`j` / `k`)**: Added `j` (down) and `k` (up) key support to navigate and live-preview themes inside the `/theme` picker popup.
 - **Live stream verification test suite (`tests/live_stream_verification.rs`)**: Integrated end-to-end verification verifying movie and series stream resolution against live backend endpoints and asserting absence of legacy notice hashes.
 - **Unified Command Hub landing design**: Redesigned the homepage landing screen into a single cohesive, proportional modal container seamlessly combining the search bar, embedded provider pill (`[MovieBox · Ctrl+P]`), live suggestions, recent favorites, and quick command shortcuts.
 - **Details Screen Subtitles Shortcut (`[s]`)**: Added `s`/`S` keyboard shortcut on Details screen to open the subtitle language picker, matching mouse click and footer hints.
@@ -131,6 +133,10 @@
   `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
 
 ### Changed
+- **Framed Zero-Results & Error state cards**: Enclosed empty search results and query error states in styled, centered cards with pill headers (`SearchViewState::Error`, `SearchViewState::NoResults`) and actionable guidance pills (`[Ctrl+P] Switch Provider`, `[r] Retry`, `[Esc] Back`), with dedicated handling for empty `/favorites` queries (`"No favorites saved yet"`).
+- **Multi-column result grid gutter arithmetic**: Refined `ResultMetrics` and `result_columns_for` column width calculations to account for explicit 1-character column gutters across 1, 2, 3, and 4-column tiers (with 4-column breakpoint at $\ge 220$ columns).
+- **Details footer split threshold synchronization**: Unified the single-row to dual-row footer threshold constant `DETAILS_FOOTER_SPLIT_THRESHOLD` ($86$ cols) across screen rendering (`details.rs`) and mouse click detection (`mouse.rs`).
+- **Confirmation dialog button contrast**: Enhanced `[ Download ]` and `[ Cancel ]` button styling in confirmation modals with reverse/bold modifiers on basic terminals for WCAG AA visual contrast.
 - **Framed landing favorites deck styling & alignment**: Enclosed the landing Favorites list in a matching bordered card with:
   - Header border offset (`╭─ ★  Favorites ──╮` / `+- *  Favorites --+` on basic) with double-space icon breathing room.
   - 1:1 vertical column alignment between header star `★` and selection pointer `▌` (col x0 + 3), and header text `Favorites` and item titles (col x0 + 6).
