@@ -1010,7 +1010,7 @@ impl App {
                     } else if !self.state.is_resolving_playback
                         && self.state.last_playback_launch.elapsed().as_millis() >= 500
                     {
-                        self.action_sender.send(Action::PlayStream(false)).ok();
+                        self.action_sender.send(Action::PlayStream).ok();
                     }
                 }
             }
@@ -1060,7 +1060,6 @@ impl App {
 
         enum FooterAction {
             PlaySelect,
-            OpenWith,
             Download,
             Favorite,
             Subtitles,
@@ -1073,11 +1072,8 @@ impl App {
 
         if is_streams {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 4));
-            let o_label_len = if compact { 4 } else { 9 };
-            primary.push((FooterAction::OpenWith, 3 + 1 + o_label_len));
             let d_label_len = if compact { 4 } else { 8 };
             primary.push((FooterAction::Download, 3 + 1 + d_label_len));
-
             secondary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
             if !self.state.subtitle_list.is_empty() {
                 let s_label_len = if compact { 4 } else { 9 };
@@ -1135,13 +1131,10 @@ impl App {
                 match action {
                     FooterAction::PlaySelect => {
                         if is_streams {
-                            self.action_sender.send(Action::PlayStream(false)).ok();
+                            self.action_sender.send(Action::PlayStream).ok();
                         } else {
                             self.action_sender.send(Action::Submit).ok();
                         }
-                    }
-                    FooterAction::OpenWith => {
-                        self.action_sender.send(Action::PlayStream(true)).ok();
                     }
                     FooterAction::Download => {
                         if is_seasons {

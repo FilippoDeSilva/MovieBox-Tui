@@ -915,19 +915,6 @@ impl App {
                             self.state.input_mode = InputMode::Normal;
                             self.state.set_status_default("Search cleared.");
                         }
-                        KeyCode::Char('o') | KeyCode::Char('O')
-                            if self.state.input_mode == InputMode::Normal
-                                && self.state.is_tv_mode =>
-                        {
-                            let idx_opt = self.state.search_list_state.selected();
-                            if let Some(idx) = idx_opt {
-                                if let Some(item) = self.state.search_results.get(idx) {
-                                    self.action_sender
-                                        .send(Action::ShowPlayerPicker(item.id.clone(), None))
-                                        .ok();
-                                }
-                            }
-                        }
                         KeyCode::Char('f') | KeyCode::Char('F')
                             if self.state.favorites_available()
                                 && (!self.state.search_results.is_empty()
@@ -1017,12 +1004,9 @@ impl App {
                             && !self.state.show_season_download_confirm
                             && !self.state.show_episode_download_confirm
                         {
-                            let open_with = key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::SHIFT);
                             match self.state.details_pane {
                                 crate::tui::state::DetailsPane::Streams => {
-                                    self.action_sender.send(Action::PlayStream(open_with)).ok();
+                                    self.action_sender.send(Action::PlayStream).ok();
                                 }
                                 crate::tui::state::DetailsPane::Seasons => {
                                     self.trigger_episode_fetch();
@@ -1040,14 +1024,6 @@ impl App {
                     }
                     KeyCode::Char('q') => {
                         self.action_sender.send(Action::Quit).ok();
-                    }
-                    KeyCode::Char('o') | KeyCode::Char('O') => {
-                        if !self.state.subtitle_popup && !self.state.player_picker_popup {
-                            if let crate::tui::state::DetailsPane::Streams = self.state.details_pane
-                            {
-                                self.action_sender.send(Action::PlayStream(true)).ok();
-                            }
-                        }
                     }
                     KeyCode::Char('d') | KeyCode::Char('D') => {
                         if !self.state.subtitle_popup && !self.state.player_picker_popup {
@@ -1120,9 +1096,6 @@ impl App {
                         }
                     }
                     KeyCode::Enter => {
-                        let open_with = key
-                            .modifiers
-                            .contains(crossterm::event::KeyModifiers::SHIFT);
                         if self.state.show_season_download_confirm {
                             if self.state.season_download_confirm_yes_selected {
                                 self.action_sender.send(Action::ConfirmDownloadSeason).ok();
@@ -1143,7 +1116,7 @@ impl App {
                         } else {
                             match self.state.details_pane {
                                 crate::tui::state::DetailsPane::Streams => {
-                                    self.action_sender.send(Action::PlayStream(open_with)).ok();
+                                    self.action_sender.send(Action::PlayStream).ok();
                                 }
                                 crate::tui::state::DetailsPane::Seasons => {
                                     self.trigger_episode_fetch();

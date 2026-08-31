@@ -2049,12 +2049,6 @@ fn details_footer(
     if is_streams {
         primary.extend(footer_group("Enter", "Play", true, theme));
         primary.extend(footer_group(
-            "o",
-            if compact { "Open" } else { "Open With" },
-            false,
-            theme,
-        ));
-        primary.extend(footer_group(
             "d",
             if compact { "Save" } else { "Download" },
             false,
@@ -2330,7 +2324,7 @@ mod tests {
         all_spans.extend(secondary);
         let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(footer_text.contains("[Enter] Play"));
-        assert!(footer_text.contains("[o] Open With"));
+        assert!(!footer_text.contains("[o] Open With"));
         assert!(footer_text.contains("[d] Download"));
         assert!(footer_text.contains("[f] Favorite"));
         assert!(footer_text.contains("[s] Subtitles"));

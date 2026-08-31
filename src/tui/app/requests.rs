@@ -1404,7 +1404,7 @@ impl App {
                     self.state.is_fetching_streams = false;
                     if self.state.auto_play_on_ready {
                         self.state.auto_play_on_ready = false;
-                        self.action_sender.send(Action::PlayStream(false)).ok();
+                        self.action_sender.send(Action::PlayStream).ok();
                     }
                     return None;
                 }
@@ -2024,7 +2024,7 @@ impl App {
                 }
                 if self.state.auto_play_on_ready {
                     self.state.auto_play_on_ready = false;
-                    self.action_sender.send(Action::PlayStream(false)).ok();
+                    self.action_sender.send(Action::PlayStream).ok();
                 }
             }
 

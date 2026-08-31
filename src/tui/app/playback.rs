@@ -320,7 +320,7 @@ fn clean_player_error(code: Option<i32>, stderr: &str) -> String {
 impl App {
     pub(super) async fn handle_playback(&mut self, action: Action) -> Option<()> {
         match action {
-            Action::PlayStream(open_with) => {
+            Action::PlayStream => {
                 if self.state.is_playing {
                     self.state.notify(
                         NotificationKind::Warning,
@@ -369,13 +369,13 @@ impl App {
                             || release.provider == ProviderKind::BdixDhakaFlix
                         {
                             let sender_clone = self.action_sender.clone();
-                            if open_with || default_player.is_none() {
-                                sender_clone
-                                    .send(Action::ShowPlaybackPicker(direct_source))
-                                    .ok();
-                            } else if let Some(player) = default_player {
+                            if let Some(player) = default_player {
                                 sender_clone
                                     .send(Action::LaunchPlayback(player, direct_source))
+                                    .ok();
+                            } else {
+                                sender_clone
+                                    .send(Action::ShowPlaybackPicker(direct_source))
                                     .ok();
                             }
                             return None;
@@ -409,10 +409,10 @@ impl App {
                                                 &source.headers,
                                             )
                                         });
-                                    if open_with || default_player.is_none() {
-                                        sender.send(Action::ShowPlaybackPicker(source)).ok();
-                                    } else if let Some(player) = default_player {
+                                    if let Some(player) = default_player {
                                         sender.send(Action::LaunchPlayback(player, source)).ok();
+                                    } else {
+                                        sender.send(Action::ShowPlaybackPicker(source)).ok();
                                     }
                                 }
                                 Ok(Err(error)) => {
@@ -468,11 +468,7 @@ impl App {
                             .flatten();
                             if let Some(res) = cached {
                                 sender
-                                    .send(Action::ShowSubtitlePopup(
-                                        link_clone.clone(),
-                                        res,
-                                        open_with,
-                                    ))
+                                    .send(Action::ShowSubtitlePopup(link_clone.clone(), res))
                                     .ok();
                                 return;
                             }
@@ -493,35 +489,21 @@ impl App {
                                             &res_for_cache,
                                         );
                                     });
-                                    sender
-                                        .send(Action::ShowSubtitlePopup(link_clone, res, open_with))
-                                        .ok();
+                                    sender.send(Action::ShowSubtitlePopup(link_clone, res)).ok();
                                 }
                                 _ => {
-                                    if open_with {
-                                        sender
-                                            .send(Action::ShowPlayerPicker(link_clone, None))
-                                            .ok();
-                                    } else {
-                                        sender.send(Action::LaunchMpv(link_clone, None)).ok();
-                                    }
+                                    sender.send(Action::LaunchMpv(link_clone, None)).ok();
                                 }
                             }
                         });
                     } else {
-                        if open_with {
-                            self.action_sender
-                                .send(Action::ShowPlayerPicker(link, None))
-                                .ok();
-                        } else {
-                            self.action_sender.send(Action::LaunchMpv(link, None)).ok();
-                        }
+                        self.action_sender.send(Action::LaunchMpv(link, None)).ok();
                     }
                 } else {
                     self.state.is_resolving_playback = false;
                 }
             }
-            Action::ShowSubtitlePopup(link, ext_captions, open_with) => {
+            Action::ShowSubtitlePopup(link, ext_captions) => {
                 self.state.is_resolving_playback = false;
                 let options = crate::tui::state::caption_options(&ext_captions);
 
@@ -533,15 +515,8 @@ impl App {
                     self.state.subtitle_list = options;
                     self.state.subtitle_list_state.select(Some(0));
                     self.state.pending_play_link = Some(link);
-                    self.state.pending_open_with = open_with;
                 } else {
-                    if open_with {
-                        self.action_sender
-                            .send(Action::ShowPlayerPicker(link, None))
-                            .ok();
-                    } else {
-                        self.action_sender.send(Action::LaunchMpv(link, None)).ok();
-                    }
+                    self.action_sender.send(Action::LaunchMpv(link, None)).ok();
                 }
             }
             Action::ShowDownloadSubtitlePopup(ext_captions) => {
@@ -752,7 +727,6 @@ mod tests {
         app.handle_playback(crate::tui::action::Action::ShowSubtitlePopup(
             "https://example.com/video.mp4".to_string(),
             ext_captions,
-            false,
         ))
         .await;
 

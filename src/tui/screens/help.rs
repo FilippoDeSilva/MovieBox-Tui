@@ -103,10 +103,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Play Selected Channel", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [o]            ", theme.header),
-            Span::styled("Open Alternative Player Picker", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
             Span::styled("    [r]            ", theme.header),
             Span::styled("Reload TV Playlists", theme.text),
         ]));
@@ -130,14 +126,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         help_text.push(Line::from(vec![
             Span::styled("    [←] [→] / [Tab]", theme.header),
             Span::styled("Switch Details Pane (Seasons/Streams)", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
-            Span::styled("    [Enter]        ", theme.header),
-            Span::styled("Select Movie / Play Stream", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
-            Span::styled("    [o]            ", theme.header),
-            Span::styled("Open Alternative Player Picker", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    [d]            ", theme.header),
@@ -182,14 +170,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         help_text.push(Line::from(vec![
             Span::styled("    [←] [→] / [Tab]", theme.header),
             Span::styled("Switch Details Pane (Audio/Seasons/Streams)", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
-            Span::styled("    [Enter]        ", theme.header),
-            Span::styled("Play with Default Player", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
-            Span::styled("    [o]            ", theme.header),
-            Span::styled("Open Alternative Player Picker", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    [d]            ", theme.header),
@@ -238,6 +218,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     help_text.push(Line::from(vec![
         Span::styled("    /clear         ", theme.header),
         Span::styled("Clear Search & Return to Landing", theme.text),
+    ]));
+    help_text.push(Line::from(vec![
+        Span::styled("    /exit          ", theme.header),
+        Span::styled("Exit Application and Return to Shell", theme.text),
     ]));
     help_text.push(Line::from(vec![
         Span::styled("    /help          ", theme.header),

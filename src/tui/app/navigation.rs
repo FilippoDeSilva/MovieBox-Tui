@@ -769,16 +769,9 @@ impl App {
                     let idx = self.state.subtitle_list_state.selected().unwrap_or(0);
                     let sub_url = self.state.subtitle_list.get(idx).map(|(_, u)| u.clone());
                     if let Some(link) = self.state.pending_play_link.take() {
-                        let open_with = self.state.pending_open_with;
-                        if open_with {
-                            self.action_sender
-                                .send(Action::ShowPlayerPicker(link, sub_url))
-                                .ok();
-                        } else {
-                            self.action_sender
-                                .send(Action::LaunchMpv(link, sub_url))
-                                .ok();
-                        }
+                        self.action_sender
+                            .send(Action::LaunchMpv(link, sub_url))
+                            .ok();
                     }
                     return None;
                 } else if self.state.is_download_subtitle_popup {

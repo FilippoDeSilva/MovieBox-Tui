@@ -458,7 +458,7 @@ impl App {
                 self.handle_requests(action).await;
             }
 
-            Action::PlayStream(..)
+            Action::PlayStream
             | Action::ShowSubtitlePopup(..)
             | Action::ShowDownloadSubtitlePopup(..)
             | Action::ShowPlaybackPicker(..)

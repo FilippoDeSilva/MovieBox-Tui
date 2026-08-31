@@ -61,7 +61,6 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`Ctrl+P`**: Cycle content providers (`MovieBox` $\to$ `4KHDHub` $\to$ `BDIX`).
 - **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Audio Languages, Seasons, Episodes, Streams).
 - **`Enter`**: Play with default player.
-- **`o`**: Open player selection picker for the current stream.
 - **`d`**: Download current episode or full season batch.
 - **`r`**: Refresh search results / stream list.
 - **`f`**: Favorite / unfavorite the selected title (Home & Details screens).
@@ -73,16 +72,13 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`/clear`**: Clear active search query and return to landing.
 
 ### Live TV Mode
-- **`Enter`**: Play selected TV channel immediately.
-- **`o`**: Open player selection picker for the channel.
+- **`Enter`**: Play selected TV channel immediately with default player.
 - **`r`**: Reload all active M3U playlist sources.
 - **`/config`**: Open TV Playlist Manager dialog (`Space` to activate, `Delete`/`d` to remove).
 - **`/list`**: Show all loaded channels.
 ### Addon Mode (HTTP Addons)
 - **`Ctrl+P` / `/config`**: Open Addon Manager dialog (`Space` to toggle, `Delete`/`d` to remove).
-- **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Seasons, Episodes, Streams).
 - **`Enter`**: Select title or play resolved stream.
-- **`o`**: Open player selection picker for the stream.
 - **`d`**: Download HTTP stream release.
 - **`r`**: Refresh addon catalog search results.
 - **`f`**: Favorite / unfavorite the selected title (Home & Details screens).
@@ -126,6 +122,7 @@ Type these commands directly into the search bar:
 | `/toggle-update` | All | Toggle automatic update checks on startup |
 | `/toggle-bdix` | Streaming | Toggle BDIX FTP scrapers on/off |
 | `/toggle-streaming` | All | Toggle Streaming Mode content availability |
+| `/exit` | All | Exit application and return to shell (aliases `/quit`, `/q`) |
 | `/toggle-tv` | All | Toggle TV Mode IPTV player |
 | `/toggle-addons` | All | Toggle Addon Mode HTTP metadata/stream extensions |
 | `/probe` | All | Re-probe terminal graphics protocol support (Kitty, Sixel, iTerm2) |

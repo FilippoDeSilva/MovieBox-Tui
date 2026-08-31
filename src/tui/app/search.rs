@@ -142,6 +142,10 @@ impl App {
         }
 
         match parsed {
+            crate::tui::commands::ParsedCommand::Exit => {
+                self.action_sender.send(Action::Quit).ok();
+                Some(true)
+            }
             crate::tui::commands::ParsedCommand::Settings => {
                 self.action_sender.send(Action::ToggleSettingsPopup).ok();
                 Some(true)

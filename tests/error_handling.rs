@@ -125,7 +125,7 @@ async fn test_rapid_playback_invocations_debounced_and_single_flight() {
     app.state_mut().last_playback_launch = std::time::Instant::now();
     app.state_mut().is_resolving_playback = false;
 
-    let res = app.handle_action(Action::PlayStream(false)).await;
+    let res = app.handle_action(Action::PlayStream).await;
     assert_eq!(res, None);
     assert!(!app.state().is_resolving_playback);
 }
@@ -135,7 +135,7 @@ async fn test_active_player_session_blocks_duplicate_playback_and_recovers_on_ex
     let mut app = App::new();
     app.state_mut().is_playing = true;
 
-    let res = app.handle_action(Action::PlayStream(false)).await;
+    let res = app.handle_action(Action::PlayStream).await;
     assert_eq!(res, None);
     assert!(!app.state().notifications.is_empty());
     let notif = app.state().notifications.back().unwrap();

@@ -21,6 +21,7 @@ pub enum SlashCommand {
     ToggleTv,
     ToggleAddons,
     Probe,
+    Exit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,10 +45,11 @@ pub enum ParsedCommand<'a> {
     ToggleTv,
     ToggleAddons,
     Probe,
+    Exit,
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::Settings,
         Self::Browse,
         Self::History,
@@ -67,6 +69,7 @@ impl SlashCommand {
         Self::ToggleTv,
         Self::ToggleAddons,
         Self::Probe,
+        Self::Exit,
     ];
 
     pub const PRIMARY: [Self; 7] = [
@@ -108,6 +111,7 @@ impl SlashCommand {
             Self::ToggleTv => "/toggle-tv",
             Self::ToggleAddons => "/toggle-addons",
             Self::Probe => "/probe",
+            Self::Exit => "/exit",
         }
     }
 
@@ -140,6 +144,7 @@ impl SlashCommand {
             Self::ToggleTv => "Toggle TV mode navigation",
             Self::ToggleAddons => "Toggle Addon mode navigation",
             Self::Probe => "Re-detect terminal graphics support",
+            Self::Exit => "Exit application and restore terminal",
         }
     }
 
@@ -169,7 +174,8 @@ impl SlashCommand {
             | Self::ToggleStreaming
             | Self::ToggleTv
             | Self::ToggleAddons
-            | Self::Probe => true,
+            | Self::Probe
+            | Self::Exit => true,
         }
     }
 
@@ -249,6 +255,7 @@ impl SlashCommand {
             "/toggle-tv" => Some(Self::ToggleTv.description(state)),
             "/toggle-addons" => Some(Self::ToggleAddons.description(state)),
             "/probe" => Some(Self::Probe.description(state)),
+            "/exit" | "/quit" | "/q" => Some(Self::Exit.description(state)),
             _ => None,
         }
     }
@@ -287,6 +294,7 @@ impl SlashCommand {
                 Some(ParsedCommand::ToggleAddons)
             }
             "/probe" => Some(ParsedCommand::Probe),
+            "/exit" | "/quit" | "/q" => Some(ParsedCommand::Exit),
             _ => None,
         }
     }
@@ -347,7 +355,12 @@ mod tests {
     #[test]
     fn test_toggle_commands_and_aliases_parse() {
         let state = AppState::default();
-        assert_eq!(SlashCommand::ALL.len(), 19);
+        assert_eq!(SlashCommand::ALL.len(), 20);
+        assert_eq!(SlashCommand::parse("/exit"), Some(ParsedCommand::Exit));
+        assert_eq!(SlashCommand::parse("/quit"), Some(ParsedCommand::Exit));
+        assert_eq!(SlashCommand::parse("/q"), Some(ParsedCommand::Exit));
+        assert!(SlashCommand::Exit.is_available(&state));
+        assert_eq!(SlashCommand::Exit.name(), "/exit");
         assert_eq!(SlashCommand::parse("/clear"), Some(ParsedCommand::Clear));
         assert!(SlashCommand::Clear.is_available(&state));
         assert_eq!(SlashCommand::Clear.name(), "/clear");
