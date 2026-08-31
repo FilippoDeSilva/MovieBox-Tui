@@ -634,7 +634,6 @@ mod tests {
         assert_eq!(buf.len_graphemes(), 2);
         assert_eq!(buf.cursor(), 2);
 
-        // Compound emoji with ZWJ sequence: Family (👨‍👩‍👧‍👦)
         let family = "👨‍👩‍👧‍👦";
         buf.insert_str(family);
         assert_eq!(buf.len_graphemes(), 3);
@@ -689,17 +688,16 @@ mod tests {
         buf.move_end();
         assert!(!buf.delete_forwards());
         assert_eq!(buf.as_str(), "abc");
-
-        buf.set_cursor(1); // after 'a'
-        assert!(buf.delete_backwards()); // deletes 'a'
+        buf.set_cursor(1);
+        assert!(buf.delete_backwards());
         assert_eq!(buf.as_str(), "bc");
         assert_eq!(buf.cursor(), 0);
 
-        assert!(buf.delete_forwards()); // deletes 'b'
+        assert!(buf.delete_forwards());
         assert_eq!(buf.as_str(), "c");
         assert_eq!(buf.cursor(), 0);
 
-        assert!(buf.delete_forwards()); // deletes 'c'
+        assert!(buf.delete_forwards());
         assert_eq!(buf.as_str(), "");
         assert!(buf.is_empty());
         assert!(!buf.delete_forwards());

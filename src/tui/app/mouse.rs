@@ -1062,7 +1062,6 @@ impl App {
             PlaySelect,
             Download,
             Favorite,
-            Subtitles,
             StreamsTab,
             Back,
         }
@@ -1075,10 +1074,6 @@ impl App {
             let d_label_len = if compact { 4 } else { 8 };
             primary.push((FooterAction::Download, 3 + 1 + d_label_len));
             secondary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
-            if !self.state.subtitle_list.is_empty() {
-                let s_label_len = if compact { 4 } else { 9 };
-                secondary.push((FooterAction::Subtitles, 3 + 1 + s_label_len));
-            }
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else if is_languages {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
@@ -1145,12 +1140,6 @@ impl App {
                     }
                     FooterAction::Favorite => {
                         self.action_sender.send(Action::ToggleFavorite).ok();
-                    }
-                    FooterAction::Subtitles => {
-                        if !self.state.subtitle_list.is_empty() {
-                            self.state.subtitle_popup = true;
-                            self.state.subtitle_list_state.select(Some(0));
-                        }
                     }
                     FooterAction::StreamsTab => {
                         self.action_sender.send(Action::TabPane).ok();

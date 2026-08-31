@@ -2055,14 +2055,6 @@ fn details_footer(
             theme,
         ));
         secondary.extend(footer_group("f", fav_label, false, theme));
-        if !state.subtitle_list.is_empty() {
-            secondary.extend(footer_group(
-                "s",
-                if compact { "Subs" } else { "Subtitles" },
-                false,
-                theme,
-            ));
-        }
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_languages {
         primary.extend(footer_group("Enter", "Select", true, theme));
@@ -2327,7 +2319,6 @@ mod tests {
         assert!(!footer_text.contains("[o] Open With"));
         assert!(footer_text.contains("[d] Download"));
         assert!(footer_text.contains("[f] Favorite"));
-        assert!(footer_text.contains("[s] Subtitles"));
         assert!(footer_text.contains("[Esc] Back"));
 
         state.details_pane = crate::tui::state::DetailsPane::Seasons;
@@ -2397,14 +2388,11 @@ mod tests {
             DetailsPane::Episodes,
         ];
 
-        // Width < 85 should only return the active pane
         let narrow = visible_selector_panes(&all_panes, DetailsPane::Languages, 50);
         assert_eq!(narrow, vec![DetailsPane::Languages]);
 
         let narrow_season = visible_selector_panes(&all_panes, DetailsPane::Seasons, 60);
         assert_eq!(narrow_season, vec![DetailsPane::Seasons]);
-
-        // Width >= 85 should return all 3 panes
         let wide = visible_selector_panes(&all_panes, DetailsPane::Languages, 100);
         assert_eq!(wide.len(), 3);
     }

@@ -279,7 +279,6 @@ impl Theme {
             _ => base,
         }
     }
-    /// Returns a 3-point color swatch (Accent, Surface, Base) for a given theme name/kind.
     pub fn palette_swatch_spans(theme_name: &str, basic_terminal: bool) -> Vec<Span<'static>> {
         let kind = ThemeKind::parse(theme_name);
         let sample = Self::from_kind(kind);

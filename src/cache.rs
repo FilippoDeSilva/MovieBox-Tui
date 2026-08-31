@@ -577,8 +577,6 @@ mod tests {
         let destination = dir.join("not-a-file-target-dir");
         fs::create_dir_all(&destination).expect("destination directory");
         atomic_write_file(&destination.parent().unwrap().join("seed"), b"seed").ok();
-        // Renaming a file onto an existing directory always fails; the
-        // destination must survive untouched.
         let result = atomic_write_file(&destination, b"payload");
         assert!(result.is_err());
         assert!(destination.is_dir(), "existing destination was destroyed");
