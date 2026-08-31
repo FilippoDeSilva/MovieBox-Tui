@@ -829,22 +829,14 @@ impl App {
             available_panes.push(DetailsPane::Episodes);
         }
 
-        let tier = crate::tui::screens::details::DetailsLayoutTier::for_area(area);
-        let header_height = tier.header_height(area, self.state.selected_details.as_ref());
-        let footer_height = tier.footer_height(area.width);
-
-        let chunks = Layout::vertical([
-            Constraint::Length(header_height),
-            Constraint::Length(1),
-            Constraint::Min(5),
-            Constraint::Length(footer_height),
-        ])
-        .split(area);
-
-        let workflow_area = chunks[1];
-        let bottom_area = chunks[2];
-        let footer_area = chunks[3];
-
+        let layout = crate::tui::screens::details::details_screen_layout(
+            area,
+            self.state.selected_details.as_ref(),
+        );
+        let tier = layout.tier;
+        let workflow_area = layout.workflow_area;
+        let bottom_area = layout.bottom_area;
+        let footer_area = layout.footer_area;
         if row >= footer_area.y && row < footer_area.bottom() {
             self.handle_details_footer_click(col, row - footer_area.y, area.width);
             return None;

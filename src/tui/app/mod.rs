@@ -17,12 +17,62 @@ mod search;
 mod system;
 mod tv;
 
+#[derive(Default)]
+pub struct RequestTaskHandles {
+    pub search: Option<tokio::task::JoinHandle<()>>,
+    pub details: Option<tokio::task::JoinHandle<()>>,
+    pub streams: Option<tokio::task::JoinHandle<()>>,
+    pub suggest: Option<tokio::task::JoinHandle<()>>,
+    pub homepage: Option<tokio::task::JoinHandle<()>>,
+}
+
+impl RequestTaskHandles {
+    pub fn cancel_search(&mut self) {
+        if let Some(h) = self.search.take() {
+            h.abort();
+        }
+    }
+
+    pub fn cancel_details(&mut self) {
+        if let Some(h) = self.details.take() {
+            h.abort();
+        }
+    }
+
+    pub fn cancel_streams(&mut self) {
+        if let Some(h) = self.streams.take() {
+            h.abort();
+        }
+    }
+
+    pub fn cancel_suggest(&mut self) {
+        if let Some(h) = self.suggest.take() {
+            h.abort();
+        }
+    }
+
+    pub fn cancel_homepage(&mut self) {
+        if let Some(h) = self.homepage.take() {
+            h.abort();
+        }
+    }
+
+    pub fn cancel_all(&mut self) {
+        self.cancel_search();
+        self.cancel_details();
+        self.cancel_streams();
+        self.cancel_suggest();
+        self.cancel_homepage();
+    }
+}
+
 pub struct App {
     state: AppState,
     theme: Theme,
     service: std::sync::Arc<crate::service::MovieBoxService>,
     action_sender: mpsc::UnboundedSender<Action>,
     action_receiver: mpsc::UnboundedReceiver<Action>,
+    request_tasks: RequestTaskHandles,
 }
 
 impl Default for App {
@@ -113,6 +163,7 @@ impl App {
             service,
             action_sender,
             action_receiver,
+            request_tasks: RequestTaskHandles::default(),
         };
         if app.state.is_tv_mode {
             app.load_tv_playlists_from_config();

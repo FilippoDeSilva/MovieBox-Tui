@@ -174,3 +174,43 @@ impl PlaybackSource {
         }
     }
 }
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProviderError {
+    #[error("Network connection failed: {0}")]
+    Network(String),
+    #[error("Rate limited by provider")]
+    RateLimited(Option<u64>),
+    #[error("Item not found on provider")]
+    NotFound,
+    #[error("Failed to parse response: {0}")]
+    Parsing(String),
+    #[error("Provider is temporarily unavailable: {0}")]
+    Unavailable(String),
+}
+
+impl ProviderError {
+    pub fn user_message(&self, provider: ProviderKind) -> String {
+        match self {
+            Self::Network(msg) => format!("Network error on {provider}: {msg}"),
+            Self::RateLimited(secs) => match secs {
+                Some(s) => format!("Rate limited on {provider}. Retry in {s}s."),
+                None => format!("Rate limited on {provider}."),
+            },
+            Self::NotFound => format!("Content not found on {provider}."),
+            Self::Parsing(msg) => format!("Parser error on {provider}: {msg}"),
+            Self::Unavailable(msg) => format!("{provider} unavailable: {msg}"),
+        }
+    }
+}
+
+impl From<String> for ProviderError {
+    fn from(msg: String) -> Self {
+        Self::Unavailable(msg)
+    }
+}
+
+impl From<&str> for ProviderError {
+    fn from(msg: &str) -> Self {
+        Self::Unavailable(msg.to_string())
+    }
+}

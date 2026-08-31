@@ -117,9 +117,19 @@ Type these commands directly into the search bar:
 | `/favorites` | Streaming / Addon | View all starred titles |
 | `/theme` | All | Open visual theme palette swatch picker |
 | `/clear` | All | Clear search results and return to landing |
-| `/help` | All | Open interactive keybinding help menu |
+| `/help` | All | Open interactive keybinding help menu (alias `/?`) |
 | `/list` | TV | View live TV channels |
-## Help Overlay
+| `/config` | All | Open mode-specific configuration dialog (TV Playlists, Addons, or Settings) |
+| `/download-dir [path]` | All | View or configure custom media download folder (`reset` for default) |
+| `/update` | All | Trigger interactive manual update check against GitHub |
+| `/clear-cache` | All | Evict temporary cache files and image artifacts |
+| `/github` | All | Open MovieBox-TUI GitHub repository in default browser |
+| `/toggle-update` | All | Toggle automatic update checks on startup |
+| `/toggle-bdix` | Streaming | Toggle BDIX FTP scrapers on/off |
+| `/toggle-streaming` | All | Toggle Streaming Mode content availability |
+| `/toggle-tv` | All | Toggle TV Mode IPTV player |
+| `/toggle-addons` | All | Toggle Addon Mode HTTP metadata/stream extensions |
+| `/probe` | All | Re-probe terminal graphics protocol support (Kitty, Sixel, iTerm2) |
 
 - Open with `?`; close with `?`, `Esc`, or `q`.
 - `↑`/`↓`, `PageUp`/`PageDown`, and the mouse wheel scroll long content.

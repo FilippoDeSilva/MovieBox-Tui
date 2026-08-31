@@ -644,118 +644,22 @@ impl App {
                                 self.state.addon_manager_popup = false;
                             }
                             KeyCode::Up => {
-                                use crate::tui::state::AddonManagerRow;
-                                let rows = self.state.addon_manager_rows();
-                                let total = rows.len();
-                                let mut next = if self.state.addon_manager_selected == 0 {
-                                    total.saturating_sub(1)
-                                } else {
-                                    self.state.addon_manager_selected - 1
-                                };
-                                while next != self.state.addon_manager_selected
-                                    && matches!(rows.get(next), Some(AddonManagerRow::Header(_)))
-                                {
-                                    next = if next == 0 {
-                                        total.saturating_sub(1)
-                                    } else {
-                                        next - 1
-                                    };
-                                }
-                                self.state.addon_manager_selected = next;
+                                self.state.step_addon_manager_selected(-1);
                             }
                             KeyCode::Down => {
-                                use crate::tui::state::AddonManagerRow;
-                                let rows = self.state.addon_manager_rows();
-                                let total = rows.len();
-                                let mut next = if self.state.addon_manager_selected + 1 >= total {
-                                    0
-                                } else {
-                                    self.state.addon_manager_selected + 1
-                                };
-                                while next != self.state.addon_manager_selected
-                                    && matches!(rows.get(next), Some(AddonManagerRow::Header(_)))
-                                {
-                                    next = if next + 1 >= total { 0 } else { next + 1 };
-                                }
-                                self.state.addon_manager_selected = next;
+                                self.state.step_addon_manager_selected(1);
                             }
                             KeyCode::Home => {
-                                use crate::tui::state::AddonManagerRow;
-                                let rows = self.state.addon_manager_rows();
-                                if let Some(idx) = rows
-                                    .iter()
-                                    .position(|r| !matches!(r, AddonManagerRow::Header(_)))
-                                {
-                                    self.state.addon_manager_selected = idx;
-                                }
+                                self.state.first_addon_manager_selected();
                             }
                             KeyCode::End => {
-                                use crate::tui::state::AddonManagerRow;
-                                let rows = self.state.addon_manager_rows();
-                                if let Some(idx) = rows
-                                    .iter()
-                                    .rposition(|r| !matches!(r, AddonManagerRow::Header(_)))
-                                {
-                                    self.state.addon_manager_selected = idx;
-                                }
+                                self.state.last_addon_manager_selected();
                             }
                             KeyCode::PageUp => {
-                                use crate::tui::state::AddonManagerRow;
-                                let rows = self.state.addon_manager_rows();
-                                let total = rows.len();
-                                if total > 0 {
-                                    let mut target =
-                                        self.state.addon_manager_selected.saturating_sub(5);
-                                    while target > 0
-                                        && matches!(
-                                            rows.get(target),
-                                            Some(AddonManagerRow::Header(_))
-                                        )
-                                    {
-                                        target = target.saturating_sub(1);
-                                    }
-                                    if matches!(rows.get(target), Some(AddonManagerRow::Header(_)))
-                                    {
-                                        if let Some(idx) = rows
-                                            .iter()
-                                            .position(|r| !matches!(r, AddonManagerRow::Header(_)))
-                                        {
-                                            target = idx;
-                                        }
-                                    }
-                                    self.state.addon_manager_selected = target;
-                                }
+                                self.state.step_addon_manager_selected(-5);
                             }
                             KeyCode::PageDown => {
-                                use crate::tui::state::AddonManagerRow;
-                                let rows = self.state.addon_manager_rows();
-                                let total = rows.len();
-                                if total > 0 {
-                                    let mut target = (self.state.addon_manager_selected + 5)
-                                        .min(total.saturating_sub(1));
-                                    while target < total
-                                        && matches!(
-                                            rows.get(target),
-                                            Some(AddonManagerRow::Header(_))
-                                        )
-                                    {
-                                        target += 1;
-                                    }
-                                    if target >= total
-                                        || matches!(
-                                            rows.get(target),
-                                            Some(AddonManagerRow::Header(_))
-                                        )
-                                    {
-                                        if let Some(idx) = rows
-                                            .iter()
-                                            .rposition(|r| !matches!(r, AddonManagerRow::Header(_)))
-                                        {
-                                            target = idx;
-                                        }
-                                    }
-                                    self.state.addon_manager_selected = target;
-                                }
+                                self.state.step_addon_manager_selected(5);
                             }
                             KeyCode::Char('d') | KeyCode::Delete => {
                                 use crate::tui::state::AddonManagerRow;
@@ -837,107 +741,22 @@ impl App {
                                 self.state.tv_config_popup = false;
                             }
                             KeyCode::Up => {
-                                use crate::tui::state::TvManagerRow;
-                                let rows = self.state.tv_manager_rows();
-                                let total = rows.len();
-                                let mut next = if self.state.tv_manager_selected == 0 {
-                                    total.saturating_sub(1)
-                                } else {
-                                    self.state.tv_manager_selected - 1
-                                };
-                                while next != self.state.tv_manager_selected
-                                    && matches!(rows.get(next), Some(TvManagerRow::Header(_)))
-                                {
-                                    next = if next == 0 {
-                                        total.saturating_sub(1)
-                                    } else {
-                                        next - 1
-                                    };
-                                }
-                                self.state.tv_manager_selected = next;
+                                self.state.step_tv_manager_selected(-1);
                             }
                             KeyCode::Down => {
-                                use crate::tui::state::TvManagerRow;
-                                let rows = self.state.tv_manager_rows();
-                                let total = rows.len();
-                                let mut next = if self.state.tv_manager_selected + 1 >= total {
-                                    0
-                                } else {
-                                    self.state.tv_manager_selected + 1
-                                };
-                                while next != self.state.tv_manager_selected
-                                    && matches!(rows.get(next), Some(TvManagerRow::Header(_)))
-                                {
-                                    next = if next + 1 >= total { 0 } else { next + 1 };
-                                }
+                                self.state.step_tv_manager_selected(1);
                             }
                             KeyCode::Home => {
-                                use crate::tui::state::TvManagerRow;
-                                let rows = self.state.tv_manager_rows();
-                                if let Some(idx) = rows
-                                    .iter()
-                                    .position(|r| !matches!(r, TvManagerRow::Header(_)))
-                                {
-                                    self.state.tv_manager_selected = idx;
-                                }
+                                self.state.first_tv_manager_selected();
                             }
                             KeyCode::End => {
-                                use crate::tui::state::TvManagerRow;
-                                let rows = self.state.tv_manager_rows();
-                                if let Some(idx) = rows
-                                    .iter()
-                                    .rposition(|r| !matches!(r, TvManagerRow::Header(_)))
-                                {
-                                    self.state.tv_manager_selected = idx;
-                                }
+                                self.state.last_tv_manager_selected();
                             }
                             KeyCode::PageUp => {
-                                use crate::tui::state::TvManagerRow;
-                                let rows = self.state.tv_manager_rows();
-                                let total = rows.len();
-                                if total > 0 {
-                                    let mut target =
-                                        self.state.tv_manager_selected.saturating_sub(5);
-                                    while target > 0
-                                        && matches!(rows.get(target), Some(TvManagerRow::Header(_)))
-                                    {
-                                        target = target.saturating_sub(1);
-                                    }
-                                    if matches!(rows.get(target), Some(TvManagerRow::Header(_))) {
-                                        if let Some(idx) = rows
-                                            .iter()
-                                            .position(|r| !matches!(r, TvManagerRow::Header(_)))
-                                        {
-                                            target = idx;
-                                        }
-                                    }
-                                    self.state.tv_manager_selected = target;
-                                }
+                                self.state.step_tv_manager_selected(-5);
                             }
                             KeyCode::PageDown => {
-                                use crate::tui::state::TvManagerRow;
-                                let rows = self.state.tv_manager_rows();
-                                let total = rows.len();
-                                if total > 0 {
-                                    let mut target = (self.state.tv_manager_selected + 5)
-                                        .min(total.saturating_sub(1));
-                                    while target < total
-                                        && matches!(rows.get(target), Some(TvManagerRow::Header(_)))
-                                    {
-                                        target += 1;
-                                    }
-                                    if target >= total
-                                        || matches!(rows.get(target), Some(TvManagerRow::Header(_)))
-                                    {
-                                        if let Some(idx) = rows
-                                            .iter()
-                                            .rposition(|r| !matches!(r, TvManagerRow::Header(_)))
-                                        {
-                                            target = idx;
-                                        }
-                                    }
-                                    self.state.tv_manager_selected = target;
-                                }
+                                self.state.step_tv_manager_selected(5);
                             }
                             KeyCode::Char('d') | KeyCode::Delete => {
                                 use crate::tui::state::TvManagerRow;

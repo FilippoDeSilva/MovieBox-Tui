@@ -5,8 +5,24 @@ pub mod title;
 
 pub use title::clean_moviebox_title;
 
-use crate::providers::models::ProviderKind;
+use crate::providers::models::{CatalogItem, MediaDetails, ProviderError, ProviderKind};
 use crate::providers::{Provider, ProviderCapabilities};
+
+impl From<ScraperError> for ProviderError {
+    fn from(err: ScraperError) -> Self {
+        match err {
+            ScraperError::Reqwest(e) => ProviderError::Network(e.to_string()),
+            ScraperError::ApiStatus(429) => ProviderError::RateLimited(None),
+            ScraperError::ApiStatus(404) => ProviderError::NotFound,
+            ScraperError::ApiStatus(s) => ProviderError::Unavailable(format!("HTTP status {s}")),
+            ScraperError::HostsExhausted => {
+                ProviderError::Unavailable("All hosts exhausted".to_string())
+            }
+            ScraperError::Json(e) => ProviderError::Parsing(e.to_string()),
+            ScraperError::MissingToken => ProviderError::Unavailable("Missing token".to_string()),
+        }
+    }
+}
 
 impl Provider for client::MovieBoxClient {
     fn id(&self) -> ProviderKind {
@@ -23,16 +39,17 @@ impl Provider for client::MovieBoxClient {
         }
     }
 
-    async fn search(&self, query: &str, page: usize) -> Result<serde_json::Value, String> {
-        self.search(query, page)
+    async fn search(&self, query: &str, page: usize) -> Result<Vec<CatalogItem>, ProviderError> {
+        let json = self
+            .search(query, page)
             .await
-            .map_err(|error| format!("{error:?}"))
+            .map_err(ProviderError::from)?;
+        Ok(adapt::moviebox_search_json_to_catalog(&json))
     }
 
-    async fn details(&self, id: &str) -> Result<serde_json::Value, String> {
-        self.get_details(id)
-            .await
-            .map_err(|error| format!("{error:?}"))
+    async fn details(&self, id: &str) -> Result<MediaDetails, ProviderError> {
+        let json = self.get_details(id).await.map_err(ProviderError::from)?;
+        adapt::moviebox_details_json_to_media_details(&json)
     }
 }
 

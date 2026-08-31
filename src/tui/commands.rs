@@ -47,7 +47,7 @@ pub enum ParsedCommand<'a> {
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 19] = [
         Self::Settings,
         Self::Browse,
         Self::History,
@@ -61,6 +61,12 @@ impl SlashCommand {
         Self::Update,
         Self::ClearCache,
         Self::Github,
+        Self::ToggleUpdate,
+        Self::ToggleBdix,
+        Self::ToggleStreaming,
+        Self::ToggleTv,
+        Self::ToggleAddons,
+        Self::Probe,
     ];
 
     pub const PRIMARY: [Self; 7] = [
@@ -341,7 +347,7 @@ mod tests {
     #[test]
     fn test_toggle_commands_and_aliases_parse() {
         let state = AppState::default();
-        assert_eq!(SlashCommand::ALL.len(), 13);
+        assert_eq!(SlashCommand::ALL.len(), 19);
         assert_eq!(SlashCommand::parse("/clear"), Some(ParsedCommand::Clear));
         assert!(SlashCommand::Clear.is_available(&state));
         assert_eq!(SlashCommand::Clear.name(), "/clear");

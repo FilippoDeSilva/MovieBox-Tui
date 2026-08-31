@@ -125,46 +125,49 @@ impl App {
         let ctrl_t = crate::tui::text::ctrl_key("T");
         let ctrl_a = crate::tui::text::ctrl_key("A");
 
+        let will_handle = !matches!(
+            &parsed,
+            crate::tui::commands::ParsedCommand::History if current_mode != crate::tui::state::AppMode::Tv
+        ) && !matches!(
+            &parsed,
+            crate::tui::commands::ParsedCommand::Favorites if current_mode != crate::tui::state::AppMode::Tv
+        ) && !matches!(
+            &parsed,
+            crate::tui::commands::ParsedCommand::List if current_mode == crate::tui::state::AppMode::Tv
+        );
+
+        if will_handle {
+            self.state.search_query.clear();
+            self.state.input_mode = InputMode::Normal;
+        }
+
         match parsed {
             crate::tui::commands::ParsedCommand::Settings => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.action_sender.send(Action::ToggleSettingsPopup).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::ClearCache => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.action_sender.send(Action::ClearCache).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Clear => {
                 self.state.clear_search_state();
-                self.state.input_mode = InputMode::Normal;
                 self.state.set_status_default("Search cleared.");
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Help => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.action_sender.send(Action::ToggleHelp).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Github => {
                 let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Probe => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.action_sender.send(Action::ProbeTerminal).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Update => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 if !self.state.is_checking_updates {
                     self.state.update_available = None;
                     self.state.manual_update_check = true;
@@ -178,8 +181,6 @@ impl App {
             crate::tui::commands::ParsedCommand::ToggleUpdate => {
                 self.state.auto_update = !self.state.auto_update;
                 self.persist_config();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "Auto Update Check",
@@ -192,14 +193,10 @@ impl App {
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Theme => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.action_sender.send(Action::ToggleThemePopup).ok();
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Browse => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.state.notify(
                         NotificationKind::Info,
@@ -213,8 +210,6 @@ impl App {
             }
             crate::tui::commands::ParsedCommand::History => {
                 if current_mode == crate::tui::state::AppMode::Tv {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",
@@ -227,8 +222,6 @@ impl App {
             }
             crate::tui::commands::ParsedCommand::Favorites => {
                 if current_mode == crate::tui::state::AppMode::Tv {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",
@@ -243,8 +236,6 @@ impl App {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.apply_tv_search_results(query, lower_query);
                 } else {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",
@@ -262,16 +253,11 @@ impl App {
                 } else if current_mode == crate::tui::state::AppMode::Addon {
                     self.action_sender.send(Action::ShowAddonManager).ok();
                 } else {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.action_sender.send(Action::ToggleSettingsPopup).ok();
                 }
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::DownloadDir(raw_arg) => {
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
-
                 if raw_arg.is_empty() {
                     let current = crate::logging::sanitize_path(self.resolve_download_base_dir());
                     self.state
@@ -369,8 +355,6 @@ impl App {
             crate::tui::commands::ParsedCommand::ToggleBdix => {
                 let enable_req = !self.state.bdix_enabled;
                 if current_mode != crate::tui::state::AppMode::Streaming {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Info,
                         "BDIX Sources",
@@ -381,8 +365,6 @@ impl App {
 
                 self.state.bdix_enabled = enable_req;
                 self.persist_config();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "BDIX Providers",
@@ -407,8 +389,6 @@ impl App {
             crate::tui::commands::ParsedCommand::ToggleStreaming => {
                 let enable_req = !self.state.streaming_enabled;
                 if !enable_req && !self.state.tv_enabled && !self.state.addons_enabled {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Warning,
                         "Streaming Mode",
@@ -419,8 +399,6 @@ impl App {
 
                 self.state.streaming_enabled = enable_req;
                 self.persist_config();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "Streaming Mode",
@@ -445,8 +423,6 @@ impl App {
             crate::tui::commands::ParsedCommand::ToggleTv => {
                 let enable_req = !self.state.tv_enabled;
                 if !enable_req && !self.state.streaming_enabled && !self.state.addons_enabled {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Warning,
                         "TV Mode",
@@ -457,8 +433,6 @@ impl App {
 
                 self.state.tv_enabled = enable_req;
                 self.persist_config();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "TV Mode",
@@ -480,8 +454,6 @@ impl App {
             crate::tui::commands::ParsedCommand::ToggleAddons => {
                 let enable_req = !self.state.addons_enabled;
                 if !enable_req && !self.state.streaming_enabled && !self.state.tv_enabled {
-                    self.state.search_query.clear();
-                    self.state.input_mode = InputMode::Normal;
                     self.state.notify(
                         NotificationKind::Warning,
                         "Addon Mode",
@@ -492,8 +464,6 @@ impl App {
 
                 self.state.addons_enabled = enable_req;
                 self.persist_config();
-                self.state.search_query.clear();
-                self.state.input_mode = InputMode::Normal;
                 self.state.notify(
                     NotificationKind::Info,
                     "Addon Mode",
@@ -573,16 +543,17 @@ impl App {
     }
 
     pub(super) fn run_search_request(
-        &self,
+        &mut self,
         query: String,
         force_refresh: bool,
         context: RequestContext,
     ) {
+        self.request_tasks.cancel_search();
         let request_id = self.state.active_search_request;
         let page = 1;
         let sender = self.action_sender.clone();
         let service = self.service.clone();
-        tokio::spawn(async move {
+        self.request_tasks.search = Some(tokio::spawn(async move {
             if !force_refresh {
                 let q = query.clone();
                 let provider = context.provider;
@@ -629,7 +600,7 @@ impl App {
                         .ok();
                 }
             }
-        });
+        }));
     }
 
     pub(super) fn prepare_homepage_request(&mut self, tab_id: &str, page: usize) {
@@ -677,15 +648,16 @@ impl App {
     }
 
     pub(super) fn run_details_request(
-        &self,
+        &mut self,
         id: String,
         force_refresh: bool,
         context: RequestContext,
     ) {
+        self.request_tasks.cancel_details();
         let request_id = self.state.active_details_request;
         let service = self.service.clone();
         let sender = self.action_sender.clone();
-        tokio::spawn(async move {
+        self.request_tasks.details = Some(tokio::spawn(async move {
             if !force_refresh {
                 let id_for_cache = id.clone();
                 if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
@@ -728,14 +700,15 @@ impl App {
                         .ok();
                 }
             }
-        });
+        }));
     }
 
-    pub(super) fn run_homepage_request(&self, tab_id: String, page: usize) {
+    pub(super) fn run_homepage_request(&mut self, tab_id: String, page: usize) {
+        self.request_tasks.cancel_homepage();
         let request_id = self.state.active_homepage_request;
         let service = self.service.clone();
         let sender = self.action_sender.clone();
-        tokio::spawn(async move {
+        self.request_tasks.homepage = Some(tokio::spawn(async move {
             let t_clone = tab_id.clone();
             if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
                 crate::cache::get_homepage_cache(&t_clone, page)
@@ -775,7 +748,7 @@ impl App {
                         .ok();
                 }
             }
-        });
+        }));
     }
 
     pub(super) fn extract_homepage_subjects(payload: &serde_json::Value) -> Vec<serde_json::Value> {

@@ -1,6 +1,9 @@
 use super::models::{MetaDetail, MetaItem, StreamItem};
 use crate::models::SearchResult;
-use crate::providers::models::{PlaybackSource, ProviderKind, Release, SourceMirror};
+use crate::providers::models::{
+    CatalogItem, Episode, MediaDetails, MediaType, PlaybackSource, ProviderKind, ProviderMediaId,
+    Release, Season, SourceMirror,
+};
 use std::collections::BTreeMap;
 
 pub fn meta_to_search_result(item: &MetaItem) -> SearchResult {
@@ -32,6 +35,135 @@ pub fn meta_to_search_result(item: &MetaItem) -> SearchResult {
         season: 0,
         episode: 0,
         provider: ProviderKind::Addons,
+    }
+}
+
+pub fn meta_to_catalog_item(item: &MetaItem) -> CatalogItem {
+    let is_series = item.r#type.eq_ignore_ascii_case("series")
+        || item.r#type.eq_ignore_ascii_case("tv")
+        || item.r#type.eq_ignore_ascii_case("anime");
+    let year: Option<String> = item
+        .release_info
+        .as_deref()
+        .or(item.year.as_deref())
+        .or(item.released.as_deref())
+        .map(crate::tui::text::extract_4digit_year)
+        .filter(|y| !y.is_empty());
+
+    let title = if !item.name.trim().is_empty() {
+        item.name.clone()
+    } else {
+        item.title.clone().unwrap_or_else(|| "Unknown".to_string())
+    };
+
+    let poster_url = item.poster.clone().or_else(|| item.cover.clone());
+
+    CatalogItem {
+        id: ProviderMediaId {
+            provider: ProviderKind::Addons,
+            value: item.id.clone(),
+        },
+        title,
+        media_type: if is_series {
+            MediaType::Series
+        } else {
+            MediaType::Movie
+        },
+        year,
+        poster_url,
+        season_count: None,
+    }
+}
+
+pub fn meta_detail_to_media_details(detail: &MetaDetail) -> MediaDetails {
+    let is_series = detail.r#type.eq_ignore_ascii_case("series")
+        || detail.r#type.eq_ignore_ascii_case("tv")
+        || detail.r#type.eq_ignore_ascii_case("anime")
+        || !detail.videos.is_empty();
+
+    let mut season_map: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for video in &detail.videos {
+        let s = video.season.unwrap_or(1);
+        let e = video.episode.unwrap_or(1);
+        let eps = season_map.entry(s).or_default();
+        if !eps.contains(&e) {
+            eps.push(e);
+        }
+    }
+
+    for eps in season_map.values_mut() {
+        eps.sort_unstable();
+    }
+
+    let seasons = season_map
+        .into_iter()
+        .map(|(season_num, eps)| Season {
+            number: season_num,
+            episodes: eps
+                .into_iter()
+                .map(|ep_num| Episode {
+                    season: season_num,
+                    number: ep_num,
+                    title: None,
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+
+    let year = detail
+        .release_info
+        .as_deref()
+        .or(detail.year.as_deref())
+        .or(detail.released.as_deref())
+        .map(crate::tui::text::extract_4digit_year)
+        .filter(|y| !y.is_empty());
+
+    let title = if !detail.name.trim().is_empty() {
+        detail.name.clone()
+    } else {
+        detail
+            .title
+            .clone()
+            .unwrap_or_else(|| "Unknown".to_string())
+    };
+
+    let poster_url = detail.poster.clone().or_else(|| detail.cover.clone());
+
+    MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::Addons,
+            value: detail.id.clone(),
+        },
+        title,
+        media_type: if is_series {
+            MediaType::Series
+        } else {
+            MediaType::Movie
+        },
+        year,
+        description: detail.description.clone(),
+        tagline: None,
+        imdb_rating: detail.imdb_rating.clone().or_else(|| detail.rating.clone()),
+        director: if !detail.director.is_empty() {
+            Some(detail.director.join(", "))
+        } else {
+            None
+        },
+        stars: if !detail.cast.is_empty() {
+            Some(detail.cast.join(", "))
+        } else {
+            None
+        },
+        prints: None,
+        audios: None,
+        poster_url,
+        duration: detail.runtime.clone(),
+        genres: if !detail.genres.is_empty() {
+            detail.genres.clone()
+        } else {
+            detail.genre.clone()
+        },
+        seasons,
     }
 }
 
@@ -620,4 +752,101 @@ pub fn release_to_playback_source(release: &Release) -> Option<PlaybackSource> {
         subtitle: None,
         source_label: mirror.label.clone(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_meta_to_catalog_item() {
+        let item = MetaItem {
+            id: "tt1234".to_string(),
+            r#type: "movie".to_string(),
+            name: "Test Movie".to_string(),
+            title: None,
+            poster: Some("https://example.com/poster.jpg".to_string()),
+            cover: None,
+            description: Some("Description".to_string()),
+            overview: None,
+            synopsis: None,
+            release_info: Some("2022".to_string()),
+            year: None,
+            released: None,
+            imdb_rating: Some("7.5".to_string()),
+            rating: None,
+            genres: vec!["Action".to_string()],
+            genre: Vec::new(),
+        };
+
+        let catalog = meta_to_catalog_item(&item);
+        assert_eq!(catalog.id.value, "tt1234");
+        assert_eq!(catalog.title, "Test Movie");
+        assert_eq!(catalog.media_type, MediaType::Movie);
+        assert_eq!(catalog.year.as_deref(), Some("2022"));
+        assert_eq!(
+            catalog.poster_url.as_deref(),
+            Some("https://example.com/poster.jpg")
+        );
+    }
+
+    #[test]
+    fn test_meta_detail_to_media_details() {
+        let detail = MetaDetail {
+            id: "tt5678".to_string(),
+            r#type: "series".to_string(),
+            name: "Test Series".to_string(),
+            title: None,
+            poster: Some("https://example.com/series.jpg".to_string()),
+            cover: None,
+            background: None,
+            logo: None,
+            description: Some("Series description".to_string()),
+            overview: None,
+            synopsis: None,
+            release_info: Some("2021".to_string()),
+            year: None,
+            released: None,
+            imdb_rating: Some("8.2".to_string()),
+            rating: None,
+            genres: vec!["Drama".to_string()],
+            genre: Vec::new(),
+            runtime: Some("45m".to_string()),
+            cast: vec!["Actor One".to_string(), "Actor Two".to_string()],
+            director: vec!["Director Name".to_string()],
+            videos: vec![
+                super::super::models::MetaVideo {
+                    id: Some("ep1".to_string()),
+                    title: Some("Pilot".to_string()),
+                    name: None,
+                    season: Some(1),
+                    episode: Some(1),
+                    number: None,
+                    released: None,
+                    thumbnail: None,
+                },
+                super::super::models::MetaVideo {
+                    id: Some("ep2".to_string()),
+                    title: Some("Episode 2".to_string()),
+                    name: None,
+                    season: Some(1),
+                    episode: Some(2),
+                    number: None,
+                    released: None,
+                    thumbnail: None,
+                },
+            ],
+        };
+
+        let media = meta_detail_to_media_details(&detail);
+        assert_eq!(media.id.value, "tt5678");
+        assert_eq!(media.title, "Test Series");
+        assert_eq!(media.media_type, MediaType::Series);
+        assert_eq!(media.year.as_deref(), Some("2021"));
+        assert_eq!(media.director.as_deref(), Some("Director Name"));
+        assert_eq!(media.stars.as_deref(), Some("Actor One, Actor Two"));
+        assert_eq!(media.seasons.len(), 1);
+        assert_eq!(media.seasons[0].number, 1);
+        assert_eq!(media.seasons[0].episodes.len(), 2);
+    }
 }

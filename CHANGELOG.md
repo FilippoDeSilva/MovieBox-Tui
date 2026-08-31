@@ -3,11 +3,21 @@
 ## [Unreleased]
 
 ### Added
+- **Core Domain Typing & Modernized Provider Traits (`src/models.rs`, `src/providers/`)**:
+  - Refactored `Provider` and `ReleaseProvider` trait methods to return strongly typed domain models (`Result<Vec<CatalogItem>, ProviderError>`, `Result<MediaDetails, ProviderError>`, and `Result<Vec<Release>, ProviderError>`) instead of untyped `serde_json::Value` objects.
+  - Introduced structured, classified error boundaries (`ProviderError`) with automatic user notification formatting via `.user_message(provider)` and `From` conversions for provider client errors (`ScraperError`, `FourKHdHubError`, `CircleFtpError`, `DhakaFlixError`).
+  - Added strongly typed domain adapters (`moviebox_search_json_to_catalog`, `moviebox_details_json_to_media_details`, `meta_to_catalog_item`, `meta_detail_to_media_details`) and exposed `search_typed` and `details_typed` on `MovieBoxService`.
+- **In-Flight Async Task Tracking & Cancellation (`RequestTaskHandles`)**:
+  - Added `RequestTaskHandles` to `App` with atomic `JoinHandle::abort` cancellation triggers (`cancel_search`, `cancel_details`, `cancel_streams`, `cancel_suggest`, `cancel_homepage`, `cancel_all`), preventing stale network requests and CPU leaks when navigating or changing search queries.
+- **AppState Domain Partitioning & Sub-States (`src/tui/state.rs`)**:
+  - Partitioned the monolithic `AppState` into cohesive domain sub-states (`UiState`, `CatalogState`, `PlaybackState`, `DownloadState`) to decouple modal UI flags, search catalogs, playback handles, and download queues.
+- **Unified Header-Aware List Navigation (`src/tui/state.rs`, `src/tui/app/keyboard.rs`)**:
+  - Consolidated duplicate manager list wrapping, header-skipping, and step math into reusable helpers (`step_header_aware_list`, `step_tv_manager_selected`, `step_addon_manager_selected`, `first_*`, `last_*`).
+- **Unified Screen Layout & Mouse Hitbox Geometry (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
+  - Exported `DetailsScreenLayout` and `details_screen_layout` so both visual rendering and mouse hit-testing derive from identical calculated rect bounds across all viewport tiers.
+- **Centralized Slash Command Dispatch & Complete Command Inventory (`src/tui/commands.rs`, `src/tui/app/search.rs`)**:
+  - Centralized command input-clearing pre-conditions and expanded `SlashCommand::ALL` to all 19 registered variants.
 - **Unified Interactive Settings & Preferences Hub (`/settings`)**: Introduced a consolidated, mouse-friendly modal dialog replacing fragmented slash commands. Features 4 categorized tabs (`General`, `Content Modes`, `Appearance`, `Maintenance`), installed media player selection via interactive popup picker, live visual theme palette swatch picker integration, inline download directory editing, and multi-mode toggling with safety guards. Streamlined slash command autocomplete suggestions and in-app help overlays while retaining full legacy command compatibility.
-- **Stream list tabular column headers (`stream_table_header_spans`)**: Rendered aligned header row (`Quality`, `Size`, `Codecs`, `Duration`, `Release / Source`) at the top of stream results in the Details view on viewports $\ge 76$ columns.
-- **Vim navigation in Theme picker (`j` / `k`)**: Added `j` (down) and `k` (up) key support to navigate and live-preview themes inside the `/theme` picker popup.
-- **Live stream verification test suite (`tests/live_stream_verification.rs`)**: Integrated end-to-end verification verifying movie and series stream resolution against live backend endpoints and asserting absence of legacy notice hashes.
-- **Unified Command Hub landing design**: Redesigned the homepage landing screen into a single cohesive, proportional modal container seamlessly combining the search bar, embedded provider pill (`[MovieBox · Ctrl+P]`), live suggestions, recent favorites, and quick command shortcuts.
 - **Details Screen Subtitles Shortcut (`[s]`)**: Added `s`/`S` keyboard shortcut on Details screen to open the subtitle language picker, matching mouse click and footer hints.
 - **Theme picker 3-point color swatches**: Rendered 3-point color swatches (`■ ■ ■` Accent | Surface | Base) previewing palette colors in `/theme`.
 - **Category origin pill badges**: Added `[MOVIES]`, `[SERIES]`, and `[DISCOVER]` category badges in the `/browse` preset dialog.

@@ -4,7 +4,7 @@ This document describes the testing architecture, quality assurance procedures, 
 
 ## 1. Test Architecture
 
-The test suite comprises **284 automated tests across 18 test suites** (151 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 133 integration tests across 17 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
+The test suite comprises **296+ automated tests across 19 test suites** (158 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 138 integration tests across 18 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
 
 The MovieBox-TUI test architecture follows a strict separation of concerns:
 
@@ -20,6 +20,7 @@ MovieBox-TUI/
     │   │   └── sample_playlist.m3u
     │   └── addons/
     │       └── manifest.json
+    ├── settings_hub.rs        # Interactive Settings Hub modal tab navigation, choices, & option rows
     ├── history_reconciliation.rs  # History identity & background state reconciliation
     ├── history_audit.rs           # Cross-mode watch progress, series advancement, & boundary audit
     ├── grand_user_journey.rs      # End-to-end full multi-phase user lifecycle verification

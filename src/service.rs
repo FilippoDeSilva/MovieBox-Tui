@@ -6,7 +6,7 @@ use crate::providers::Provider;
 use crate::providers::bdix::circleftp::CircleFtpClient;
 use crate::providers::bdix::dhakaflix::client::DhakaFlixClient;
 use crate::providers::fourkhdhub::FourKHdHubClient;
-use crate::providers::models::ProviderKind;
+use crate::providers::models::{CatalogItem, MediaDetails, ProviderError, ProviderKind};
 use crate::providers::moviebox::client::MovieBoxClient;
 
 #[derive(Clone)]
@@ -64,19 +64,18 @@ impl MovieBoxService {
         self.client.suggest(query).await.map_err(|e| e.to_string())
     }
 
-    pub async fn search(
+    pub async fn search_typed(
         &self,
         provider: ProviderKind,
         query: &str,
         page: usize,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<Vec<CatalogItem>, ProviderError> {
         match provider {
             ProviderKind::MovieBox => Provider::search(&self.client, query, page).await,
             ProviderKind::FourKHdHub => {
-                let fourk = self
-                    .fourk_client
-                    .as_ref()
-                    .ok_or_else(|| "4KHDHub provider is unavailable".to_string())?;
+                let fourk = self.fourk_client.as_ref().ok_or_else(|| {
+                    ProviderError::Unavailable("4KHDHub is unavailable".to_string())
+                })?;
                 Provider::search(fourk, query, page).await
             }
             ProviderKind::BdixCircleFtp => {
@@ -84,6 +83,80 @@ impl MovieBoxService {
             }
             ProviderKind::BdixDhakaFlix => {
                 Provider::search(&self.dhakaflix_client, query, page).await
+            }
+            ProviderKind::Addons => {
+                let addons = crate::config::load_addons();
+                let catalog_addons: Vec<_> = addons
+                    .iter()
+                    .filter(|a| a.enabled && (a.provides_meta || a.provides_catalog))
+                    .collect();
+
+                if catalog_addons.is_empty() {
+                    return Err(ProviderError::Unavailable(
+                        "No catalog/metadata addon enabled. Open /config to configure one."
+                            .to_string(),
+                    ));
+                }
+
+                let mut combined = Vec::new();
+                for addon in catalog_addons {
+                    let base_url =
+                        crate::providers::addons::AddonClient::base_addon_url(&addon.manifest_url);
+                    if let Ok(movies) = self
+                        .addon_client
+                        .fetch_catalog_search(&base_url, "movie", "top", query)
+                        .await
+                    {
+                        combined.extend(movies);
+                    }
+                    if let Ok(series) = self
+                        .addon_client
+                        .fetch_catalog_search(&base_url, "series", "top", query)
+                        .await
+                    {
+                        combined.extend(series);
+                    }
+                    if !combined.is_empty() {
+                        break;
+                    }
+                }
+
+                if combined.is_empty() {
+                    return Err(ProviderError::NotFound);
+                }
+
+                let mut seen = std::collections::HashSet::new();
+                Ok(combined
+                    .into_iter()
+                    .filter(|m| seen.insert(m.id.clone()))
+                    .map(|m| crate::providers::addons::adapter::meta_to_catalog_item(&m))
+                    .collect())
+            }
+        }
+    }
+
+    pub async fn search(
+        &self,
+        provider: ProviderKind,
+        query: &str,
+        page: usize,
+    ) -> Result<serde_json::Value, String> {
+        match provider {
+            ProviderKind::MovieBox => self
+                .client
+                .search(query, page)
+                .await
+                .map_err(|e| e.to_string()),
+            ProviderKind::FourKHdHub
+            | ProviderKind::BdixCircleFtp
+            | ProviderKind::BdixDhakaFlix => {
+                let items = self
+                    .search_typed(provider, query, page)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(crate::providers::fourkhdhub::search_to_moviebox_json(
+                    &items,
+                ))
             }
             ProviderKind::Addons => {
                 let addons = crate::config::load_addons();
@@ -175,18 +248,17 @@ impl MovieBoxService {
         Ok(json)
     }
 
-    pub async fn details(
+    pub async fn details_typed(
         &self,
         provider: ProviderKind,
         subject_id: &str,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<MediaDetails, ProviderError> {
         match provider {
             ProviderKind::MovieBox => Provider::details(&self.client, subject_id).await,
             ProviderKind::FourKHdHub => {
-                let fourk = self
-                    .fourk_client
-                    .as_ref()
-                    .ok_or_else(|| "4KHDHub provider is unavailable".to_string())?;
+                let fourk = self.fourk_client.as_ref().ok_or_else(|| {
+                    ProviderError::Unavailable("4KHDHub is unavailable".to_string())
+                })?;
                 Provider::details(fourk, subject_id).await
             }
             ProviderKind::BdixCircleFtp => {
@@ -194,6 +266,97 @@ impl MovieBoxService {
             }
             ProviderKind::BdixDhakaFlix => {
                 Provider::details(&self.dhakaflix_client, subject_id).await
+            }
+            ProviderKind::Addons => {
+                let addons = crate::config::load_addons();
+                let meta_addons: Vec<_> = addons
+                    .iter()
+                    .filter(|a| a.enabled && a.provides_meta)
+                    .collect();
+
+                let types_to_try = ["series", "tv", "anime", "movie", "other"];
+                let mut best_detail: Option<crate::providers::addons::models::MetaDetail> = None;
+
+                for addon in &meta_addons {
+                    let base_url =
+                        crate::providers::addons::AddonClient::base_addon_url(&addon.manifest_url);
+                    for t in types_to_try {
+                        if let Ok(d) = self.addon_client.fetch_meta(&base_url, t, subject_id).await
+                        {
+                            if !d.videos.is_empty()
+                                || d.r#type.eq_ignore_ascii_case("series")
+                                || d.r#type.eq_ignore_ascii_case("tv")
+                            {
+                                return Ok(
+                                    crate::providers::addons::adapter::meta_detail_to_media_details(
+                                        &d,
+                                    ),
+                                );
+                            }
+                            if best_detail.is_none() {
+                                best_detail = Some(d);
+                            }
+                        }
+                    }
+                }
+
+                for addon in &addons {
+                    if addon.enabled
+                        && !meta_addons
+                            .iter()
+                            .any(|m| m.manifest_url == addon.manifest_url)
+                    {
+                        let base_url = crate::providers::addons::AddonClient::base_addon_url(
+                            &addon.manifest_url,
+                        );
+                        for t in types_to_try {
+                            if let Ok(d) =
+                                self.addon_client.fetch_meta(&base_url, t, subject_id).await
+                            {
+                                if !d.videos.is_empty()
+                                    || d.r#type.eq_ignore_ascii_case("series")
+                                    || d.r#type.eq_ignore_ascii_case("tv")
+                                {
+                                    return Ok(crate::providers::addons::adapter::meta_detail_to_media_details(&d));
+                                }
+                                if best_detail.is_none() {
+                                    best_detail = Some(d);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(d) = best_detail {
+                    return Ok(crate::providers::addons::adapter::meta_detail_to_media_details(&d));
+                }
+
+                Err(ProviderError::NotFound)
+            }
+        }
+    }
+
+    pub async fn details(
+        &self,
+        provider: ProviderKind,
+        subject_id: &str,
+    ) -> Result<serde_json::Value, String> {
+        match provider {
+            ProviderKind::MovieBox => self
+                .client
+                .get_details(subject_id)
+                .await
+                .map_err(|e| e.to_string()),
+            ProviderKind::FourKHdHub
+            | ProviderKind::BdixCircleFtp
+            | ProviderKind::BdixDhakaFlix => {
+                let details = self
+                    .details_typed(provider, subject_id)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(crate::providers::fourkhdhub::details_to_moviebox_json(
+                    &details,
+                ))
             }
             ProviderKind::Addons => {
                 let addons = crate::config::load_addons();

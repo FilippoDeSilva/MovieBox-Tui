@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DetailsLayoutTier {
+pub enum DetailsLayoutTier {
     Wide,
     Medium,
     Narrow,
@@ -19,7 +19,7 @@ pub(crate) enum DetailsLayoutTier {
 }
 
 impl DetailsLayoutTier {
-    pub(crate) fn for_area(area: Rect) -> Self {
+    pub fn for_area(area: Rect) -> Self {
         if area.width < 60 || area.height < 24 {
             Self::Tiny
         } else if area.width < 80 {
@@ -121,9 +121,21 @@ fn subject_provider(state: &AppState, subject_id: &str) -> crate::providers::mod
         .unwrap_or(state.active_provider)
 }
 
-pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
+#[derive(Debug, Clone, Copy)]
+pub struct DetailsScreenLayout {
+    pub tier: DetailsLayoutTier,
+    pub header_area: Rect,
+    pub workflow_area: Rect,
+    pub bottom_area: Rect,
+    pub footer_area: Rect,
+}
+
+pub fn details_screen_layout(
+    area: Rect,
+    selected_details: Option<&serde_json::Value>,
+) -> DetailsScreenLayout {
     let tier = DetailsLayoutTier::for_area(area);
-    let header_height = tier.header_height(area, state.selected_details.as_ref());
+    let header_height = tier.header_height(area, selected_details);
     let footer_height = tier.footer_height(area.width);
     let chunks = Layout::vertical([
         Constraint::Length(header_height),
@@ -132,9 +144,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         Constraint::Length(footer_height),
     ])
     .split(area);
-    let workflow_area = chunks[1];
-    let bottom_area = chunks[2];
 
+    DetailsScreenLayout {
+        tier,
+        header_area: chunks[0],
+        workflow_area: chunks[1],
+        bottom_area: chunks[2],
+        footer_area: chunks[3],
+    }
+}
+
+pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
+    let layout = details_screen_layout(area, state.selected_details.as_ref());
+    let tier = layout.tier;
+    let header_area = layout.header_area;
+    let workflow_area = layout.workflow_area;
+    let bottom_area = layout.bottom_area;
+    let footer_area = layout.footer_area;
     let details_json = match &state.selected_details {
         Some(d) => d,
         None => {
@@ -325,8 +351,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             0,
         ));
 
-    let inner_area = details_block.inner(chunks[0]);
-    frame.render_widget(details_block.clone(), chunks[0]);
+    let inner_area = details_block.inner(header_area);
+    frame.render_widget(details_block.clone(), header_area);
 
     let show_poster = !matches!(tier, DetailsLayoutTier::Tiny)
         && inner_area.height >= 6
@@ -1425,7 +1451,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         ])
     }
     .alignment(Alignment::Center);
-    frame.render_widget(footer_p, chunks[3]);
+    frame.render_widget(footer_p, footer_area);
 
     if state.subtitle_popup || state.is_download_subtitle_popup {
         let items = state

@@ -40,16 +40,17 @@ impl App {
                     return None;
                 }
 
+                self.request_tasks.cancel_suggest();
                 let service = self.service.clone();
                 let sender = self.action_sender.clone();
                 let query_clone = query.clone();
-                tokio::spawn(async move {
+                self.request_tasks.suggest = Some(tokio::spawn(async move {
                     if let Ok(res) = service.suggest(&query_clone).await {
                         sender
                             .send(Action::SuggestSuccess(request_id, query_clone, res))
                             .ok();
                     }
-                });
+                }));
             }
 
             Action::SuggestSuccess(request_id, query, payload) => {
@@ -1562,7 +1563,9 @@ impl App {
                                     )
                                     .await
                                 } else {
-                                    Err("4KHDHub provider is unavailable".to_string())
+                                    Err(crate::providers::models::ProviderError::Unavailable(
+                                        "4KHDHub provider is unavailable".to_string(),
+                                    ))
                                 }
                             }
                             ProviderKind::BdixCircleFtp => {
@@ -1671,7 +1674,8 @@ impl App {
                 let resolutions = pool.available_resolutions.clone();
                 let is_movie = season == 0 && episode == 0;
 
-                tokio::spawn(async move {
+                self.request_tasks.cancel_streams();
+                self.request_tasks.streams = Some(tokio::spawn(async move {
                     sender
                         .send(Action::SetStatus("Fetching streams...".to_string()))
                         .ok();
@@ -1825,7 +1829,7 @@ impl App {
                             ))
                             .ok();
                     }
-                });
+                }));
             }
 
             Action::EpisodeStreamsReady(

@@ -3,8 +3,9 @@ use ratatui::widgets::{ListState, TableState};
 
 pub use crate::player::PlayerKind;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
+    #[default]
     Home,
     Details,
 }
@@ -25,8 +26,9 @@ pub enum AppMode {
     Addon,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum InputMode {
+    #[default]
     Normal,
     Editing,
 }
@@ -130,6 +132,70 @@ pub fn result_columns_for(width: u16) -> u16 {
     } else {
         5
     }
+}
+
+#[derive(Debug, Default)]
+pub struct UiState {
+    pub active_screen: Screen,
+    pub input_mode: InputMode,
+    pub dirty: bool,
+    pub show_theme_popup: bool,
+    pub active_theme_kind: String,
+    pub theme_is_auto: bool,
+    pub show_browse_popup: bool,
+    pub show_settings_popup: bool,
+    pub settings_category: SettingsCategory,
+    pub settings_selected_row: usize,
+    pub show_help: bool,
+    pub help_scroll: usize,
+    pub cursor_beam: bool,
+    pub details_pane: DetailsPane,
+    pub player_picker_popup: bool,
+    pub settings_player_picker: bool,
+    pub subtitle_popup: bool,
+    pub is_download_subtitle_popup: bool,
+    pub tv_config_popup: bool,
+    pub addon_manager_popup: bool,
+    pub favorites_focus: bool,
+    pub is_loading: bool,
+    pub is_resolving_playback: bool,
+    pub is_fetching_streams: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct CatalogState {
+    pub active_provider: ProviderKind,
+    pub provider_generation: u64,
+    pub current_tab_id: String,
+    pub current_page: usize,
+    pub is_homepage_mode: bool,
+    pub active_subject_id: Option<String>,
+    pub search_error: Option<String>,
+    pub details_error: Option<String>,
+    pub stream_error: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct PlaybackState {
+    pub is_playing: bool,
+    pub default_player: Option<String>,
+    pub available_players: Vec<PlayerKind>,
+    pub pending_play_link: Option<String>,
+    pub pending_open_with: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct DownloadState {
+    pub download_progress: Option<f64>,
+    pub download_status: Option<String>,
+    pub download_dir: Option<std::path::PathBuf>,
+    pub download_queue_total: usize,
+    pub show_season_download_confirm: bool,
+    pub season_download_confirm_yes_selected: bool,
+    pub show_episode_download_confirm: bool,
+    pub episode_download_confirm_yes_selected: bool,
+    pub is_waiting_for_download_stream: bool,
+    pub auto_play_on_ready: bool,
 }
 
 pub struct AppState {
@@ -872,6 +938,64 @@ pub enum AddonManagerRow {
     Addon(usize),
     AddUrl,
 }
+pub fn step_header_aware_list<F>(current: usize, total: usize, step: isize, is_header: F) -> usize
+where
+    F: Fn(usize) -> bool,
+{
+    if total == 0 {
+        return 0;
+    }
+    if step == 0 {
+        return current;
+    }
+
+    if step < -1 {
+        let jump = (-step) as usize;
+        let mut target = current.saturating_sub(jump);
+        while target > 0 && is_header(target) {
+            target = target.saturating_sub(1);
+        }
+        if is_header(target) {
+            if let Some(first_valid) = (0..total).find(|&i| !is_header(i)) {
+                target = first_valid;
+            }
+        }
+        return target;
+    } else if step > 1 {
+        let jump = step as usize;
+        let mut target = (current + jump).min(total.saturating_sub(1));
+        while target < total && is_header(target) {
+            target += 1;
+        }
+        if target >= total || is_header(target) {
+            if let Some(last_valid) = (0..total).rposition(|i| !is_header(i)) {
+                target = last_valid;
+            }
+        }
+        return target;
+    }
+
+    let forward = step > 0;
+    let mut next = if forward {
+        if current + 1 >= total { 0 } else { current + 1 }
+    } else if current == 0 {
+        total.saturating_sub(1)
+    } else {
+        current - 1
+    };
+
+    while next != current && is_header(next) {
+        next = if forward {
+            if next + 1 >= total { 0 } else { next + 1 }
+        } else if next == 0 {
+            total.saturating_sub(1)
+        } else {
+            next - 1
+        };
+    }
+
+    next
+}
 
 impl AppState {
     pub fn tv_manager_rows(&self) -> Vec<TvManagerRow> {
@@ -894,6 +1018,34 @@ impl AppState {
         rows
     }
 
+    pub fn step_tv_manager_selected(&mut self, step: isize) {
+        let rows = self.tv_manager_rows();
+        self.tv_manager_selected =
+            step_header_aware_list(self.tv_manager_selected, rows.len(), step, |idx| {
+                matches!(rows.get(idx), Some(TvManagerRow::Header(_)))
+            });
+    }
+
+    pub fn first_tv_manager_selected(&mut self) {
+        let rows = self.tv_manager_rows();
+        if let Some(idx) = rows
+            .iter()
+            .position(|r| !matches!(r, TvManagerRow::Header(_)))
+        {
+            self.tv_manager_selected = idx;
+        }
+    }
+
+    pub fn last_tv_manager_selected(&mut self) {
+        let rows = self.tv_manager_rows();
+        if let Some(idx) = rows
+            .iter()
+            .rposition(|r| !matches!(r, TvManagerRow::Header(_)))
+        {
+            self.tv_manager_selected = idx;
+        }
+    }
+
     pub fn addon_manager_rows(&self) -> Vec<AddonManagerRow> {
         let mut rows = vec![AddonManagerRow::Header("Installed Addons")];
         for index in 0..self.installed_addons.len() {
@@ -901,6 +1053,34 @@ impl AppState {
         }
         rows.push(AddonManagerRow::AddUrl);
         rows
+    }
+
+    pub fn step_addon_manager_selected(&mut self, step: isize) {
+        let rows = self.addon_manager_rows();
+        self.addon_manager_selected =
+            step_header_aware_list(self.addon_manager_selected, rows.len(), step, |idx| {
+                matches!(rows.get(idx), Some(AddonManagerRow::Header(_)))
+            });
+    }
+
+    pub fn first_addon_manager_selected(&mut self) {
+        let rows = self.addon_manager_rows();
+        if let Some(idx) = rows
+            .iter()
+            .position(|r| !matches!(r, AddonManagerRow::Header(_)))
+        {
+            self.addon_manager_selected = idx;
+        }
+    }
+
+    pub fn last_addon_manager_selected(&mut self) {
+        let rows = self.addon_manager_rows();
+        if let Some(idx) = rows
+            .iter()
+            .rposition(|r| !matches!(r, AddonManagerRow::Header(_)))
+        {
+            self.addon_manager_selected = idx;
+        }
     }
 }
 
