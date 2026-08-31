@@ -40,5 +40,5 @@ namespace.
 - `/list` — display all loaded TV channels.
 - `/config` — open the TV Playlist Manager dialog.
 - `[r]` key — reload all active M3U playlist sources.
-- Global commands (`/theme`, `/download-dir`, `/update`, `/toggle-update`, `/clear-cache`, `/github`, `/enable-tv`, `/disable-tv`, `/enable-streaming`, `/disable-streaming`, `/enable-addons`, `/disable-addons`) are active across all modes.
+- Global commands (`/settings`, `/theme`, `/download-dir`, `/exit`, `/update`, `/toggle-update`, `/clear-cache`, `/github`, `/enable-tv`, `/disable-tv`, `/enable-streaming`, `/disable-streaming`, `/enable-addons`, `/disable-addons`) are active across all modes.
 - Streaming/Addon-only commands (e.g. `/browse`, `/history`, `/enable-bdix`) display friendly guidance notifications prompting you to switch modes (`Ctrl+S` or `Ctrl+A`).
