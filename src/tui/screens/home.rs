@@ -48,25 +48,84 @@ pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&
     crate::tui::commands::SlashCommand::description_for(cmd, state)
 }
 
-pub(crate) fn poster_placeholder_lines(basic: bool, is_loading: bool, tick: u64) -> &'static str {
-    if basic {
-        if is_loading {
-            match (tick / 4) % 3 {
-                0 => "[ . . . . . ]",
-                1 => "[ o o o o o ]",
-                _ => "[ O O O O O ]",
+pub(crate) fn render_poster_placeholder(
+    frame: &mut Frame,
+    area: Rect,
+    theme: &Theme,
+    basic_terminal: bool,
+    is_in_flight: bool,
+    tick: u64,
+) {
+    if area.width < 2 || area.height < 2 {
+        return;
+    }
+    let border_type = crate::tui::overlay::border_type(basic_terminal);
+    let border_style = if is_in_flight {
+        theme.lavender
+    } else {
+        theme.surface1
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(border_style);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 {
+        return;
+    }
+
+    let anim_frame = (tick / 4) % 3;
+    let eyes = if basic_terminal {
+        if is_in_flight {
+            match anim_frame {
+                0 => ".  .",
+                1 => "o  o",
+                _ => "O  O",
             }
         } else {
-            "[ no poster ]"
+            "-  -"
         }
-    } else if is_loading {
-        match (tick / 4) % 3 {
-            0 => "┌──────┐\n│ ·  · │\n│  ──  │\n│ ·  · │\n└──────┘",
-            1 => "┌──────┐\n│ ◦  ◦ │\n│  ──  │\n│ ◦  ◦ │\n└──────┘",
-            _ => "┌──────┐\n│ ○  ○ │\n│  ──  │\n│ ○  ○ │\n└──────┘",
+    } else if is_in_flight {
+        match anim_frame {
+            0 => "·  ·",
+            1 => "◦  ◦",
+            _ => "○  ○",
         }
     } else {
-        "┌──────┐\n│ ▓  ▓ │\n│  ──  │\n│ ▓  ▓ │\n└──────┘"
+        "·  ·"
+    };
+
+    let text_style = if is_in_flight {
+        theme.lavender
+    } else {
+        theme.text_dim
+    };
+
+    if inner.height == 1 {
+        let p = Paragraph::new(eyes)
+            .style(text_style)
+            .alignment(Alignment::Center);
+        frame.render_widget(p, inner);
+    } else if inner.height == 2 {
+        let mouth = if basic_terminal { "--" } else { "──" };
+        let content = format!("{eyes}\n{mouth}");
+        let p = Paragraph::new(content)
+            .style(text_style)
+            .alignment(Alignment::Center);
+        frame.render_widget(p, inner);
+    } else {
+        let pad_top = inner.height.saturating_sub(2) / 2;
+        let mouth = if basic_terminal { "--" } else { "──" };
+        let mut content = "\n".repeat(pad_top as usize);
+        content.push_str(eyes);
+        content.push('\n');
+        content.push_str(mouth);
+        let p = Paragraph::new(content)
+            .style(text_style)
+            .alignment(Alignment::Center);
+        frame.render_widget(p, inner);
     }
 }
 
@@ -1436,6 +1495,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     frame.render_widget(indicator, v_layout[1]);
                 }
 
+                let img_height = poster_area.height.min(state.poster_rows);
+                let img_y_offset = item_area.height.saturating_sub(img_height) / 2;
+                let p_area = Rect {
+                    y: poster_area.y + img_y_offset,
+                    height: img_height,
+                    ..poster_area
+                };
+
                 if state.image_supported {
                     if let Some(img) = state.search_posters.peek(&res.id) {
                         let target_dims = (poster_area.width, state.poster_rows);
@@ -1458,44 +1525,29 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         }
                         if let Some((_, proto)) = state.search_poster_protocols.peek(&res.id) {
                             if !state.has_active_modal() {
-                                let img_height = poster_area.height.min(state.poster_rows);
-                                let img_y_offset = item_area.height.saturating_sub(img_height) / 2;
-                                let p_area = Rect {
-                                    y: poster_area.y + img_y_offset,
-                                    height: img_height,
-                                    ..poster_area
-                                };
                                 frame.render_widget(ratatui_image::Image::new(proto), p_area);
                             }
                         }
                     } else {
                         let is_in_flight = state.in_flight_posters.contains(&res.id);
-                        let placeholder = Paragraph::new(poster_placeholder_lines(
+                        render_poster_placeholder(
+                            frame,
+                            p_area,
+                            theme,
                             state.basic_terminal,
                             is_in_flight,
                             state.tick_count,
-                        ))
-                        .style(if is_in_flight {
-                            theme.lavender
-                        } else {
-                            theme.text_dim
-                        })
-                        .alignment(Alignment::Center);
-                        frame.render_widget(placeholder, poster_area);
+                        );
                     }
                 } else {
-                    let placeholder_height = item_area.height.min(2);
-                    let v_center = item_area.height.saturating_sub(placeholder_height) / 2;
-                    let p_area = Rect {
-                        x: poster_area.x,
-                        y: poster_area.y + v_center,
-                        width: 12,
-                        height: placeholder_height,
-                    };
-                    let placeholder = Paragraph::new("No\nPoster")
-                        .style(theme.text_dim)
-                        .alignment(Alignment::Center);
-                    frame.render_widget(placeholder, p_area);
+                    render_poster_placeholder(
+                        frame,
+                        p_area,
+                        theme,
+                        state.basic_terminal,
+                        false,
+                        state.tick_count,
+                    );
                 }
 
                 let text_height = text_area.height;
