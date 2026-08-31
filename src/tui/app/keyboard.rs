@@ -928,7 +928,7 @@ impl App {
                                 }
                             }
                         }
-                        KeyCode::Char('*') | KeyCode::Char('f') | KeyCode::Char('F')
+                        KeyCode::Char('f') | KeyCode::Char('F')
                             if self.state.favorites_available()
                                 && (!self.state.search_results.is_empty()
                                     || self.state.favorites_focus) =>

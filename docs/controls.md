@@ -64,8 +64,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`o`**: Open player selection picker for the current stream.
 - **`d`**: Download current episode or full season batch.
 - **`r`**: Refresh search results / stream list.
-- **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
-- **`f`**: Favorite / unfavorite the open title on the Details screen.
+- **`f`**: Favorite / unfavorite the selected title (Home & Details screens).
 - **`s`**: Open subtitle language picker on the Details screen.
 - **`/settings`**: Open interactive Settings & Preferences Hub.
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
@@ -86,8 +85,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`o`**: Open player selection picker for the stream.
 - **`d`**: Download HTTP stream release.
 - **`r`**: Refresh addon catalog search results.
-- **`*` / `f`**: Favorite / unfavorite the selected title on the Home screen.
-- **`f`**: Favorite / unfavorite the open title on the Details screen.
+- **`f`**: Favorite / unfavorite the selected title (Home & Details screens).
 - **`s`**: Open subtitle language picker on the Details screen.
 - **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.

@@ -220,7 +220,7 @@ impl App {
             self.state.notify(
                 NotificationKind::Info,
                 "Favorites",
-                "No favorites yet. Star a title with * to add one.",
+                "No favorites yet. Favorite a title with 'f' to add one.",
             );
         } else {
             items.sort_by_key(|item| std::cmp::Reverse(item.added_at));

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Unified `f` Shortcut for Favorites (`src/tui/app/keyboard.rs`, `src/tui/screens/help.rs`)**: Standardized favorite / unfavorite toggling across all screens exclusively to `f` / `F`, removing redundant `*` keybindings and streamlining in-app help overlays and documentation.
 - **Responsive Details Screen Layout & Narrow Terminal Polish (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
   - **Narrow-Screen Dynamic Selector Pane Focus**: On compact terminal widths (<85 columns), renders the active selector pane (Audio, Seasons, or Episodes) with 100% available horizontal width instead of horizontally cramming 3 unreadable 14-character columns that cut off titles, language names, and season numbers.
   - **Adaptive Pane Titles & Border Overflow Guard**: Dynamic title formatting for selector panes and streams headers (`"Streams · N available · X/Y"` $\to$ `"Streams · N (X/Y)"` $\to$ `"Streams (N)"`) preventing Ratatui border title truncations (`"● Audio · 4  1/"`).

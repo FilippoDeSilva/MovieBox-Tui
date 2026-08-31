@@ -38,7 +38,7 @@ Searching and watching media through web browsers often means dealing with heavy
 - **Addon Mode:** Install community HTTP addon manifests for custom catalog metadata (Cinemeta, Anime Kitsu) and direct stream resolution.
 - **Smooth Video Playback:** Plays directly in **mpv** or **VLC**, with **IINA** available on macOS, using your computer's hardware for smooth video.
 - **Easy Downloads:** Download single episodes or entire seasons with one keypress. Completed episodes are skipped automatically.
-- **Favorites:** Star any movie or series with `*` (or `f` on the details screen) and reach it instantly from a dedicated row on the home screen, or view the full list with `/favorites`.
+- **Favorites:** Favorite any movie or series with `f` and reach it instantly from a dedicated row on the home screen, or view the full list with `/favorites`.
 - **Refined Terminal Interface:** Full keyboard and mouse support, responsive multi-column grid, compact single-column narrow terminal fallbacks, fluid 10-frame Braille loading spinners, WCAG AA contrast light/dark themes (Catppuccin Latte/Mocha, Nord, TokyoNight, Dracula, Gruvbox, Rosé Pine), contextual window titles, and modal-gated poster art.
 ## Installation
 

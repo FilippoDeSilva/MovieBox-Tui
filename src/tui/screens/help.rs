@@ -144,12 +144,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Download Video Stream", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [*] / [f]      ", theme.header),
-            Span::styled("Favorite / Unfavorite (Home)", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
             Span::styled("    [f]            ", theme.header),
-            Span::styled("Favorite / Unfavorite (Details)", theme.text),
+            Span::styled("Favorite / Unfavorite Title", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    [s]            ", theme.header),
@@ -200,12 +196,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
             Span::styled("Download Episode / Season Batch", theme.text),
         ]));
         help_text.push(Line::from(vec![
-            Span::styled("    [*] / [f]      ", theme.header),
-            Span::styled("Favorite / Unfavorite (Home)", theme.text),
-        ]));
-        help_text.push(Line::from(vec![
             Span::styled("    [f]            ", theme.header),
-            Span::styled("Favorite / Unfavorite (Details)", theme.text),
+            Span::styled("Favorite / Unfavorite Title", theme.text),
         ]));
         help_text.push(Line::from(vec![
             Span::styled("    [s]            ", theme.header),
