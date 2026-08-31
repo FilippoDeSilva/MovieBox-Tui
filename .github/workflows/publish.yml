@@ -35,18 +35,21 @@ jobs:
         with:
           ref: ${{ steps.ref.outputs.target_ref }}
 
-      - name: Skip when no release was published
+      - name: Skip when no release was published or version already exists
         id: release_gate
         if: ${{ github.event_name == 'workflow_run' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
-          if gh release view "v$VERSION" --repo "${{ github.repository }}" --json id > /dev/null 2>&1; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Release run finished without publishing v$VERSION (no new release). Nothing to do."
+          if ! gh release view "v$VERSION" --repo "${{ github.repository }}" --json id > /dev/null 2>&1; then
+            echo "Release run finished without publishing v$VERSION (no new GitHub release). Nothing to do."
             echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif curl -s -f -o /dev/null -H "User-Agent: github-actions" "https://crates.io/api/v1/crates/moviebox-tui/$VERSION"; then
+            echo "Crate moviebox-tui@$VERSION is already published on crates.io. Nothing to do."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Confirm version
