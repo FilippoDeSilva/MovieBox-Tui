@@ -20,11 +20,11 @@ pub enum DetailsLayoutTier {
 
 impl DetailsLayoutTier {
     pub fn for_area(area: Rect) -> Self {
-        if area.width < 60 || area.height < 24 {
+        if area.width < 60 || area.height < 22 {
             Self::Tiny
-        } else if area.width < 80 {
+        } else if area.width < 85 {
             Self::Narrow
-        } else if area.width < 120 {
+        } else if area.width < 115 {
             Self::Medium
         } else {
             Self::Wide
@@ -33,16 +33,16 @@ impl DetailsLayoutTier {
 
     pub(crate) fn header_height(self, area: Rect, details: Option<&serde_json::Value>) -> u16 {
         let (minimum, maximum, synopsis_limit, reserved_width) = match self {
-            Self::Wide => (9, 12, 3, 30),
-            Self::Medium => (8, 11, 2, 24),
-            Self::Narrow => (7, 9, 2, 4),
-            Self::Tiny => (4, 6, 1, 4),
+            Self::Wide => (9, 12, 4, 30),
+            Self::Medium => (8, 11, 3, 24),
+            Self::Narrow => (7, 10, 3, 4),
+            Self::Tiny => (5, 8, 2, 4),
         };
         let available_maximum = area.height.saturating_sub(match self {
-            Self::Wide => 18,
-            Self::Medium => 17,
-            Self::Narrow => 16,
-            Self::Tiny => 12,
+            Self::Wide => 16,
+            Self::Medium => 14,
+            Self::Narrow => 12,
+            Self::Tiny => 10,
         });
         let maximum = maximum.min(available_maximum.max(minimum));
 
@@ -84,8 +84,30 @@ impl DetailsLayoutTier {
 
 pub const DETAILS_FOOTER_SPLIT_THRESHOLD: u16 = 80;
 
+pub(crate) fn visible_selector_panes(
+    available_panes: &[crate::tui::state::DetailsPane],
+    current_pane: crate::tui::state::DetailsPane,
+    width: u16,
+) -> Vec<crate::tui::state::DetailsPane> {
+    if available_panes.is_empty() {
+        return Vec::new();
+    }
+    if width < 85 {
+        if available_panes.contains(&current_pane) {
+            vec![current_pane]
+        } else if let Some(last) = available_panes.last() {
+            vec![*last]
+        } else {
+            Vec::new()
+        }
+    } else {
+        available_panes.to_vec()
+    }
+}
+
 pub(crate) fn selector_pane_constraints(
     visible_panes: &[crate::tui::state::DetailsPane],
+    total_width: u16,
 ) -> Vec<Constraint> {
     use crate::tui::state::DetailsPane;
     match visible_panes.len() {
@@ -93,21 +115,37 @@ pub(crate) fn selector_pane_constraints(
         1 => vec![Constraint::Min(20)],
         2 => {
             if visible_panes.contains(&DetailsPane::Languages) {
-                vec![Constraint::Length(18), Constraint::Min(26)]
+                if total_width < 100 {
+                    vec![Constraint::Percentage(38), Constraint::Percentage(62)]
+                } else {
+                    vec![Constraint::Length(24), Constraint::Min(30)]
+                }
             } else if visible_panes.contains(&DetailsPane::Seasons)
                 && visible_panes.contains(&DetailsPane::Episodes)
             {
-                vec![Constraint::Length(16), Constraint::Min(30)]
+                if total_width < 100 {
+                    vec![Constraint::Percentage(32), Constraint::Percentage(68)]
+                } else {
+                    vec![Constraint::Length(20), Constraint::Min(35)]
+                }
             } else {
-                vec![Constraint::Length(18), Constraint::Min(24)]
+                vec![Constraint::Percentage(40), Constraint::Percentage(60)]
             }
         }
         _ => {
-            vec![
-                Constraint::Length(18),
-                Constraint::Length(14),
-                Constraint::Min(26),
-            ]
+            if total_width < 120 {
+                vec![
+                    Constraint::Percentage(28),
+                    Constraint::Percentage(24),
+                    Constraint::Percentage(48),
+                ]
+            } else {
+                vec![
+                    Constraint::Length(24),
+                    Constraint::Length(18),
+                    Constraint::Min(35),
+                ]
+            }
         }
     }
 }
@@ -354,9 +392,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let inner_area = details_block.inner(header_area);
     frame.render_widget(details_block.clone(), header_area);
 
-    let show_poster = !matches!(tier, DetailsLayoutTier::Tiny)
-        && inner_area.height >= 6
-        && inner_area.width >= 60;
+    let show_poster = !matches!(tier, DetailsLayoutTier::Tiny | DetailsLayoutTier::Narrow)
+        && inner_area.height >= 7
+        && inner_area.width >= 75;
     let poster_width = if show_poster {
         let width_for_height = state
             .poster_image
@@ -651,15 +689,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         available_selector_panes.push(crate::tui::state::DetailsPane::Episodes);
     }
 
-    let visible_selector_panes = if matches!(tier, DetailsLayoutTier::Tiny) {
-        available_selector_panes
-            .iter()
-            .copied()
-            .filter(|pane| *pane == state.details_pane)
-            .collect::<Vec<_>>()
-    } else {
-        available_selector_panes
-    };
+    let visible_selector_panes =
+        visible_selector_panes(&available_selector_panes, state.details_pane, area.width);
 
     let selector_height = if visible_selector_panes.is_empty() {
         0
@@ -687,9 +718,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let selector_chunks = if visible_selector_panes.is_empty() {
         Vec::new()
     } else {
-        Layout::horizontal(selector_pane_constraints(&visible_selector_panes))
-            .split(selector_area)
-            .to_vec()
+        Layout::horizontal(selector_pane_constraints(
+            &visible_selector_panes,
+            selector_area.width,
+        ))
+        .split(selector_area)
+        .to_vec()
     };
 
     let mut lang_area = None;
@@ -738,6 +772,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         crate::tui::state::DetailsPane::Languages,
                         language_focused,
                         state,
+                        lang_area.map_or(0, |a| a.width),
                     ))
                     .title_style(if language_focused {
                         focused_title_style(theme)
@@ -795,6 +830,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         crate::tui::state::DetailsPane::Seasons,
                         seasons_focused,
                         state,
+                        seasons_area.map_or(0, |a| a.width),
                     ))
                     .title_style(if seasons_focused {
                         focused_title_style(theme)
@@ -900,6 +936,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         crate::tui::state::DetailsPane::Episodes,
                         episodes_focused,
                         state,
+                        eps_area.map_or(0, |a| a.width),
                     ))
                     .title_style(if episodes_focused {
                         focused_title_style(theme)
@@ -946,23 +983,38 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .selected()
             .unwrap_or(0)
             .min(streams_count.saturating_sub(1));
-        format!(
-            " {}Streams · {} available · {}/{} ",
-            if streams_focused {
-                focus_title_marker(state.basic_terminal)
-            } else {
-                ""
-            },
+        let marker = if streams_focused {
+            focus_title_marker(state.basic_terminal)
+        } else {
+            ""
+        };
+        let avail = streams_area.width.saturating_sub(4) as usize;
+        let title_full = format!(
+            " {marker}Streams · {} available · {}/{} ",
             streams_count,
             selected + 1,
             streams_count
-        )
+        );
+        if avail > 0 && crate::tui::text::width(&title_full) > avail {
+            let title_medium = format!(
+                " {marker}Streams · {} ({}/{}) ",
+                streams_count,
+                selected + 1,
+                streams_count
+            );
+            if crate::tui::text::width(&title_medium) <= avail {
+                title_medium
+            } else {
+                format!(" {marker}Streams ({streams_count}) ")
+            }
+        } else {
+            title_full
+        }
     } else if streams_focused {
         format!(" {}Streams ", focus_title_marker(state.basic_terminal))
     } else {
         " Streams ".to_string()
     };
-
     let streams_block = Block::default()
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
@@ -1078,8 +1130,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             .get("sourceCount")
                             .and_then(|value| value.as_u64())
                             .unwrap_or(0);
-                        let is_compact = streams_area.width < 76;
-                        let is_wide = streams_area.width > 110;
+                        let is_ultra_compact = streams_area.width < 58;
+                        let is_compact = streams_area.width < 85;
+                        let is_wide = streams_area.width >= 115;
                         let stream_width = streams_area.width.saturating_sub(6) as usize;
 
                         let mut stream_spans = vec![Span::styled(pointer, marker_style)];
@@ -1124,7 +1177,18 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             duration_str.clone()
                         };
 
-                        if is_compact {
+                        if is_ultra_compact {
+                            let used_prefix = stream_spans
+                                .iter()
+                                .map(|s| crate::tui::text::width(s.content.as_ref()))
+                                .sum::<usize>();
+                            let remaining = stream_width.saturating_sub(used_prefix);
+                            if remaining > 0 {
+                                let title_trunc =
+                                    crate::tui::text::truncate_width(&release_title, remaining);
+                                stream_spans.push(Span::styled(title_trunc, primary_style));
+                            }
+                        } else if is_compact {
                             let codec_display = crate::tui::text::truncate_width(&codec_str, 5);
                             stream_spans.push(Span::styled(
                                 format!("{codec_display:<5} "),
@@ -1649,34 +1713,52 @@ fn pane_title(
     pane: crate::tui::state::DetailsPane,
     focused: bool,
     state: &AppState,
+    max_width: u16,
 ) -> Line<'static> {
     let marker = if focused {
         focus_title_marker(state.basic_terminal)
     } else {
         ""
     };
-    let mut title = format!(" {marker}{label} · {count}");
-    if focused {
-        let mut panes = Vec::new();
-        let has_languages = state
-            .selected_details
-            .as_ref()
-            .and_then(|details| details.get("dubs"))
-            .and_then(|dubs| dubs.as_array())
-            .is_some_and(|dubs| dubs.len() > 1);
-        if has_languages {
-            panes.push(crate::tui::state::DetailsPane::Languages);
-        }
-        if !state.available_seasons.is_empty() {
-            panes.push(crate::tui::state::DetailsPane::Seasons);
-            panes.push(crate::tui::state::DetailsPane::Episodes);
-        }
-        panes.push(crate::tui::state::DetailsPane::Streams);
-        if let Some(position) = panes.iter().position(|candidate| *candidate == pane) {
-            title.push_str(&format!("  {}/{}", position + 1, panes.len()));
-        }
+    let mut panes = Vec::new();
+    let has_languages = state
+        .selected_details
+        .as_ref()
+        .and_then(|details| details.get("dubs"))
+        .and_then(|dubs| dubs.as_array())
+        .is_some_and(|dubs| dubs.len() > 1);
+    if has_languages {
+        panes.push(crate::tui::state::DetailsPane::Languages);
     }
-    title.push(' ');
+    if !state.available_seasons.is_empty() {
+        panes.push(crate::tui::state::DetailsPane::Seasons);
+        panes.push(crate::tui::state::DetailsPane::Episodes);
+    }
+    panes.push(crate::tui::state::DetailsPane::Streams);
+
+    let position_str = if focused {
+        if let Some(position) = panes.iter().position(|candidate| *candidate == pane) {
+            format!("  {}/{}", position + 1, panes.len())
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let title_full = format!(" {marker}{label} · {count}{position_str} ");
+    let avail = max_width.saturating_sub(2) as usize;
+    let title = if avail > 0 && crate::tui::text::width(&title_full) > avail {
+        let title_compact = format!(" {marker}{label} · {count} ");
+        if crate::tui::text::width(&title_compact) <= avail {
+            title_compact
+        } else {
+            format!(" {marker}{label} ({count}) ")
+        }
+    } else {
+        title_full
+    };
+
     Line::from(title)
 }
 
@@ -1880,19 +1962,21 @@ fn render_workflow(
 
 fn stream_table_header_spans(width: u16, theme: &Theme) -> Vec<Span<'static>> {
     let header_style = theme.overlay0.add_modifier(Modifier::BOLD);
-    if width < 76 {
+    if width < 58 {
+        vec![Span::styled("  RES     SIZE     RELEASE", header_style)]
+    } else if width < 85 {
         vec![Span::styled(
-            "  RES     SIZE     CODEC RELEASE",
+            "  RES     SIZE     CODEC   RELEASE",
             header_style,
         )]
-    } else if width > 110 {
+    } else if width < 115 {
         vec![Span::styled(
-            "  RES     SIZE     MEDIA TAGS             DURATION UPLOADER        RELEASE",
+            "  RES     SIZE     MEDIA TAGS     DURATION   RELEASE",
             header_style,
         )]
     } else {
         vec![Span::styled(
-            "  RES     SIZE     MEDIA TAGS     DURATION UPLOADER / RELEASE",
+            "  RES     SIZE     MEDIA TAGS             DURATION   UPLOADER        RELEASE",
             header_style,
         )]
     }
@@ -2308,5 +2392,91 @@ mod tests {
         assert!(content.contains("EP 01"));
         assert!(content.contains("EP 02"));
         assert!(content.contains("EP 10"));
+    }
+
+    #[test]
+    fn test_responsive_selector_panes_single_pane_on_narrow_screen() {
+        use crate::tui::state::DetailsPane;
+        let all_panes = vec![
+            DetailsPane::Languages,
+            DetailsPane::Seasons,
+            DetailsPane::Episodes,
+        ];
+
+        // Width < 85 should only return the active pane
+        let narrow = visible_selector_panes(&all_panes, DetailsPane::Languages, 50);
+        assert_eq!(narrow, vec![DetailsPane::Languages]);
+
+        let narrow_season = visible_selector_panes(&all_panes, DetailsPane::Seasons, 60);
+        assert_eq!(narrow_season, vec![DetailsPane::Seasons]);
+
+        // Width >= 85 should return all 3 panes
+        let wide = visible_selector_panes(&all_panes, DetailsPane::Languages, 100);
+        assert_eq!(wide.len(), 3);
+    }
+
+    #[test]
+    fn test_pane_title_compact_width_does_not_overflow() {
+        use crate::tui::state::DetailsPane;
+        let state = AppState {
+            selected_details: Some(serde_json::json!({
+                "dubs": [
+                    { "lanName": "Original" },
+                    { "lanName": "Hindi" }
+                ]
+            })),
+            ..Default::default()
+        };
+
+        let title_wide = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 40);
+        assert!(title_wide.to_string().contains("1/"));
+
+        let title_narrow = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 12);
+        assert!(!title_narrow.to_string().contains("1/"));
+        assert!(title_narrow.to_string().contains("Audio"));
+    }
+
+    #[test]
+    fn test_details_screen_renders_in_narrow_terminal_without_clipping() {
+        let backend = ratatui::backend::TestBackend::new(50, 35);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            active_subject_id: Some("breaking_bad".to_string()),
+            selected_details: Some(serde_json::json!({
+                "id": "breaking_bad",
+                "title": "Breaking Bad",
+                "subjectType": 2,
+                "year": "2008",
+                "genres": ["Crime", "Drama", "Thriller"],
+                "description": "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine.",
+                "dubs": [
+                    { "lanName": "Original", "subjectId": "1" },
+                    { "lanName": "Hindi", "subjectId": "2" },
+                    { "lanName": "Spanish (LA)", "subjectId": "3" },
+                    { "lanName": "Portuguese (Brazil)", "subjectId": "4" }
+                ]
+            })),
+            available_seasons: vec![serde_json::json!({ "se": 1, "maxEp": 7 })],
+            available_episode_numbers: vec![vec![1, 2, 3]],
+            details_pane: crate::tui::state::DetailsPane::Languages,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("Breaking Bad"));
+        assert!(content.contains("Portuguese (Brazil)"));
     }
 }

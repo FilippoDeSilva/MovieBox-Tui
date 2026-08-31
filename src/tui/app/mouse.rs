@@ -833,7 +833,7 @@ impl App {
             area,
             self.state.selected_details.as_ref(),
         );
-        let tier = layout.tier;
+        let _tier = layout.tier;
         let workflow_area = layout.workflow_area;
         let bottom_area = layout.bottom_area;
         let footer_area = layout.footer_area;
@@ -854,16 +854,11 @@ impl App {
             return None;
         }
 
-        let visible_selector_panes =
-            if matches!(tier, crate::tui::screens::details::DetailsLayoutTier::Tiny) {
-                available_panes
-                    .iter()
-                    .copied()
-                    .filter(|pane| *pane == self.state.details_pane)
-                    .collect::<Vec<_>>()
-            } else {
-                available_panes
-            };
+        let visible_selector_panes = crate::tui::screens::details::visible_selector_panes(
+            &available_panes,
+            self.state.details_pane,
+            area.width,
+        );
 
         let selector_height = if visible_selector_panes.is_empty() {
             0
@@ -894,10 +889,11 @@ impl App {
         if !visible_selector_panes.is_empty()
             && selector_area.contains(ratatui::layout::Position::new(col, row))
         {
-            let selector_constraints =
-                crate::tui::screens::details::selector_pane_constraints(&visible_selector_panes);
+            let selector_constraints = crate::tui::screens::details::selector_pane_constraints(
+                &visible_selector_panes,
+                selector_area.width,
+            );
             let selector_chunks = Layout::horizontal(selector_constraints).split(selector_area);
-
             for (pane, pane_rect) in visible_selector_panes
                 .into_iter()
                 .zip(selector_chunks.iter())

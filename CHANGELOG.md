@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Responsive Details Screen Layout & Narrow Terminal Polish (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
+  - **Narrow-Screen Dynamic Selector Pane Focus**: On compact terminal widths (<85 columns), renders the active selector pane (Audio, Seasons, or Episodes) with 100% available horizontal width instead of horizontally cramming 3 unreadable 14-character columns that cut off titles, language names, and season numbers.
+  - **Adaptive Pane Titles & Border Overflow Guard**: Dynamic title formatting for selector panes and streams headers (`"Streams · N available · X/Y"` $\to$ `"Streams · N (X/Y)"` $\to$ `"Streams (N)"`) preventing Ratatui border title truncations (`"● Audio · 4  1/"`).
+  - **Compact Header & Responsive Poster Guard**: Automatically suppresses the side-by-side poster column when width is <75 columns, giving full terminal width to the title, IMDb badge, metadata, and synopsis without tight character clipping.
+  - **Multi-Tier Responsive Stream Table Layout**: Added dedicated 4-tier column formatting across ultra-compact (<58 cols), compact (58..85 cols), standard (85..115 cols), and wide (>=115 cols) widths.
 - **4KHDHub Fast Stream Resolution & Bounded Concurrency (`src/providers/fourkhdhub/`)**:
   - **Path Percent-Encoding Normalization (`hubcloud.rs`)**: Automatic normalization of raw stream URLs containing unencoded spaces, brackets, and special characters using `percent_encoding::utf8_percent_encode` with `NON_ALPHANUMERIC`, preventing `InvalidUrl` errors on complex release paths.
   - **Prioritized Mirror Scoring (`hubcloud.rs`)**: Refactored candidate stream scoring to prioritize direct Google Video/CDN backends (`score 0`) and PixelDrain API (`score 1`) ahead of storage CDNs (`score 2`) and Cloudflare workers (`score 3`).
