@@ -14,7 +14,7 @@ impl From<FourKHdHubError> for ProviderError {
             FourKHdHubError::Network(e) => ProviderError::Network(e.to_string()),
             FourKHdHubError::InvalidUrl(u) => ProviderError::Parsing(format!("Invalid URL: {u}")),
             FourKHdHubError::Parse(p) => ProviderError::Parsing(p),
-            FourKHdHubError::NoPlayableMirror(_) => ProviderError::NotFound,
+            FourKHdHubError::NoPlayableMirror(msg) => ProviderError::Unavailable(msg),
         }
     }
 }

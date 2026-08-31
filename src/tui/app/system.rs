@@ -685,11 +685,13 @@ impl App {
                 self.state.is_resolving_playback = false;
                 if msg.starts_with("Error:") {
                     log::error!("{msg}");
-                    self.state.notify(
-                        NotificationKind::Error,
-                        "Operation failed",
-                        msg.trim_start_matches("Error:").trim(),
-                    );
+                    let body = msg.trim_start_matches("Error:").trim();
+                    let title = if body.starts_with("4KHDHub") {
+                        "4KHDHub Stream Unavailable"
+                    } else {
+                        "Operation failed"
+                    };
+                    self.state.notify(NotificationKind::Error, title, body);
                 } else {
                     self.state.set_status_default(msg);
                 }

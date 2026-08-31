@@ -64,7 +64,7 @@ async fn test_stream_resolve_failure_resets_resolving_flag_and_notifies_user() {
     app.state_mut().is_resolving_playback = true;
 
     app.handle_action(Action::SetStatus(
-        "Error: 4KHDHub source failed: Stream extraction returned HTTP 403 Forbidden".to_string(),
+        "Error: 4KHDHub: Mirrors for this release are dead or expired on 4KHDHub. Select another release (e.g. 1080p) or press Ctrl+P for MovieBox.".to_string(),
     ))
     .await;
 
@@ -72,10 +72,11 @@ async fn test_stream_resolve_failure_resets_resolving_flag_and_notifies_user() {
     assert!(!app.state().notifications.is_empty());
     let notif = app.state().notifications.back().unwrap();
     assert_eq!(notif.kind, NotificationKind::Error);
+    assert_eq!(notif.title, "4KHDHub Stream Unavailable");
     assert!(
         notif
             .message
-            .contains("Stream extraction returned HTTP 403")
+            .contains("Mirrors for this release are dead or expired")
     );
 }
 

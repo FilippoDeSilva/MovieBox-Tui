@@ -338,7 +338,7 @@ impl App {
                         let sender = self.action_sender.clone();
                         tokio::spawn(async move {
                             let result = tokio::time::timeout(
-                                std::time::Duration::from_secs(15),
+                                std::time::Duration::from_secs(18),
                                 client.resolve_release(&release),
                             )
                             .await;
@@ -349,18 +349,16 @@ impl App {
                                         .ok();
                                 }
                                 Ok(Err(error)) => {
-                                    log::error!("stream resolve failed: {error}");
+                                    log::error!("4KHDHub download resolve failed: {error}");
                                     sender
-                                        .send(Action::SetStatus(format!(
-                                            "Error: Resolve failed: {error}"
-                                        )))
+                                        .send(Action::SetStatus(format!("Error: 4KHDHub: {error}")))
                                         .ok();
                                 }
                                 Err(_) => {
-                                    log::error!("stream resolve timed out");
+                                    log::error!("4KHDHub download resolve timed out");
                                     sender
                                         .send(Action::SetStatus(
-                                            "Error: Stream resolve timed out".to_string(),
+                                            "Error: 4KHDHub download resolution timed out. Select another release (e.g. 1080p) or press Ctrl+P for MovieBox.".to_string(),
                                         ))
                                         .ok();
                                 }

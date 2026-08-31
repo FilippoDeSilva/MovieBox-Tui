@@ -602,7 +602,7 @@ async fn test_esc_in_normal_mode_focuses_search_bar_when_results_present() {
 }
 
 #[tokio::test]
-async fn test_esc_in_editing_mode_switches_to_normal_when_results_present() {
+async fn test_esc_in_editing_mode_clears_search_and_switches_to_normal() {
     let mut app = App::new();
     app.state_mut().active_screen = Screen::Home;
     app.state_mut().input_mode = InputMode::Editing;
@@ -622,8 +622,8 @@ async fn test_esc_in_editing_mode_switches_to_normal_when_results_present() {
     app.handle_action(Action::Key(esc_key)).await;
 
     assert_eq!(app.state().input_mode, InputMode::Normal);
-    assert_eq!(app.state().search_results.len(), 1);
-    assert_eq!(app.state().search_query, "matrix");
+    assert!(app.state().search_results.is_empty());
+    assert!(app.state().search_query.is_empty());
 }
 
 #[tokio::test]

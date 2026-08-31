@@ -45,20 +45,15 @@ which `app/playback.rs::launch_player` feeds to the external player.
 
 ## 4KHDHub
 
-- `client.rs::resolve_release` walks the release's mirrors; each candidate goes through
-  `preflight` which validates the URL and issues an **open-range** probe
-  (`Range: bytes=0-`) so probe-only trap mirrors (which answer a tiny bounded range but
-  refuse real streaming) are rejected. The 4KHD referer and a browser user-agent are
-  attached so referer-gated CDNs stream in the player too.
-- `hubcloud.rs` resolves hubcloud/hubdrive pages into candidate playable links and
-  selects a mirror by score.
+- `client.rs::resolve_release` resolves release mirrors concurrently using bounded-concurrency probing (`select_ok` in batches of 3) with a 3.5s per-probe timeout.
+- Direct links undergo automatic path percent-encoding normalization (`validate_playback_url`) to handle filenames containing unencoded spaces, brackets, and special characters.
+- Preflight probes issue an **open-range** probe (`Range: bytes=0-`) and inspect response bodies for expired mirror errors (`"Failed to extract link"`, `"Token Expired"`, `"404"`) to fail fast on expired torrents.
+- `hubcloud.rs` scores and prioritizes candidate streams (Fast Direct Google/CDN $\to$ PixelDrain $\to$ Storage $\to$ Workers $\to$ Fallbacks).
 - **Multilingual audio detection**: `parser.rs::detect_language` parses release titles and
   metadata for 30+ regional and international languages (Hindi, Tamil, Telugu, Kannada,
   Malayalam, Bengali, Marathi, Punjabi, Gujarati, Urdu, Japanese, Korean, Chinese, Spanish,
   French, German, Italian, etc.) and formats all available audio tracks for stream display.
-- Errors are surfaced as `FourKHdHubError`; mirror rejections and the final failure
-  reason are logged with the mirror label and a sanitized URL.
-
+- Errors are mapped into `ProviderError::Unavailable` with user-actionable instructions guiding selection of alternate releases.
 ## BDIX
 
 - `circleftp` and `dhakaflix` scrape FTP-style indexes; both are used behind the

@@ -90,3 +90,89 @@ async fn test_live_series_resolutions_and_streams() {
         "Should find at least one real episode stream"
     );
 }
+
+#[tokio::test]
+#[ignore = "live network test; run with cargo test --test live_stream_verification -- --ignored"]
+async fn test_live_fourkhdhub_movie_resolution() {
+    let client = moviebox_tui::providers::fourkhdhub::FourKHdHubClient::new()
+        .expect("fourkhdhub client creation");
+    let items = client.search("Inception").await.expect("search Inception");
+    assert!(!items.is_empty(), "Inception search should return results");
+
+    let target = &items[0];
+    println!("Found item: {} ({:?})", target.title, target.id);
+    let releases = client
+        .releases(&target.id.value, 0, 0)
+        .await
+        .expect("fetch movie releases");
+    assert!(!releases.is_empty(), "releases should not be empty");
+
+    for release in &releases {
+        println!("Attempting resolve for: {}", release.filename);
+        let start = std::time::Instant::now();
+        match client.resolve_release(release).await {
+            Ok(source) => {
+                println!(
+                    "Resolved in {:?}: {} [{}]",
+                    start.elapsed(),
+                    source.url,
+                    source.source_label
+                );
+                assert!(source.url.starts_with("https://"));
+                break;
+            }
+            Err(e) => {
+                println!("Failed fast in {:?}: {e}", start.elapsed());
+                assert!(start.elapsed() < std::time::Duration::from_secs(8));
+            }
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "live network test; run with cargo test --test live_stream_verification -- --ignored"]
+async fn test_live_fourkhdhub_game_of_thrones_resolution() {
+    let client = moviebox_tui::providers::fourkhdhub::FourKHdHubClient::new()
+        .expect("fourkhdhub client creation");
+    let items = client
+        .search("Game of Thrones")
+        .await
+        .expect("search Game of Thrones");
+    assert!(!items.is_empty(), "Game of Thrones search results");
+
+    let target = items
+        .iter()
+        .find(|item| item.title.to_lowercase().contains("thrones"))
+        .expect("Game of Thrones entry");
+    println!("Found series: {} ({:?})", target.title, target.id);
+
+    let releases = client
+        .releases(&target.id.value, 1, 1)
+        .await
+        .expect("releases for S01E01");
+    assert!(!releases.is_empty(), "S01E01 releases found");
+
+    for release in &releases {
+        println!(
+            "Attempting resolve for S01E01 release: {}",
+            release.filename
+        );
+        let start = std::time::Instant::now();
+        match client.resolve_release(release).await {
+            Ok(source) => {
+                println!(
+                    "SUCCESS in {:?}: {} [{}]",
+                    start.elapsed(),
+                    source.url,
+                    source.source_label
+                );
+                assert!(source.url.starts_with("https://"));
+                break;
+            }
+            Err(e) => {
+                println!("Failed fast in {:?}: {e}", start.elapsed());
+                assert!(start.elapsed() < std::time::Duration::from_secs(8));
+            }
+        }
+    }
+}
