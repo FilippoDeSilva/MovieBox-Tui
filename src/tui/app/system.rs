@@ -11,7 +11,11 @@ impl App {
             Action::Tick => {
                 let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0)
                     || self.state.tick_count < 15
-                    || self.state.input_mode == InputMode::Editing;
+                    || self.state.input_mode == InputMode::Editing
+                    || (self.state.active_screen == Screen::Home
+                        && self.state.search_results.is_empty()
+                        && self.state.search_query.is_empty()
+                        && self.state.tick_count % 40 == 0);
                 self.state.tick_count = self.state.tick_count.wrapping_add(1);
                 if !self.state.notifications.is_empty() {
                     needs_redraw = true;

@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- **Mode-Aware Dynamic Search Suggestions & Rotating Hints (`src/tui/screens/home.rs`)**: Mode-aware rotating search suggestion hints cycling at 4-second intervals across Streaming, Addon, and TV modes providing title recommendations, slash command discovery, and mode-specific tips with priority fallback for active status messages.
+- **Smooth Precision Beam Cursor & Active Keystroke Debounce (`src/tui/screens/home.rs`)**: High-contrast vertical beam cursor (`▎` in `theme.accent`, `█` on basic terminals) with zero gap spacing against ghosted placeholder text, balanced 500ms idle blinking cadence, and active typing debounce preventing mid-keystroke cursor flickering.
+- **Multi-`Esc` Search Results Return-to-Homepage Navigation (`src/tui/app/keyboard.rs`)**: Enhanced `Esc` navigation so pressing `Esc` from search results focuses the search input (`InputMode::Editing`), and pressing `Esc` again clears the search state and returns directly to the landing screen / homepage.
 - **Core Domain Typing & Modernized Provider Traits (`src/models.rs`, `src/providers/`)**:
   - Refactored `Provider` and `ReleaseProvider` trait methods to return strongly typed domain models (`Result<Vec<CatalogItem>, ProviderError>`, `Result<MediaDetails, ProviderError>`, and `Result<Vec<Release>, ProviderError>`) instead of untyped `serde_json::Value` objects.
   - Introduced structured, classified error boundaries (`ProviderError`) with automatic user notification formatting via `.user_message(provider)` and `From` conversions for provider client errors (`ScraperError`, `FourKHdHubError`, `CircleFtpError`, `DhakaFlixError`).

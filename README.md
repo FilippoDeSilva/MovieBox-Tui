@@ -33,7 +33,7 @@ Searching and watching media through web browsers often means dealing with heavy
 
 ## Features at a Glance
 
-- **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, community HTTP addons, and custom IPTV playlists). Grapheme-safe search input with word deletion, line clearing, and autocomplete suggestions.
+- **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, community HTTP addons, and custom IPTV playlists). Features dynamic rotating search suggestions, precision vertical beam cursor with typing debounce, grapheme-safe input, and autocomplete discovery.
 - **Stream Details & Media Badges:** High-contrast color-coded resolution badges (4K UHD, 1080p FHD, 720p HD, SD) and audio/codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`) with smooth horizontal pane navigation (`←`/`→`/`h`/`l`/`Tab`).
 - **Addon Mode:** Install community HTTP addon manifests for custom catalog metadata (Cinemeta, Anime Kitsu) and direct stream resolution.
 - **Smooth Video Playback:** Plays directly in **mpv** or **VLC**, with **IINA** available on macOS, using your computer's hardware for smooth video.

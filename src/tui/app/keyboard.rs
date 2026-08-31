@@ -454,10 +454,9 @@ impl App {
                         self.state.input_mode = InputMode::Normal;
                         self.state.suggest_index = None;
                         self.state.search_suggestions.clear();
-                        if self.state.search_results.is_empty() {
-                            self.state.clear_search_state();
-                        }
-                        self.state.set_status_default("");
+                        self.state.clear_search_state();
+                        self.state.status_message.clear();
+                        self.state.status_timer = 0;
                     }
                     KeyCode::Enter => {
                         let selected_opt = self
@@ -1291,6 +1290,44 @@ mod tests {
         app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::empty()))
             .await;
 
+        assert!(app.state.search_query.is_empty());
+        assert!(app.state.search_results.is_empty());
+        assert_eq!(app.state.search_list_state.selected(), None);
+    }
+
+    #[tokio::test]
+    async fn test_search_results_multiple_esc_returns_to_homepage() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.search_query.set_content("Deewaniyat");
+        app.state.search_results = vec![crate::models::SearchResult {
+            id: "1".to_string(),
+            title: "Deewaniyat".to_string(),
+            stype: 1,
+            release_year: "2024".to_string(),
+            provider: crate::models::ProviderKind::MovieBox,
+            cover_url: None,
+            season: 0,
+            episode: 0,
+        }];
+        app.state.search_list_state.select(Some(0));
+
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        while let Ok(action) = app.action_receiver.try_recv() {
+            app.handle_action(action).await;
+        }
+        assert_eq!(app.state.input_mode, InputMode::Editing);
+        assert_eq!(app.state.search_query.as_str(), "Deewaniyat");
+        assert!(!app.state.search_results.is_empty());
+
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        while let Ok(action) = app.action_receiver.try_recv() {
+            app.handle_action(action).await;
+        }
+        assert_eq!(app.state.input_mode, InputMode::Normal);
         assert!(app.state.search_query.is_empty());
         assert!(app.state.search_results.is_empty());
         assert_eq!(app.state.search_list_state.selected(), None);

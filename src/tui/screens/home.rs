@@ -576,6 +576,42 @@ pub(crate) fn render_favorites_landing(
     }
 }
 
+pub(crate) fn dynamic_search_placeholder(state: &AppState) -> &'static str {
+    if state.is_tv_mode {
+        const TV_HINTS: &[&str] = &[
+            "Search live TV channels & streams…",
+            "Type /list to display all channels…",
+            "Type /config to add M3U playlist URLs…",
+            "Type /settings for TV & player options…",
+        ];
+        let idx = ((state.tick_count / 40) as usize) % TV_HINTS.len();
+        TV_HINTS[idx]
+    } else if state.is_addon_mode {
+        const ADDON_HINTS: &[&str] = &[
+            "Search movies and series via addons…",
+            "Type /config to install Stremio addons…",
+            "Type /browse to explore addon catalogs…",
+            "Type /favorites for starred addon media…",
+            "Type /settings for preferences & options…",
+        ];
+        let idx = ((state.tick_count / 40) as usize) % ADDON_HINTS.len();
+        ADDON_HINTS[idx]
+    } else {
+        const STREAMING_HINTS: &[&str] = &[
+            "Search movies, series & anime…",
+            "Try 'Interstellar', 'Dune', 'Breaking Bad'…",
+            "Type /settings for preferences & players…",
+            "Type /browse for trending & top rated…",
+            "Type /history to resume your watch list…",
+            "Type /favorites for starred media…",
+            "Type /theme to switch color palettes…",
+            "Type /help for interactive keybindings…",
+        ];
+        let idx = ((state.tick_count / 40) as usize) % STREAMING_HINTS.len();
+        STREAMING_HINTS[idx]
+    }
+}
+
 #[cfg(test)]
 fn search_content(
     state: &AppState,
@@ -596,16 +632,13 @@ fn search_content(
     if state.search_query.is_empty() {
         let content = if has_status && !editing {
             crate::tui::text::truncate_width(&state.status_message, available)
-        } else if state.is_tv_mode {
-            "Search live channels…".to_string()
-        } else if state.is_addon_mode {
-            "Search movies and series via addons…".to_string()
         } else {
-            "Search movies and series…".to_string()
+            dynamic_search_placeholder(state).to_string()
         };
         if editing {
             let cursor = if !real_cursor {
-                if show_cursor { "█ " } else { "  " }
+                let cursor_char = if state.basic_terminal { "█" } else { "▎" };
+                if show_cursor { cursor_char } else { " " }
             } else {
                 ""
             };
@@ -617,7 +650,7 @@ fn search_content(
         let segments = state.search_query.graphemes();
         let cursor = state.search_query.cursor();
         let cursor_char = if show_cursor {
-            "█"
+            if state.basic_terminal { "█" } else { "▎" }
         } else if cursor < segments.len() {
             segments[cursor]
         } else {
@@ -790,22 +823,29 @@ fn render_search_bar(
             theme.text_dim
         };
 
+        let has_status = state.status_timer > 0
+            && !state.status_message.is_empty()
+            && is_query_empty
+            && !editing;
         let search_line = if is_query_empty {
-            let placeholder_text = if state.is_tv_mode {
-                "Search live channels…"
-            } else if state.is_addon_mode {
-                "Search movies and series via addons…"
+            let placeholder_text = if has_status {
+                state.status_message.as_str()
             } else {
-                "Search movies and series…"
+                dynamic_search_placeholder(state)
             };
 
             if editing && !modal_active {
-                let cursor_str = if show_cursor { "█" } else { " " };
+                let cursor_char = if state.basic_terminal { "█" } else { "▎" };
+                let cursor_str = if show_cursor { cursor_char } else { " " };
                 Line::from(vec![
                     Span::styled(prefix, prefix_style),
                     Span::styled(cursor_str, theme.accent),
-                    Span::raw(" "),
                     Span::styled(placeholder_text, theme.text_dim),
+                ])
+            } else if has_status {
+                Line::from(vec![
+                    Span::styled(prefix, prefix_style),
+                    Span::styled(placeholder_text, theme.accent),
                 ])
             } else {
                 Line::from(vec![
@@ -817,7 +857,7 @@ fn render_search_bar(
             let segments = state.search_query.graphemes();
             let cursor = state.search_query.cursor();
             let cursor_char = if show_cursor {
-                "█"
+                if state.basic_terminal { "█" } else { "▎" }
             } else if cursor < segments.len() {
                 segments[cursor]
             } else {
@@ -933,20 +973,16 @@ fn render_search_bar(
         let search_line = if state.search_query.is_empty() {
             let placeholder_text = if has_status {
                 state.status_message.as_str()
-            } else if state.is_tv_mode {
-                "Search live channels…"
-            } else if state.is_addon_mode {
-                "Search movies and series via addons…"
             } else {
-                "Search movies and series…"
+                dynamic_search_placeholder(state)
             };
 
             if editing {
-                let cursor_str = if show_cursor { "█" } else { " " };
+                let cursor_char = if state.basic_terminal { "█" } else { "▎" };
+                let cursor_str = if show_cursor { cursor_char } else { " " };
                 Line::from(vec![
                     Span::styled(prefix, theme.accent),
                     Span::styled(cursor_str, theme.accent),
-                    Span::raw(" "),
                     Span::styled(placeholder_text, theme.text_dim),
                 ])
             } else if has_status {
@@ -964,7 +1000,7 @@ fn render_search_bar(
             let segments = state.search_query.graphemes();
             let cursor = state.search_query.cursor();
             let cursor_char = if show_cursor {
-                "█"
+                if state.basic_terminal { "█" } else { "▎" }
             } else if cursor < segments.len() {
                 segments[cursor]
             } else {
@@ -1020,7 +1056,9 @@ fn render_search_bar(
 }
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
-    let show_cursor = (state.tick_count % 16) < 8;
+    let is_actively_typing =
+        state.last_search_edit.elapsed() < std::time::Duration::from_millis(500);
+    let show_cursor = is_actively_typing || (state.tick_count % 10) < 5;
     let view = search_view_state(state);
     let search_bar_area;
 
@@ -2523,7 +2561,7 @@ mod tests {
             ..Default::default()
         };
         let content_rich = search_content(&state_rich, SearchViewState::Editing, true, 80, false);
-        assert!(content_rich.contains("❯ █ Search movies and series…"));
+        assert!(content_rich.contains("❯ ▎Search movies, series & anime…"));
 
         let state_basic = AppState {
             input_mode: InputMode::Editing,
@@ -2531,7 +2569,119 @@ mod tests {
             ..Default::default()
         };
         let content_basic = search_content(&state_basic, SearchViewState::Editing, true, 80, false);
-        assert!(content_basic.contains("> █ Search movies and series…"));
+        assert!(content_basic.contains("> █Search movies, series & anime…"));
+    }
+
+    #[test]
+    fn test_dynamic_search_placeholder_rotation() {
+        let mut state = AppState::default();
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Search movies, series & anime…"
+        );
+        state.tick_count = 40;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Try 'Interstellar', 'Dune', 'Breaking Bad'…"
+        );
+        state.tick_count = 80;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Type /settings for preferences & players…"
+        );
+        state.tick_count = 120;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Type /browse for trending & top rated…"
+        );
+        state.tick_count = 160;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Type /history to resume your watch list…"
+        );
+        state.tick_count = 200;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Type /favorites for starred media…"
+        );
+        state.tick_count = 240;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Type /theme to switch color palettes…"
+        );
+        state.tick_count = 280;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Type /help for interactive keybindings…"
+        );
+        state.tick_count = 320;
+        assert_eq!(
+            dynamic_search_placeholder(&state),
+            "Search movies, series & anime…"
+        );
+
+        let mut tv_state = AppState {
+            is_tv_mode: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            dynamic_search_placeholder(&tv_state),
+            "Search live TV channels & streams…"
+        );
+        tv_state.tick_count = 40;
+        assert_eq!(
+            dynamic_search_placeholder(&tv_state),
+            "Type /list to display all channels…"
+        );
+        tv_state.tick_count = 80;
+        assert_eq!(
+            dynamic_search_placeholder(&tv_state),
+            "Type /config to add M3U playlist URLs…"
+        );
+        tv_state.tick_count = 120;
+        assert_eq!(
+            dynamic_search_placeholder(&tv_state),
+            "Type /settings for TV & player options…"
+        );
+        tv_state.tick_count = 160;
+        assert_eq!(
+            dynamic_search_placeholder(&tv_state),
+            "Search live TV channels & streams…"
+        );
+
+        let mut addon_state = AppState {
+            is_addon_mode: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            dynamic_search_placeholder(&addon_state),
+            "Search movies and series via addons…"
+        );
+        addon_state.tick_count = 40;
+        assert_eq!(
+            dynamic_search_placeholder(&addon_state),
+            "Type /config to install Stremio addons…"
+        );
+        addon_state.tick_count = 80;
+        assert_eq!(
+            dynamic_search_placeholder(&addon_state),
+            "Type /browse to explore addon catalogs…"
+        );
+        addon_state.tick_count = 120;
+        assert_eq!(
+            dynamic_search_placeholder(&addon_state),
+            "Type /favorites for starred addon media…"
+        );
+        addon_state.tick_count = 160;
+        assert_eq!(
+            dynamic_search_placeholder(&addon_state),
+            "Type /settings for preferences & options…"
+        );
+        addon_state.tick_count = 200;
+        assert_eq!(
+            dynamic_search_placeholder(&addon_state),
+            "Search movies and series via addons…"
+        );
     }
 
     #[test]
@@ -2708,7 +2858,7 @@ mod tests {
             rendered.push('\n');
         }
         assert!(rendered.contains('❯'));
-        assert!(rendered.contains("Search movies and series…"));
+        assert!(rendered.contains("Search movies, series & anime…"));
         assert!(rendered.contains("[MovieBox"));
         assert!(rendered.contains(&crate::tui::text::ctrl_key("P")));
 
@@ -2819,7 +2969,7 @@ mod tests {
             tv_rendered.push('\n');
         }
         assert!(tv_rendered.contains("[Live TV"));
-        assert!(tv_rendered.contains("Search live channels…"));
+        assert!(tv_rendered.contains("Search live TV channels & streams…"));
 
         let mut addon_state = AppState {
             is_addon_mode: true,
