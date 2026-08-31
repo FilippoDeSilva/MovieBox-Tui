@@ -72,12 +72,13 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 - **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
 - **`/clear`**: Clear active search query and return to landing.
+
+### Live TV Mode
 - **`Enter`**: Play selected TV channel immediately.
 - **`o`**: Open player selection picker for the channel.
 - **`r`**: Reload all active M3U playlist sources.
 - **`/config`**: Open TV Playlist Manager dialog (`Space` to activate, `Delete`/`d` to remove).
 - **`/list`**: Show all loaded channels.
-
 ### Addon Mode (HTTP Addons)
 - **`Ctrl+P` / `/config`**: Open Addon Manager dialog (`Space` to toggle, `Delete`/`d` to remove).
 - **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Seasons, Episodes, Streams).

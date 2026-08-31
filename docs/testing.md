@@ -4,8 +4,7 @@ This document describes the testing architecture, quality assurance procedures, 
 
 ## 1. Test Architecture
 
-The test suite comprises **296+ automated tests across 19 test suites** (158 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 138 integration tests across 18 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
-
+The test suite comprises **310+ automated tests across 21 test suites** (170 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 140 integration tests across 20 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
 The MovieBox-TUI test architecture follows a strict separation of concerns:
 
 ```text
@@ -64,7 +63,7 @@ Integration tests live in the `tests/` directory and test externally observable 
 - **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
 - **`addons_manifest.rs`**: Validates deserialization of Cinemeta/Stremio addon manifests, series vs movie metadata classification, multi-season episode decomposition, episode stream isolation (`parse_season_episode`), token and codec parsing, and movie stream regressions.
 - **`url_security.rs`**: Validates HTTP/HTTPS URL detection and Windows reserved device stem sanitization (`CON`, `AUX`, `PRN`, `NUL`, `COM1-9`, `LPT1-9`).
-- **`live_stream_verification.rs`**: Validates real-world MovieBox CDN stream link resolution for movies and TV series, verifying that the backend returns valid signed MP4 streams and that legacy upgrade notice hashes (`1c7de0bd...`) are rejected. The tests are `#[ignore]`-gated for offline execution; opt in with `cargo test --test live_stream_verification -- --ignored`.
+- **`live_stream_verification.rs`**: Validates real-world stream link resolution across MovieBox signed CDN endpoints and 4KHDHub multi-mirror releases (verifying fast <3.5s direct stream resolution on working mirrors and fast <4.5s failure with actionable diagnostics on expired torrents). The tests are `#[ignore]`-gated for offline execution; opt in with `cargo test --test live_stream_verification -- --ignored`.
 
 ---
 

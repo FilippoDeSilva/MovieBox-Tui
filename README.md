@@ -34,12 +34,12 @@ Searching and watching media through web browsers often means dealing with heavy
 ## Features at a Glance
 
 - **Search Everything:** Find movies, TV shows, anime, and live TV channels across multiple sources (MovieBox, 4KHDHub, BDIX mirrors, community HTTP addons, and custom IPTV playlists). Features dynamic rotating search suggestions, precision vertical beam cursor with typing debounce, grapheme-safe input, and autocomplete discovery.
-- **Stream Details & Media Badges:** High-contrast color-coded resolution badges (4K UHD, 1080p FHD, 720p HD, SD) and audio/codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`) with smooth horizontal pane navigation (`←`/`→`/`h`/`l`/`Tab`).
+- **Stream Details & Media Badges:** Responsive multi-tier details layout with adaptive selector panes (Audio, Seasons, Episodes), color-coded resolution badges (4K UHD, 1080p FHD, 720p HD, SD), and audio/codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`) with smooth horizontal pane navigation (`←`/`→`/`h`/`l`/`Tab`).
 - **Addon Mode:** Install community HTTP addon manifests for custom catalog metadata (Cinemeta, Anime Kitsu) and direct stream resolution.
 - **Smooth Video Playback:** Plays directly in **mpv** or **VLC**, with **IINA** available on macOS, using your computer's hardware for smooth video.
 - **Easy Downloads:** Download single episodes or entire seasons with one keypress. Completed episodes are skipped automatically.
 - **Favorites:** Star any movie or series with `*` (or `f` on the details screen) and reach it instantly from a dedicated row on the home screen, or view the full list with `/favorites`.
-- **Refined Terminal Interface:** Full keyboard and mouse support, responsive multi-column grid, fluid 10-frame Braille loading spinners, WCAG AA contrast light/dark themes (Catppuccin Latte/Mocha, Nord, TokyoNight, Dracula, Gruvbox, Rosé Pine), contextual window titles, and modal-gated poster art.
+- **Refined Terminal Interface:** Full keyboard and mouse support, responsive multi-column grid, compact single-column narrow terminal fallbacks, fluid 10-frame Braille loading spinners, WCAG AA contrast light/dark themes (Catppuccin Latte/Mocha, Nord, TokyoNight, Dracula, Gruvbox, Rosé Pine), contextual window titles, and modal-gated poster art.
 ## Installation
 
 A media player (**[mpv](https://mpv.io)** or **[VLC](https://www.videolan.org/vlc/)**; **[IINA](https://iina.io)** on macOS) is recommended for video playback.
