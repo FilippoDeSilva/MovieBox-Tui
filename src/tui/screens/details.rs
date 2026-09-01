@@ -34,16 +34,16 @@ impl DetailsLayoutTier {
 
     pub(crate) fn header_height(self, area: Rect, details: Option<&MediaDetails>) -> u16 {
         let (minimum, maximum, synopsis_limit, reserved_width) = match self {
-            Self::Wide => (9, 12, 4, 30),
-            Self::Medium => (8, 11, 3, 24),
-            Self::Narrow => (7, 10, 3, 4),
-            Self::Tiny => (5, 8, 2, 4),
+            Self::Wide => (5, 11, 4, 30),
+            Self::Medium => (5, 10, 3, 24),
+            Self::Narrow => (4, 9, 3, 4),
+            Self::Tiny => (4, 7, 2, 4),
         };
         let available_maximum = area.height.saturating_sub(match self {
-            Self::Wide => 16,
-            Self::Medium => 14,
-            Self::Narrow => 12,
-            Self::Tiny => 10,
+            Self::Wide => 14,
+            Self::Medium => 12,
+            Self::Narrow => 10,
+            Self::Tiny => 8,
         });
         let maximum = maximum.min(available_maximum.max(minimum));
 
@@ -51,20 +51,40 @@ impl DetailsLayoutTier {
             return minimum.min(maximum);
         };
         let synopsis = details.description.as_deref().unwrap_or_default();
-        let text_width = area.width.saturating_sub(reserved_width).max(20) as usize;
+        let show_poster = area.width >= 75 && details.poster_url.is_some();
+        let text_width = area
+            .width
+            .saturating_sub(if show_poster { reserved_width } else { 4 })
+            .max(20) as usize;
         let title = &details.title;
         let title_rows = (crate::tui::text::width(title) + 14)
             .div_ceil(text_width)
             .clamp(1, 2);
-        let synopsis_rows = crate::tui::text::width(synopsis)
-            .div_ceil(text_width)
-            .clamp(1, synopsis_limit);
-        let metadata_rows = match self {
-            Self::Wide | Self::Medium => 5,
-            Self::Narrow => 4,
-            Self::Tiny => 3,
+        let has_tagline = details
+            .tagline
+            .as_ref()
+            .is_some_and(|t| !t.trim().is_empty());
+        let has_cast = details.stars.as_ref().is_some_and(|s| !s.trim().is_empty());
+        let has_prints = details
+            .prints
+            .as_ref()
+            .is_some_and(|p| !p.trim().is_empty());
+        let meta_lines = title_rows
+            + (if has_tagline { 1 } else { 0 })
+            + (if has_cast { 1 } else { 0 })
+            + (if has_prints { 1 } else { 0 });
+        let synopsis_rows = if synopsis.trim().is_empty() {
+            0
+        } else {
+            crate::tui::text::width(synopsis)
+                .div_ceil(text_width)
+                .clamp(1, synopsis_limit)
         };
-        let content_rows = metadata_rows + title_rows.saturating_sub(1) + synopsis_rows;
+        let content_rows = if show_poster {
+            (meta_lines + 1 + synopsis_rows).max(7)
+        } else {
+            meta_lines + 1 + synopsis_rows
+        };
         (content_rows as u16 + 2).clamp(minimum, maximum)
     }
     pub(crate) fn footer_height(self, width: u16) -> u16 {
@@ -419,11 +439,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         inner_area
     };
 
-    let meta_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(4), Constraint::Percentage(100)])
-        .split(meta_area);
-
     let mut info_lines = vec![];
 
     let bullet_sep = if state.basic_terminal { " - " } else { " · " };
@@ -532,6 +547,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if !tech_spans.is_empty() {
         info_lines.push(Line::from(tech_spans));
     }
+    let info_height = info_lines.len() as u16;
+    let meta_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(info_height), Constraint::Min(0)])
+        .split(meta_area);
 
     let info_p = Paragraph::new(info_lines);
     frame.render_widget(info_p, meta_chunks[0]);
@@ -872,22 +892,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         };
         let avail = streams_area.width.saturating_sub(4) as usize;
         let title_full = format!(
-            " {marker}Streams · {} available · {}/{} ",
-            streams_count,
+            " {marker}Streams ({streams_count}) · {}/{} ",
             selected + 1,
             streams_count
         );
         if avail > 0 && crate::tui::text::width(&title_full) > avail {
-            let title_medium = format!(
-                " {marker}Streams · {} ({}/{}) ",
-                streams_count,
-                selected + 1,
-                streams_count
-            );
+            let title_medium = format!(" {marker}Streams ({streams_count}) ");
             if crate::tui::text::width(&title_medium) <= avail {
                 title_medium
             } else {
-                format!(" {marker}Streams ({streams_count}) ")
+                format!(" {marker}Streams ")
             }
         } else {
             title_full
@@ -1378,7 +1392,7 @@ fn clean_language_name(value: &str) -> String {
 
 fn pane_title(
     label: &str,
-    count: usize,
+    _count: usize,
     pane: crate::tui::state::DetailsPane,
     focused: bool,
     state: &AppState,
@@ -1403,7 +1417,7 @@ fn pane_title(
     }
     panes.push(crate::tui::state::DetailsPane::Streams);
 
-    let position_str = if focused {
+    let position_str = if focused && panes.len() > 1 {
         if let Some(position) = panes.iter().position(|candidate| *candidate == pane) {
             format!("  {}/{}", position + 1, panes.len())
         } else {
@@ -1413,15 +1427,10 @@ fn pane_title(
         String::new()
     };
 
-    let title_full = format!(" {marker}{label} · {count}{position_str} ");
+    let title_full = format!(" {marker}{label}{position_str} ");
     let avail = max_width.saturating_sub(2) as usize;
     let title = if avail > 0 && crate::tui::text::width(&title_full) > avail {
-        let title_compact = format!(" {marker}{label} · {count} ");
-        if crate::tui::text::width(&title_compact) <= avail {
-            title_compact
-        } else {
-            format!(" {marker}{label} ({count}) ")
-        }
+        format!(" {marker}{label} ")
     } else {
         title_full
     };
@@ -2202,17 +2211,19 @@ mod tests {
                     },
                 ],
             }),
+            basic_terminal: false,
             ..Default::default()
         };
 
         let title_wide = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 40);
-        assert!(title_wide.to_string().contains("1/"));
+        assert_eq!(title_wide.to_string(), " ● Audio  1/2 ");
 
-        let title_narrow = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 12);
-        assert!(!title_narrow.to_string().contains("1/"));
-        assert!(title_narrow.to_string().contains("Audio"));
+        let title_unfocused = pane_title("Audio", 2, DetailsPane::Languages, false, &state, 40);
+        assert_eq!(title_unfocused.to_string(), " Audio ");
+
+        let title_narrow = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 10);
+        assert_eq!(title_narrow.to_string(), " ● Audio ");
     }
-
     #[test]
     fn test_details_screen_renders_in_narrow_terminal_without_clipping() {
         let backend = ratatui::backend::TestBackend::new(50, 35);

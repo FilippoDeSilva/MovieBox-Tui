@@ -307,6 +307,11 @@ fn mpv_command(
     }
 
     if !headers.is_empty() {
+        for (name, value) in headers {
+            if name.eq_ignore_ascii_case("user-agent") {
+                command.arg(format!("{prefix}user-agent={value}"));
+            }
+        }
         let fields = headers
             .iter()
             .map(|(name, value)| format!("{name}: {value}"))
