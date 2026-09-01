@@ -95,7 +95,11 @@ fn test_addon_series_metadata_and_episodes_decomposition() {
         genre: vec![],
         runtime: Some("49 min".to_string()),
         cast: vec!["Bryan Cranston".to_string(), "Aaron Paul".to_string()],
+        stars: vec![],
         director: vec!["Vince Gilligan".to_string()],
+        directors: vec![],
+        writer: vec![],
+        writers: vec![],
         videos: vec![
             MetaVideo {
                 id: Some("tt0903747:1:1".to_string()),
@@ -173,7 +177,11 @@ fn test_addon_series_classification_and_default_season_structure() {
         genre: vec![],
         runtime: Some("45 min".to_string()),
         cast: vec![],
+        stars: vec![],
         director: vec![],
+        directors: vec![],
+        writer: vec![],
+        writers: vec![],
         videos: vec![],
     };
 

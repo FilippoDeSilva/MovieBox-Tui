@@ -35,6 +35,7 @@ impl App {
                         self.state
                             .search_preview
                             .as_ref()
+                            .filter(|p| p.id.value == *subject_id)
                             .and_then(|p| p.cover_url().map(|s| s.to_string()))
                     });
             }
@@ -43,6 +44,7 @@ impl App {
                     .state
                     .search_preview
                     .as_ref()
+                    .filter(|p| p.id.value == *subject_id)
                     .and_then(|p| p.duration.as_deref().and_then(parse_duration_seconds));
             }
             return Some(item);

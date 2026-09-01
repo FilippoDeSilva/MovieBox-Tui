@@ -152,7 +152,8 @@ impl MediaDetails {
         item: &crate::models::SearchResult,
         preview: Option<&MediaDetails>,
     ) -> Self {
-        if let Some(p) = preview {
+        if let Some(p) = preview.filter(|p| p.id.value == item.id && p.id.provider == item.provider)
+        {
             let mut details = p.clone();
             if details.title.trim().is_empty() {
                 details.title = item.title.clone();
@@ -176,7 +177,11 @@ impl MediaDetails {
                 } else {
                     MediaType::Movie
                 },
-                year: Some(item.release_year.clone()),
+                year: if !item.release_year.trim().is_empty() {
+                    Some(item.release_year.clone())
+                } else {
+                    None
+                },
                 description: None,
                 tagline: None,
                 imdb_rating: None,

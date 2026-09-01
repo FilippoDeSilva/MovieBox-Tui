@@ -23,12 +23,7 @@ enum SearchViewState {
 fn search_view_state(state: &AppState) -> SearchViewState {
     if state.input_mode == InputMode::Editing {
         SearchViewState::Editing
-    } else if state.is_loading
-        && (!state.search_query.trim().is_empty()
-            || state.active_browse_preset.is_some()
-            || state.active_addon_catalog.is_some()
-            || state.is_homepage_mode)
-    {
+    } else if state.is_loading {
         SearchViewState::Loading
     } else if state.search_error.is_some() {
         SearchViewState::Error
@@ -258,13 +253,13 @@ fn render_search_state(
 
     match view {
         SearchViewState::Loading => {
-            let msg = if state.basic_terminal {
+            if state.basic_terminal {
                 let dots = match (state.tick_count / 4) % 3 {
                     0 => ".",
                     1 => "..",
                     _ => "...",
                 };
-                if let Some(preset) = state.active_browse_preset {
+                let text = if let Some(preset) = state.active_browse_preset {
                     format!("Loading {}{dots}", preset.label())
                 } else if let Some(catalog) = &state.active_addon_catalog {
                     format!("Loading {}{dots}", catalog.label)
@@ -274,25 +269,34 @@ fn render_search_state(
                     format!("Searching for “{query}”{dots}")
                 } else {
                     format!("Loading{dots}")
-                }
+                };
+                lines.push(Line::from(vec![Span::styled(text, theme.lavender)]));
             } else {
                 const SPINNER_FRAMES: [&str; 10] =
                     ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
                 let spinner =
                     SPINNER_FRAMES[(state.tick_count as usize / 2) % SPINNER_FRAMES.len()];
-                if let Some(preset) = state.active_browse_preset {
-                    format!("{spinner} Loading {}", preset.label())
+                let text = if let Some(preset) = state.active_browse_preset {
+                    format!("Loading {}", preset.label())
                 } else if let Some(catalog) = &state.active_addon_catalog {
-                    format!("{spinner} Loading {}", catalog.label)
+                    format!("Loading {}", catalog.label)
                 } else if state.is_homepage_mode {
-                    format!("{spinner} Loading discover")
+                    "Loading discover".to_string()
                 } else if !state.search_query.trim().is_empty() {
-                    format!("{spinner} Searching for “{query}”")
+                    format!("Searching for “{query}”")
                 } else {
-                    format!("{spinner} Loading")
-                }
-            };
-            lines.push(Line::from(vec![Span::styled(msg, theme.lavender)]));
+                    "Loading".to_string()
+                };
+
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{spinner} "),
+                        theme.accent.add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(text, theme.subtext1.add_modifier(Modifier::BOLD)),
+                ]));
+            }
         }
         SearchViewState::NoResults => {
             let symbol = if state.basic_terminal { "-" } else { "·" };
@@ -427,6 +431,10 @@ fn render_search_state(
         card_width = (max_line_width + 4)
             .clamp(32, area.width.saturating_sub(2))
             .min(72);
+    } else if view == SearchViewState::Loading {
+        card_width = (max_line_width + 2)
+            .clamp(24, area.width.saturating_sub(2))
+            .min(64);
     }
 
     let is_boxed = matches!(view, SearchViewState::Error | SearchViewState::NoResults);
@@ -1741,7 +1749,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         state.basic_terminal,
                     ));
                 } else {
-                    if let Some(meta) = &state.search_preview {
+                    let matching_meta = state
+                        .search_preview
+                        .as_ref()
+                        .filter(|m| m.id.value == res.id && m.id.provider == res.provider);
+                    if let Some(meta) = matching_meta {
                         if is_selected {
                             if let Some(r) = meta.imdb_rating.as_deref() {
                                 let star = if state.basic_terminal { "* " } else { "★ " };

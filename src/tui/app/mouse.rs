@@ -941,52 +941,29 @@ impl App {
             let streams_count = self.state.selected_resources.len();
 
             if streams_count > 0 {
-                let list = self.state.selected_resources.clone();
+                let list_start_y = streams_area.y.saturating_add(2);
+                let list_end_y = streams_area.bottom().saturating_sub(1);
+                if row >= list_start_y && row < list_end_y {
+                    let clicked_stream_row = (row - list_start_y)
+                        .saturating_add(self.state.resource_list_state.offset() as u16);
+                    let target_idx =
+                        (clicked_stream_row as usize).min(streams_count.saturating_sub(1));
 
-                let clicked_stream_row = row
-                    .saturating_sub(streams_area.y + 1)
-                    .saturating_add(self.state.resource_list_state.offset() as u16);
-                let mut line_offset = 0_u16;
-                let mut prev_resolution = None;
-                let mut matched_idx = None;
+                    let prev_selected = self.state.resource_list_state.selected();
+                    self.state.resource_list_state.select(Some(target_idx));
 
-                for (i, file) in list.iter().enumerate() {
-                    let resolution = file.resolution_u64() as i64;
-                    if prev_resolution != Some(resolution) {
-                        if i > 0 {
-                            line_offset += 1;
+                    if prev_selected == Some(target_idx) {
+                        if self.state.is_playing {
+                            self.state.notify(
+                                NotificationKind::Warning,
+                                "Playback already active",
+                                "Stop the current player before starting another.",
+                            );
+                        } else if !self.state.is_resolving_playback
+                            && self.state.last_playback_launch.elapsed().as_millis() >= 500
+                        {
+                            self.action_sender.send(Action::PlayStream).ok();
                         }
-                        line_offset += 1;
-                        if i == 0 {
-                            line_offset += 1;
-                        }
-                        prev_resolution = Some(resolution);
-                    }
-                    if clicked_stream_row == line_offset {
-                        matched_idx = Some(i);
-                        break;
-                    }
-                    line_offset += 1;
-                }
-
-                let target_idx = matched_idx.unwrap_or_else(|| {
-                    (clicked_stream_row as usize / 2).min(streams_count.saturating_sub(1))
-                });
-
-                let prev_selected = self.state.resource_list_state.selected();
-                self.state.resource_list_state.select(Some(target_idx));
-
-                if prev_selected == Some(target_idx) {
-                    if self.state.is_playing {
-                        self.state.notify(
-                            NotificationKind::Warning,
-                            "Playback already active",
-                            "Stop the current player before starting another.",
-                        );
-                    } else if !self.state.is_resolving_playback
-                        && self.state.last_playback_launch.elapsed().as_millis() >= 500
-                    {
-                        self.action_sender.send(Action::PlayStream).ok();
                     }
                 }
             }

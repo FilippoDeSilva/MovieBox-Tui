@@ -3,6 +3,23 @@
 ## [Unreleased]
 
 ### Added
+- **Smooth Loading Transitions & Zero-Flicker View State Optimization (`src/tui/screens/home.rs`, `src/tui/screens/details.rs`, `src/tui/app/keyboard.rs`)**:
+  - Eliminated millisecond flashes of "No matches found" / "No results found" when submitting searches by synchronizing `is_loading` state on Enter and prioritizing `SearchViewState::Loading` in `search_view_state`.
+  - Prevented transient "No stream sources found" flash on the Details screen by displaying the stream loading spinner while either `is_fetching_streams` or `is_loading` is active.
+  - Ensured smooth, fluid visual transitions without jarring state jumps when searching, switching providers, or navigating media details.
+- **Isolated Stream Selection Highlighting & Dedicated Table Header (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
+  - Fixed stream selection highlight bleeding over group and table column headers by separating the column header into a static, unselected header row at the top of the Streams pane in `theme.overlay0`.
+  - Rendered each stream as an atomic 1-line `ListItem`, ensuring Ratatui's `selection_style` background and `selection_symbol` apply exclusively to the selected stream row.
+  - Aligned table column headers (`RES`, `SIZE`, `MEDIA TAGS`, `DURATION`, `UPLOADER`, `RELEASE`) across all 4 responsive tiers (<58, 58..85, 85..115, $\ge$115 cols).
+  - Simplified scroll indicator calculation and aligned mouse click hitboxes directly to stream rows.
+- **Strict Metadata & Preview Identity Isolation (`src/providers/models.rs`, `src/tui/app/requests.rs`, `src/tui/screens/details.rs`, `src/tui/screens/home.rs`, `src/tui/app/playback.rs`)**:
+  - Filtered `MediaDetails::from_search_result` to only consume `search_preview` when `preview.id.value == item.id && preview.id.provider == item.provider`, preventing stale metadata leakage when navigating search results quickly.
+  - Guarded `DetailsSuccess` metadata merging to only combine missing fields when `existing.id.value == id && existing.id.provider == details.id.provider`.
+  - Guarded synopsis fallback in `details.rs`, search result card badges in `home.rs`, and watch history duration/cover fallbacks in `playback.rs` with strict subject ID matching.
+- **Addon Provider Metadata Resolution & Crew Support (`src/providers/addons/`)**:
+  - Reordered `AddonClient::details` query priority to start with `"movie"` before `"series"`, returning immediately upon receiving valid matching metadata.
+  - Added support for plural and alternate crew and cast fields (`directors`, `writer`, `writers`, `stars`) in `MetaDetail` deserialization and adaptation.
+  - Prevented incorrect media type classification from corrupting stream queries to addon providers.
 - **Domain Factory Methods & Codebase Deduplication (`src/providers/models.rs`, `src/models.rs`, `src/history.rs`, `src/favorites.rs`, `src/tui/app/`)**:
   - Centralized `MediaDetails::from_search_result(&item, preview)` constructor on `MediaDetails`, eliminating 100+ lines of duplicate fallback creation across `navigation.rs` and `favorites.rs`.
   - Added `WatchHistoryItem::from_details` and `FavoriteItem::from_details` domain constructors consuming strongly typed `MediaDetails`.

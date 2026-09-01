@@ -81,21 +81,27 @@ impl Provider for AddonClient {
             .filter(|a| a.enabled && a.provides_meta)
             .collect();
 
-        let types_to_try = ["series", "tv", "anime", "movie", "other"];
+        let types_to_try = ["movie", "series", "tv", "anime", "other"];
         let mut best_detail: Option<models::MetaDetail> = None;
 
         for addon in &meta_addons {
             let base_url = Self::base_addon_url(&addon.manifest_url);
             for t in types_to_try {
                 if let Ok(d) = self.fetch_meta(&base_url, t, id).await {
-                    if !d.videos.is_empty()
-                        || d.r#type.eq_ignore_ascii_case("series")
-                        || d.r#type.eq_ignore_ascii_case("tv")
-                    {
-                        return Ok(adapter::meta_detail_to_media_details(&d));
-                    }
-                    if best_detail.is_none() {
-                        best_detail = Some(d);
+                    let has_valid_id = d.id == id;
+                    let has_title = !d.name.trim().is_empty()
+                        || d.title.as_deref().is_some_and(|t| !t.trim().is_empty());
+                    if has_valid_id && has_title {
+                        if !d.videos.is_empty()
+                            || d.r#type.eq_ignore_ascii_case("series")
+                            || d.r#type.eq_ignore_ascii_case("tv")
+                            || d.r#type.eq_ignore_ascii_case("movie")
+                        {
+                            return Ok(adapter::meta_detail_to_media_details(&d));
+                        }
+                        if best_detail.is_none() {
+                            best_detail = Some(d);
+                        }
                     }
                 }
             }
@@ -110,14 +116,20 @@ impl Provider for AddonClient {
                 let base_url = Self::base_addon_url(&addon.manifest_url);
                 for t in types_to_try {
                     if let Ok(d) = self.fetch_meta(&base_url, t, id).await {
-                        if !d.videos.is_empty()
-                            || d.r#type.eq_ignore_ascii_case("series")
-                            || d.r#type.eq_ignore_ascii_case("tv")
-                        {
-                            return Ok(adapter::meta_detail_to_media_details(&d));
-                        }
-                        if best_detail.is_none() {
-                            best_detail = Some(d);
+                        let has_valid_id = d.id == id;
+                        let has_title = !d.name.trim().is_empty()
+                            || d.title.as_deref().is_some_and(|t| !t.trim().is_empty());
+                        if has_valid_id && has_title {
+                            if !d.videos.is_empty()
+                                || d.r#type.eq_ignore_ascii_case("series")
+                                || d.r#type.eq_ignore_ascii_case("tv")
+                                || d.r#type.eq_ignore_ascii_case("movie")
+                            {
+                                return Ok(adapter::meta_detail_to_media_details(&d));
+                            }
+                            if best_detail.is_none() {
+                                best_detail = Some(d);
+                            }
                         }
                     }
                 }

@@ -487,6 +487,10 @@ impl App {
                                 self.state.search_query.set_content(&query);
                             }
                             self.state.input_mode = InputMode::Normal;
+                            if !query.starts_with('/') {
+                                self.state.is_loading = true;
+                                self.state.search_error = None;
+                            }
                             self.state.search_suggestions.clear();
                             self.state.suggest_index = None;
                             self.state.search_list_state.select(None);

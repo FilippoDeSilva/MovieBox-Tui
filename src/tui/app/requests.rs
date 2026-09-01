@@ -860,8 +860,8 @@ impl App {
                 self.state.is_loading = false;
                 self.state.details_error = None;
 
-                if self.state.language_chosen {
-                    if let Some(existing) = &self.state.selected_details {
+                if let Some(existing) = &self.state.selected_details {
+                    if existing.id.value == id && existing.id.provider == details.id.provider {
                         if details.title.trim().is_empty() {
                             details.title = existing.title.clone();
                         }
@@ -883,30 +883,15 @@ impl App {
                         if details.imdb_rating.is_none() {
                             details.imdb_rating = existing.imdb_rating.clone();
                         }
+                        if details.director.is_none() {
+                            details.director = existing.director.clone();
+                        }
+                        if details.stars.is_none() {
+                            details.stars = existing.stars.clone();
+                        }
                         if details.dubs.is_empty() {
                             details.dubs = existing.dubs.clone();
                         }
-                    }
-                }
-
-                if let Some(existing) = &self.state.selected_details {
-                    if details.title.trim().is_empty() {
-                        details.title = existing.title.clone();
-                    }
-                    if details.year.is_none() {
-                        details.year = existing.year.clone();
-                    }
-                    if details.poster_url.is_none() {
-                        details.poster_url = existing.poster_url.clone();
-                    }
-                    if details.description.is_none() {
-                        details.description = existing.description.clone();
-                    }
-                    if details.imdb_rating.is_none() {
-                        details.imdb_rating = existing.imdb_rating.clone();
-                    }
-                    if details.genres.is_empty() {
-                        details.genres = existing.genres.clone();
                     }
                 }
 

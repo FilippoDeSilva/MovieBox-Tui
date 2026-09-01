@@ -5,7 +5,7 @@ Addon Mode enables support for community HTTP addon manifests. You can install a
 ## Features
 
 - **Standard Protocol Support**: Compatibility with standard addon manifests (`/manifest.json`, `/catalog`, `/meta`, `/stream`).
-- **Core Metadata Protection**: Cinemeta is pre-installed out-of-the-box as the core metadata provider (`[Core]`) and locked to prevent accidental removal.
+- **Core Metadata Protection & Fast Resolution**: Cinemeta is pre-installed out-of-the-box as the core metadata provider (`[Core]`) and locked to prevent accidental removal. Metadata requests prioritize media type resolution with full support for alternate crew fields (`directors`, `writers`, `stars`).
 - **Direct HTTP Stream Engine**: Automatically extracts and filters direct Cloudflare R2, PixelDrain, direct video CDN, and HubCloud/HubDrive HTTP streams.
 - **Multi-Addon Concurrency**: Simultaneously queries all enabled stream addons and aggregates releases.
 - **Quality, Resolution & Codec Parsing**: Ranks streams with high-contrast color-coded resolution badges (`4K UHD`, `1080p FHD`, `720p HD`, `SD`) and granular audio/video codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`), file size in GB/MB, and audio language tracks (e.g. `[Dual]`, `[Multi]`, `Hindi + English`).

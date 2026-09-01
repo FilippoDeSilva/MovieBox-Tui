@@ -1,7 +1,5 @@
 use crate::models::{MediaDetails, ProviderKind};
-pub(crate) use crate::tui::widgets::{
-    extract_media_tags, resolution_badge_spans, resolution_label,
-};
+pub(crate) use crate::tui::widgets::{extract_media_tags, resolution_badge_spans};
 use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
@@ -259,15 +257,26 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 ])
                 .split(area);
 
-            let loading_text = if state.basic_terminal {
-                format!("Loading details {spinner}")
+            let loading_spans = if state.basic_terminal {
+                vec![Span::styled(
+                    format!("Loading details {spinner}"),
+                    theme.lavender,
+                )]
             } else {
-                format!("{spinner} Loading details...")
+                vec![
+                    Span::styled(
+                        format!("{spinner} "),
+                        theme.accent.add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(
+                        "Loading details...",
+                        theme.subtext1.add_modifier(Modifier::BOLD),
+                    ),
+                ]
             };
-            let loading_p = Paragraph::new(loading_text)
-                .alignment(ratatui::layout::Alignment::Center)
-                .style(theme.lavender);
-
+            let loading_p = Paragraph::new(Line::from(loading_spans))
+                .alignment(ratatui::layout::Alignment::Center);
             frame.render_widget(loading_p, vertical_chunks[1]);
             return;
         }
@@ -295,6 +304,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             state
                 .search_preview
                 .as_ref()
+                .filter(|p| p.id.value == details.id.value && p.id.provider == details.id.provider)
                 .and_then(|p| p.description.as_deref())
         })
         .unwrap_or("No description available.");
@@ -925,42 +935,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let list = &state.selected_resources;
     if !list.is_empty() {
-        let mut prev_quality = String::new();
         let selected_idx = state.resource_list_state.selected();
-        let mut count_2160 = 0usize;
-        let mut count_1080 = 0usize;
-        let mut count_720 = 0usize;
-        let mut count_480 = 0usize;
-        let mut count_other = 0usize;
-        for file in list {
-            match file.resolution_u64() {
-                2160 => count_2160 += 1,
-                1080 => count_1080 += 1,
-                720 => count_720 += 1,
-                480 => count_480 += 1,
-                _ => count_other += 1,
-            }
-        }
-        let quality_count = |label: &str| match label {
-            "4K" => count_2160,
-            "1080p" => count_1080,
-            "720p" => count_720,
-            "480p" => count_480,
-            _ => count_other,
-        };
 
         let list_items: Vec<ListItem> = list
             .iter()
             .enumerate()
             .map(|(i, file)| {
                 let resolution = file.resolution_u64() as i64;
-                let quality_label = resolution_label(resolution);
-
-                let is_first_of_quality = quality_label != prev_quality;
-                prev_quality = quality_label.to_string();
-
                 let codec = file.codec.as_deref().unwrap_or("None");
-
                 let duration_str = "--:--".to_string();
 
                 let size_formatted = file
@@ -969,22 +951,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .unwrap_or_else(|| "--".to_string());
 
                 let is_selected = Some(i) == selected_idx;
-                let pointer = if is_selected {
-                    selection_symbol(streams_focused, state.basic_terminal)
-                } else {
-                    "  "
-                };
 
                 let row_style = if is_selected {
                     selection_style(streams_focused, state.basic_terminal, theme)
-                } else {
-                    metadata_style(theme)
-                };
-                let marker_style = if is_selected && streams_focused {
-                    with_selection_surface(theme.accent, state.basic_terminal, theme)
-                        .add_modifier(Modifier::BOLD)
-                } else if is_selected {
-                    theme.accent
                 } else {
                     metadata_style(theme)
                 };
@@ -1003,18 +972,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let is_fourk = file.provider == ProviderKind::FourKHdHub;
                 let release_title = crate::tui::text::clean_stream_text(&file.filename);
                 let upload_by = crate::tui::text::clean_stream_text(file.source_label());
-                let _language = file
-                    .language
-                    .as_deref()
-                    .map(crate::tui::text::clean_stream_text)
-                    .unwrap_or_else(|| "Unknown".to_string());
                 let source_count = file.mirrors.len() as u64;
                 let is_ultra_compact = streams_area.width < 58;
                 let is_compact = streams_area.width < 85;
                 let is_wide = streams_area.width >= 115;
                 let stream_width = streams_area.width.saturating_sub(6) as usize;
 
-                let mut stream_spans = vec![Span::styled(pointer, marker_style)];
+                let mut stream_spans = Vec::new();
 
                 stream_spans.extend(resolution_badge_spans(
                     resolution,
@@ -1109,75 +1073,57 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     ));
                 }
 
-                let mut lines = vec![];
-                if is_first_of_quality {
-                    if i > 0 {
-                        lines.push(ratatui::text::Line::from(""));
-                    }
-                    let option_count = quality_count(quality_label).max(1);
-                    let header_spans = vec![
-                        Span::styled(quality_label, theme.highlight.add_modifier(Modifier::BOLD)),
-                        Span::styled(" · ", theme.overlay0),
-                        Span::styled(
-                            format!(
-                                "{option_count} option{}",
-                                if option_count == 1 { "" } else { "s" }
-                            ),
-                            theme.subtext1,
-                        ),
-                    ];
-                    lines.push(ratatui::text::Line::from(header_spans));
-                    lines.push(ratatui::text::Line::from(stream_table_header_spans(
-                        streams_area.width,
-                        theme,
-                    )));
-                }
-                lines.push(ratatui::text::Line::from(stream_spans));
-
-                ListItem::new(lines).style(row_style)
+                ListItem::new(ratatui::text::Line::from(stream_spans)).style(row_style)
             })
             .collect();
 
-        let streams_list = List::new(list_items)
-            .block(streams_block.clone())
-            .highlight_style(selection_style(
-                streams_focused,
-                state.basic_terminal,
-                theme,
-            ))
-            .highlight_symbol(selection_symbol(streams_focused, state.basic_terminal));
+        frame.render_widget(streams_block.clone(), streams_area);
+        let inner_streams = streams_block.inner(streams_area);
 
-        frame.render_stateful_widget(streams_list, streams_area, &mut state.resource_list_state);
+        if inner_streams.height >= 2 {
+            let stream_chunks =
+                Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).split(inner_streams);
 
-        let mut headings = 0;
-        let mut prev_q = String::new();
-        for file in list {
-            let resolution = file.resolution_u64() as i64;
-            let label = resolution_label(resolution);
-            if label != prev_q {
-                headings += 2;
-                prev_q = label.to_string();
-            }
+            let header_spans = stream_table_header_spans(streams_area.width, theme);
+            frame.render_widget(
+                Paragraph::new(ratatui::text::Line::from(header_spans)),
+                stream_chunks[0],
+            );
+
+            let streams_list = List::new(list_items)
+                .highlight_style(selection_style(
+                    streams_focused,
+                    state.basic_terminal,
+                    theme,
+                ))
+                .highlight_symbol(selection_symbol(streams_focused, state.basic_terminal));
+
+            frame.render_stateful_widget(
+                streams_list,
+                stream_chunks[1],
+                &mut state.resource_list_state,
+            );
+        } else {
+            let streams_list = List::new(list_items)
+                .highlight_style(selection_style(
+                    streams_focused,
+                    state.basic_terminal,
+                    theme,
+                ))
+                .highlight_symbol(selection_symbol(streams_focused, state.basic_terminal));
+
+            frame.render_stateful_widget(
+                streams_list,
+                inner_streams,
+                &mut state.resource_list_state,
+            );
         }
-        let content_height = list.len() + headings;
-        let rendered_position = selected_idx.map_or(0, |selected| {
-            let mut headings = 0;
-            let mut prev_q = String::new();
-            for file in list.iter().take(selected.saturating_add(1)) {
-                let resolution = file.resolution_u64() as i64;
-                let label = resolution_label(resolution);
-                if label != prev_q {
-                    headings += 2;
-                    prev_q = label.to_string();
-                }
-            }
-            selected + headings
-        });
+
         render_scroll_indicator(
             frame,
             streams_area,
-            content_height,
-            rendered_position,
+            list.len(),
+            selected_idx.unwrap_or(0),
             theme,
             state.basic_terminal,
         );
@@ -1198,12 +1144,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else {
                 format!("{error} — press r to retry or Ctrl+P to switch provider.")
             }
-        } else if state.is_fetching_streams {
+        } else if state.is_fetching_streams || state.is_loading {
             let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
             if state.basic_terminal {
                 format!("Loading streams {spinner}")
             } else {
-                format!("{spinner} Loading streams...")
+                format!("{spinner}  Loading streams...")
             }
         } else {
             format!(
@@ -1215,8 +1161,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             theme.error
         } else if waiting_for_language {
             theme.text_dim
-        } else {
+        } else if state.is_fetching_streams || state.is_loading {
             theme.lavender
+        } else {
+            theme.text_dim
         };
 
         let inner = streams_block.inner(streams_area);
@@ -1639,12 +1587,12 @@ fn stream_table_header_spans(width: u16, theme: &Theme) -> Vec<Span<'static>> {
         )]
     } else if width < 115 {
         vec![Span::styled(
-            "  RES     SIZE     MEDIA TAGS     DURATION   RELEASE",
+            "  RES     SIZE     MEDIA TAGS    DURATION   RELEASE",
             header_style,
         )]
     } else {
         vec![Span::styled(
-            "  RES     SIZE     MEDIA TAGS             DURATION   UPLOADER        RELEASE",
+            "  RES     SIZE     MEDIA TAGS            DURATION   UPLOADER        RELEASE",
             header_style,
         )]
     }
@@ -1920,12 +1868,104 @@ mod tests {
             .map(|cell| cell.symbol())
             .collect::<String>();
 
-        assert!(content.contains("1080p · 2 options"));
-        assert!(content.contains("720p · 1 option"));
+        assert!(content.contains("RES"));
+        assert!(content.contains("SIZE"));
+        assert!(content.contains("MEDIA TAGS"));
         assert!(content.contains("1080p"));
+        assert!(content.contains("720p"));
         assert!(content.contains("1.0GB"));
         assert!(content.contains("HEVC"));
         assert!(content.contains("Pahe.in"));
+    }
+
+    #[test]
+    fn test_stream_selection_highlighting_isolated_to_row() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "dune2".to_string(),
+                },
+                title: "Dune: Part Two".to_string(),
+                media_type: MediaType::Movie,
+                year: Some("2024".to_string()),
+                description: Some("Epic continuation".to_string()),
+                tagline: None,
+                imdb_rating: Some("8.6".to_string()),
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: Some("166m".to_string()),
+                genres: vec!["Sci-Fi".to_string()],
+                seasons: vec![],
+                dubs: vec![],
+            }),
+            selected_resources: vec![
+                Release {
+                    provider: ProviderKind::MovieBox,
+                    filename: "Dune.Part.Two.2024.1080p.WEBRip.x265".to_string(),
+                    quality: Some("1080p".to_string()),
+                    codec: Some("hevc".to_string()),
+                    language: Some("English".to_string()),
+                    size_bytes: Some(1073741824),
+                    season: None,
+                    episode: None,
+                    mirrors: vec![],
+                },
+                Release {
+                    provider: ProviderKind::MovieBox,
+                    filename: "Dune.Part.Two.2024.720p.WEBRip.x264".to_string(),
+                    quality: Some("720p".to_string()),
+                    codec: Some("h264".to_string()),
+                    language: Some("English".to_string()),
+                    size_bytes: Some(500000000),
+                    season: None,
+                    episode: None,
+                    mirrors: vec![],
+                },
+            ],
+            details_pane: crate::tui::state::DetailsPane::Streams,
+            ..Default::default()
+        };
+        state.resource_list_state.select(Some(0));
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut found_header = false;
+        let mut header_has_selection_bg = false;
+
+        let sel_style = selection_style(true, false, &theme);
+
+        for y in 0..buffer.area.height {
+            let row_symbols: String = (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect();
+            if row_symbols.contains("RES") && row_symbols.contains("SIZE") {
+                found_header = true;
+                for x in 0..buffer.area.width {
+                    let cell = &buffer[(x, y)];
+                    if cell.style().bg == sel_style.bg && sel_style.bg.is_some() {
+                        header_has_selection_bg = true;
+                    }
+                }
+            }
+        }
+
+        assert!(found_header, "Streams table header row should be rendered");
+        assert!(
+            !header_has_selection_bg,
+            "Streams table header should not have selection background"
+        );
     }
 
     #[test]

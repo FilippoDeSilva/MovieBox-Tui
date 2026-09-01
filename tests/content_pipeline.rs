@@ -1,4 +1,5 @@
 use moviebox_tui::{
+    models::SearchResult,
     providers::{
         addons::{
             adapter::{meta_detail_to_media_details, meta_to_catalog_item},
@@ -296,7 +297,11 @@ fn test_addon_metadata_mapping_and_partial_data_degradation() {
         genre: vec![],
         runtime: None,
         cast: vec![],
+        stars: vec![],
         director: vec![],
+        directors: vec![],
+        writer: vec![],
+        writers: vec![],
         videos: vec![],
     };
 
@@ -330,7 +335,11 @@ fn test_addon_metadata_mapping_and_partial_data_degradation() {
         genre: vec![],
         runtime: Some("45 min".to_string()),
         cast: vec!["Actor One".to_string(), "Actor Two".to_string()],
+        stars: vec![],
         director: vec!["Director Name".to_string()],
+        directors: vec![],
+        writer: vec![],
+        writers: vec![],
         videos: vec![
             MetaVideo {
                 id: Some("ep1".to_string()),
@@ -491,4 +500,84 @@ async fn test_poster_identity_isolation() {
     .await;
 
     assert!(app.state().poster_image.is_some());
+}
+
+#[tokio::test]
+async fn test_search_preview_and_details_metadata_isolation() {
+    let mut app = App::new();
+    app.state_mut().update_available = None;
+
+    let old_preview = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::Addons,
+            value: "tt_old_movie".to_string(),
+        },
+        title: "Old Movie Title".to_string(),
+        media_type: MediaType::Movie,
+        year: Some("2020".to_string()),
+        description: Some("Old Movie Description".to_string()),
+        tagline: None,
+        imdb_rating: Some("8.5".to_string()),
+        director: Some("Old Director".to_string()),
+        stars: Some("Old Star".to_string()),
+        prints: None,
+        audios: None,
+        poster_url: Some("https://example.com/old.jpg".to_string()),
+        duration: Some("120 min".to_string()),
+        genres: vec!["Action".to_string()],
+        seasons: vec![],
+        dubs: vec![],
+    };
+
+    let new_search_result = SearchResult {
+        id: "tt_new_movie".to_string(),
+        title: "New Movie Title".to_string(),
+        stype: 1,
+        release_year: "2025".to_string(),
+        cover_url: Some("https://example.com/new.jpg".to_string()),
+        season: 0,
+        episode: 0,
+        provider: ProviderKind::Addons,
+    };
+
+    // Mismatched preview should NOT leak description/director/stars/rating into fallback
+    let fallback = MediaDetails::from_search_result(&new_search_result, Some(&old_preview));
+    assert_eq!(fallback.id.value, "tt_new_movie");
+    assert_eq!(fallback.title, "New Movie Title");
+    assert_eq!(fallback.year.as_deref(), Some("2025"));
+    assert!(fallback.description.is_none());
+    assert!(fallback.director.is_none());
+    assert!(fallback.stars.is_none());
+    assert!(fallback.imdb_rating.is_none());
+
+    // Matching preview SHOULD preserve preview details
+    let matching_preview = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::Addons,
+            value: "tt_new_movie".to_string(),
+        },
+        title: "New Movie Title".to_string(),
+        media_type: MediaType::Movie,
+        year: Some("2025".to_string()),
+        description: Some("New Movie Description".to_string()),
+        tagline: None,
+        imdb_rating: Some("7.9".to_string()),
+        director: Some("New Director".to_string()),
+        stars: Some("New Star".to_string()),
+        prints: None,
+        audios: None,
+        poster_url: Some("https://example.com/new.jpg".to_string()),
+        duration: Some("140 min".to_string()),
+        genres: vec!["Drama".to_string()],
+        seasons: vec![],
+        dubs: vec![],
+    };
+    let matching_fallback =
+        MediaDetails::from_search_result(&new_search_result, Some(&matching_preview));
+    assert_eq!(matching_fallback.id.value, "tt_new_movie");
+    assert_eq!(
+        matching_fallback.description.as_deref(),
+        Some("New Movie Description")
+    );
+    assert_eq!(matching_fallback.director.as_deref(), Some("New Director"));
 }

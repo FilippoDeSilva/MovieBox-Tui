@@ -174,11 +174,19 @@ pub fn meta_detail_to_media_details(detail: &MetaDetail) -> MediaDetails {
         imdb_rating: detail.imdb_rating.clone().or_else(|| detail.rating.clone()),
         director: if !detail.director.is_empty() {
             Some(detail.director.join(", "))
+        } else if !detail.directors.is_empty() {
+            Some(detail.directors.join(", "))
+        } else if !detail.writers.is_empty() {
+            Some(detail.writers.join(", "))
+        } else if !detail.writer.is_empty() {
+            Some(detail.writer.join(", "))
         } else {
             None
         },
         stars: if !detail.cast.is_empty() {
             Some(detail.cast.join(", "))
+        } else if !detail.stars.is_empty() {
+            Some(detail.stars.join(", "))
         } else {
             None
         },
@@ -667,7 +675,11 @@ mod tests {
             genre: Vec::new(),
             runtime: Some("45m".to_string()),
             cast: vec!["Actor One".to_string(), "Actor Two".to_string()],
+            stars: Vec::new(),
             director: vec!["Director Name".to_string()],
+            directors: Vec::new(),
+            writer: Vec::new(),
+            writers: Vec::new(),
             videos: vec![
                 super::super::models::MetaVideo {
                     id: Some("ep1".to_string()),
