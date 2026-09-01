@@ -2,6 +2,7 @@ use crate::providers::models::{
     AudioTrackOption, CatalogItem, Episode, MediaDetails, MediaType, ProviderError, ProviderKind,
     ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
 };
+use base64::Engine;
 pub fn captions_json_to_options(payload: &serde_json::Value) -> Vec<SubtitleOption> {
     let Some(captions) = payload.get("extCaptions").and_then(|c| c.as_array()) else {
         return Vec::new();
@@ -513,6 +514,150 @@ pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
     }
 }
 
+pub fn resolve_dash_manifest_from_policy(sign_cookie: &str) -> Option<String> {
+    for part in sign_cookie.split(';') {
+        let trimmed = part.trim();
+        if let Some(policy_b64) = trimmed.strip_prefix("CloudFront-Policy=") {
+            let mut padded = policy_b64.to_string();
+            let padding = (4 - padded.len() % 4) % 4;
+            padded.push_str(&"=".repeat(padding));
+            if let Ok(decoded_bytes) = base64::engine::general_purpose::STANDARD.decode(&padded) {
+                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded_bytes) {
+                    if let Some(resource) = json
+                        .get("Statement")
+                        .and_then(|s| s.as_array())
+                        .and_then(|arr| arr.first())
+                        .and_then(|st| st.get("Resource"))
+                        .and_then(|r| r.as_str())
+                    {
+                        let base_resource = resource.trim_end_matches('*').trim_end_matches('/');
+                        if !base_resource.is_empty() && base_resource.starts_with("http") {
+                            return Some(format!("{base_resource}/index.mpd"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn moviebox_play_info_json_to_releases(
+    payload: &serde_json::Value,
+    season: usize,
+    episode: usize,
+    user_agent: &str,
+) -> Vec<Release> {
+    let data = payload.get("data").unwrap_or(payload);
+    let title_prefix = data
+        .get("title")
+        .and_then(|t| t.as_str())
+        .unwrap_or("MovieBox Stream");
+
+    let Some(streams) = data.get("streams").and_then(|s| s.as_array()) else {
+        return Vec::new();
+    };
+
+    let mut releases = Vec::new();
+
+    for stream in streams {
+        let format_type = stream
+            .get("format")
+            .and_then(|f| f.as_str())
+            .unwrap_or("MP4");
+        let codec = stream
+            .get("codecName")
+            .or_else(|| stream.get("codec"))
+            .and_then(|c| c.as_str())
+            .map(|s| s.to_string());
+        let size_bytes = stream.get("size").and_then(|s| {
+            if let Some(n) = s.as_u64() {
+                Some(n)
+            } else if let Some(n) = s.as_i64() {
+                Some(n as u64)
+            } else if let Some(str_val) = s.as_str() {
+                str_val.parse::<u64>().ok()
+            } else {
+                None
+            }
+        });
+
+        let resolutions_str = stream
+            .get("resolutions")
+            .or_else(|| data.get("displayResolutions"))
+            .and_then(|r| r.as_str())
+            .unwrap_or("1080,720,480");
+
+        let sign_cookie = stream
+            .get("signCookie")
+            .and_then(|c| c.as_str())
+            .unwrap_or("");
+
+        let stream_url = stream.get("url").and_then(|u| u.as_str()).unwrap_or("");
+
+        let manifest_url = resolve_dash_manifest_from_policy(sign_cookie).or_else(|| {
+            if stream_url.starts_with("http") {
+                Some(stream_url.to_string())
+            } else {
+                None
+            }
+        });
+
+        let Some(playable_url) = manifest_url else {
+            continue;
+        };
+
+        let mut headers = vec![
+            ("Referer".to_string(), "https://sportslive.wine".to_string()),
+            ("User-Agent".to_string(), user_agent.to_string()),
+        ];
+        if !sign_cookie.is_empty() {
+            headers.push(("Cookie".to_string(), sign_cookie.to_string()));
+        }
+
+        let mut parsed_resolutions: Vec<u32> = resolutions_str
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u32>().ok())
+            .collect();
+        parsed_resolutions.sort_by(|a, b| b.cmp(a));
+        parsed_resolutions.dedup();
+        if parsed_resolutions.is_empty() {
+            parsed_resolutions.push(1080);
+        }
+
+        for &res in &parsed_resolutions {
+            let quality = Some(format!("{res}p"));
+            let codec_disp = codec.as_deref().unwrap_or(format_type);
+            let filename = if season > 0 && episode > 0 {
+                format!("{title_prefix} S{season:02}E{episode:02} {res}p {codec_disp}")
+            } else {
+                format!("{title_prefix} {res}p {codec_disp}")
+            };
+
+            let mirror = SourceMirror {
+                label: format!("{res}p {codec_disp}"),
+                resolver_url: playable_url.clone(),
+                headers: headers.clone(),
+                direct_file: true,
+            };
+
+            releases.push(Release {
+                provider: ProviderKind::MovieBox,
+                filename,
+                quality,
+                codec: codec.clone(),
+                language: None,
+                size_bytes,
+                season: if season > 0 { Some(season) } else { None },
+                episode: if episode > 0 { Some(episode) } else { None },
+                mirrors: vec![mirror],
+            });
+        }
+    }
+
+    releases
+}
+
 pub fn moviebox_resource_json_to_releases(payload: &serde_json::Value) -> Vec<Release> {
     let items = if let Some(list) = payload.get("list").and_then(|l| l.as_array()) {
         list.as_slice()
@@ -663,5 +808,92 @@ mod tests {
             Some("https://stream.example.com/mh0101.mp4")
         );
         assert_eq!(releases[0].source_label(), "NF");
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_policy() {
+        let policy_json = r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/4179386086617137184_0_0_1080_h265_518/*","Condition":{"DateLessThan":{"AWS:EpochTime":1788879894}}}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cookie = format!(
+            "CloudFront-Policy={b64};CloudFront-Signature=abc;CloudFront-Key-Pair-Id=KMHN1LQ1HEUPL;"
+        );
+
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some(
+                "https://sacdn.hakunaymatata.com/dash/4179386086617137184_0_0_1080_h265_518/index.mpd"
+            )
+        );
+    }
+
+    #[test]
+    fn test_moviebox_play_info_json_to_releases_with_signed_cookie() {
+        let policy_json = r#"{"Statement":[{"Resource":"https://sacdn.example.com/dash/12345_0_0_1080_h265_518/*"}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cookie = format!(
+            "CloudFront-Policy={b64};CloudFront-Signature=xyz;CloudFront-Key-Pair-Id=K123;"
+        );
+
+        let payload = json!({
+            "code": 0,
+            "message": "ok",
+            "data": {
+                "title": "Sample Movie",
+                "displayResolutions": "480,720,1080",
+                "streams": [
+                    {
+                        "id": "9999",
+                        "format": "MP4",
+                        "codecName": "hevc",
+                        "duration": 7200,
+                        "size": "1500000000",
+                        "resolutions": "1080,720,480",
+                        "url": "https://macdn.example.com/notice.mp4",
+                        "signCookie": cookie
+                    }
+                ]
+            }
+        });
+
+        let releases = moviebox_play_info_json_to_releases(&payload, 0, 0, "TestAgent/1.0");
+        assert_eq!(releases.len(), 3);
+        assert_eq!(releases[0].quality.as_deref(), Some("1080p"));
+        assert_eq!(releases[0].codec.as_deref(), Some("hevc"));
+        assert_eq!(releases[1].quality.as_deref(), Some("720p"));
+        assert_eq!(releases[2].quality.as_deref(), Some("480p"));
+        assert_eq!(
+            releases[0].direct_url(),
+            Some("https://sacdn.example.com/dash/12345_0_0_1080_h265_518/index.mpd")
+        );
+        let mirror = &releases[0].mirrors[0];
+        assert!(
+            mirror
+                .headers
+                .iter()
+                .any(|(k, v)| k == "Referer" && v == "https://sportslive.wine")
+        );
+        assert!(
+            mirror
+                .headers
+                .iter()
+                .any(|(k, v)| k == "Cookie" && v.contains("CloudFront-Policy="))
+        );
+    }
+
+    #[test]
+    fn test_moviebox_play_info_empty_or_invalid_streams() {
+        let empty_payload = json!({
+            "code": 0,
+            "data": {
+                "title": "Empty",
+                "streams": []
+            }
+        });
+        let releases = moviebox_play_info_json_to_releases(&empty_payload, 0, 0, "TestAgent/1.0");
+        assert!(releases.is_empty());
+
+        let invalid_cookie = "CloudFront-Policy=invalid_base64;";
+        assert_eq!(resolve_dash_manifest_from_policy(invalid_cookie), None);
     }
 }

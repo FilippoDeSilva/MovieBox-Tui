@@ -1497,6 +1497,21 @@ impl App {
                         .send(Action::SetStatus("Fetching streams...".to_string()))
                         .ok();
 
+                    if let Ok(streams) = crate::providers::ReleaseProvider::episode_streams(
+                        &client, &id_clone, season, episode,
+                    )
+                    .await
+                    {
+                        if !streams.is_empty() {
+                            sender
+                                .send(Action::EpisodeStreamsReady(
+                                    context, request_id, id_clone, season, episode, streams,
+                                ))
+                                .ok();
+                            return;
+                        }
+                    }
+
                     let mut all_items: Vec<Release> = Vec::new();
                     let mut found_target = false;
                     let mut any_fetch_failed = false;

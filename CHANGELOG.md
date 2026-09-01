@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **MovieBox Current Playback API & Long-Lived Session Lifecycle (`src/providers/moviebox/`, `src/player.rs`, `src/tui/app/requests.rs`)**:
+  - Upgraded guest authentication to `POST /wefeed-mobile-bff/user-api/visitor-login` with a dedicated `MovieBoxSession` model that parses JWT claims (`userId`, `exp`).
+  - Added atomic disk session persistence (`~/.cache/moviebox-tui/moviebox_session.bin`), single-flight async initialization mutex, and automatic 401/403 recovery with single retry.
+  - Implemented `resolve_dash_manifest_from_policy` and `moviebox_play_info_json_to_releases` to decode CloudFront base64 statements into canonical MPEG-DASH manifests (`https://sacdn.hakunaymatata.com/dash/.../index.mpd`).
+  - Added multi-resolution stream releases (`1080p`, `720p`, `480p` HEVC) from stream descriptor representations.
+  - Updated `mpv` and `IINA` player invocations to forward authentication headers via `--http-header-fields` and `--ytdl-raw-options=add-header=...` for authenticated CloudFront DASH demuxing.
 - **Smooth Loading Transitions & Zero-Flicker View State Optimization (`src/tui/screens/home.rs`, `src/tui/screens/details.rs`, `src/tui/app/keyboard.rs`)**:
   - Eliminated millisecond flashes of "No matches found" / "No results found" when submitting searches by synchronizing `is_loading` state on Enter and prioritizing `SearchViewState::Loading` in `search_view_state`.
   - Prevented transient "No stream sources found" flash on the Details screen by displaying the stream loading spinner while either `is_fetching_streams` or `is_loading` is active.

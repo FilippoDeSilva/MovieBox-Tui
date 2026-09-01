@@ -318,6 +318,13 @@ fn mpv_command(
             .collect::<Vec<_>>()
             .join(",");
         command.arg(format!("{prefix}http-header-fields={fields}"));
+
+        let ytdl_headers = headers
+            .iter()
+            .map(|(name, value)| format!("add-header={name}:{value}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        command.arg(format!("{prefix}ytdl-raw-options={ytdl_headers}"));
     }
     if let Some(subtitle) = subtitle {
         let opt = if iina {

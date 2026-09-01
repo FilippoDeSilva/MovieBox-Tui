@@ -1,6 +1,7 @@
 pub mod adapt;
 pub mod client;
 pub mod crypto;
+pub mod session;
 pub mod title;
 
 pub use title::clean_moviebox_title;
@@ -53,17 +54,69 @@ impl Provider for client::MovieBoxClient {
     }
 }
 
+impl crate::providers::ReleaseProvider for client::MovieBoxClient {
+    async fn episode_streams(
+        &self,
+        id: &str,
+        season: usize,
+        episode: usize,
+    ) -> Result<Vec<crate::providers::models::Release>, ProviderError> {
+        let json = self
+            .get_play_info(id, season, episode)
+            .await
+            .map_err(ProviderError::from)?;
+        let releases =
+            adapt::moviebox_play_info_json_to_releases(&json, season, episode, self.user_agent());
+        if !releases.is_empty() {
+            return Ok(releases);
+        }
+
+        let (items, _) = self
+            .fetch_resource_page(id, 0, 1)
+            .await
+            .map_err(ProviderError::from)?;
+        let mut legacy_releases = Vec::new();
+        for item in items {
+            let rel = adapt::moviebox_resource_item_to_release(&item);
+            if (season == 0 && episode == 0)
+                || (rel.season == Some(season) && rel.episode == Some(episode))
+            {
+                legacy_releases.push(rel);
+            }
+        }
+        Ok(legacy_releases)
+    }
+}
+
 use client::{MovieBoxClient, ScraperError};
 use serde_json::{Value, json};
 
 impl MovieBoxClient {
+    pub async fn get_play_info(
+        &self,
+        subject_id: &str,
+        season: usize,
+        episode: usize,
+    ) -> Result<Value, ScraperError> {
+        let path = if season == 0 && episode == 0 {
+            format!(
+                "/wefeed-mobile-bff/subject-api/play-info/v2?subjectId={}",
+                subject_id
+            )
+        } else {
+            format!(
+                "/wefeed-mobile-bff/subject-api/play-info/v2?subjectId={}&se={}&ep={}",
+                subject_id, season, episode
+            )
+        };
+        self.get(&path).await
+    }
     pub async fn search(&self, query: &str, page: usize) -> Result<Value, ScraperError> {
         let payload = json!({
             "keyword": query,
             "page": page,
-            "perPage": 20,
-            "subjectType": "All",
-            "tabId": "All"
+            "perPage": 15,
+            "subjectType": 0
         });
         self.post("/wefeed-mobile-bff/subject-api/search/v2", &payload)
             .await
