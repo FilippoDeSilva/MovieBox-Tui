@@ -3,8 +3,6 @@ use crate::providers::models::ProviderKind;
 use crate::tui::text::parse_duration_seconds;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
-pub(crate) use crate::service::extract_cover_url;
-
 impl App {
     fn preferred_playback_player(
         &self,
@@ -22,67 +20,47 @@ impl App {
         let provider = self.provider_for_subject(subject_id).cache_key();
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
-        let mut title = "Unknown".to_string();
-        let mut cover_url = None;
-        let mut stype = 1;
-        let mut release_year = "Unknown".to_string();
-        let mut duration_seconds = None;
 
         if let Some(details) = &self.state.selected_details {
-            if let Some(t) = details.get("title").and_then(|t| t.as_str()) {
-                title = crate::providers::moviebox::clean_moviebox_title(t);
+            let mut item =
+                crate::history::WatchHistoryItem::from_details(provider, details, season, episode);
+            if item.cover_url.is_none() {
+                item.cover_url = self
+                    .state
+                    .search_results
+                    .iter()
+                    .find(|r| r.id == *subject_id)
+                    .and_then(|r| r.cover_url.clone())
+                    .or_else(|| {
+                        self.state
+                            .search_preview
+                            .as_ref()
+                            .and_then(|p| p.cover_url().map(|s| s.to_string()))
+                    });
             }
-            cover_url = extract_cover_url(details);
-            stype = crate::tui::state::stype(details);
-            if let Some(y) = details
-                .get("year")
-                .or_else(|| details.get("releaseYear"))
-                .and_then(|y| y.as_str())
-            {
-                release_year = y.to_string();
-            } else if let Some(y) = details.get("year").and_then(|y| y.as_i64()) {
-                release_year = y.to_string();
+            if item.duration_seconds.is_none() {
+                item.duration_seconds = self
+                    .state
+                    .search_preview
+                    .as_ref()
+                    .and_then(|p| p.duration.as_deref().and_then(parse_duration_seconds));
             }
-            if let Some(d) = details.get("duration").and_then(|v| v.as_str()) {
-                duration_seconds = parse_duration_seconds(d);
-            }
+            return Some(item);
         }
 
-        if cover_url.is_none() {
-            cover_url = self
-                .state
-                .search_results
-                .iter()
-                .find(|r| r.id == *subject_id)
-                .and_then(|r| r.cover_url.clone());
-        }
-
-        if cover_url.is_none() {
-            if let Some(preview) = &self.state.search_preview {
-                cover_url = extract_cover_url(preview);
-                if duration_seconds.is_none() {
-                    if let Some(d) = preview.get("duration").and_then(|v| v.as_str()) {
-                        duration_seconds = parse_duration_seconds(d);
-                    }
-                }
-            }
-        }
-
-        if title == "Unknown" {
-            if let Some(res) = self
-                .state
-                .search_results
-                .iter()
-                .find(|r| r.id == *subject_id)
-            {
-                title = res.title.clone();
-                stype = res.stype;
-                if release_year == "Unknown" {
-                    release_year = res.release_year.clone();
-                }
-            }
-        }
-
+        let res = self
+            .state
+            .search_results
+            .iter()
+            .find(|r| r.id == *subject_id);
+        let title = res
+            .map(|r| r.title.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+        let cover_url = res.and_then(|r| r.cover_url.clone());
+        let stype = res.map(|r| r.stype).unwrap_or(1);
+        let release_year = res
+            .map(|r| r.release_year.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -98,7 +76,7 @@ impl App {
             season,
             episode,
             timestamp,
-            duration_seconds,
+            duration_seconds: None,
             progress_seconds: 0,
             completed: false,
         })
@@ -443,8 +421,7 @@ impl App {
                         .state
                         .selected_details
                         .as_ref()
-                        .and_then(|d| d.get("id"))
-                        .and_then(crate::tui::state::subject_id)
+                        .map(|d| d.id.value.clone())
                         .unwrap_or_default();
                     let resource_id = self.get_selected_resource_id();
 
@@ -454,14 +431,14 @@ impl App {
                             "Preparing playback",
                             "Fetching subtitles.",
                         );
-                        let client = self.service.client.clone();
+                        let service = self.service.clone();
                         let sender = self.action_sender.clone();
                         let link_clone = link.clone();
                         tokio::spawn(async move {
                             let cached = tokio::task::spawn_blocking({
                                 let subject_id = subject_id.clone();
                                 let rid = rid.clone();
-                                move || crate::cache::get_captions_cache(&subject_id, &rid)
+                                move || crate::cache::get_captions_cache_typed(&subject_id, &rid)
                             })
                             .await
                             .ok()
@@ -474,7 +451,7 @@ impl App {
                             }
                             let result = tokio::time::timeout(
                                 std::time::Duration::from_secs(15),
-                                client.get_ext_captions(&subject_id, &rid),
+                                service.get_ext_captions(&subject_id, &rid),
                             )
                             .await;
                             match result {
@@ -483,7 +460,7 @@ impl App {
                                     let rid = rid.clone();
                                     let res_for_cache = res.clone();
                                     tokio::task::spawn_blocking(move || {
-                                        crate::cache::set_captions_cache(
+                                        crate::cache::set_captions_cache_typed(
                                             &subject_id,
                                             &rid,
                                             &res_for_cache,
@@ -503,9 +480,10 @@ impl App {
                     self.state.is_resolving_playback = false;
                 }
             }
-            Action::ShowSubtitlePopup(link, ext_captions) => {
+            Action::ShowSubtitlePopup(link, subtitles) => {
                 self.state.is_resolving_playback = false;
-                let options = crate::tui::state::caption_options(&ext_captions);
+                let mut options = vec![("None".to_string(), "".to_string())];
+                options.extend(subtitles.into_iter().map(|s| (s.name, s.url)));
 
                 if options.len() > 1 {
                     self.state.show_help = false;
@@ -519,9 +497,10 @@ impl App {
                     self.action_sender.send(Action::LaunchMpv(link, None)).ok();
                 }
             }
-            Action::ShowDownloadSubtitlePopup(ext_captions) => {
+            Action::ShowDownloadSubtitlePopup(subtitles) => {
                 self.state.is_resolving_playback = false;
-                let options = crate::tui::state::caption_options(&ext_captions);
+                let mut options = vec![("None".to_string(), "".to_string())];
+                options.extend(subtitles.into_iter().map(|s| (s.name, s.url)));
 
                 if options.len() > 1 {
                     self.state.show_help = false;
@@ -717,12 +696,16 @@ mod tests {
     async fn show_popup_when_subtitles_available() {
         let mut app = crate::tui::app::App::new();
 
-        let ext_captions = serde_json::json!({
-            "extCaptions": [
-                { "lanName": "Spanish", "url": "https://example.com/es.srt" },
-                { "lanName": "French", "url": "https://example.com/fr.srt" }
-            ]
-        });
+        let ext_captions = vec![
+            crate::providers::models::SubtitleOption {
+                name: "Spanish".to_string(),
+                url: "https://example.com/es.srt".to_string(),
+            },
+            crate::providers::models::SubtitleOption {
+                name: "French".to_string(),
+                url: "https://example.com/fr.srt".to_string(),
+            },
+        ];
 
         app.handle_playback(crate::tui::action::Action::ShowSubtitlePopup(
             "https://example.com/video.mp4".to_string(),

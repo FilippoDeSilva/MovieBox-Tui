@@ -1,5 +1,5 @@
 use super::{App, network};
-use crate::providers::{fourkhdhub::releases_to_moviebox_json, models::ProviderKind};
+use crate::models::{Episode, MediaType, ProviderKind, Release, Season};
 use crate::tui::{
     action::Action,
     state::{InputMode, Screen, SearchResult},
@@ -15,18 +15,9 @@ impl App {
                 if query.starts_with('/') {
                     let matching_commands =
                         crate::tui::commands::SlashCommand::suggest(&self.state, &query);
-                    let suggestions: Vec<serde_json::Value> = matching_commands
-                        .into_iter()
-                        .map(|cmd_name| serde_json::json!({ "title": cmd_name }))
-                        .collect();
-                    if !suggestions.is_empty() {
-                        let fake_payload = serde_json::json!({
-                            "results": [{
-                                "subjects": suggestions
-                            }]
-                        });
+                    if !matching_commands.is_empty() {
                         self.action_sender
-                            .send(Action::SuggestSuccess(request_id, query, fake_payload))
+                            .send(Action::SuggestSuccess(request_id, query, matching_commands))
                             .ok();
                     }
                     return None;
@@ -37,6 +28,12 @@ impl App {
                 }
                 if self.state.active_provider != ProviderKind::MovieBox {
                     self.state.search_suggestions.clear();
+                    return None;
+                }
+                if let Some(cached) = self.state.suggest_cache.get(&query).cloned() {
+                    self.action_sender
+                        .send(Action::SuggestSuccess(request_id, query, cached))
+                        .ok();
                     return None;
                 }
 
@@ -53,7 +50,7 @@ impl App {
                 }));
             }
 
-            Action::SuggestSuccess(request_id, query, payload) => {
+            Action::SuggestSuccess(request_id, query, suggestions) => {
                 if request_id != self.state.active_suggest_request {
                     return None;
                 }
@@ -71,54 +68,44 @@ impl App {
                 if !matches {
                     return None;
                 }
+                if !query.starts_with('/') {
+                    self.state
+                        .suggest_cache
+                        .put(query.clone(), suggestions.clone());
+                }
 
                 self.state.search_suggestions.clear();
 
-                let subjects_opt = payload
-                    .get("results")
-                    .and_then(|r| r.as_array())
-                    .and_then(|arr| arr.first())
-                    .and_then(|first| first.get("subjects"))
-                    .and_then(|s| s.as_array());
+                let limit = if query.starts_with('/') { 20 } else { 10 };
+                for raw_title in suggestions.into_iter().take(limit) {
+                    let clean_title = if query.starts_with('/') {
+                        raw_title
+                    } else {
+                        crate::providers::moviebox::clean_moviebox_title(&raw_title)
+                    };
 
-                if let Some(subjects) = subjects_opt {
-                    let limit = if query.starts_with('/') { 20 } else { 10 };
-                    for item in subjects.iter().take(limit) {
-                        let raw_title = item
-                            .get("title")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("Unknown")
-                            .to_string();
-                        let clean_title = if query.starts_with('/') {
-                            raw_title
-                        } else {
-                            crate::providers::moviebox::clean_moviebox_title(&raw_title)
-                        };
-
-                        if query.starts_with('/') {
-                            if clean_title.starts_with(&query)
-                                && !self.state.search_suggestions.contains(&clean_title)
-                            {
-                                self.state.search_suggestions.push(clean_title);
-                            }
-                            continue;
-                        }
-
-                        let normalized_query = query
-                            .to_lowercase()
-                            .replace(|c: char| !c.is_alphanumeric(), "");
-                        let normalized_title = clean_title
-                            .to_lowercase()
-                            .replace(|c: char| !c.is_alphanumeric(), "");
-                        if !normalized_title.contains(&normalized_query)
-                            && !normalized_query.is_empty()
+                    if query.starts_with('/') {
+                        if clean_title.starts_with(&query)
+                            && !self.state.search_suggestions.contains(&clean_title)
                         {
-                            continue;
-                        }
-
-                        if !self.state.search_suggestions.contains(&clean_title) {
                             self.state.search_suggestions.push(clean_title);
                         }
+                        continue;
+                    }
+
+                    let normalized_query = query
+                        .to_lowercase()
+                        .replace(|c: char| !c.is_alphanumeric(), "");
+                    let normalized_title = clean_title
+                        .to_lowercase()
+                        .replace(|c: char| !c.is_alphanumeric(), "");
+                    if !normalized_title.contains(&normalized_query) && !normalized_query.is_empty()
+                    {
+                        continue;
+                    }
+
+                    if !self.state.search_suggestions.contains(&clean_title) {
+                        self.state.search_suggestions.push(clean_title);
                     }
                 }
             }
@@ -270,14 +257,14 @@ impl App {
                         .fetch_addon_catalog(&manifest_url, &r_type, &cat_id)
                         .await;
                     match result {
-                        Ok(res) => {
+                        Ok(items) => {
                             sender
                                 .send(Action::SearchSuccess {
                                     context,
                                     request_id,
                                     query: String::new(),
                                     page: 1,
-                                    payload: res,
+                                    items,
                                 })
                                 .ok();
                         }
@@ -295,7 +282,7 @@ impl App {
                 request_id,
                 query,
                 page,
-                payload,
+                items,
             } => {
                 if request_id != self.state.active_search_request {
                     return None;
@@ -312,148 +299,116 @@ impl App {
                 if page <= 1 {
                     self.state.search_results.clear();
                 }
-                let subjects_opt = payload
-                    .get("results")
-                    .and_then(|r| r.as_array())
-                    .and_then(|arr| arr.first())
-                    .and_then(|first| first.get("subjects"))
-                    .and_then(|s| s.as_array());
 
-                if let Some(subjects) = subjects_opt {
-                    for item in subjects {
-                        let id = item
-                            .get("subjectId")
-                            .and_then(|si| si.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        let raw_title = item
-                            .get("title")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("Unknown")
-                            .to_string();
+                for item in items {
+                    let id = item.id.value.clone();
+                    let raw_title = item.title.clone();
+                    let clean_title = crate::providers::moviebox::clean_moviebox_title(&raw_title);
 
-                        let clean_title =
-                            crate::providers::moviebox::clean_moviebox_title(&raw_title);
-
-                        let normalized_query = query
-                            .to_lowercase()
-                            .replace(|c: char| !c.is_alphanumeric(), "");
-                        let normalized_title = raw_title
-                            .to_lowercase()
-                            .replace(|c: char| !c.is_alphanumeric(), "");
-                        if !normalized_title.contains(&normalized_query)
-                            && !normalized_query.is_empty()
-                        {
-                            continue;
-                        }
-
-                        let stype = item
-                            .get("subjectType")
-                            .and_then(|s| s.as_i64())
-                            .unwrap_or(0);
-                        let release_year = item
-                            .get("releaseDate")
-                            .and_then(|rd| rd.as_str())
-                            .unwrap_or("N/A")
-                            .to_string();
-
-                        let cover_url = item
-                            .get("poster")
-                            .or_else(|| item.get("cover"))
-                            .or_else(|| item.get("pic"))
-                            .and_then(|c| {
-                                c.as_str().or_else(|| c.get("url").and_then(|u| u.as_str()))
-                            })
-                            .map(|s| s.to_string());
-
-                        let season =
-                            item.get("season").and_then(|s| s.as_u64()).unwrap_or(0) as usize;
-
-                        if let Some(existing) =
-                            self.state.search_results.iter_mut().find(|r| r.id == id)
-                        {
-                            if season > existing.season {
-                                existing.season = season;
-                                existing.title = clean_title;
-                                existing.stype = stype;
-                                existing.release_year = release_year;
-                                existing.cover_url = cover_url;
-                            }
-                            continue;
-                        }
-
-                        let raw_lower = raw_title.to_lowercase();
-                        let is_dub = raw_lower.contains("[hindi]")
-                            || raw_lower.contains("[tamil]")
-                            || raw_lower.contains("[telugu]")
-                            || raw_lower.contains("[english]");
-
-                        if is_dub
-                            && self
-                                .state
-                                .search_results
-                                .iter()
-                                .any(|r| r.title == clean_title && r.stype == stype)
-                        {
-                            continue;
-                        }
-
-                        if self.state.search_results.iter().any(|r| {
-                            r.title == clean_title
-                                && r.release_year == release_year
-                                && r.stype == stype
-                        }) {
-                            continue;
-                        }
-
-                        if !id.is_empty() {
-                            self.state.search_results.push(SearchResult {
-                                id,
-                                title: clean_title,
-                                stype,
-                                release_year,
-                                cover_url,
-                                season,
-                                episode: 1,
-                                provider: context.provider,
-                            });
-                        }
+                    let normalized_query = query
+                        .to_lowercase()
+                        .replace(|c: char| !c.is_alphanumeric(), "");
+                    let normalized_title = raw_title
+                        .to_lowercase()
+                        .replace(|c: char| !c.is_alphanumeric(), "");
+                    if !normalized_title.contains(&normalized_query) && !normalized_query.is_empty()
+                    {
+                        continue;
                     }
-                    let previous_selected_id = if page > 1 {
-                        self.state.search_list_state.selected().and_then(|idx| {
-                            self.state.search_results.get(idx).map(|r| r.id.clone())
-                        })
+
+                    let stype = if item.media_type == crate::models::MediaType::Series {
+                        2
                     } else {
-                        None
+                        1
                     };
+                    let release_year = item.year.clone().unwrap_or_default();
+                    let cover_url = item.poster_url.clone();
+                    let season = item.season_count.unwrap_or(0);
 
-                    let query_lower = query.to_lowercase();
-                    self.state.search_results.sort_by(|a, b| {
-                        let a_title = a.title.to_lowercase();
-                        let b_title = b.title.to_lowercase();
+                    if let Some(existing) =
+                        self.state.search_results.iter_mut().find(|r| r.id == id)
+                    {
+                        if season > existing.season {
+                            existing.season = season;
+                            existing.title = clean_title;
+                            existing.stype = stype;
+                            existing.release_year = release_year;
+                            existing.cover_url = cover_url;
+                        }
+                        continue;
+                    }
 
-                        let a_exact = a_title == query_lower;
-                        let b_exact = b_title == query_lower;
+                    let raw_lower = raw_title.to_lowercase();
+                    let is_dub = raw_lower.contains("[hindi]")
+                        || raw_lower.contains("[tamil]")
+                        || raw_lower.contains("[telugu]")
+                        || raw_lower.contains("[english]");
 
-                        let a_starts = a_title.starts_with(&query_lower);
-                        let b_starts = b_title.starts_with(&query_lower);
-
-                        b_exact
-                            .cmp(&a_exact)
-                            .then_with(|| b_starts.cmp(&a_starts))
-                            .then_with(|| b.stype.cmp(&a.stype))
-                            .then_with(|| b.release_year.cmp(&a.release_year))
-                    });
-
-                    if let Some(prev_id) = previous_selected_id {
-                        if let Some(new_idx) = self
+                    if is_dub
+                        && self
                             .state
                             .search_results
                             .iter()
-                            .position(|r| r.id == prev_id)
-                        {
-                            self.state.search_list_state.select(Some(new_idx));
-                        }
+                            .any(|r| r.title == clean_title && r.stype == stype)
+                    {
+                        continue;
+                    }
+
+                    if self.state.search_results.iter().any(|r| {
+                        r.title == clean_title && r.release_year == release_year && r.stype == stype
+                    }) {
+                        continue;
+                    }
+
+                    if !id.is_empty() {
+                        self.state.search_results.push(SearchResult {
+                            id,
+                            title: clean_title,
+                            stype,
+                            release_year,
+                            cover_url,
+                            season,
+                            episode: 1,
+                            provider: context.provider,
+                        });
+                    }
+                }
+
+                let previous_selected_id = if page > 1 {
+                    self.state
+                        .search_list_state
+                        .selected()
+                        .and_then(|idx| self.state.search_results.get(idx).map(|r| r.id.clone()))
+                } else {
+                    None
+                };
+
+                let query_lower = query.to_lowercase();
+                self.state.search_results.sort_by(|a, b| {
+                    let a_title = a.title.to_lowercase();
+                    let b_title = b.title.to_lowercase();
+
+                    let a_exact = a_title == query_lower;
+                    let b_exact = b_title == query_lower;
+
+                    let a_starts = a_title.starts_with(&query_lower);
+                    let b_starts = b_title.starts_with(&query_lower);
+
+                    b_exact
+                        .cmp(&a_exact)
+                        .then_with(|| b_starts.cmp(&a_starts))
+                        .then_with(|| b.stype.cmp(&a.stype))
+                        .then_with(|| b.release_year.cmp(&a.release_year))
+                });
+
+                if let Some(prev_id) = previous_selected_id {
+                    if let Some(new_idx) = self
+                        .state
+                        .search_results
+                        .iter()
+                        .position(|r| r.id == prev_id)
+                    {
+                        self.state.search_list_state.select(Some(new_idx));
                     }
                 }
 
@@ -529,7 +484,8 @@ impl App {
                 request_id,
                 tab_id,
                 page,
-                payload,
+                items,
+                metrics,
             } => {
                 if request_id != self.state.active_homepage_request {
                     return None;
@@ -551,13 +507,10 @@ impl App {
                 } else {
                     None
                 };
-
-                let extracted_subjects = self
-                    .state
-                    .active_browse_preset
-                    .map(|preset| Self::extract_browse_subjects(&payload, preset))
-                    .unwrap_or_else(|| Self::extract_homepage_subjects(&payload));
-                let count = self.append_homepage_subjects(extracted_subjects);
+                self.state
+                    .homepage_cache
+                    .put((tab_id.clone(), page), (items.clone(), metrics.clone()));
+                let count = self.append_homepage_items(items, metrics);
                 self.sort_browse_results();
 
                 if let Some(prev_id) = previous_selected_id {
@@ -704,11 +657,7 @@ impl App {
                     self.state.poster_protocol = None;
                     if let Some(img) = self.state.image_cache.get(&id) {
                         self.state.poster_image = Some(std::sync::Arc::clone(img));
-                    } else if let Some(url) = cached
-                        .get("cover")
-                        .and_then(|c| c.get("url"))
-                        .and_then(|u| u.as_str())
-                    {
+                    } else if let Some(url) = cached.cover_url() {
                         let url = url.to_string();
                         let tx = self.action_sender.clone();
                         let id2 = id.clone();
@@ -751,14 +700,14 @@ impl App {
                 }
 
                 self.state.preview_loading = true;
-                let client = self.service.client.clone();
+                let service = self.service.clone();
                 let sender = self.action_sender.clone();
                 let id_clone = id.clone();
 
                 tokio::spawn(async move {
                     if let Ok(Some(cached_disk)) = tokio::task::spawn_blocking({
                         let id_clone = id_clone.clone();
-                        move || crate::cache::get_provider_details_cache(prov, &id_clone)
+                        move || crate::cache::get_provider_details_cache_typed(prov, &id_clone)
                     })
                     .await
                     {
@@ -768,12 +717,14 @@ impl App {
                         return;
                     }
 
-                    match client.get_details(&id_clone).await {
+                    match service.details_typed(prov, &id_clone).await {
                         Ok(details) => {
                             let id_save = id_clone.clone();
                             let det_save = details.clone();
                             let _ = tokio::task::spawn_blocking(move || {
-                                crate::cache::set_provider_details_cache(prov, &id_save, &det_save)
+                                crate::cache::set_provider_details_cache_typed(
+                                    prov, &id_save, &det_save,
+                                )
                             })
                             .await;
                             sender
@@ -782,14 +733,14 @@ impl App {
                         }
                         Err(e) => {
                             sender
-                                .send(Action::PreviewFailure(request_id, format!("{:?}", e)))
+                                .send(Action::PreviewFailure(request_id, e.user_message(prov)))
                                 .ok();
                         }
                     }
                 });
             }
 
-            Action::PreviewSuccess(request_id, id, json) => {
+            Action::PreviewSuccess(request_id, id, details) => {
                 if request_id != self.state.active_preview_request {
                     return None;
                 }
@@ -797,8 +748,7 @@ impl App {
                     self.state
                         .selected_details
                         .as_ref()
-                        .and_then(|d| d.get("id"))
-                        .and_then(crate::tui::state::subject_id)
+                        .map(|d| d.id.value.clone())
                 } else {
                     self.state
                         .search_list_state
@@ -813,14 +763,13 @@ impl App {
                     return None;
                 }
 
-                self.state.preview_cache.put(id.clone(), json.clone());
-                self.state.search_preview = Some(json.clone());
+                self.state.preview_cache.put(id.clone(), details.clone());
+                self.state.search_preview = Some(details.clone());
                 self.state.poster_image = None;
                 self.state.poster_protocol = None;
                 if let Some(cached_img) = self.state.image_cache.get(&id) {
                     self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
-                } else if let Some(url) = crate::tui::app::playback::extract_cover_url(&json) {
-                    self.state.history.update_cover_url(&id, &url);
+                } else if let Some(url) = details.cover_url() {
                     let url_clone = url.to_string();
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
@@ -900,7 +849,7 @@ impl App {
                     .set_status_default(format!("Preview failed: {}", err));
             }
 
-            Action::DetailsSuccess(context, request_id, id, payload) => {
+            Action::DetailsSuccess(context, request_id, id, mut details) => {
                 if request_id != self.state.active_details_request {
                     return None;
                 }
@@ -910,136 +859,71 @@ impl App {
                 }
                 self.state.is_loading = false;
                 self.state.details_error = None;
-                let mut final_payload = payload.clone();
+
                 if self.state.language_chosen {
                     if let Some(existing) = &self.state.selected_details {
-                        if let Some(final_obj) = final_payload.as_object_mut() {
-                            if let Some(existing_obj) = existing.as_object() {
-                                let preserve_keys = [
-                                    "title",
-                                    "synopsis",
-                                    "cover",
-                                    "year",
-                                    "releaseDate",
-                                    "duration",
-                                    "countryName",
-                                    "genre",
-                                    "imdbRatingValue",
-                                    "intro",
-                                    "description",
-                                    "dubs",
-                                ];
-                                for key in preserve_keys {
-                                    if let Some(v) = existing_obj.get(key) {
-                                        final_obj.insert(key.to_string(), v.clone());
-                                    }
-                                }
-                            }
+                        if details.title.trim().is_empty() {
+                            details.title = existing.title.clone();
+                        }
+                        if details.description.is_none() {
+                            details.description = existing.description.clone();
+                        }
+                        if details.poster_url.is_none() {
+                            details.poster_url = existing.poster_url.clone();
+                        }
+                        if details.year.is_none() {
+                            details.year = existing.year.clone();
+                        }
+                        if details.duration.is_none() {
+                            details.duration = existing.duration.clone();
+                        }
+                        if details.genres.is_empty() {
+                            details.genres = existing.genres.clone();
+                        }
+                        if details.imdb_rating.is_none() {
+                            details.imdb_rating = existing.imdb_rating.clone();
+                        }
+                        if details.dubs.is_empty() {
+                            details.dubs = existing.dubs.clone();
                         }
                     }
                 }
 
-                if let Some(final_obj) = final_payload.as_object_mut() {
-                    if let Some(existing) = &self.state.selected_details {
-                        if let Some(existing_obj) = existing.as_object() {
-                            if final_obj
-                                .get("title")
-                                .and_then(|t| t.as_str())
-                                .is_none_or(|s| s.trim().is_empty())
-                            {
-                                if let Some(v) = existing_obj.get("title") {
-                                    final_obj.insert("title".to_string(), v.clone());
-                                }
-                            }
-                            if final_obj
-                                .get("releaseDate")
-                                .and_then(|y| y.as_str())
-                                .is_none_or(|s| s.trim().is_empty())
-                            {
-                                if let Some(v) = existing_obj.get("releaseDate") {
-                                    final_obj.insert("releaseDate".to_string(), v.clone());
-                                }
-                            }
-                            if (!final_obj.contains_key("cover")
-                                || final_obj
-                                    .get("cover")
-                                    .and_then(|c| c.get("url"))
-                                    .and_then(|u| u.as_str())
-                                    .is_none_or(|s| s.trim().is_empty()))
-                                && let Some(v) = existing_obj.get("cover")
-                            {
-                                final_obj.insert("cover".to_string(), v.clone());
-                            }
-                            if final_obj
-                                .get("description")
-                                .and_then(|d| d.as_str())
-                                .is_none_or(|s| s.trim().is_empty())
-                                && let Some(v) = existing_obj
-                                    .get("description")
-                                    .or_else(|| existing_obj.get("intro"))
-                            {
-                                final_obj.insert("description".to_string(), v.clone());
-                            }
-                            if final_obj
-                                .get("imdbRatingValue")
-                                .and_then(|r| r.as_str())
-                                .is_none_or(|s| s.trim().is_empty())
-                                && let Some(v) = existing_obj.get("imdbRatingValue")
-                            {
-                                final_obj.insert("imdbRatingValue".to_string(), v.clone());
-                            }
-                            if (!final_obj.contains_key("genre")
-                                || final_obj
-                                    .get("genre")
-                                    .and_then(|g| g.as_array())
-                                    .is_none_or(|a| a.is_empty()))
-                                && let Some(v) = existing_obj.get("genre")
-                            {
-                                final_obj.insert("genre".to_string(), v.clone());
-                            }
-                        }
+                if let Some(existing) = &self.state.selected_details {
+                    if details.title.trim().is_empty() {
+                        details.title = existing.title.clone();
                     }
+                    if details.year.is_none() {
+                        details.year = existing.year.clone();
+                    }
+                    if details.poster_url.is_none() {
+                        details.poster_url = existing.poster_url.clone();
+                    }
+                    if details.description.is_none() {
+                        details.description = existing.description.clone();
+                    }
+                    if details.imdb_rating.is_none() {
+                        details.imdb_rating = existing.imdb_rating.clone();
+                    }
+                    if details.genres.is_empty() {
+                        details.genres = existing.genres.clone();
+                    }
+                }
 
-                    if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
-                        if final_obj
-                            .get("title")
-                            .and_then(|t| t.as_str())
-                            .is_none_or(|s| s.trim().is_empty())
-                        {
-                            final_obj.insert(
-                                "title".to_string(),
-                                serde_json::Value::String(res.title.clone()),
-                            );
-                        }
-                        if final_obj
-                            .get("releaseDate")
-                            .and_then(|y| y.as_str())
-                            .is_none_or(|s| s.trim().is_empty())
-                        {
-                            final_obj.insert(
-                                "releaseDate".to_string(),
-                                serde_json::Value::String(res.release_year.clone()),
-                            );
-                        }
-                        if (!final_obj.contains_key("cover")
-                            || final_obj
-                                .get("cover")
-                                .and_then(|c| c.get("url"))
-                                .and_then(|u| u.as_str())
-                                .is_none_or(|s| s.trim().is_empty()))
-                            && res.cover_url.is_some()
-                        {
-                            final_obj.insert(
-                                "cover".to_string(),
-                                serde_json::json!({ "url": res.cover_url }),
-                            );
-                        }
+                if let Some(res) = self.state.search_results.iter().find(|r| r.id == id) {
+                    if details.title.trim().is_empty() {
+                        details.title = res.title.clone();
+                    }
+                    if details.year.is_none() {
+                        details.year = Some(res.release_year.clone());
+                    }
+                    if details.poster_url.is_none() {
+                        details.poster_url = res.cover_url.clone();
                     }
                 }
 
                 self.state.active_subject_id = Some(id.clone());
-                self.state.selected_details = Some(final_payload.clone());
-                let payload = final_payload;
+                self.state.selected_details = Some(details.clone());
 
                 if self.state.poster_image.is_none() {
                     if let Some(cached_img) = self
@@ -1049,9 +933,8 @@ impl App {
                         .or_else(|| self.state.search_posters.get(&id))
                     {
                         self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
-                    } else if let Some(url) = crate::tui::app::playback::extract_cover_url(&payload)
-                    {
-                        self.state.history.update_cover_url(&id, &url);
+                    } else if let Some(url) = details.cover_url() {
+                        self.state.history.update_cover_url(&id, url);
                         let url_clone = url.to_string();
                         let action_tx = self.action_sender.clone();
                         let id_clone = id.clone();
@@ -1091,51 +974,27 @@ impl App {
                     }
                 }
 
-                let stype = crate::tui::state::stype(&payload);
-
-                if let Some(seasons_arr) = payload
-                    .get("seasons")
-                    .and_then(|s| s.get("seasons"))
-                    .and_then(|s| s.as_array())
-                    .filter(|a| !a.is_empty())
-                {
-                    self.state.available_seasons = seasons_arr.clone();
-                } else if stype == 2 {
-                    let max_ep = payload
-                        .get("resourceDetectors")
-                        .and_then(|r| r.as_array())
-                        .and_then(|a| a.first())
-                        .and_then(|r| r.get("totalEpisode"))
-                        .and_then(|t| t.as_i64())
-                        .unwrap_or(1);
-
-                    self.state.available_seasons = vec![serde_json::json!({
-                        "se": 1,
-                        "maxEp": max_ep,
-                        "allEp": ""
-                    })];
+                if !details.seasons.is_empty() {
+                    self.state.available_seasons = details.seasons.clone();
+                } else if details.media_type == MediaType::Series {
+                    self.state.available_seasons = vec![Season {
+                        number: 1,
+                        episodes: vec![Episode {
+                            season: 1,
+                            number: 1,
+                            title: None,
+                        }],
+                    }];
                 } else {
                     self.state.available_seasons.clear();
                 }
 
                 self.state.available_episode_numbers.clear();
                 for season in &self.state.available_seasons {
-                    let all_ep_str = season.get("allEp").and_then(|v| v.as_str()).unwrap_or("");
-                    let ep_numbers: Vec<usize> = if !all_ep_str.is_empty() {
-                        all_ep_str
-                            .split(',')
-                            .filter_map(|s| s.trim().parse().ok())
-                            .collect()
-                    } else if let Some(arr) =
-                        season.get("episodeNumbers").and_then(|e| e.as_array())
-                    {
-                        arr.iter()
-                            .filter_map(|v| v.as_u64().map(|n| n as usize))
-                            .collect()
+                    let ep_numbers: Vec<usize> = if !season.episodes.is_empty() {
+                        season.episodes.iter().map(|e| e.number).collect()
                     } else {
-                        let max_ep =
-                            season.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
-                        (1..=max_ep).collect()
+                        vec![1]
                     };
                     self.state.available_episode_numbers.push(ep_numbers);
                 }
@@ -1169,12 +1028,7 @@ impl App {
                     .state
                     .available_seasons
                     .iter()
-                    .position(|s| {
-                        s.get("se")
-                            .and_then(|v| v.as_i64())
-                            .map(|v| v as usize == target_season)
-                            .unwrap_or(false)
-                    })
+                    .position(|s| s.number == target_season)
                     .unwrap_or(0);
 
                 self.state.season_list_state.select(Some(season_idx));
@@ -1188,27 +1042,20 @@ impl App {
 
                 self.state.episode_list_state.select(Some(ep_idx));
 
-                if let Some(dubs) = payload.get("dubs").and_then(|d| d.as_array()) {
+                if !details.dubs.is_empty() {
                     let find_by_pattern = |patterns: &[&str]| {
-                        dubs.iter().position(|dub| {
-                            let labels = [
-                                dub.get("title").and_then(|v| v.as_str()),
-                                dub.get("name").and_then(|v| v.as_str()),
-                                dub.get("lanName").and_then(|v| v.as_str()),
-                                dub.get("audioName").and_then(|v| v.as_str()),
-                            ];
-                            let label = labels.into_iter().flatten().collect::<Vec<_>>().join(" ");
-                            let lower = label.to_ascii_lowercase();
+                        details.dubs.iter().position(|dub| {
+                            let lower =
+                                format!("{} {}", dub.language, dub.label).to_ascii_lowercase();
                             patterns.iter().any(|pat| lower.contains(pat))
                         })
                     };
 
                     let preferred_idx = if self.state.language_chosen {
-                        dubs.iter()
-                            .position(|dub| {
-                                dub.get("subjectId").and_then(crate::tui::state::subject_id)
-                                    == Some(id.clone())
-                            })
+                        details
+                            .dubs
+                            .iter()
+                            .position(|dub| dub.subject_id == id)
                             .unwrap_or(0)
                     } else {
                         find_by_pattern(&["original", "orig"])
@@ -1224,10 +1071,7 @@ impl App {
                 self.state.selected_season = target_season;
                 self.state.selected_episode = target_episode;
 
-                let has_multiple_dubs = payload
-                    .get("dubs")
-                    .and_then(|d| d.as_array())
-                    .is_some_and(|a| a.len() > 1);
+                let has_multiple_dubs = details.has_languages();
 
                 if has_multiple_dubs
                     && !self.state.language_chosen
@@ -1239,7 +1083,7 @@ impl App {
                         .set_status_default("Please select a language dubbing.");
                 } else {
                     if !self.state.language_chosen {
-                        if stype == 2 && !self.state.available_seasons.is_empty() {
+                        if details.is_series() && !self.state.available_seasons.is_empty() {
                             self.state.details_pane = crate::tui::state::DetailsPane::Seasons;
                         } else {
                             self.state.details_pane = crate::tui::state::DetailsPane::Streams;
@@ -1284,9 +1128,7 @@ impl App {
                         self.state
                             .selected_details
                             .as_ref()
-                            .and_then(|d| d.get("id"))
-                            .and_then(|i| i.as_str())
-                            .map(|s| s.to_string())
+                            .map(|d| d.id.value.clone())
                     }) {
                         self.state.active_subject_id = Some(id.clone());
 
@@ -1299,9 +1141,7 @@ impl App {
                             {
                                 self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
                             } else if let Some(details) = &self.state.selected_details {
-                                if let Some(url) =
-                                    crate::tui::app::playback::extract_cover_url(details)
-                                {
+                                if let Some(url) = details.cover_url() {
                                     let url_clone = url.to_string();
                                     let action_tx = self.action_sender.clone();
                                     let id_clone = id.clone();
@@ -1357,23 +1197,24 @@ impl App {
                 };
                 self.state.stream_pool.insert(subject_id.clone(), pool);
 
-                let (se, ep) = if let Some(details) = &self.state.selected_details {
-                    let stype = crate::tui::state::stype(details);
-                    if stype == 2 {
-                        let se = if self.state.selected_season > 0 {
-                            self.state.selected_season
-                        } else {
-                            1
-                        };
-                        let ep = if self.state.selected_episode > 0 {
-                            self.state.selected_episode
-                        } else {
-                            1
-                        };
-                        (se, ep)
+                let is_series = self
+                    .state
+                    .selected_details
+                    .as_ref()
+                    .is_some_and(|d| d.is_series());
+
+                let (se, ep) = if is_series {
+                    let se = if self.state.selected_season > 0 {
+                        self.state.selected_season
                     } else {
-                        (0usize, 0usize)
-                    }
+                        1
+                    };
+                    let ep = if self.state.selected_episode > 0 {
+                        self.state.selected_episode
+                    } else {
+                        1
+                    };
+                    (se, ep)
                 } else {
                     (0usize, 0usize)
                 };
@@ -1381,24 +1222,11 @@ impl App {
                 self.state.selected_season = se;
                 self.state.selected_episode = ep;
 
-                let already_loaded = self
-                    .state
-                    .selected_resources
-                    .as_ref()
-                    .and_then(|resources| resources.get("list"))
-                    .and_then(|list| list.as_array())
-                    .is_some_and(|list| !list.is_empty());
+                let already_loaded = !self.state.selected_resources.is_empty();
                 if already_loaded {
-                    if let Some(streams) = self
-                        .state
-                        .selected_resources
-                        .as_ref()
-                        .and_then(|resources| resources.get("list"))
-                        .and_then(|list| list.as_array())
-                        .cloned()
-                        && let Some(pool) = self.state.stream_pool.get_mut(&subject_id)
-                    {
-                        pool.episode_index.insert((se, ep), streams);
+                    if let Some(pool) = self.state.stream_pool.get_mut(&subject_id) {
+                        pool.episode_index
+                            .insert((se, ep), self.state.selected_resources.clone());
                     }
                     self.state.is_loading = false;
                     self.state.is_fetching_streams = false;
@@ -1430,7 +1258,7 @@ impl App {
                 let request_id = self.state.active_resource_request;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
-                self.state.selected_resources = None;
+                self.state.selected_resources.clear();
                 self.state.stream_error = None;
 
                 if force_refresh {
@@ -1448,8 +1276,9 @@ impl App {
                     let sender = self.action_sender.clone();
                     let req_id = request_id;
                     if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                        crate::cache::get_provider_stream_cache(prov, &id_clone, season, episode)
-                            .and_then(|v| v.as_array().cloned())
+                        crate::cache::get_provider_stream_cache_typed(
+                            prov, &id_clone, season, episode,
+                        )
                     })
                     .await
                     {
@@ -1461,7 +1290,7 @@ impl App {
                                     subject_id.clone(),
                                     season,
                                     episode,
-                                    serde_json::Value::Array(cached),
+                                    cached,
                                 ))
                                 .ok();
                         });
@@ -1478,7 +1307,7 @@ impl App {
                         .state
                         .selected_details
                         .as_ref()
-                        .map(|d| crate::tui::state::stype(d) == 2)
+                        .map(|d| d.is_series())
                         .unwrap_or(season > 0);
 
                     let has_stream_addons = addons.iter().any(|a| a.enabled && a.provides_stream);
@@ -1511,25 +1340,22 @@ impl App {
                         }
 
                         if !releases.is_empty() {
-                            let json = crate::providers::addons::adapter::releases_to_moviebox_json(
-                                &releases,
-                            );
                             let id_clone = id.clone();
-                            let json_clone = json.clone();
+                            let releases_clone = releases.clone();
                             let provider = context.provider;
                             tokio::task::spawn_blocking(move || {
-                                crate::cache::set_provider_stream_cache(
+                                crate::cache::set_provider_stream_cache_typed(
                                     provider,
                                     &id_clone,
                                     season,
                                     episode,
-                                    &json_clone,
+                                    &releases_clone,
                                 );
                             });
 
                             sender
                                 .send(Action::EpisodeStreamsReady(
-                                    context, request_id, id, season, episode, json,
+                                    context, request_id, id, season, episode, releases,
                                 ))
                                 .ok();
                         } else {
@@ -1589,14 +1415,22 @@ impl App {
                         };
                         match result {
                             Ok(releases) if !releases.is_empty() => {
-                                sender
-                                    .send(Action::EpisodeStreamsReady(
-                                        context,
-                                        request_id,
-                                        id,
+                                let id_clone = id.clone();
+                                let releases_clone = releases.clone();
+                                let provider = context.provider;
+                                tokio::task::spawn_blocking(move || {
+                                    crate::cache::set_provider_stream_cache_typed(
+                                        provider,
+                                        &id_clone,
                                         season,
                                         episode,
-                                        releases_to_moviebox_json(&releases),
+                                        &releases_clone,
+                                    );
+                                });
+
+                                sender
+                                    .send(Action::EpisodeStreamsReady(
+                                        context, request_id, id, season, episode, releases,
                                     ))
                                     .ok();
                             }
@@ -1648,7 +1482,7 @@ impl App {
                                     cached_subject_id,
                                     season,
                                     episode,
-                                    serde_json::Value::Array(cached),
+                                    cached,
                                 ))
                                 .ok();
                         });
@@ -1658,10 +1492,8 @@ impl App {
 
                 let mut absolute_episode = 0;
                 for s_val in &self.state.available_seasons {
-                    let se = s_val.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-                    if se < season {
-                        absolute_episode +=
-                            s_val.get("maxEp").and_then(|m| m.as_i64()).unwrap_or(1) as usize;
+                    if s_val.number < season {
+                        absolute_episode += s_val.episodes.len().max(1);
                     }
                 }
                 absolute_episode += episode.saturating_sub(1);
@@ -1680,7 +1512,7 @@ impl App {
                         .send(Action::SetStatus("Fetching streams...".to_string()))
                         .ok();
 
-                    let mut all_items: Vec<serde_json::Value> = Vec::new();
+                    let mut all_items: Vec<Release> = Vec::new();
                     let mut found_target = false;
                     let mut any_fetch_failed = false;
 
@@ -1701,7 +1533,13 @@ impl App {
                                         .get("hasMore")
                                         .and_then(|v| v.as_bool())
                                         .unwrap_or(false);
-                                    all_items.extend(items);
+                                    for item in items {
+                                        all_items.push(
+                                            crate::providers::moviebox::adapt::moviebox_resource_item_to_release(
+                                                &item,
+                                            ),
+                                        );
+                                    }
                                     if !has_more {
                                         break;
                                     }
@@ -1770,18 +1608,18 @@ impl App {
                                     {
                                         has_more = true;
                                     }
-                                    for item in &items {
-                                        let se =
-                                            item.get("se").and_then(|v| v.as_i64()).unwrap_or(0)
-                                                as usize;
-                                        let ep =
-                                            item.get("ep").and_then(|v| v.as_i64()).unwrap_or(0)
-                                                as usize;
-                                        if se == season && ep == episode {
+                                    for item in items {
+                                        let release =
+                                            crate::providers::moviebox::adapt::moviebox_resource_item_to_release(
+                                                &item,
+                                            );
+                                        if release.season == Some(season)
+                                            && release.episode == Some(episode)
+                                        {
                                             found_target = true;
                                         }
+                                        all_items.push(release);
                                     }
-                                    all_items.extend(items);
                                 }
                             }
 
@@ -1820,12 +1658,7 @@ impl App {
                     } else {
                         sender
                             .send(Action::EpisodeStreamsReady(
-                                context,
-                                request_id,
-                                id_clone,
-                                season,
-                                episode,
-                                serde_json::Value::Array(all_items),
+                                context, request_id, id_clone, season, episode, all_items,
                             ))
                             .ok();
                     }
@@ -1838,7 +1671,7 @@ impl App {
                 subject_id,
                 target_se,
                 target_ep,
-                payload,
+                mut raw_list,
             ) => {
                 if request_id != self.state.active_resource_request {
                     return None;
@@ -1854,32 +1687,19 @@ impl App {
                     return None;
                 }
 
-                let mut raw_list = payload.as_array().cloned().unwrap_or_default();
-
                 if let Some(subject_id) = &self.state.active_subject_id {
                     let id = subject_id.clone();
                     if let Some(pool) = self.state.stream_pool.get_mut(&id) {
                         let mut actual_resolutions = std::collections::HashSet::new();
 
-                        for item in raw_list.clone() {
-                            if let Some(r) = item.get("resolution").and_then(|r| r.as_u64()) {
+                        for mut item in raw_list.clone() {
+                            let r = item.resolution_u64();
+                            if r > 0 {
                                 actual_resolutions.insert(r as u32);
                             }
 
-                            let mut se = item
-                                .get("se")
-                                .and_then(|v| {
-                                    v.as_i64()
-                                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-                                })
-                                .unwrap_or(0) as usize;
-                            let mut ep = item
-                                .get("ep")
-                                .and_then(|v| {
-                                    v.as_i64()
-                                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-                                })
-                                .unwrap_or(0) as usize;
+                            let mut se = item.season.unwrap_or(0);
+                            let mut ep = item.episode.unwrap_or(0);
 
                             if target_se == 0 && target_ep == 0 {
                                 se = 0;
@@ -1889,38 +1709,23 @@ impl App {
                                 ep = target_ep;
                             }
 
-                            let entry = pool.episode_index.entry((se, ep)).or_insert_with(Vec::new);
-                            let rid = item.get("resourceId").and_then(|r| r.as_str());
-                            let link = item
-                                .get("resourceLink")
-                                .and_then(|l| l.as_str())
-                                .unwrap_or("");
+                            item.season = Some(se);
+                            item.episode = Some(ep);
+
+                            let entry = pool.episode_index.entry((se, ep)).or_default();
+                            let link = item.direct_url().unwrap_or("");
 
                             let mut exists = false;
                             for i in entry.iter_mut() {
-                                let i_rid = i.get("resourceId").and_then(|r| r.as_str());
-                                if rid.is_some() && i_rid == rid {
-                                    if let Some(obj) = i.as_object_mut() {
-                                        obj.insert(
-                                            "resourceLink".to_string(),
-                                            serde_json::Value::String(link.to_string()),
-                                        );
-                                    }
-                                    exists = true;
-                                    break;
-                                }
-
-                                let i_link =
-                                    i.get("resourceLink").and_then(|l| l.as_str()).unwrap_or("");
+                                let i_link = i.direct_url().unwrap_or("");
                                 let base_link = link.split('?').next().unwrap_or(link);
                                 let i_base_link = i_link.split('?').next().unwrap_or(i_link);
 
-                                if base_link == i_base_link && !base_link.is_empty() {
-                                    if let Some(obj) = i.as_object_mut() {
-                                        obj.insert(
-                                            "resourceLink".to_string(),
-                                            serde_json::Value::String(link.to_string()),
-                                        );
+                                if (!base_link.is_empty() && base_link == i_base_link)
+                                    || (!item.filename.is_empty() && item.filename == i.filename)
+                                {
+                                    if !item.mirrors.is_empty() && i.mirrors.is_empty() {
+                                        i.mirrors = item.mirrors.clone();
                                     }
                                     exists = true;
                                     break;
@@ -1953,34 +1758,26 @@ impl App {
                 }
 
                 let mut filtered = raw_list;
-
-                filtered.sort_by(|a, b| {
-                    let res_a = a.get("resolution").and_then(|r| r.as_i64()).unwrap_or(0);
-                    let res_b = b.get("resolution").and_then(|r| r.as_i64()).unwrap_or(0);
-                    res_b.cmp(&res_a)
-                });
+                filtered.sort_by_key(|b| std::cmp::Reverse(b.resolution_u64()));
 
                 let count = filtered.len();
-                let array_payload = serde_json::Value::Array(filtered.clone());
                 if count > 0 {
                     if let Some(subject_id) = &self.state.active_subject_id {
                         let id_clone = subject_id.clone();
-                        let payload_clone = array_payload.clone();
+                        let filtered_clone = filtered.clone();
                         tokio::task::spawn_blocking(move || {
-                            crate::cache::set_provider_stream_cache(
+                            crate::cache::set_provider_stream_cache_typed(
                                 context.provider,
                                 &id_clone,
                                 target_se,
                                 target_ep,
-                                &payload_clone,
+                                &filtered_clone,
                             );
                         });
                     }
                 }
 
-                let mut result = serde_json::Map::new();
-                result.insert("list".to_string(), array_payload);
-                self.state.selected_resources = Some(serde_json::Value::Object(result));
+                self.state.selected_resources = filtered;
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
                 self.state.stream_error = None;
@@ -2006,8 +1803,10 @@ impl App {
                                     if pref.is_none() {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                                     } else if let Some(pref_lang) = pref.flatten() {
-                                        let sub_url =
-                                            crate::tui::state::caption_url_for(&res, &pref_lang);
+                                        let sub_url = res
+                                            .into_iter()
+                                            .find(|s| s.name == pref_lang)
+                                            .map(|s| s.url);
                                         sender.send(Action::DownloadStream(sub_url)).ok();
                                     } else {
                                         sender.send(Action::DownloadStream(None)).ok();
@@ -2052,24 +1851,20 @@ impl App {
                 self.state.auto_play_on_ready = false;
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
-                self.state.selected_resources = None;
+                self.state.selected_resources.clear();
+                self.state.resource_list_state.select(None);
+                self.state.stream_error = Some(err.clone());
                 log::error!(
                     "episode streams failed ({} s{}e{}): {err}",
                     context.provider.cache_key(),
                     target_se,
                     target_ep
                 );
-                self.state.stream_error = Some(err.clone());
-                self.state.set_status_default(format!("Error: {}", err));
-                if self.state.is_waiting_for_download_stream {
-                    self.state.is_waiting_for_download_stream = false;
-                    self.action_sender
-                        .send(Action::DownloadFailed(format!(
-                            "Failed to resolve streams for S{:02}E{:02}: {}",
-                            target_se, target_ep, err
-                        )))
-                        .ok();
-                }
+                self.state.notify(
+                    crate::tui::overlay::NotificationKind::Error,
+                    "Streams Failed",
+                    err,
+                );
             }
             _ => return None,
         }

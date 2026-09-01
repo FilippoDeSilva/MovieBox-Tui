@@ -181,6 +181,7 @@ impl CircleFtpClient {
             duration,
             genres,
             seasons,
+            dubs: vec![],
         })
     }
 

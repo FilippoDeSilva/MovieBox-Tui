@@ -106,11 +106,15 @@ pub fn settings_player_label(choice: Option<&str>) -> &'static str {
 }
 
 pub use crate::models::{
-    BrowseMetric, BrowseMetrics, BrowsePreset, Notification, NotificationKind, SearchResult,
-    SubjectStreamPool,
+    AudioTrackOption, BrowseMetric, BrowseMetrics, BrowsePreset, CatalogItem, Episode,
+    MediaDetails, MediaType, Notification, NotificationKind, Release, SearchResult, Season,
+    SourceMirror, SubjectStreamPool,
 };
-pub use crate::service::{caption_options, caption_url_for, stype, subject_id};
 
+pub type HomepageCacheData = (
+    Vec<CatalogItem>,
+    std::collections::HashMap<String, BrowseMetrics>,
+);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResultMetrics {
     pub poster_rows_eff: u16,
@@ -209,6 +213,8 @@ pub struct AppState {
     pub last_search_edit: std::time::Instant,
     pub search_suggestions: Vec<String>,
     pub suggest_index: Option<usize>,
+    pub suggest_cache: lru::LruCache<String, Vec<String>>,
+    pub homepage_cache: lru::LruCache<(String, usize), HomepageCacheData>,
     pub search_results: Vec<SearchResult>,
     pub search_error: Option<String>,
     pub is_homepage_mode: bool,
@@ -222,9 +228,9 @@ pub struct AppState {
     pub in_flight_posters: std::collections::HashSet<String>,
     pub search_list_state: TableState,
 
-    pub selected_details: Option<serde_json::Value>,
+    pub selected_details: Option<MediaDetails>,
     pub active_subject_id: Option<String>,
-    pub selected_resources: Option<serde_json::Value>,
+    pub selected_resources: Vec<Release>,
     pub stream_pool: std::collections::HashMap<String, SubjectStreamPool>,
     pub fetch_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub show_season_download_confirm: bool,
@@ -236,7 +242,7 @@ pub struct AppState {
     pub is_fetching_streams: bool,
     pub stream_error: Option<String>,
     pub details_error: Option<String>,
-    pub preview_cache: lru::LruCache<String, serde_json::Value>,
+    pub preview_cache: lru::LruCache<String, MediaDetails>,
     pub resource_list_state: ListState,
 
     pub details_pane: DetailsPane,
@@ -245,10 +251,10 @@ pub struct AppState {
     pub season_list_state: ListState,
     pub episode_list_state: ListState,
     pub language_list_state: ListState,
-    pub available_seasons: Vec<serde_json::Value>,
+    pub available_seasons: Vec<Season>,
     pub available_episode_numbers: Vec<Vec<usize>>,
 
-    pub search_preview: Option<serde_json::Value>,
+    pub search_preview: Option<MediaDetails>,
     pub preview_loading: bool,
 
     pub tick_count: u64,
@@ -374,6 +380,8 @@ impl Default for AppState {
             last_search_edit: std::time::Instant::now(),
             search_suggestions: Vec::new(),
             suggest_index: None,
+            suggest_cache: lru::LruCache::new(cache_capacity(128)),
+            homepage_cache: lru::LruCache::new(cache_capacity(32)),
             search_results: Vec::new(),
             search_error: None,
             is_homepage_mode: false,
@@ -388,7 +396,7 @@ impl Default for AppState {
             basic_terminal: crate::tui::terminal::uses_basic_ui(),
             selected_details: None,
             active_subject_id: None,
-            selected_resources: None,
+            selected_resources: vec![],
             stream_pool: std::collections::HashMap::new(),
             fetch_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             show_season_download_confirm: false,
@@ -400,9 +408,8 @@ impl Default for AppState {
             auto_play_on_ready: false,
             stream_error: None,
             details_error: None,
-            preview_cache: lru::LruCache::new(cache_capacity(30)),
             resource_list_state: ListState::default(),
-
+            preview_cache: lru::LruCache::new(cache_capacity(64)),
             details_pane: DetailsPane::default(),
             selected_season: 1,
             selected_episode: 1,
@@ -556,6 +563,27 @@ impl AppState {
             }
         }
     }
+    pub fn provider_for_subject(&self, subject_id: &str) -> ProviderKind {
+        self.search_results
+            .iter()
+            .find(|r| r.id == subject_id)
+            .map(|r| r.provider)
+            .or_else(|| {
+                self.selected_details
+                    .as_ref()
+                    .filter(|d| d.id.value == subject_id)
+                    .map(|d| d.id.provider)
+            })
+            .or_else(|| self.selected_resources.first().map(|r| r.provider))
+            .unwrap_or(self.active_provider)
+    }
+
+    pub fn current_subject_provider(&self) -> ProviderKind {
+        self.active_subject_id
+            .as_deref()
+            .map(|id| self.provider_for_subject(id))
+            .unwrap_or(self.active_provider)
+    }
 
     pub fn notify(
         &mut self,
@@ -702,6 +730,7 @@ impl AppState {
         self.search_results.clear();
         self.search_error = None;
         self.search_suggestions.clear();
+        self.suggest_cache.clear();
         self.suggest_index = None;
         self.search_preview = None;
         self.preview_loading = false;
@@ -722,7 +751,7 @@ impl AppState {
     pub fn clear_details_state(&mut self) {
         self.active_subject_id = None;
         self.selected_details = None;
-        self.selected_resources = None;
+        self.selected_resources.clear();
         self.is_fetching_streams = false;
         self.pending_episode_fetch = None;
         self.auto_play_on_ready = false;

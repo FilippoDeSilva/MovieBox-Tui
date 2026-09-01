@@ -425,6 +425,46 @@ pub const CTRL_PREFIX: &str = "Ctrl+";
 pub fn ctrl_key(key: &str) -> String {
     format!("{CTRL_PREFIX}{key}")
 }
+pub const CTRL_S_STR: &str = if cfg!(target_os = "macos") {
+    "^S"
+} else {
+    "Ctrl+S"
+};
+pub const CTRL_T_STR: &str = if cfg!(target_os = "macos") {
+    "^T"
+} else {
+    "Ctrl+T"
+};
+pub const CTRL_A_STR: &str = if cfg!(target_os = "macos") {
+    "^A"
+} else {
+    "Ctrl+A"
+};
+pub const CTRL_D_STR: &str = if cfg!(target_os = "macos") {
+    "^D"
+} else {
+    "Ctrl+D"
+};
+pub const CTRL_F_STR: &str = if cfg!(target_os = "macos") {
+    "^F"
+} else {
+    "Ctrl+F"
+};
+pub const CTRL_H_STR: &str = if cfg!(target_os = "macos") {
+    "^H"
+} else {
+    "Ctrl+H"
+};
+pub const CTRL_P_STR: &str = if cfg!(target_os = "macos") {
+    "^P"
+} else {
+    "Ctrl+P"
+};
+pub const CTRL_R_STR: &str = if cfg!(target_os = "macos") {
+    "^R"
+} else {
+    "Ctrl+R"
+};
 
 pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
@@ -475,9 +515,13 @@ pub fn is_http_url(source: &str) -> bool {
     let trimmed = source.trim();
     trimmed.starts_with("http://") || trimmed.starts_with("https://")
 }
-
 pub fn extract_4digit_year(raw: &str) -> String {
-    raw.chars().filter(|c| c.is_ascii_digit()).take(4).collect()
+    raw.as_bytes()
+        .windows(4)
+        .find(|window| window.iter().all(u8::is_ascii_digit) && matches!(window[0], b'1' | b'2'))
+        .and_then(|window| std::str::from_utf8(window).ok())
+        .map(str::to_string)
+        .unwrap_or_default()
 }
 
 pub fn format_duration(secs: u64) -> String {
@@ -746,5 +790,14 @@ mod tests {
         assert!(buf.is_empty());
         assert_eq!(buf.cursor(), 0);
         assert_eq!(buf.as_str(), "");
+    }
+    #[test]
+    fn test_extract_4digit_year() {
+        assert_eq!(extract_4digit_year("2024"), "2024");
+        assert_eq!(extract_4digit_year("Movie 2 (2024)"), "2024");
+        assert_eq!(extract_4digit_year("Classic Film (1999)"), "1999");
+        assert_eq!(extract_4digit_year("2024-05-12"), "2024");
+        assert_eq!(extract_4digit_year("No year here"), "");
+        assert_eq!(extract_4digit_year("Not A Year (20x4)"), "");
     }
 }

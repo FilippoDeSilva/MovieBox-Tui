@@ -108,6 +108,13 @@ pub struct Season {
     pub episodes: Vec<Episode>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AudioTrackOption {
+    pub subject_id: String,
+    pub language: String,
+    pub label: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MediaDetails {
     pub id: ProviderMediaId,
@@ -125,6 +132,66 @@ pub struct MediaDetails {
     pub duration: Option<String>,
     pub genres: Vec<String>,
     pub seasons: Vec<Season>,
+    pub dubs: Vec<AudioTrackOption>,
+}
+
+impl MediaDetails {
+    pub fn is_series(&self) -> bool {
+        self.media_type == MediaType::Series || !self.seasons.is_empty()
+    }
+
+    pub fn has_languages(&self) -> bool {
+        self.dubs.len() > 1
+    }
+
+    pub fn cover_url(&self) -> Option<&str> {
+        self.poster_url.as_deref()
+    }
+
+    pub fn from_search_result(
+        item: &crate::models::SearchResult,
+        preview: Option<&MediaDetails>,
+    ) -> Self {
+        if let Some(p) = preview {
+            let mut details = p.clone();
+            if details.title.trim().is_empty() {
+                details.title = item.title.clone();
+            }
+            if details.year.is_none() && !item.release_year.trim().is_empty() {
+                details.year = Some(item.release_year.clone());
+            }
+            if details.poster_url.is_none() {
+                details.poster_url = item.cover_url.clone();
+            }
+            details
+        } else {
+            MediaDetails {
+                id: ProviderMediaId {
+                    provider: item.provider,
+                    value: item.id.clone(),
+                },
+                title: item.title.clone(),
+                media_type: if item.stype == 2 {
+                    MediaType::Series
+                } else {
+                    MediaType::Movie
+                },
+                year: Some(item.release_year.clone()),
+                description: None,
+                tagline: None,
+                imdb_rating: None,
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: item.cover_url.clone(),
+                duration: None,
+                genres: vec![],
+                seasons: vec![],
+                dubs: vec![],
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +219,31 @@ pub struct Release {
     pub season: Option<usize>,
     pub episode: Option<usize>,
     pub mirrors: Vec<SourceMirror>,
+}
+impl Release {
+    pub fn resolution_u64(&self) -> u64 {
+        self.quality
+            .as_deref()
+            .and_then(|q| q.trim_end_matches('p').parse::<u64>().ok())
+            .unwrap_or(1080)
+    }
+
+    pub fn source_label(&self) -> &str {
+        self.mirrors
+            .first()
+            .map(|m| m.label.as_str())
+            .unwrap_or_else(|| match self.provider {
+                ProviderKind::FourKHdHub => "4KHDHub",
+                ProviderKind::BdixCircleFtp => "CircleFTP",
+                ProviderKind::BdixDhakaFlix => "DhakaFlix",
+                ProviderKind::Addons => "Addon",
+                ProviderKind::MovieBox => "Direct",
+            })
+    }
+
+    pub fn direct_url(&self) -> Option<&str> {
+        self.mirrors.first().map(|m| m.resolver_url.as_str())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -8,8 +8,8 @@ pub mod tv;
 pub use tv as m3u;
 
 pub use models::{
-    CatalogItem, Episode, MediaDetails, MediaType, PlaybackSource, ProviderError, ProviderKind,
-    ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
+    AudioTrackOption, CatalogItem, Episode, MediaDetails, MediaType, PlaybackSource, ProviderError,
+    ProviderKind, ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
 };
 use serde::{Deserialize, Serialize};
 

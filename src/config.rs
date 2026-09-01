@@ -145,16 +145,37 @@ pub fn favorites_path() -> Option<PathBuf> {
 }
 
 pub fn load() -> Config {
-    config_path()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|c| serde_json::from_str::<Config>(&c).ok())
-        .unwrap_or_default()
+    let Some(path) = config_path() else {
+        return Config::default();
+    };
+    if path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(config) = serde_json::from_str::<Config>(&content) {
+                return config;
+            }
+        }
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
+        log::error!(
+            "failed to parse config from {}, rotating to {}",
+            crate::logging::sanitize_path(&path),
+            crate::logging::sanitize_path(&corrupt_path)
+        );
+        let _ = std::fs::rename(&path, corrupt_path);
+    }
+    Config::default()
 }
 
 pub fn save(config: &Config) {
     let Some(path) = config_path() else {
         return;
     };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     if let Ok(json) = serde_json::to_string_pretty(config) {
         if let Err(error) = crate::cache::atomic_write_file(&path, json.as_bytes()) {
             log::warn!("failed to write config: {error}");

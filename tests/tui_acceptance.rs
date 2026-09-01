@@ -569,9 +569,27 @@ async fn test_contextual_window_title() {
     assert_eq!(app.contextual_title(), "MovieBox-Tui — Addons");
 
     app.state_mut().active_screen = Screen::Details;
-    app.state_mut().selected_details = Some(serde_json::json!({
-        "title": "Inception"
-    }));
+    app.state_mut().selected_details = Some(moviebox_tui::models::MediaDetails {
+        id: moviebox_tui::models::ProviderMediaId {
+            provider: moviebox_tui::models::ProviderKind::MovieBox,
+            value: "1".to_string(),
+        },
+        title: "Inception".to_string(),
+        media_type: moviebox_tui::models::MediaType::Movie,
+        year: None,
+        description: None,
+        tagline: None,
+        imdb_rating: None,
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons: vec![],
+        dubs: vec![],
+    });
     assert_eq!(app.contextual_title(), "MovieBox-Tui — Inception");
 }
 #[tokio::test]

@@ -40,6 +40,7 @@ Searching and watching media through web browsers often means dealing with heavy
 - **Easy Downloads:** Download single episodes or entire seasons with one keypress. Completed episodes are skipped automatically.
 - **Favorites:** Favorite any movie or series with `f` and reach it instantly from a dedicated row on the home screen, or view the full list with `/favorites`.
 - **Refined Terminal Interface:** Full keyboard and mouse support, responsive multi-column grid, compact single-column narrow terminal fallbacks, fluid 10-frame Braille loading spinners, WCAG AA contrast light/dark themes (Catppuccin Latte/Mocha, Nord, TokyoNight, Dracula, Gruvbox, Rosé Pine), contextual window titles, and modal-gated poster art.
+- **Zero-JSON Engine & MessagePack Binary Caching:** 100% strongly typed native domain pipeline with zero heap-allocated JSON boxing in the UI render loop, multi-tier in-memory L1 LRU caching, and sub-millisecond on-disk binary caching powered by `rmp-serde`.
 ## Installation
 
 A media player (**[mpv](https://mpv.io)** or **[VLC](https://www.videolan.org/vlc/)**; **[IINA](https://iina.io)** on macOS) is recommended for video playback.

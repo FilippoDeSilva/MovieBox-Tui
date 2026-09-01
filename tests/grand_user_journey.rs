@@ -1,5 +1,7 @@
 use moviebox_tui::providers::addons::models::{AddonManifest, InstalledAddon};
-use moviebox_tui::providers::models::{ProviderKind, RequestContext};
+use moviebox_tui::providers::models::{
+    CatalogItem, MediaDetails, MediaType, ProviderKind, ProviderMediaId, RequestContext,
+};
 use moviebox_tui::tui::action::Action;
 use moviebox_tui::tui::app::App;
 use moviebox_tui::tui::state::{AppMode, InputMode, Screen};
@@ -25,38 +27,54 @@ async fn test_grand_user_journey_complete_lifecycle() {
         provider: ProviderKind::MovieBox,
         generation: app.state().provider_generation,
     };
-    let search_payload = serde_json::json!({
-        "results": [{
-            "subjects": [{
-                "subjectId": "inc_101",
-                "title": "Inception",
-                "subjectType": 1,
-                "releaseDate": "2010",
-                "cover": { "url": "https://example.com/inception.jpg" }
-            }]
-        }]
-    });
+    let search_items = vec![CatalogItem {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "inc_101".to_string(),
+        },
+        title: "Inception".to_string(),
+        media_type: MediaType::Movie,
+        year: Some("2010".to_string()),
+        poster_url: Some("https://example.com/inception.jpg".to_string()),
+        season_count: None,
+    }];
 
     app.handle_action(Action::SearchSuccess {
         context: streaming_ctx,
         request_id: app.state().active_search_request,
         query: "Inception".to_string(),
         page: 1,
-        payload: search_payload,
+        items: search_items,
     })
     .await;
 
     assert_eq!(app.state().search_results.len(), 1);
     assert_eq!(app.state().search_results[0].title, "Inception");
 
-    let details_payload = serde_json::json!({
-        "id": "inc_101",
-        "title": "Inception",
-        "subjectType": 1,
-        "releaseDate": "2010",
-        "duration": "120 min",
-        "synopsis": "A thief who steals corporate secrets through the use of dream-sharing technology."
-    });
+    let details_payload = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "inc_101".to_string(),
+        },
+        title: "Inception".to_string(),
+        media_type: MediaType::Movie,
+        year: Some("2010".to_string()),
+        description: Some(
+            "A thief who steals corporate secrets through the use of dream-sharing technology."
+                .to_string(),
+        ),
+        tagline: None,
+        imdb_rating: None,
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: Some("120 min".to_string()),
+        genres: vec![],
+        seasons: vec![],
+        dubs: vec![],
+    };
 
     app.state_mut().active_screen = Screen::Details;
     app.state_mut().active_subject_id = Some("inc_101".to_string());
@@ -70,7 +88,7 @@ async fn test_grand_user_journey_complete_lifecycle() {
 
     assert_eq!(app.state().active_screen, Screen::Details);
     assert_eq!(
-        app.state().selected_details.as_ref().unwrap()["title"],
+        app.state().selected_details.as_ref().unwrap().title,
         "Inception"
     );
 

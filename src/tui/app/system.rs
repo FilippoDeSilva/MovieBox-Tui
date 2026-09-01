@@ -41,15 +41,16 @@ impl App {
                     self.state.dirty = true;
                 }
 
-                let current_query = self.state.search_query.trim().to_string();
-                if current_query != self.state.last_suggest_query
+                let query_trimmed = self.state.search_query.as_str().trim();
+                if query_trimmed != self.state.last_suggest_query.as_str()
                     && self.state.last_search_edit.elapsed()
                         >= std::time::Duration::from_millis(350)
                 {
-                    self.state.last_suggest_query = current_query.clone();
-                    if !current_query.is_empty() {
-                        if self.state.is_tv_mode && !current_query.starts_with('/') {
-                            let q = current_query.to_lowercase();
+                    self.state.last_suggest_query.clear();
+                    self.state.last_suggest_query.push_str(query_trimmed);
+                    if !query_trimmed.is_empty() {
+                        if self.state.is_tv_mode && !query_trimmed.starts_with('/') {
+                            let q = query_trimmed.to_lowercase();
                             self.state.search_suggestions = self
                                 .state
                                 .tv_channels
@@ -59,7 +60,9 @@ impl App {
                                 .map(|c| c.name.clone())
                                 .collect();
                         } else {
-                            self.action_sender.send(Action::Suggest(current_query)).ok();
+                            self.action_sender
+                                .send(Action::Suggest(query_trimmed.to_string()))
+                                .ok();
                         }
                     } else {
                         self.state.search_suggestions.clear();
@@ -76,13 +79,7 @@ impl App {
                             if let Some(cached) = pool.episode_index.get(&(se, ep)) {
                                 found_cached = true;
                                 let count = cached.len();
-                                let mut result = serde_json::Map::new();
-                                result.insert(
-                                    "list".to_string(),
-                                    serde_json::Value::Array(cached.clone()),
-                                );
-                                self.state.selected_resources =
-                                    Some(serde_json::Value::Object(result));
+                                self.state.selected_resources = cached.clone();
                                 self.state.is_loading = false;
                                 self.state.resource_list_state.select(if count > 0 {
                                     Some(0)
@@ -256,6 +253,8 @@ impl App {
                 self.state.stream_pool.clear();
                 self.state.image_cache.clear();
                 self.state.preview_cache.clear();
+                self.state.suggest_cache.clear();
+                self.state.homepage_cache.clear();
                 if self.state.is_tv_mode {
                     self.state.tv_channels.clear();
                 }
@@ -645,8 +644,8 @@ impl App {
             Action::ShowBrowseMenu => {
                 let current_mode = self.state.mode();
                 if current_mode == crate::tui::state::AppMode::Tv {
-                    let ctrl_s = crate::tui::text::ctrl_key("S");
-                    let ctrl_a = crate::tui::text::ctrl_key("A");
+                    let ctrl_s = crate::tui::text::CTRL_S_STR;
+                    let ctrl_a = crate::tui::text::CTRL_A_STR;
                     self.state.notify(
                         NotificationKind::Info,
                         "TV Mode",

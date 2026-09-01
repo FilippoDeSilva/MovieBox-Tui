@@ -713,19 +713,19 @@ impl App {
         let compact = width < 76;
         let ultra_compact = width < 58;
         let ctrl_s = if ultra_compact || compact {
-            "S".to_string()
+            "S"
         } else {
-            crate::tui::text::ctrl_key("S")
+            crate::tui::text::CTRL_S_STR
         };
         let ctrl_t = if ultra_compact || compact {
-            "T".to_string()
+            "T"
         } else {
-            crate::tui::text::ctrl_key("T")
+            crate::tui::text::CTRL_T_STR
         };
         let ctrl_a = if ultra_compact || compact {
-            "A".to_string()
+            "A"
         } else {
-            crate::tui::text::ctrl_key("A")
+            crate::tui::text::CTRL_A_STR
         };
 
         enum BottomBtn {
@@ -811,14 +811,10 @@ impl App {
     }
 
     fn handle_details_mouse(&mut self, col: u16, row: u16, area: Rect) -> Option<Action> {
-        let details_json = self.state.selected_details.as_ref()?.clone();
+        let details = self.state.selected_details.as_ref()?.clone();
 
-        let type_val = crate::tui::state::stype(&details_json);
-        let has_languages = details_json
-            .get("dubs")
-            .and_then(|d| d.as_array())
-            .is_some_and(|d| d.len() > 1);
-        let is_series = type_val == 2 && !self.state.available_seasons.is_empty();
+        let has_languages = details.has_languages();
+        let is_series = details.is_series() && !self.state.available_seasons.is_empty();
 
         let mut available_panes = Vec::new();
         if has_languages {
@@ -868,10 +864,7 @@ impl App {
                 .available_episode_numbers
                 .get(self.state.season_list_state.selected().unwrap_or(0))
                 .map_or(0, Vec::len);
-            let language_count = details_json
-                .get("dubs")
-                .and_then(|dubs| dubs.as_array())
-                .map_or(0, Vec::len);
+            let language_count = details.dubs.len();
             language_count
                 .max(self.state.available_seasons.len())
                 .max(episode_count)
@@ -903,26 +896,22 @@ impl App {
                     match pane {
                         DetailsPane::Languages => {
                             self.state.details_pane = DetailsPane::Languages;
-                            if let Some(dubs) = details_json.get("dubs").and_then(|d| d.as_array())
-                            {
-                                if clicked_row < dubs.len() {
-                                    self.action_sender
-                                        .send(Action::SelectLanguage(clicked_row))
-                                        .ok();
-                                }
+                            if clicked_row < details.dubs.len() {
+                                self.action_sender
+                                    .send(Action::SelectLanguage(clicked_row))
+                                    .ok();
                             }
                         }
                         DetailsPane::Seasons => {
                             self.state.details_pane = DetailsPane::Seasons;
                             if clicked_row < self.state.available_seasons.len() {
                                 self.state.season_list_state.select(Some(clicked_row));
-                                self.state.selected_season =
-                                    self.state
-                                        .available_seasons
-                                        .get(clicked_row)
-                                        .and_then(|s| s.get("se"))
-                                        .and_then(|v| v.as_i64())
-                                        .unwrap_or(1) as usize;
+                                self.state.selected_season = self
+                                    .state
+                                    .available_seasons
+                                    .get(clicked_row)
+                                    .map(|s| s.number)
+                                    .unwrap_or(1);
                                 self.state.episode_list_state.select(Some(0));
                                 self.trigger_episode_fetch();
                             }
@@ -949,23 +938,10 @@ impl App {
 
         if streams_area.contains(ratatui::layout::Position::new(col, row)) {
             self.state.details_pane = DetailsPane::Streams;
-            let streams_count = self
-                .state
-                .selected_resources
-                .as_ref()
-                .and_then(|r| r.get("list"))
-                .and_then(|l| l.as_array())
-                .map_or(0, Vec::len);
+            let streams_count = self.state.selected_resources.len();
 
             if streams_count > 0 {
-                let list = self
-                    .state
-                    .selected_resources
-                    .as_ref()
-                    .and_then(|r| r.get("list"))
-                    .and_then(|l| l.as_array())
-                    .cloned()
-                    .unwrap_or_default();
+                let list = self.state.selected_resources.clone();
 
                 let clicked_stream_row = row
                     .saturating_sub(streams_area.y + 1)
@@ -975,7 +951,7 @@ impl App {
                 let mut matched_idx = None;
 
                 for (i, file) in list.iter().enumerate() {
-                    let resolution = file.get("resolution").and_then(|r| r.as_i64()).unwrap_or(0);
+                    let resolution = file.resolution_u64() as i64;
                     if prev_resolution != Some(resolution) {
                         if i > 0 {
                             line_offset += 1;
@@ -1029,14 +1005,9 @@ impl App {
 
         let is_favorited = if let Some(details) = &self.state.selected_details {
             let details_subject_id = self.state.active_subject_id.as_deref().unwrap_or("");
-            let title = details.get("title").and_then(|t| t.as_str()).unwrap_or("");
-            let type_val = crate::tui::state::stype(details);
-            let year = details
-                .get("releaseDate")
-                .or_else(|| details.get("year"))
-                .or_else(|| details.get("releaseInfo"))
-                .and_then(|y| y.as_str())
-                .unwrap_or("N/A");
+            let title = &details.title;
+            let type_val = if details.is_series() { 2 } else { 1 };
+            let year = details.year.as_deref().unwrap_or("N/A");
             let provider = self
                 .state
                 .search_results

@@ -2,6 +2,10 @@ use super::client::FourKHdHubError;
 use reqwest::Url;
 use scraper::{Html, Selector};
 use std::net::IpAddr;
+use std::sync::LazyLock;
+
+static SEL_DOWNLOAD: LazyLock<Selector> = LazyLock::new(|| Selector::parse("a#download").unwrap());
+static SEL_LINKS: LazyLock<Selector> = LazyLock::new(|| Selector::parse("a[href]").unwrap());
 
 pub async fn resolve(
     client: &reqwest::Client,
@@ -17,10 +21,8 @@ pub async fn resolve(
         .await?;
     let resolver_url = {
         let document = Html::parse_document(&drive_html);
-        let download = Selector::parse("a#download")
-            .map_err(|_| FourKHdHubError::Parse("invalid resolver selector".into()))?;
         document
-            .select(&download)
+            .select(&SEL_DOWNLOAD)
             .filter_map(|node| node.value().attr("href"))
             .find(|href| href.starts_with("https://"))
             .map(str::to_string)
@@ -35,8 +37,6 @@ pub async fn resolve(
         .text()
         .await?;
     let resolver = Html::parse_document(&resolver_html);
-    let links = Selector::parse("a[href]")
-        .map_err(|_| FourKHdHubError::Parse("invalid link selector".into()))?;
 
     let mut candidates = extract_script_pixeldrain_urls(&resolver_html)
         .into_iter()
@@ -44,7 +44,7 @@ pub async fn resolve(
         .collect::<Vec<_>>();
     candidates.extend(
         resolver
-            .select(&links)
+            .select(&SEL_LINKS)
             .filter_map(|node| {
                 let href = node.value().attr("href")?;
                 let label = node.text().collect::<String>();

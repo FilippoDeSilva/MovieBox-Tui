@@ -1,5 +1,5 @@
 use super::App;
-use crate::providers::models::{ProviderKind, Release};
+use crate::providers::models::{MediaDetails, ProviderKind, Release};
 use crate::tui::{
     action::Action,
     state::{InputMode, Screen},
@@ -103,25 +103,11 @@ impl App {
     }
 
     pub(super) fn provider_for_subject(&self, subject_id: &str) -> ProviderKind {
-        self.state
-            .search_results
-            .iter()
-            .find(|result| result.id == subject_id)
-            .map(|result| result.provider)
-            .or_else(|| {
-                self.get_selected_release()
-                    .as_ref()
-                    .map(|release| release.provider)
-            })
-            .unwrap_or(self.state.active_provider)
+        self.state.provider_for_subject(subject_id)
     }
 
     pub(super) fn current_subject_provider(&self) -> ProviderKind {
-        self.state
-            .active_subject_id
-            .as_deref()
-            .map(|subject_id| self.provider_for_subject(subject_id))
-            .unwrap_or(self.state.active_provider)
+        self.state.current_subject_provider()
     }
 
     fn result_grid_columns(&self) -> usize {
@@ -165,7 +151,7 @@ impl App {
                     let q = query.clone();
                     let provider = context.provider;
                     if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                        crate::cache::get_provider_search_cache(provider, &q, next_page)
+                        crate::cache::get_provider_search_cache_typed(provider, &q, next_page)
                     })
                     .await
                     {
@@ -175,20 +161,22 @@ impl App {
                                 request_id,
                                 query,
                                 page: next_page,
-                                payload: cached,
+                                items: cached,
                             })
                             .ok();
                         return;
                     }
 
-                    let result = service.search(context.provider, &query, next_page).await;
+                    let result = service
+                        .search_typed(context.provider, &query, next_page)
+                        .await;
                     match result {
-                        Ok(res) => {
+                        Ok(items) => {
                             let q = query.clone();
                             let provider = context.provider;
-                            let cached = res.clone();
+                            let cached = items.clone();
                             tokio::task::spawn_blocking(move || {
-                                crate::cache::set_provider_search_cache(
+                                crate::cache::set_provider_search_cache_typed(
                                     provider, &q, next_page, &cached,
                                 );
                             });
@@ -198,13 +186,18 @@ impl App {
                                     request_id,
                                     query,
                                     page: next_page,
-                                    payload: res,
+                                    items,
                                 })
                                 .ok();
                         }
                         Err(e) => {
                             sender
-                                .send(Action::SearchFailure(context, request_id, next_page, e))
+                                .send(Action::SearchFailure(
+                                    context,
+                                    request_id,
+                                    next_page,
+                                    e.user_message(context.provider),
+                                ))
                                 .ok();
                         }
                     }
@@ -224,9 +217,7 @@ impl App {
             .state
             .selected_details
             .as_ref()
-            .and_then(|details| details.get("dubs"))
-            .and_then(|dubs| dubs.as_array())
-            .is_some_and(|dubs| dubs.len() > 1);
+            .is_some_and(|details| details.has_languages());
         let is_series = !self.state.available_seasons.is_empty();
         let mut panes = Vec::new();
         if has_languages {
@@ -254,14 +245,13 @@ impl App {
 
     pub(super) fn trigger_episode_fetch(&mut self) {
         if let Some(id) = self.state.active_subject_id.clone() {
-            let stype = self
+            let is_series = self
                 .state
                 .selected_details
                 .as_ref()
-                .map(crate::tui::state::stype)
-                .unwrap_or(1);
+                .is_some_and(|d| d.is_series());
 
-            let (se, ep) = if stype == 2 {
+            let (se, ep) = if is_series {
                 let se_idx = self.state.season_list_state.selected().unwrap_or(0);
                 let ep_idx = self.state.episode_list_state.selected().unwrap_or(0);
 
@@ -269,10 +259,8 @@ impl App {
                     .state
                     .available_seasons
                     .get(se_idx)
-                    .and_then(|s| s.get("se"))
-                    .and_then(|s| s.as_i64())
-                    .unwrap_or(1) as usize;
-
+                    .map(|s| s.number)
+                    .unwrap_or(1);
                 let ep_num =
                     if let Some(ep_numbers) = self.state.available_episode_numbers.get(se_idx) {
                         ep_numbers.get(ep_idx).copied().unwrap_or(ep_idx + 1)
@@ -302,7 +290,7 @@ impl App {
                 if let Some(pool) = self.state.stream_pool.get_mut(&id) {
                     pool.episode_index.insert((se, ep), streams.clone());
                 }
-                self.state.selected_resources = None;
+                self.state.selected_resources.clear();
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
                 self.state.set_status_short("Loading streams...");
@@ -314,17 +302,12 @@ impl App {
                     tokio::time::sleep(std::time::Duration::from_millis(120)).await;
                     sender
                         .send(Action::EpisodeStreamsReady(
-                            context,
-                            request_id,
-                            id,
-                            se,
-                            ep,
-                            serde_json::Value::Array(streams),
+                            context, request_id, id, se, ep, streams,
                         ))
                         .ok();
                 });
             } else {
-                self.state.selected_resources = None;
+                self.state.selected_resources.clear();
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
                 self.state.set_status_short("Loading streams...");
@@ -336,47 +319,27 @@ impl App {
     }
 
     pub(super) fn get_selected_link(&self) -> Option<String> {
-        self.state
-            .selected_resources
-            .as_ref()
-            .and_then(|res| res.get("list"))
-            .and_then(|l| l.as_array())
-            .and_then(|list| {
-                let idx = self.state.resource_list_state.selected().unwrap_or(0);
-                list.get(idx)
-            })
-            .and_then(|file| file.get("resourceLink"))
-            .and_then(|r| r.as_str())
-            .map(|s| s.to_string())
+        let release = self.get_selected_release()?;
+        release.direct_url().map(|s| s.to_string())
     }
 
     pub(super) fn get_selected_resource_id(&self) -> Option<String> {
-        self.state
-            .selected_resources
-            .as_ref()
-            .and_then(|res| res.get("list"))
-            .and_then(|l| l.as_array())
-            .and_then(|list| {
-                let idx = self.state.resource_list_state.selected().unwrap_or(0);
-                list.get(idx)
-            })
-            .and_then(|file| file.get("resourceId"))
-            .and_then(|r| r.as_str())
-            .map(|s| s.to_string())
+        let release = self.get_selected_release()?;
+        let idx = self.state.resource_list_state.selected().unwrap_or(0);
+        Some(format!(
+            "{}-{idx}",
+            release
+                .provider
+                .label()
+                .to_lowercase()
+                .replace(' ', "-")
+                .replace(['(', ')'], "")
+        ))
     }
 
     pub(super) fn get_selected_release(&self) -> Option<Release> {
-        let item = self
-            .state
-            .selected_resources
-            .as_ref()?
-            .get("list")?
-            .as_array()?
-            .get(self.state.resource_list_state.selected().unwrap_or(0))?;
-
-        item.get("_addon_release")
-            .or_else(|| item.get("_fourk_release"))
-            .and_then(|value| serde_json::from_value(value.clone()).ok())
+        let idx = self.state.resource_list_state.selected()?;
+        self.state.selected_resources.get(idx).cloned()
     }
 }
 
@@ -450,7 +413,7 @@ impl App {
                         self.state.stream_pool.clear();
                         self.state.pending_episode_fetch = None;
                         self.state.selected_details = None;
-                        self.state.selected_resources = None;
+                        self.state.selected_resources.clear();
                         self.state.active_subject_id = None;
                         self.state.available_seasons.clear();
                         self.state.available_episode_numbers.clear();
@@ -469,12 +432,11 @@ impl App {
 
             Action::SelectLanguage(idx) => {
                 if let Some(details) = &self.state.selected_details
-                    && let Some(dubs) = details.get("dubs").and_then(|d| d.as_array())
-                    && let Some(dub) = dubs.get(idx)
-                    && let Some(id) = dub.get("subjectId").and_then(crate::tui::state::subject_id)
+                    && let Some(dub) = details.dubs.get(idx)
+                    && !dub.subject_id.is_empty()
                 {
-                    let next_id = id.to_string();
-                    self.state.selected_resources = None;
+                    let next_id = dub.subject_id.clone();
+                    self.state.selected_resources.clear();
                     self.state.resource_list_state.select(None);
                     self.state.language_chosen = true;
                     self.state.language_list_state.select(Some(idx));
@@ -639,17 +601,9 @@ impl App {
                     }
                     Screen::Details => match self.state.details_pane {
                         crate::tui::state::DetailsPane::Streams => {
-                            let res_opt = &self.state.selected_resources;
-                            let list_opt = res_opt
-                                .as_ref()
-                                .and_then(|r| r.get("list"))
-                                .and_then(|l| l.as_array());
-                            if let Some(list) = list_opt {
-                                let current =
-                                    self.state.resource_list_state.selected().unwrap_or(0);
-                                if current + 1 < list.len() {
-                                    self.state.resource_list_state.select(Some(current + 1));
-                                }
+                            let current = self.state.resource_list_state.selected().unwrap_or(0);
+                            if current + 1 < self.state.selected_resources.len() {
+                                self.state.resource_list_state.select(Some(current + 1));
                             }
                         }
                         crate::tui::state::DetailsPane::Seasons => {
@@ -676,8 +630,7 @@ impl App {
                         crate::tui::state::DetailsPane::Languages => {
                             let current = self.state.language_list_state.selected().unwrap_or(0);
                             if let Some(details) = &self.state.selected_details
-                                && let Some(dubs) = details.get("dubs").and_then(|d| d.as_array())
-                                && current + 1 < dubs.len()
+                                && current + 1 < details.dubs.len()
                             {
                                 self.state.language_list_state.select(Some(current + 1));
                             }
@@ -814,29 +767,12 @@ impl App {
                         }
                         self.state.active_screen = Screen::Details;
                         self.state.active_subject_id = Some(item.id.clone());
-                        let mut fallback_details = serde_json::json!({
-                            "id": item.id,
-                            "subjectId": item.id,
-                            "title": item.title,
-                            "subjectType": item.stype,
-                            "releaseDate": item.release_year,
-                            "cover": { "url": item.cover_url },
-                        });
-                        if let Some(preview) = &self.state.search_preview {
-                            if let Some(preview_obj) = preview.as_object() {
-                                if let Some(fallback_obj) = fallback_details.as_object_mut() {
-                                    for (k, v) in preview_obj {
-                                        if !fallback_obj.contains_key(k)
-                                            || fallback_obj[k].is_null()
-                                        {
-                                            fallback_obj.insert(k.clone(), v.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        let fallback_details = MediaDetails::from_search_result(
+                            &item,
+                            self.state.search_preview.as_ref(),
+                        );
                         self.state.selected_details = Some(fallback_details);
-                        self.state.selected_resources = None;
+                        self.state.selected_resources.clear();
                         self.state.is_loading = true;
                         self.state.is_fetching_streams = false;
                         self.state.stream_error = None;
@@ -912,27 +848,10 @@ impl App {
             }
             self.state.active_screen = Screen::Details;
             self.state.active_subject_id = Some(item.id.clone());
-            let mut fallback_details = serde_json::json!({
-                "id": item.id,
-                "subjectId": item.id,
-                "title": item.title,
-                "subjectType": item.stype,
-                "releaseDate": item.release_year,
-                "cover": { "url": item.cover_url },
-            });
-            if let Some(preview) = &self.state.search_preview {
-                if let Some(preview_obj) = preview.as_object() {
-                    if let Some(fallback_obj) = fallback_details.as_object_mut() {
-                        for (k, v) in preview_obj {
-                            if !fallback_obj.contains_key(k) || fallback_obj[k].is_null() {
-                                fallback_obj.insert(k.clone(), v.clone());
-                            }
-                        }
-                    }
-                }
-            }
+            let fallback_details =
+                MediaDetails::from_search_result(&item, self.state.search_preview.as_ref());
             self.state.selected_details = Some(fallback_details);
-            self.state.selected_resources = None;
+            self.state.selected_resources.clear();
             self.state.is_loading = true;
             self.state.is_fetching_streams = false;
             self.state.stream_error = None;

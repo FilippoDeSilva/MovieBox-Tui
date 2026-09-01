@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, Borders, Paragraph},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,7 +247,7 @@ fn render_search_state(
         card_width.saturating_sub(10) as usize,
     );
 
-    let ctrl_p = crate::tui::text::ctrl_key("P");
+    let ctrl_p = crate::tui::text::CTRL_P_STR;
     let bullet = if state.basic_terminal {
         " - "
     } else {
@@ -337,7 +337,7 @@ fn render_search_state(
             } else if state.is_addon_mode {
                 vec![
                     Span::styled("[", theme.text_dim),
-                    Span::styled(&ctrl_p, theme.shortcut),
+                    Span::styled(ctrl_p, theme.shortcut),
                     Span::styled("] ", theme.text_dim),
                     Span::styled("Change Catalog", theme.subtext1),
                     Span::styled(bullet, theme.text_dim),
@@ -354,7 +354,7 @@ fn render_search_state(
             } else {
                 vec![
                     Span::styled("[", theme.text_dim),
-                    Span::styled(&ctrl_p, theme.shortcut),
+                    Span::styled(ctrl_p, theme.shortcut),
                     Span::styled("] ", theme.text_dim),
                     Span::styled("Switch Provider", theme.subtext1),
                     Span::styled(bullet, theme.text_dim),
@@ -409,7 +409,7 @@ fn render_search_state(
                 Span::styled("Retry", theme.subtext1),
                 Span::styled(bullet, theme.text_dim),
                 Span::styled("[", theme.text_dim),
-                Span::styled(&ctrl_p, theme.shortcut),
+                Span::styled(ctrl_p, theme.shortcut),
                 Span::styled("] ", theme.text_dim),
                 Span::styled("Switch Provider", theme.subtext1),
                 Span::styled(bullet, theme.text_dim),
@@ -765,14 +765,14 @@ fn render_search_bar(
 
         let is_ultra_compact = area.width < 58;
         let ctrl_p = if is_ultra_compact {
-            "P".to_string()
+            "P"
         } else {
-            crate::tui::text::ctrl_key("P")
+            crate::tui::text::CTRL_P_STR
         };
         let ctrl_t = if is_ultra_compact {
-            "T".to_string()
+            "T"
         } else {
-            crate::tui::text::ctrl_key("T")
+            crate::tui::text::CTRL_T_STR
         };
 
         let is_query_empty = state.search_query.is_empty();
@@ -1228,19 +1228,19 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let ultra_compact_tabs = area.width < 58;
 
         let ctrl_s = if ultra_compact_tabs || compact_tabs {
-            "S".to_string()
+            "S"
         } else {
-            crate::tui::text::ctrl_key("S")
+            crate::tui::text::CTRL_S_STR
         };
         let ctrl_t = if ultra_compact_tabs || compact_tabs {
-            "T".to_string()
+            "T"
         } else {
-            crate::tui::text::ctrl_key("T")
+            crate::tui::text::CTRL_T_STR
         };
         let ctrl_a = if ultra_compact_tabs || compact_tabs {
-            "A".to_string()
+            "A"
         } else {
-            crate::tui::text::ctrl_key("A")
+            crate::tui::text::CTRL_A_STR
         };
 
         let current_mode = state.mode();
@@ -1271,7 +1271,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         if state.streaming_enabled && current_mode != crate::tui::state::AppMode::Streaming {
             bar_spans.push(Span::styled("[", bracket_style));
-            bar_spans.push(Span::styled(&ctrl_s, shortcut_style));
+            bar_spans.push(Span::styled(ctrl_s, shortcut_style));
             bar_spans.push(Span::styled("] ", bracket_style));
             bar_spans.push(Span::styled("Stream", text_style));
         }
@@ -1281,7 +1281,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 bar_spans.push(Span::raw(sep));
             }
             bar_spans.push(Span::styled("[", bracket_style));
-            bar_spans.push(Span::styled(&ctrl_t, shortcut_style));
+            bar_spans.push(Span::styled(ctrl_t, shortcut_style));
             bar_spans.push(Span::styled("] ", bracket_style));
             bar_spans.push(Span::styled("TV", text_style));
         }
@@ -1291,7 +1291,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 bar_spans.push(Span::raw(sep));
             }
             bar_spans.push(Span::styled("[", bracket_style));
-            bar_spans.push(Span::styled(&ctrl_a, shortcut_style));
+            bar_spans.push(Span::styled(ctrl_a, shortcut_style));
             bar_spans.push(Span::styled("] ", bracket_style));
             bar_spans.push(Span::styled("Addon", text_style));
         }
@@ -1409,14 +1409,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .max(6);
             state.last_result_metrics = Some(metrics);
             let row_height = metrics.row_height;
-            let rows = state
-                .search_results
-                .iter()
-                .map(|_| Row::new(vec![Cell::from("")]).height(row_height));
-
-            let table = Table::new(rows, [Constraint::Percentage(100)]).block(list_block);
-
-            frame.render_stateful_widget(table, results_area, &mut state.search_list_state);
+            frame.render_widget(list_block, results_area);
 
             let inner_area = results_area;
             let is_editing = state.input_mode == InputMode::Editing;
@@ -1456,19 +1449,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     );
                 }
 
-                let layout = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Length(2),
-                        Constraint::Length(poster_width),
-                        Constraint::Length(1),
-                        Constraint::Min(0),
-                    ])
-                    .split(item_area);
-
-                let highlight_area = layout[0];
-                let poster_area = layout[1];
-                let text_area = layout[3];
+                let (highlight_area, poster_area, text_area) =
+                    item_slot_rects(item_area, poster_width);
 
                 if is_selected {
                     let (indicator_sym, indicator_style) = if is_editing {
@@ -1483,16 +1465,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         ratatui::text::Span::styled(indicator_sym, indicator_style),
                     ]));
 
-                    let v_layout = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([
-                            Constraint::Length(item_area.height.saturating_sub(1) / 2),
-                            Constraint::Length(1),
-                            Constraint::Min(0),
-                        ])
-                        .split(highlight_area);
-
-                    frame.render_widget(indicator, v_layout[1]);
+                    let indicator_y =
+                        highlight_area.y + (highlight_area.height.saturating_sub(1) / 2);
+                    let indicator_area = Rect {
+                        x: highlight_area.x,
+                        y: indicator_y,
+                        width: highlight_area.width,
+                        height: 1.min(highlight_area.height),
+                    };
+                    frame.render_widget(indicator, indicator_area);
                 }
 
                 let img_height = poster_area.height.min(state.poster_rows);
@@ -1762,32 +1743,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 } else {
                     if let Some(meta) = &state.search_preview {
                         if is_selected {
-                            let rating = meta
-                                .get("imdbRating")
-                                .or_else(|| meta.get("imdbRatingValue"))
-                                .and_then(|v| v.as_str());
-                            if let Some(r) = rating {
+                            if let Some(r) = meta.imdb_rating.as_deref() {
                                 let star = if state.basic_terminal { "* " } else { "★ " };
                                 row2_spans.push(ratatui::text::Span::styled(star, theme.rating));
                                 row2_spans.push(ratatui::text::Span::styled(r, theme.text));
                                 row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                             }
 
-                            let mut g_names = vec![];
-                            if let Some(genres) = meta.get("genres").and_then(|g| g.as_array()) {
-                                g_names = genres
-                                    .iter()
-                                    .filter_map(|g| {
-                                        g.get("name")
-                                            .and_then(|n| n.as_str())
-                                            .map(|s| s.to_string())
-                                    })
-                                    .collect();
-                            }
-                            if !g_names.is_empty() {
-                                let g_str = g_names.join(", ");
+                            let genre_buf = meta.genres.join(", ");
+                            if !genre_buf.is_empty() {
                                 let g_trunc = crate::tui::text::truncate_width(
-                                    &g_str,
+                                    &genre_buf,
                                     text_area.width.saturating_sub(2) as usize,
                                 );
                                 row3_spans
@@ -1806,7 +1772,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             theme.text_dim,
                         ));
                     }
-
                     if res.release_year != "Unknown" && !res.release_year.is_empty() {
                         row2_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
                         row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
@@ -2402,6 +2367,34 @@ fn render_search_suggestions(
         frame.render_widget(Paragraph::new(Line::from(spans)).style(row_style), row_area);
     }
 }
+#[inline(always)]
+fn item_slot_rects(item_area: Rect, poster_width: u16) -> (Rect, Rect, Rect) {
+    let highlight_w = 2.min(item_area.width);
+    let poster_w = poster_width.min(item_area.width.saturating_sub(highlight_w));
+    let text_x = item_area.x + highlight_w + poster_w + 1;
+    let text_w = item_area.width.saturating_sub(highlight_w + poster_w + 1);
+
+    (
+        Rect {
+            x: item_area.x,
+            y: item_area.y,
+            width: highlight_w,
+            height: item_area.height,
+        },
+        Rect {
+            x: item_area.x + highlight_w,
+            y: item_area.y,
+            width: poster_w,
+            height: item_area.height,
+        },
+        Rect {
+            x: text_x,
+            y: item_area.y,
+            width: text_w,
+            height: item_area.height,
+        },
+    )
+}
 
 #[cfg(test)]
 mod tests {
@@ -2912,7 +2905,7 @@ mod tests {
         assert!(rendered.contains('❯'));
         assert!(rendered.contains("Search movies, series & anime…"));
         assert!(rendered.contains("[MovieBox"));
-        assert!(rendered.contains(&crate::tui::text::ctrl_key("P")));
+        assert!(rendered.contains(crate::tui::text::CTRL_P_STR));
 
         assert!(!rendered.contains("Stream"));
         assert!(rendered.contains("TV"));

@@ -1,38 +1,11 @@
 use super::{App, network};
+use crate::models::CatalogItem;
 use crate::providers::models::{ProviderKind, RequestContext};
-use crate::service::extract_browse_metrics;
 use crate::tui::{
     action::Action,
     overlay::NotificationKind,
-    state::{BrowsePreset, InputMode, Screen, SearchResult},
+    state::{InputMode, Screen, SearchResult},
 };
-
-fn browse_group_matches(title: &str, preset: BrowsePreset) -> bool {
-    let title = title.to_lowercase();
-    match preset {
-        BrowsePreset::Trending => title.contains("trending") || title.contains("hot"),
-        BrowsePreset::TopRatedAllTime => {
-            title.contains("top") || title.contains("rated") || title.contains("favorite")
-        }
-        BrowsePreset::TopRatedRecent => {
-            title.contains("new")
-                || title.contains("release")
-                || title.contains("recent")
-                || title.contains("latest")
-        }
-        BrowsePreset::MostWatched => {
-            title.contains("popular")
-                || title.contains("popluar")
-                || title.contains("most")
-                || title.contains("watched")
-                || title.contains("box office")
-                || title.contains("action")
-                || title.contains("adventure")
-                || title.contains("super hero")
-                || title.contains("stars")
-        }
-    }
-}
 
 fn compare_browse_values(
     left: Option<f64>,
@@ -121,9 +94,9 @@ impl App {
         };
 
         let current_mode = self.state.mode();
-        let ctrl_s = crate::tui::text::ctrl_key("S");
-        let ctrl_t = crate::tui::text::ctrl_key("T");
-        let ctrl_a = crate::tui::text::ctrl_key("A");
+        let ctrl_s = crate::tui::text::CTRL_S_STR;
+        let ctrl_t = crate::tui::text::CTRL_T_STR;
+        let ctrl_a = crate::tui::text::CTRL_A_STR;
 
         let will_handle = !matches!(
             &parsed,
@@ -500,7 +473,7 @@ impl App {
         self.state.active_screen = Screen::Home;
         self.state.active_subject_id = None;
         self.state.selected_details = None;
-        self.state.selected_resources = None;
+        self.state.selected_resources.clear();
         self.state.is_loading = true;
         self.state.search_error = None;
         self.state.search_list_state.select(Some(0));
@@ -529,7 +502,7 @@ impl App {
         self.state.active_screen = Screen::Home;
         self.state.active_subject_id = None;
         self.state.selected_details = None;
-        self.state.selected_resources = None;
+        self.state.selected_resources.clear();
         self.state.is_loading = true;
         self.state.search_error = None;
         self.state.search_list_state.select(Some(0));
@@ -562,7 +535,7 @@ impl App {
                 let q = query.clone();
                 let provider = context.provider;
                 if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                    crate::cache::get_provider_search_cache(provider, &q, page)
+                    crate::cache::get_provider_search_cache_typed(provider, &q, page)
                 })
                 .await
                 {
@@ -572,21 +545,21 @@ impl App {
                             request_id,
                             query: query.clone(),
                             page,
-                            payload: cached,
+                            items: cached,
                         })
                         .ok();
                     return;
                 }
             }
 
-            let result = service.search(context.provider, &query, page).await;
+            let result = service.search_typed(context.provider, &query, page).await;
             match result {
-                Ok(res) => {
+                Ok(items) => {
                     let q = query.clone();
                     let provider = context.provider;
-                    let cached = res.clone();
+                    let cached = items.clone();
                     tokio::task::spawn_blocking(move || {
-                        crate::cache::set_provider_search_cache(provider, &q, page, &cached);
+                        crate::cache::set_provider_search_cache_typed(provider, &q, page, &cached);
                     });
                     sender
                         .send(Action::SearchSuccess {
@@ -594,13 +567,18 @@ impl App {
                             request_id,
                             query,
                             page,
-                            payload: res,
+                            items,
                         })
                         .ok();
                 }
                 Err(error) => {
                     sender
-                        .send(Action::SearchFailure(context, request_id, page, error))
+                        .send(Action::SearchFailure(
+                            context,
+                            request_id,
+                            page,
+                            error.user_message(context.provider),
+                        ))
                         .ok();
                 }
             }
@@ -619,7 +597,7 @@ impl App {
             self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
             self.state.active_subject_id = None;
             self.state.selected_details = None;
-            self.state.selected_resources = None;
+            self.state.selected_resources.clear();
             self.state.search_results.clear();
             self.state.browse_metrics.clear();
             self.state.search_list_state.select(Some(0));
@@ -659,13 +637,21 @@ impl App {
     ) {
         self.request_tasks.cancel_details();
         let request_id = self.state.active_details_request;
+        if !force_refresh {
+            if let Some(cached) = self.state.preview_cache.get(&id).cloned() {
+                self.action_sender
+                    .send(Action::DetailsSuccess(context, request_id, id, cached))
+                    .ok();
+                return;
+            }
+        }
         let service = self.service.clone();
         let sender = self.action_sender.clone();
         self.request_tasks.details = Some(tokio::spawn(async move {
             if !force_refresh {
                 let id_for_cache = id.clone();
                 if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                    crate::cache::get_provider_details_cache(context.provider, &id_for_cache)
+                    crate::cache::get_provider_details_cache_typed(context.provider, &id_for_cache)
                 })
                 .await
                 {
@@ -681,13 +667,13 @@ impl App {
                 }
             }
 
-            let result = service.details(context.provider, &id).await;
+            let result = service.details_typed(context.provider, &id).await;
             match result {
                 Ok(details) => {
                     let id_for_cache = id.clone();
                     let details_for_cache = details.clone();
                     let _ = tokio::task::spawn_blocking(move || {
-                        crate::cache::set_provider_details_cache(
+                        crate::cache::set_provider_details_cache_typed(
                             context.provider,
                             &id_for_cache,
                             &details_for_cache,
@@ -700,7 +686,11 @@ impl App {
                 }
                 Err(error) => {
                     sender
-                        .send(Action::DetailsFailure(context, request_id, error))
+                        .send(Action::DetailsFailure(
+                            context,
+                            request_id,
+                            error.user_message(context.provider),
+                        ))
                         .ok();
                 }
             }
@@ -710,12 +700,29 @@ impl App {
     pub(super) fn run_homepage_request(&mut self, tab_id: String, page: usize) {
         self.request_tasks.cancel_homepage();
         let request_id = self.state.active_homepage_request;
+        if let Some((items, metrics)) = self
+            .state
+            .homepage_cache
+            .get(&(tab_id.clone(), page))
+            .cloned()
+        {
+            self.action_sender
+                .send(Action::HomepageSuccess {
+                    request_id,
+                    tab_id,
+                    page,
+                    items,
+                    metrics,
+                })
+                .ok();
+            return;
+        }
         let service = self.service.clone();
         let sender = self.action_sender.clone();
         self.request_tasks.homepage = Some(tokio::spawn(async move {
             let t_clone = tab_id.clone();
-            if let Ok(Some(cached)) = tokio::task::spawn_blocking(move || {
-                crate::cache::get_homepage_cache(&t_clone, page)
+            if let Ok(Some((items, metrics))) = tokio::task::spawn_blocking(move || {
+                crate::cache::get_homepage_cache_typed(&t_clone, page)
             })
             .await
             {
@@ -724,159 +731,60 @@ impl App {
                         request_id,
                         tab_id: tab_id.clone(),
                         page,
-                        payload: cached,
+                        items,
+                        metrics,
                     })
                     .ok();
                 return;
             }
 
             match service.homepage(&tab_id, page).await {
-                Ok(res) => {
-                    let r_clone = res.clone();
+                Ok((items, metrics)) => {
+                    let items_clone = items.clone();
+                    let metrics_clone = metrics.clone();
                     let t_clone = tab_id.clone();
                     tokio::task::spawn_blocking(move || {
-                        crate::cache::set_homepage_cache(&t_clone, page, &r_clone);
+                        crate::cache::set_homepage_cache_typed(
+                            &t_clone,
+                            page,
+                            &(items_clone, metrics_clone),
+                        );
                     });
                     sender
                         .send(Action::HomepageSuccess {
                             request_id,
                             tab_id,
                             page,
-                            payload: res,
+                            items,
+                            metrics,
                         })
                         .ok();
                 }
                 Err(error) => {
-                    sender
-                        .send(Action::HomepageFailure(request_id, format!("{:?}", error)))
-                        .ok();
+                    sender.send(Action::HomepageFailure(request_id, error)).ok();
                 }
             }
         }));
     }
 
-    pub(super) fn extract_homepage_subjects(payload: &serde_json::Value) -> Vec<serde_json::Value> {
-        let mut extracted_subjects = Vec::new();
-        if let Some(items) = payload.get("items").and_then(|i| i.as_array()) {
-            for item in items {
-                if let Some(banner) = item
-                    .get("banner")
-                    .and_then(|b| b.get("banners"))
-                    .and_then(|b| b.as_array())
-                {
-                    for banner_item in banner {
-                        if let Some(subject) = banner_item.get("subject") {
-                            extracted_subjects.push(subject.clone());
-                        }
-                    }
-                }
-                if let Some(custom_data) = item
-                    .get("customData")
-                    .and_then(|c| c.get("items"))
-                    .and_then(|i| i.as_array())
-                {
-                    for custom_item in custom_data {
-                        if let Some(subject) = custom_item.get("subject") {
-                            extracted_subjects.push(subject.clone());
-                        }
-                    }
-                }
-                if let Some(subjects) = item.get("subjects").and_then(|s| s.as_array()) {
-                    for subject in subjects {
-                        extracted_subjects.push(subject.clone());
-                    }
-                }
-            }
-        }
-        extracted_subjects
-    }
-
-    pub(super) fn extract_browse_subjects(
-        payload: &serde_json::Value,
-        preset: BrowsePreset,
-    ) -> Vec<serde_json::Value> {
-        let Some(items) = payload.get("items").and_then(|items| items.as_array()) else {
-            return Vec::new();
-        };
-
-        let matching_items: Vec<_> = items
-            .iter()
-            .filter(|item| {
-                item.get("title")
-                    .and_then(|title| title.as_str())
-                    .is_some_and(|title| browse_group_matches(title, preset))
-            })
-            .collect();
-
-        let groups = if matching_items.is_empty() {
-            items.iter().collect()
-        } else {
-            matching_items
-        };
-
-        let mut subjects = Vec::new();
-        let mut seen_ids = std::collections::HashSet::new();
-        let rank_metric = preset.metric() == crate::tui::state::BrowseMetric::Trending;
-
-        for group in groups {
-            let Some(group_subjects) = group.get("subjects").and_then(|s| s.as_array()) else {
-                continue;
-            };
-            for (index, subject) in group_subjects.iter().enumerate() {
-                let mut subject = subject.clone();
-                let id_opt = subject.get("subjectId").and_then(|i| i.as_str());
-                if let Some(id) = id_opt {
-                    if seen_ids.contains(id) {
-                        continue;
-                    }
-                    seen_ids.insert(id.to_string());
-                }
-                if rank_metric && let Some(subject_object) = subject.as_object_mut() {
-                    subject_object.insert(
-                        "__browse_rank".to_string(),
-                        serde_json::json!((group_subjects.len() - index) as f64),
-                    );
-                }
-                subjects.push(subject);
-            }
-        }
-
-        subjects
-    }
-
-    pub(super) fn append_homepage_subjects(&mut self, subjects: Vec<serde_json::Value>) -> usize {
+    pub(super) fn append_homepage_items(
+        &mut self,
+        items: Vec<CatalogItem>,
+        metrics_map: std::collections::HashMap<String, crate::models::BrowseMetrics>,
+    ) -> usize {
         let mut count = 0;
-        for item in subjects {
-            let id = item
-                .get("subjectId")
-                .and_then(|si| si.as_str())
-                .unwrap_or("")
-                .to_string();
-            let raw_title = item
-                .get("title")
-                .and_then(|t| t.as_str())
-                .unwrap_or("Unknown")
-                .to_string();
-            let clean_title = crate::providers::moviebox::clean_moviebox_title(&raw_title);
-            let stype = item
-                .get("subjectType")
-                .and_then(|st| st.as_i64())
-                .unwrap_or(0);
-            let release_year = item
-                .get("releaseDate")
-                .and_then(|rd| rd.as_str())
-                .unwrap_or("")
-                .split('-')
-                .next()
-                .unwrap_or("")
-                .to_string();
-            let cover_url = item
-                .get("cover")
-                .and_then(|c| c.get("url"))
-                .and_then(|u| u.as_str())
-                .map(|s| s.to_string());
-            let season = item.get("season").and_then(|s| s.as_u64()).unwrap_or(0) as usize;
-            let metrics = extract_browse_metrics(&item);
+        for item in items {
+            let id = item.id.value.clone();
+            let clean_title = crate::providers::moviebox::clean_moviebox_title(&item.title);
+            let stype = if item.media_type == crate::models::MediaType::Series {
+                2
+            } else {
+                1
+            };
+            let release_year = item.year.clone().unwrap_or_default();
+            let cover_url = item.poster_url.clone();
+            let season = item.season_count.unwrap_or(0);
+            let metrics = metrics_map.get(&id).copied().unwrap_or_default();
 
             if let Some(existing) = self.state.search_results.iter_mut().find(|r| r.id == id) {
                 let stored_metrics = self.state.browse_metrics.entry(id.clone()).or_default();
@@ -895,7 +803,7 @@ impl App {
                 continue;
             }
 
-            let raw_lower = raw_title.to_lowercase();
+            let raw_lower = item.title.to_lowercase();
             let is_dub = raw_lower.contains("[hindi]")
                 || raw_lower.contains("[tamil]")
                 || raw_lower.contains("[telugu]")
@@ -927,7 +835,7 @@ impl App {
                     cover_url,
                     season,
                     episode: 1,
-                    provider: ProviderKind::MovieBox,
+                    provider: item.id.provider,
                 });
                 count += 1;
             }
@@ -1034,8 +942,8 @@ impl App {
 
                     let mut resolved_url = cover_url;
                     if resolved_url.is_none() {
-                        if let Ok(details) = service.details(provider, &id).await {
-                            resolved_url = crate::tui::app::playback::extract_cover_url(&details);
+                        if let Ok(details) = service.details_typed(provider, &id).await {
+                            resolved_url = details.cover_url().map(|s| s.to_string());
                         }
                     }
 

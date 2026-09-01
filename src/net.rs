@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{
@@ -10,14 +10,15 @@ use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
 const FALLBACK_DNS_PORT: u16 = 53;
 
+static GLOBAL_RESOLVER: std::sync::LazyLock<Arc<TokioResolver>> =
+    std::sync::LazyLock::new(|| Arc::new(build_resolver()));
+
 #[derive(Debug, Default, Clone)]
-pub struct FallbackResolver {
-    inner: Arc<OnceLock<Arc<TokioResolver>>>,
-}
+pub struct FallbackResolver;
 
 impl FallbackResolver {
     pub fn new() -> Self {
-        Self::default()
+        Self
     }
 }
 
@@ -51,9 +52,8 @@ fn build_resolver() -> TokioResolver {
 
 impl Resolve for FallbackResolver {
     fn resolve(&self, name: Name) -> Resolving {
-        let inner = Arc::clone(&self.inner);
+        let resolver = Arc::clone(&GLOBAL_RESOLVER);
         Box::pin(async move {
-            let resolver = inner.get_or_init(|| Arc::new(build_resolver()));
             let lookup = resolver.lookup_ip(name.as_str()).await?;
             let addrs: Addrs = Box::new(
                 lookup
@@ -66,7 +66,12 @@ impl Resolve for FallbackResolver {
 }
 
 pub fn http_client_builder() -> reqwest::ClientBuilder {
-    reqwest::Client::builder().dns_resolver(Arc::new(FallbackResolver::new()))
+    reqwest::Client::builder()
+        .dns_resolver(Arc::new(FallbackResolver::new()))
+        .tcp_nodelay(true)
+        .tcp_keepalive(Some(std::time::Duration::from_secs(45)))
+        .pool_idle_timeout(Some(std::time::Duration::from_secs(90)))
+        .pool_max_idle_per_host(8)
 }
 
 #[cfg(test)]
@@ -108,8 +113,7 @@ mod tests {
     #[test]
     fn clones_share_lazy_state_slot() {
         let original = FallbackResolver::new();
-        let clone = original.clone();
-        assert!(original.inner.get().is_none());
-        assert!(clone.inner.get().is_none());
+        let _clone = original.clone();
+        let _builder = http_client_builder();
     }
 }

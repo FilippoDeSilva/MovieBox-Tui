@@ -17,22 +17,45 @@ shared typed models in `providers/models.rs` and the moviebox JSON schema used b
 BDIX sources are only reachable from supported Bangladeshi ISPs and are hidden by
 default (`bdix_enabled` in config; `/enable-bdix`).
 
-## Shared flow
+## Shared Provider Contract
 
 Search, details, and episode-streams are dispatched per provider. Pluggable provider seams
-in `providers/mod.rs` give every client a shared async trait shape:
+in `providers/mod.rs` give every client a shared, strictly-typed async trait shape:
 
 - `Provider::id(&self) -> ProviderKind`: Returns the provider's unique identifier.
 - `Provider::capabilities(&self) -> ProviderCapabilities`: Reports supported capabilities (`supports_search`, `supports_pagination`, `supports_series`, `supports_subtitles`, `supports_homepage`).
-- `Provider::search` / `Provider::details`: Dispatches search and metadata queries. MovieBox provides it natively; other providers adapt typed models (`MediaDetails`) via adapters.
-- `ReleaseProvider::episode_streams`: Returns the typed `Release` list for release-based providers; MovieBox keeps its own paginated resource path.
+- `Provider::search(&self, query: &str, page: usize) -> Result<Vec<CatalogItem>, ProviderError>`: Dispatches search queries, returning strongly-typed `CatalogItem`s.
+- `Provider::details(&self, id: &str) -> Result<MediaDetails, ProviderError>`: Dispatches metadata queries, returning strongly-typed `MediaDetails`.
+- `ReleaseProvider::episode_streams(&self, id: &str, season: usize, episode: usize) -> Result<Vec<Release>, ProviderError>`: Returns the typed `Release` list for release-based providers.
 - `ProviderError`: Standardized error boundary (`Network`, `RateLimited`, `NotFound`, `Parsing`, `Unavailable`) with `.user_message(provider)` generating clean UI toast notifications.
+
+### 100% Zero-JSON Architecture & High-Performance Binary Caching
+
+All internal state (`AppState`), UI screens (`details.rs`, `home.rs`), and the action event bus transport native Rust structs directly:
+- `CatalogItem` / `SearchResult` for search results and discover catalogs.
+- `MediaDetails` (with `Vec<Season>` and `Vec<AudioTrackOption>`) for media metadata.
+- `Release` (with `Vec<SourceMirror>`) for streams.
+- `SubtitleOption` for external subtitles.
+
+Disk caching in `src/cache.rs` uses high-performance portable binary serialization via `rmp-serde` (MessagePack) with a 4-byte magic signature (`MBC1`) and versioned TTL envelope (`CacheEnvelope<T>`), eliminating all runtime JSON parsing and string allocation bottlenecks.
 
 Playback resolves to a `PlaybackSource { provider, url, headers, subtitle, source_label }`,
 which `app/playback.rs::launch_player` feeds to the external player.
 
-## MovieBox
+## Adding a New Provider
 
+Adding a new streaming or BDIX provider to MovieBox TUI takes 3 simple steps:
+
+1. **Define the Provider Variant (`src/providers/models.rs`)**:
+   Add the new variant to `ProviderKind` with its label, cache key, and serialization aliases.
+
+2. **Implement the `Provider` Trait (`src/providers/<new_provider>/`)**:
+   Implement `Provider::id`, `Provider::capabilities`, `Provider::search`, and `Provider::details` for your client struct, returning typed domain models (`CatalogItem`, `MediaDetails`). If your provider resolves release streams, also implement `ReleaseProvider`.
+
+3. **Register the Client in `MovieBoxService` (`src/service.rs`)**:
+   Add your client struct to `MovieBoxService`, instantiate it in `MovieBoxService::new()`, and map it in `capabilities`, `search_typed`, and `details_typed`. All search, details, and stream dispatches operate natively with zero JSON shims.
+
+## MovieBox
 - Base host pool + per-request HMAC-MD5 signature, client token, and a spoofed Android
   device identity (`crypto.rs`) spoofing APK `v4.0.01.0813.03` (`version_codes: 50020117..50020121`)
   to satisfy the backend gateway and prevent notice video substitution.

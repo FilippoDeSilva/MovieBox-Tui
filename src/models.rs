@@ -1,6 +1,6 @@
 pub use crate::providers::models::{
-    CatalogItem, Episode, MediaDetails, MediaType, PlaybackSource, ProviderError, ProviderKind,
-    ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
+    AudioTrackOption, CatalogItem, Episode, MediaDetails, MediaType, PlaybackSource, ProviderError,
+    ProviderKind, ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
 };
 
 pub type SeasonInfo = Season;
@@ -68,6 +68,25 @@ pub struct SearchResult {
     pub season: usize,
     pub episode: usize,
     pub provider: ProviderKind,
+}
+
+impl SearchResult {
+    pub fn from_catalog_item(item: CatalogItem) -> Self {
+        Self {
+            id: item.id.value,
+            title: item.title,
+            stype: if item.media_type == MediaType::Series {
+                2
+            } else {
+                1
+            },
+            release_year: item.year.unwrap_or_default(),
+            cover_url: item.poster_url,
+            season: item.season_count.unwrap_or(0),
+            episode: 1,
+            provider: item.id.provider,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -138,7 +157,7 @@ impl BrowseMetrics {
 
 #[derive(Debug, Default, Clone)]
 pub struct SubjectStreamPool {
-    pub episode_index: HashMap<(usize, usize), Vec<serde_json::Value>>,
+    pub episode_index: HashMap<(usize, usize), Vec<Release>>,
     pub fetched_pages: HashMap<u32, HashSet<usize>>,
     pub total_pages: HashMap<u32, usize>,
     pub available_resolutions: Vec<u32>,

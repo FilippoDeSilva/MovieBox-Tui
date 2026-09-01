@@ -81,15 +81,15 @@ pub fn build_help_columns(
     }
     right.push(help_section_header("Content Modes", theme));
     if state.streaming_enabled {
-        let key = format!("[{}]", crate::tui::text::ctrl_key("S"));
+        let key = format!("[{}]", crate::tui::text::CTRL_S_STR);
         right.push(help_row(&key, "Switch to Streaming Mode", theme));
     }
     if state.tv_enabled {
-        let key = format!("[{}]", crate::tui::text::ctrl_key("T"));
+        let key = format!("[{}]", crate::tui::text::CTRL_T_STR);
         right.push(help_row(&key, "Switch to Live TV Mode", theme));
     }
     if state.addons_enabled {
-        let key = format!("[{}]", crate::tui::text::ctrl_key("A"));
+        let key = format!("[{}]", crate::tui::text::CTRL_A_STR);
         right.push(help_row(&key, "Switch to Addon Mode", theme));
     }
     right.push(Line::from(""));

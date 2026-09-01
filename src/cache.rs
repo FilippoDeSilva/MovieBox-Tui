@@ -1,36 +1,83 @@
-use crate::providers::models::ProviderKind;
+use crate::models::{
+    BrowseMetrics, CatalogItem, MediaDetails, ProviderKind, Release, SubtitleOption,
+};
+use crate::providers::addons::models::AddonManifest;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const CACHE_EXPIRY_SECS: u64 = 24 * 60 * 60;
 const STREAM_CACHE_EXPIRY_SECS: u64 = 2 * 60 * 60;
 const HOMEPAGE_CACHE_EXPIRY_SECS: u64 = 60 * 60;
+pub const CACHE_MAGIC: [u8; 4] = *b"MBC1";
 
-fn read_json_cache(path: &PathBuf, expiry_secs: u64) -> Option<serde_json::Value> {
-    if path.exists() {
-        if let Ok(metadata) = fs::metadata(path) {
-            match metadata.modified().ok().and_then(|m| m.elapsed().ok()) {
-                Some(elapsed) if elapsed.as_secs() > expiry_secs => {
-                    let _ = fs::remove_file(path);
-                    return None;
-                }
-                None => {
-                    let _ = fs::remove_file(path);
-                    return None;
-                }
-                _ => {}
+#[derive(Serialize, Deserialize)]
+pub struct CacheEnvelope<T> {
+    pub version: u32,
+    pub expires_at: u64,
+    pub data: T,
+}
+
+pub fn get_typed_cache<T: DeserializeOwned + Serialize>(
+    path: &Path,
+    expiry_secs: u64,
+) -> Option<T> {
+    use std::io::Read;
+    let mut file = fs::File::open(path).ok()?;
+    if let Ok(metadata) = file.metadata() {
+        if let Some(elapsed) = metadata.modified().ok().and_then(|m| m.elapsed().ok()) {
+            if elapsed.as_secs() > expiry_secs {
+                let _ = fs::remove_file(path);
+                return None;
             }
         }
-        if let Ok(content) = fs::read_to_string(path) {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                if !val.is_null() {
-                    return Some(val);
-                }
-            }
-        }
-        let _ = fs::remove_file(path);
     }
+    let mut bytes = Vec::new();
+    if file.read_to_end(&mut bytes).is_err() {
+        return None;
+    }
+    if bytes.len() >= 4 && bytes[0..4] == CACHE_MAGIC {
+        if let Ok(envelope) = rmp_serde::from_slice::<CacheEnvelope<T>>(&bytes[4..]) {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .ok()?
+                .as_secs();
+            if now < envelope.expires_at {
+                return Some(envelope.data);
+            } else {
+                let _ = fs::remove_file(path);
+                return None;
+            }
+        }
+    }
+    if let Ok(content) = String::from_utf8(bytes) {
+        if let Ok(val) = serde_json::from_str::<T>(&content) {
+            let _ = fs::remove_file(path);
+            set_typed_cache(path, expiry_secs, &val);
+            return Some(val);
+        }
+    }
+    let _ = fs::remove_file(path);
     None
+}
+
+pub fn set_typed_cache<T: Serialize + ?Sized>(path: &Path, expiry_secs: u64, data: &T) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let envelope = CacheEnvelope {
+        version: 1,
+        expires_at: now + expiry_secs,
+        data,
+    };
+    if let Ok(msgpack_bytes) = rmp_serde::to_vec(&envelope) {
+        let mut file_bytes = Vec::with_capacity(4 + msgpack_bytes.len());
+        file_bytes.extend_from_slice(&CACHE_MAGIC);
+        file_bytes.extend_from_slice(&msgpack_bytes);
+        let _ = atomic_write_file(path, &file_bytes);
+    }
 }
 
 pub fn md5_hex(value: &str) -> String {
@@ -81,13 +128,21 @@ fn durable_replace(
         sync_parent_dir(path);
         return Ok(());
     }
+    let _ = fs::remove_file(path);
+    if fs::rename(temporary, path).is_ok() {
+        sync_parent_dir(path);
+        return Ok(());
+    }
     let copy_target = path.with_extension(format!("tmp-{}-{suffix}", std::process::id()));
     let outcome = fs::copy(temporary, &copy_target)
         .and_then(|_| {
             let file = fs::File::open(&copy_target)?;
             file.sync_all()
         })
-        .and_then(|_| fs::rename(&copy_target, path));
+        .and_then(|_| {
+            let _ = fs::remove_file(path);
+            fs::rename(&copy_target, path)
+        });
     let _ = fs::remove_file(&copy_target);
     match outcome {
         Ok(()) => {
@@ -103,10 +158,10 @@ fn durable_replace(
 
 #[cfg(unix)]
 fn sync_parent_dir(path: &std::path::Path) {
-    if let Some(parent) = path.parent()
-        && let Ok(dir) = fs::File::open(parent)
-    {
-        let _ = dir.sync_all();
+    if let Some(parent) = path.parent() {
+        if let Ok(dir) = fs::File::open(parent) {
+            let _ = dir.sync_all();
+        }
     }
 }
 
@@ -145,55 +200,34 @@ async fn durable_replace_async(
     suffix: &str,
 ) -> std::io::Result<()> {
     if tokio::fs::rename(temporary, path).await.is_ok() {
+        sync_parent_dir(path);
+        return Ok(());
+    }
+    let _ = tokio::fs::remove_file(path).await;
+    if tokio::fs::rename(temporary, path).await.is_ok() {
+        sync_parent_dir(path);
         return Ok(());
     }
     let copy_target = path.with_extension(format!("tmp-{}-{suffix}", std::process::id()));
-    let outcome = async {
+    let outcome: std::io::Result<()> = async {
         tokio::fs::copy(temporary, &copy_target).await?;
         let file = tokio::fs::File::open(&copy_target).await?;
         file.sync_all().await?;
+        let _ = tokio::fs::remove_file(path).await;
         tokio::fs::rename(&copy_target, path).await
     }
     .await;
     let _ = tokio::fs::remove_file(&copy_target).await;
     match outcome {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            sync_parent_dir(path);
+            Ok(())
+        }
         Err(_) => Err(std::io::Error::other(format!(
-            "atomic replace failed for {}",
+            "atomic replace async failed for {}",
             crate::logging::sanitize_path(path)
         ))),
     }
-}
-
-fn write_json_cache(path: &PathBuf, data: &serde_json::Value) {
-    if data.is_null() {
-        return;
-    }
-    let Ok(content) = serde_json::to_vec(data) else {
-        log::warn!(
-            "failed to serialize cache for {}",
-            crate::logging::sanitize_path(path)
-        );
-        return;
-    };
-    if let Err(error) = atomic_write_file(path, &content) {
-        log::warn!(
-            "failed to commit cache to {}: {error}",
-            crate::logging::sanitize_path(path)
-        );
-    }
-}
-
-fn stream_payload_has_results(data: &serde_json::Value) -> bool {
-    data.as_array().is_some_and(|streams| {
-        !streams.is_empty()
-            && streams.iter().any(|stream| {
-                stream
-                    .get("resourceLink")
-                    .and_then(|link| link.as_str())
-                    .is_some_and(|link| !link.is_empty())
-            })
-    })
 }
 
 fn hash_key(value: &str) -> String {
@@ -219,118 +253,33 @@ pub fn get_provider_stream_path(
         ""
     };
     let hashed_id = hash_key(subject_id);
-    path.push(format!("{schema}{hashed_id}_{season}_{episode}.json"));
+    path.push(format!("{schema}{hashed_id}_{season}_{episode}.cache"));
     path
 }
 
-pub fn get_provider_stream_cache(
+pub fn get_provider_stream_cache_typed(
     provider: ProviderKind,
     subject_id: &str,
     season: usize,
     episode: usize,
-) -> Option<serde_json::Value> {
+) -> Option<Vec<Release>> {
     let path = get_provider_stream_path(provider, subject_id, season, episode);
-    let value = read_json_cache(&path, STREAM_CACHE_EXPIRY_SECS)?;
-    if stream_payload_has_results(&value) {
-        Some(value)
-    } else {
-        let _ = fs::remove_file(path);
-        None
-    }
+    let releases: Vec<Release> = get_typed_cache(&path, STREAM_CACHE_EXPIRY_SECS)?;
+    (!releases.is_empty()).then_some(releases)
 }
 
-pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> PathBuf {
-    let mut path = get_provider_cache_dir(provider, "details");
-    let schema = if provider == ProviderKind::FourKHdHub {
-        "v2_"
-    } else {
-        ""
-    };
-    let hashed_id = hash_key(subject_id);
-    path.push(format!("details_{schema}{hashed_id}.json"));
-    path
-}
-
-pub fn get_provider_details_cache(
+pub fn set_provider_stream_cache_typed(
     provider: ProviderKind,
     subject_id: &str,
-) -> Option<serde_json::Value> {
-    read_json_cache(
-        &get_provider_details_path(provider, subject_id),
-        CACHE_EXPIRY_SECS,
-    )
-}
-
-pub fn invalidate_provider_details_cache(provider: ProviderKind, subject_id: &str) {
-    let path = get_provider_details_path(provider, subject_id);
-    let _ = fs::remove_file(path);
-}
-
-pub fn get_provider_search_path(provider: ProviderKind, query: &str, page: usize) -> PathBuf {
-    let mut path = get_provider_cache_dir(provider, "search");
-    let hashed = hash_key(query);
-    path.push(format!("{hashed}_{page}.json"));
-    path
-}
-
-pub fn get_provider_search_cache(
-    provider: ProviderKind,
-    query: &str,
-    page: usize,
-) -> Option<serde_json::Value> {
-    let path = get_provider_search_path(provider, query, page);
-    let value = read_json_cache(&path, CACHE_EXPIRY_SECS)?;
-    if search_payload_has_results(&value) {
-        Some(value)
-    } else {
-        let _ = fs::remove_file(path);
-        None
-    }
-}
-
-pub fn set_provider_search_cache(
-    provider: ProviderKind,
-    query: &str,
-    page: usize,
-    data: &serde_json::Value,
+    season: usize,
+    episode: usize,
+    releases: &[Release],
 ) {
-    let path = get_provider_search_path(provider, query, page);
-    if !search_payload_has_results(data) {
-        let _ = fs::remove_file(path);
+    if releases.is_empty() {
         return;
     }
-    write_json_cache(&path, data);
-}
-
-fn search_payload_has_results(data: &serde_json::Value) -> bool {
-    data.get("results")
-        .and_then(|results| results.as_array())
-        .and_then(|results| results.first())
-        .and_then(|result| result.get("subjects"))
-        .and_then(|subjects| subjects.as_array())
-        .is_some_and(|subjects| !subjects.is_empty())
-}
-
-pub fn set_provider_details_cache(
-    provider: ProviderKind,
-    subject_id: &str,
-    data: &serde_json::Value,
-) {
-    let path = get_provider_details_path(provider, subject_id);
-    write_json_cache(&path, data);
-}
-
-pub fn set_provider_stream_cache(
-    provider: ProviderKind,
-    subject_id: &str,
-    season: usize,
-    episode: usize,
-    data: &serde_json::Value,
-) {
     let path = get_provider_stream_path(provider, subject_id, season, episode);
-    if stream_payload_has_results(data) {
-        write_json_cache(&path, data);
-    }
+    set_typed_cache(&path, STREAM_CACHE_EXPIRY_SECS, releases);
 }
 
 pub fn invalidate_provider_stream_cache(
@@ -345,108 +294,134 @@ pub fn invalidate_provider_stream_cache(
     }
 }
 
-pub fn clear_all_cache() {
-    let path = crate::config::cache_dir();
-    if path.exists() {
-        let _ = fs::remove_dir_all(&path);
-    }
-    if let Some(data_dir) = crate::config::data_dir() {
-        let legacy = data_dir.join("iptv_cache");
-        if legacy.exists() {
-            let _ = fs::remove_dir_all(&legacy);
-        }
-    }
-}
-
-pub fn clean_old_cache_background() {
-    tokio::task::spawn_blocking(|| {
-        let path = crate::config::cache_dir();
-        if !path.exists() {
-            return;
-        }
-
-        let max_age = 7 * 24 * 60 * 60;
-
-        let mut dirs_to_check = vec![path];
-        while let Some(dir) = dirs_to_check.pop() {
-            if let Ok(entries) = std::fs::read_dir(&dir) {
-                for entry in entries.flatten() {
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.is_dir() {
-                            dirs_to_check.push(entry.path());
-                        } else if metadata.is_file() {
-                            if let Ok(modified) = metadata.modified() {
-                                if let Ok(elapsed) = modified.elapsed() {
-                                    if elapsed.as_secs() > max_age {
-                                        let _ = fs::remove_file(entry.path());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-fn get_homepage_path(tab_id: &str, page: usize) -> PathBuf {
-    let mut path = get_provider_cache_dir(ProviderKind::MovieBox, "homepage");
-    path.push(format!("{}_{}.json", tab_id, page));
+pub fn get_provider_details_path(provider: ProviderKind, subject_id: &str) -> PathBuf {
+    let mut path = get_provider_cache_dir(provider, "details");
+    let schema = if provider == ProviderKind::FourKHdHub {
+        "v2_"
+    } else {
+        ""
+    };
+    let hashed_id = hash_key(subject_id);
+    path.push(format!("details_{schema}{hashed_id}.cache"));
     path
 }
 
-pub fn get_homepage_cache(tab_id: &str, page: usize) -> Option<serde_json::Value> {
-    read_json_cache(&get_homepage_path(tab_id, page), HOMEPAGE_CACHE_EXPIRY_SECS)
+pub fn get_provider_details_cache_typed(
+    provider: ProviderKind,
+    subject_id: &str,
+) -> Option<MediaDetails> {
+    let path = get_provider_details_path(provider, subject_id);
+    get_typed_cache(&path, CACHE_EXPIRY_SECS)
 }
 
-pub fn set_homepage_cache(tab_id: &str, page: usize, data: &serde_json::Value) {
+pub fn set_provider_details_cache_typed(
+    provider: ProviderKind,
+    subject_id: &str,
+    details: &MediaDetails,
+) {
+    let path = get_provider_details_path(provider, subject_id);
+    set_typed_cache(&path, CACHE_EXPIRY_SECS, details);
+}
+
+pub fn invalidate_provider_details_cache(provider: ProviderKind, subject_id: &str) {
+    let path = get_provider_details_path(provider, subject_id);
+    let _ = fs::remove_file(path);
+}
+
+pub fn get_provider_search_path(provider: ProviderKind, query: &str, page: usize) -> PathBuf {
+    let mut path = get_provider_cache_dir(provider, "search");
+    let hashed = hash_key(query);
+    path.push(format!("{hashed}_{page}.cache"));
+    path
+}
+
+pub fn get_provider_search_cache_typed(
+    provider: ProviderKind,
+    query: &str,
+    page: usize,
+) -> Option<Vec<CatalogItem>> {
+    let path = get_provider_search_path(provider, query, page);
+    let items: Vec<CatalogItem> = get_typed_cache(&path, CACHE_EXPIRY_SECS)?;
+    (!items.is_empty()).then_some(items)
+}
+
+pub fn set_provider_search_cache_typed(
+    provider: ProviderKind,
+    query: &str,
+    page: usize,
+    items: &[CatalogItem],
+) {
+    if items.is_empty() {
+        return;
+    }
+    let path = get_provider_search_path(provider, query, page);
+    set_typed_cache(&path, CACHE_EXPIRY_SECS, items);
+}
+
+pub fn get_homepage_path(tab_id: &str, page: usize) -> PathBuf {
+    let mut path = get_provider_cache_dir(ProviderKind::MovieBox, "homepage");
+    path.push(format!("home_{tab_id}_{page}.cache"));
+    path
+}
+
+pub fn get_homepage_cache_typed(
+    tab_id: &str,
+    page: usize,
+) -> Option<(Vec<CatalogItem>, HashMap<String, BrowseMetrics>)> {
     let path = get_homepage_path(tab_id, page);
-    write_json_cache(&path, data);
+    get_typed_cache(&path, HOMEPAGE_CACHE_EXPIRY_SECS)
+}
+
+pub fn set_homepage_cache_typed(
+    tab_id: &str,
+    page: usize,
+    data: &(Vec<CatalogItem>, HashMap<String, BrowseMetrics>),
+) {
+    let path = get_homepage_path(tab_id, page);
+    set_typed_cache(&path, HOMEPAGE_CACHE_EXPIRY_SECS, data);
 }
 
 pub fn get_addon_catalog_path(manifest_url: &str, r_type: &str, catalog_id: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(ProviderKind::Addons, "catalogs");
     let hashed = hash_key(&format!("{manifest_url}_{r_type}_{catalog_id}"));
-    path.push(format!("catalog_{hashed}.json"));
+    path.push(format!("catalog_{hashed}.cache"));
     path
 }
 
-pub fn get_addon_catalog_cache(
+pub fn get_addon_catalog_cache_typed(
     manifest_url: &str,
     r_type: &str,
     catalog_id: &str,
-) -> Option<serde_json::Value> {
-    read_json_cache(
-        &get_addon_catalog_path(manifest_url, r_type, catalog_id),
-        HOMEPAGE_CACHE_EXPIRY_SECS,
-    )
+) -> Option<Vec<CatalogItem>> {
+    let path = get_addon_catalog_path(manifest_url, r_type, catalog_id);
+    get_typed_cache(&path, HOMEPAGE_CACHE_EXPIRY_SECS)
 }
 
-pub fn set_addon_catalog_cache(
+pub fn set_addon_catalog_cache_typed(
     manifest_url: &str,
     r_type: &str,
     catalog_id: &str,
-    data: &serde_json::Value,
+    items: &[CatalogItem],
 ) {
     let path = get_addon_catalog_path(manifest_url, r_type, catalog_id);
-    write_json_cache(&path, data);
+    set_typed_cache(&path, HOMEPAGE_CACHE_EXPIRY_SECS, items);
 }
 
 pub fn get_addon_manifest_path(manifest_url: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(ProviderKind::Addons, "manifests");
     let hashed = hash_key(manifest_url);
-    path.push(format!("manifest_{hashed}.json"));
+    path.push(format!("manifest_{hashed}.cache"));
     path
 }
 
-pub fn get_addon_manifest_cache(manifest_url: &str) -> Option<serde_json::Value> {
-    read_json_cache(&get_addon_manifest_path(manifest_url), CACHE_EXPIRY_SECS)
+pub fn get_addon_manifest_cache_typed(manifest_url: &str) -> Option<AddonManifest> {
+    let path = get_addon_manifest_path(manifest_url);
+    get_typed_cache(&path, CACHE_EXPIRY_SECS)
 }
 
-pub fn set_addon_manifest_cache(manifest_url: &str, data: &serde_json::Value) {
+pub fn set_addon_manifest_cache_typed(manifest_url: &str, manifest: &AddonManifest) {
     let path = get_addon_manifest_path(manifest_url);
-    write_json_cache(&path, data);
+    set_typed_cache(&path, CACHE_EXPIRY_SECS, manifest);
 }
 
 fn get_namespaced_image_path(namespace: &str, id: &str) -> PathBuf {
@@ -518,19 +493,66 @@ pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {
 pub fn get_captions_path(subject_id: &str, resource_id: &str) -> PathBuf {
     let mut path = get_provider_cache_dir(ProviderKind::MovieBox, "captions");
     let hashed_id = hash_key(&format!("{}_{}", subject_id, resource_id));
-    path.push(format!("captions_{}.json", hashed_id));
+    path.push(format!("captions_{}.cache", hashed_id));
     path
 }
 
-pub fn get_captions_cache(subject_id: &str, resource_id: &str) -> Option<serde_json::Value> {
-    read_json_cache(
-        &get_captions_path(subject_id, resource_id),
-        CACHE_EXPIRY_SECS,
-    )
+pub fn get_captions_cache_typed(
+    subject_id: &str,
+    resource_id: &str,
+) -> Option<Vec<SubtitleOption>> {
+    let path = get_captions_path(subject_id, resource_id);
+    get_typed_cache(&path, CACHE_EXPIRY_SECS)
 }
 
-pub fn set_captions_cache(subject_id: &str, resource_id: &str, data: &serde_json::Value) {
-    write_json_cache(&get_captions_path(subject_id, resource_id), data);
+pub fn set_captions_cache_typed(subject_id: &str, resource_id: &str, captions: &[SubtitleOption]) {
+    let path = get_captions_path(subject_id, resource_id);
+    set_typed_cache(&path, CACHE_EXPIRY_SECS, captions);
+}
+
+pub fn clear_all_cache() {
+    let path = crate::config::cache_dir();
+    if path.exists() {
+        let _ = fs::remove_dir_all(&path);
+    }
+    if let Some(data_dir) = crate::config::data_dir() {
+        let legacy = data_dir.join("iptv_cache");
+        if legacy.exists() {
+            let _ = fs::remove_dir_all(&legacy);
+        }
+    }
+}
+
+pub fn clean_old_cache_background() {
+    tokio::task::spawn_blocking(|| {
+        let path = crate::config::cache_dir();
+        if !path.exists() {
+            return;
+        }
+
+        let max_age = 7 * 24 * 60 * 60;
+
+        let mut dirs_to_check = vec![path];
+        while let Some(dir) = dirs_to_check.pop() {
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_dir() {
+                            dirs_to_check.push(entry.path());
+                        } else if metadata.is_file() {
+                            if let Ok(modified) = metadata.modified() {
+                                if let Ok(elapsed) = modified.elapsed() {
+                                    if elapsed.as_secs() > max_age {
+                                        let _ = fs::remove_file(entry.path());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -552,9 +574,74 @@ mod tests {
     }
 
     #[test]
+    fn test_typed_binary_cache_envelope_roundtrip() {
+        let dir = unique_dir("typed_binary");
+        let cache_file = dir.join("test_item.cache");
+
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct SampleData {
+            id: String,
+            score: u64,
+        }
+
+        let original = SampleData {
+            id: "movie_123".to_string(),
+            score: 999,
+        };
+
+        set_typed_cache(&cache_file, 3600, &original);
+        let loaded: Option<SampleData> = get_typed_cache(&cache_file, 3600);
+
+        assert_eq!(loaded, Some(original));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_legacy_json_cache_auto_migration_to_msgpack() {
+        let dir = unique_dir("legacy_json");
+        let cache_file = dir.join("legacy.cache");
+
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct MediaSample {
+            title: String,
+            year: u32,
+        }
+
+        let json_text = r#"{"title":"Inception","year":2010}"#;
+        fs::write(&cache_file, json_text).expect("write legacy json");
+
+        let loaded: Option<MediaSample> = get_typed_cache(&cache_file, 3600);
+        assert_eq!(
+            loaded,
+            Some(MediaSample {
+                title: "Inception".to_string(),
+                year: 2010,
+            })
+        );
+
+        let binary_bytes = fs::read(&cache_file).expect("read migrated binary file");
+        assert_eq!(binary_bytes[0..4], CACHE_MAGIC);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_typed_cache_expiration() {
+        let dir = unique_dir("expired_binary");
+        let cache_file = dir.join("expired.cache");
+
+        set_typed_cache(&cache_file, 0, &"secret_data".to_string());
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let loaded: Option<String> = get_typed_cache(&cache_file, 0);
+
+        assert_eq!(loaded, None);
+        assert!(!cache_file.exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn overwrite_replaces_content_and_leaves_no_temporaries() {
         let dir = unique_dir("overwrite");
-        let target = dir.join("state.json");
+        let target = dir.join("state.cache");
         atomic_write_file(&target, b"v1").expect("first write");
         atomic_write_file(&target, b"v2").expect("second write");
         assert_eq!(fs::read_to_string(&target).unwrap(), "v2");
@@ -596,7 +683,7 @@ mod tests {
     #[tokio::test]
     async fn async_overwrite_replaces_content() {
         let dir = unique_dir("async");
-        let target = dir.join("state.json");
+        let target = dir.join("state.cache");
         atomic_write_file_async(&target, b"one")
             .await
             .expect("write");

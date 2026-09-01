@@ -50,8 +50,9 @@ src/
 
   providers/
     mod.rs           Module declarations.
-    models.rs        Shared types: ProviderKind, CatalogItem, MediaDetails,
-                     Release, PlaybackSource, RequestContext, SourceMirror.
+    models.rs        Shared typed models (ProviderKind, CatalogItem, MediaDetails,
+                     Release, PlaybackSource, RequestContext, SourceMirror) and
+                     canonical JSON domain adapters.
     moviebox/        Primary provider.
       client.rs      Async reqwest client with signed requests (anti-bot).
       crypto.rs      Request signing: HMAC-MD5 signature, client token,
@@ -60,8 +61,7 @@ src/
     fourkhdhub/      Secondary provider.
       client.rs      Search/details/stream resolution + preflight validation.
       hubcloud.rs    Mirror resolver: fetch drive pages, extract playable links.
-      parser.rs      HTML parsing into typed CatalogItem/MediaDetails/Release,
-                     plus moviebox-JSON adapters.
+      parser.rs      HTML parsing into typed CatalogItem/MediaDetails/Release.
     bdix/
       circleftp/     BDIX CircleFTP provider (client + parser).
       dhakaflix/     BDIX DhakaFlix provider (client + parser).

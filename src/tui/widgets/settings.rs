@@ -163,13 +163,24 @@ fn render_tabs(frame: &mut Frame, area: Rect, popup_area: Rect, state: &AppState
     let mut line0_spans = Vec::new();
     let mut line1_spans = Vec::new();
 
+    let compact = popup_area.width < 58;
     for (i, cat) in SettingsCategory::ALL.iter().enumerate() {
         if i > 0 {
-            line0_spans.push(Span::raw("     "));
-            line1_spans.push(Span::raw("     "));
+            let gap = if compact { "  " } else { "     " };
+            line0_spans.push(Span::raw(gap));
+            line1_spans.push(Span::raw(gap));
         }
         let is_active = *cat == state.settings_category;
-        let title = cat.title();
+        let title = if compact {
+            match cat {
+                SettingsCategory::General => "1:Gen",
+                SettingsCategory::ContentModes => "2:Modes",
+                SettingsCategory::Appearance => "3:Theme",
+                SettingsCategory::StorageInfo => "4:Info",
+            }
+        } else {
+            cat.title()
+        };
         let width = crate::tui::text::width(title);
 
         if is_active {

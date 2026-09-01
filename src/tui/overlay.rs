@@ -80,11 +80,12 @@ pub fn addon_manager_layout(area: Rect, addons_count: usize, input_active: bool)
     centered(area, popup_width, popup_height, 36, 80)
 }
 pub fn settings_modal_layout(area: Rect, category: crate::tui::state::SettingsCategory) -> Rect {
-    let popup_width = 76u16.min(area.width.saturating_sub(4)).max(52);
+    let min_width = 46u16.min(area.width.saturating_sub(2));
+    let popup_width = 76u16.min(area.width.saturating_sub(2)).max(min_width);
     let content_height = (category.row_count() as u16 * 2).max(4);
     let desired_height = 2 + 1 + content_height + 2 + 2;
     let popup_height = desired_height.min(area.height.saturating_sub(2)).max(11);
-    centered(area, popup_width, popup_height, 52, 76)
+    centered(area, popup_width, popup_height, min_width, 76)
 }
 
 pub fn download_confirm_layout(

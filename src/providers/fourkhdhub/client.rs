@@ -194,7 +194,7 @@ impl FourKHdHubClient {
             let mut request = self
                 .client
                 .get(url)
-                .header(reqwest::header::RANGE, "bytes=0-");
+                .header(reqwest::header::RANGE, "bytes=0-8191");
             for (name, value) in headers {
                 request = request.header(name, value);
             }
@@ -239,7 +239,7 @@ impl FourKHdHubClient {
                 let mut wrapped_request = self
                     .client
                     .get(&wrapped)
-                    .header(reqwest::header::RANGE, "bytes=0-");
+                    .header(reqwest::header::RANGE, "bytes=0-8191");
                 for (name, value) in headers {
                     wrapped_request = wrapped_request.header(name, value);
                 }

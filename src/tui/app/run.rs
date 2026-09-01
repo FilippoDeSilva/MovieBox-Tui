@@ -297,10 +297,8 @@ impl App {
             },
             Screen::Details => {
                 if let Some(details) = &self.state.selected_details {
-                    if let Some(title) = details.get("title").and_then(|t| t.as_str()) {
-                        if !title.is_empty() {
-                            return format!("MovieBox-Tui — {title}");
-                        }
+                    if !details.title.is_empty() {
+                        return format!("MovieBox-Tui — {}", details.title);
                     }
                 }
                 "MovieBox-Tui — Details".to_string()

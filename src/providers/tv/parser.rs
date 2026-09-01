@@ -104,26 +104,7 @@ impl M3UParser {
 
     pub fn parse_m3u(&self, content: &str) -> Vec<Channel> {
         let mut channels = Vec::new();
-        let mut current_channel = Channel {
-            id: String::new(),
-            name: String::new(),
-            logo: String::new(),
-            group: String::new(),
-            stream_url: String::new(),
-        };
-
-        let extract_attr = |line: &str, attr_name: &str| -> String {
-            for quote in ['"', '\''] {
-                let pattern = format!("{attr_name}={quote}");
-                if let Some(idx) = line.find(&pattern) {
-                    let start = idx + pattern.len();
-                    if let Some(end) = line[start..].find(quote) {
-                        return line[start..start + end].to_string();
-                    }
-                }
-            }
-            String::new()
-        };
+        let mut current_channel = Channel::default();
 
         for line in content.lines() {
             let line = line.trim();
@@ -131,9 +112,18 @@ impl M3UParser {
                 continue;
             }
             if line.starts_with("#EXTINF:") {
-                current_channel.id = extract_attr(line, "tvg-id");
-                current_channel.logo = extract_attr(line, "tvg-logo");
-                current_channel.group = extract_attr(line, "group-title");
+                let tvg_id = extract_attr_slice(line, "tvg-id");
+                if !tvg_id.is_empty() {
+                    current_channel.id = tvg_id.to_string();
+                }
+                let tvg_logo = extract_attr_slice(line, "tvg-logo");
+                if !tvg_logo.is_empty() {
+                    current_channel.logo = tvg_logo.to_string();
+                }
+                let group_title = extract_attr_slice(line, "group-title");
+                if !group_title.is_empty() {
+                    current_channel.group = group_title.to_string();
+                }
 
                 if let Some(idx) = find_extinf_title_comma(line) {
                     current_channel.name = line[idx + 1..].trim().to_string();
@@ -143,20 +133,34 @@ impl M3UParser {
                 if current_channel.id.is_empty() {
                     current_channel.id = current_channel.name.clone();
                 }
-                channels.push(current_channel.clone());
-
-                current_channel = Channel {
-                    id: String::new(),
-                    name: String::new(),
-                    logo: String::new(),
-                    group: String::new(),
-                    stream_url: String::new(),
-                };
+                channels.push(std::mem::take(&mut current_channel));
             }
         }
 
         channels
     }
+}
+
+fn extract_attr_slice<'a>(line: &'a str, attr_name: &str) -> &'a str {
+    let bytes = line.as_bytes();
+    let name_bytes = attr_name.as_bytes();
+    let mut i = 0;
+    while i + name_bytes.len() + 2 <= bytes.len() {
+        if &bytes[i..i + name_bytes.len()] == name_bytes {
+            let next_byte = bytes[i + name_bytes.len()];
+            if next_byte == b'=' {
+                let quote = bytes[i + name_bytes.len() + 1];
+                if quote == b'"' || quote == b'\'' {
+                    let start = i + name_bytes.len() + 2;
+                    if let Some(end_rel) = bytes[start..].iter().position(|&b| b == quote) {
+                        return &line[start..start + end_rel];
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    ""
 }
 
 fn find_extinf_title_comma(line: &str) -> Option<usize> {

@@ -37,16 +37,14 @@ impl App {
             .state
             .selected_details
             .as_ref()
-            .and_then(|details| details.get("title"))
-            .and_then(|title| title.as_str())
+            .map(|details| details.title.as_str())
             .unwrap_or(crate::download::DEFAULT_STREAM_NAME);
         let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
         let is_series = self
             .state
             .selected_details
             .as_ref()
-            .map(crate::tui::state::stype)
-            .is_some_and(|s| s == 2)
+            .is_some_and(|d| d.is_series())
             || !self.state.available_seasons.is_empty();
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
@@ -401,10 +399,10 @@ impl App {
                         "Preparing download",
                         "Fetching subtitles.",
                     );
-                    let client = self.service.client.clone();
+                    let service = self.service.clone();
                     let sender = self.action_sender.clone();
                     tokio::spawn(async move {
-                        if let Ok(res) = client.get_ext_captions(&subject_id, &rid).await {
+                        if let Ok(res) = service.get_ext_captions(&subject_id, &rid).await {
                             sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                         } else {
                             sender.send(Action::DownloadStream(None)).ok();
@@ -425,9 +423,11 @@ impl App {
                 self.state.season_subtitle_preference = None;
                 let season_num = self.state.selected_season;
 
-                let season_array_idx = self.state.available_seasons.iter().position(|s| {
-                    s.get("se").and_then(|v| v.as_i64()).unwrap_or(0) as usize == season_num
-                });
+                let season_array_idx = self
+                    .state
+                    .available_seasons
+                    .iter()
+                    .position(|s| s.number == season_num);
 
                 if let Some(idx) = season_array_idx {
                     if idx < self.state.available_episode_numbers.len() {
@@ -459,8 +459,7 @@ impl App {
                         .state
                         .selected_details
                         .as_ref()
-                        .and_then(|details| details.get("title"))
-                        .and_then(|title| title.as_str())
+                        .map(|details| details.title.as_str())
                         .unwrap_or(crate::download::DEFAULT_STREAM_NAME);
                     let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
                     let safe_title = clean_title
@@ -507,7 +506,7 @@ impl App {
 
                     let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
 
-                    self.state.selected_resources = None;
+                    self.state.selected_resources.clear();
                     self.state.is_fetching_streams = true;
 
                     self.action_sender

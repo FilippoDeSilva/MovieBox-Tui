@@ -1,10 +1,12 @@
 use moviebox_tui::{
     providers::{
         addons::{
-            adapter::{meta_detail_to_moviebox_json, metas_to_moviebox_search_json},
+            adapter::{meta_detail_to_media_details, meta_to_catalog_item},
             models::{MetaDetail, MetaItem, MetaVideo},
         },
-        models::{ProviderKind, RequestContext},
+        models::{
+            CatalogItem, MediaDetails, MediaType, ProviderKind, ProviderMediaId, RequestContext,
+        },
     },
     tui::{
         action::Action,
@@ -15,7 +17,7 @@ use moviebox_tui::{
 
 #[test]
 fn test_search_result_identity_and_similar_title_isolation() {
-    let metas = vec![
+    let metas = [
         MetaItem {
             id: "tt0096895".to_string(),
             r#type: "movie".to_string(),
@@ -78,31 +80,24 @@ fn test_search_result_identity_and_similar_title_isolation() {
         },
     ];
 
-    let search_json = metas_to_moviebox_search_json(metas);
-    let subjects = search_json
-        .get("results")
-        .and_then(|r| r.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|first| first.get("subjects"))
-        .and_then(|s| s.as_array())
-        .expect("subjects array must exist");
+    let subjects: Vec<CatalogItem> = metas.iter().map(meta_to_catalog_item).collect();
 
     assert_eq!(subjects.len(), 3);
 
-    assert_eq!(subjects[0]["subjectId"], "tt0096895");
-    assert_eq!(subjects[0]["title"], "Batman");
-    assert_eq!(subjects[0]["subjectType"], 1);
-    assert_eq!(subjects[0]["releaseDate"], "1989");
+    assert_eq!(subjects[0].id.value, "tt0096895");
+    assert_eq!(subjects[0].title, "Batman");
+    assert_eq!(subjects[0].media_type, MediaType::Movie);
+    assert_eq!(subjects[0].year.as_deref(), Some("1989"));
 
-    assert_eq!(subjects[1]["subjectId"], "tt1877830");
-    assert_eq!(subjects[1]["title"], "The Batman");
-    assert_eq!(subjects[1]["subjectType"], 1);
-    assert_eq!(subjects[1]["releaseDate"], "2022");
+    assert_eq!(subjects[1].id.value, "tt1877830");
+    assert_eq!(subjects[1].title, "The Batman");
+    assert_eq!(subjects[1].media_type, MediaType::Movie);
+    assert_eq!(subjects[1].year.as_deref(), Some("2022"));
 
-    assert_eq!(subjects[2]["subjectId"], "tt0103359");
-    assert_eq!(subjects[2]["title"], "Batman: The Animated Series");
-    assert_eq!(subjects[2]["subjectType"], 2);
-    assert_eq!(subjects[2]["releaseDate"], "1992");
+    assert_eq!(subjects[2].id.value, "tt0103359");
+    assert_eq!(subjects[2].title, "Batman: The Animated Series");
+    assert_eq!(subjects[2].media_type, MediaType::Series);
+    assert_eq!(subjects[2].year.as_deref(), Some("1992"));
 }
 
 #[tokio::test]
@@ -118,10 +113,27 @@ async fn test_stale_details_response_protection() {
     };
     app.state_mut().active_details_request = 1;
     app.state_mut().active_subject_id = Some("movie_a".to_string());
-    app.state_mut().selected_details = Some(serde_json::json!({
-        "id": "movie_a",
-        "title": "Movie A",
-    }));
+    app.state_mut().selected_details = Some(MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "movie_a".to_string(),
+        },
+        title: "Movie A".to_string(),
+        media_type: MediaType::Movie,
+        year: None,
+        description: None,
+        tagline: None,
+        imdb_rating: None,
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons: vec![],
+        dubs: vec![],
+    });
 
     let context_b = RequestContext {
         provider: ProviderKind::MovieBox,
@@ -129,16 +141,49 @@ async fn test_stale_details_response_protection() {
     };
     app.state_mut().active_details_request = 2;
     app.state_mut().active_subject_id = Some("movie_b".to_string());
-    app.state_mut().selected_details = Some(serde_json::json!({
-        "id": "movie_b",
-        "title": "Movie B Draft",
-    }));
-
-    let stale_payload = serde_json::json!({
-        "id": "movie_a",
-        "title": "Movie A Full Metadata",
-        "synopsis": "Stale synopsis from Movie A",
+    app.state_mut().selected_details = Some(MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "movie_b".to_string(),
+        },
+        title: "Movie B Draft".to_string(),
+        media_type: MediaType::Movie,
+        year: None,
+        description: None,
+        tagline: None,
+        imdb_rating: None,
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons: vec![],
+        dubs: vec![],
     });
+
+    let stale_payload = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "movie_a".to_string(),
+        },
+        title: "Movie A Full Metadata".to_string(),
+        media_type: MediaType::Movie,
+        year: None,
+        description: Some("Stale synopsis from Movie A".to_string()),
+        tagline: None,
+        imdb_rating: None,
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons: vec![],
+        dubs: vec![],
+    };
     app.handle_action(Action::DetailsSuccess(
         context_a,
         1,
@@ -149,15 +194,31 @@ async fn test_stale_details_response_protection() {
 
     assert_eq!(app.state().active_subject_id.as_deref(), Some("movie_b"));
     assert_eq!(
-        app.state().selected_details.as_ref().unwrap()["title"],
+        app.state().selected_details.as_ref().unwrap().title,
         "Movie B Draft"
     );
 
-    let valid_payload = serde_json::json!({
-        "id": "movie_b",
-        "title": "Movie B Full Metadata",
-        "synopsis": "Correct synopsis for Movie B",
-    });
+    let valid_payload = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "movie_b".to_string(),
+        },
+        title: "Movie B Full Metadata".to_string(),
+        media_type: MediaType::Movie,
+        year: None,
+        description: Some("Correct synopsis for Movie B".to_string()),
+        tagline: None,
+        imdb_rating: None,
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons: vec![],
+        dubs: vec![],
+    };
     app.handle_action(Action::DetailsSuccess(
         context_b,
         2,
@@ -168,12 +229,17 @@ async fn test_stale_details_response_protection() {
 
     assert_eq!(app.state().active_subject_id.as_deref(), Some("movie_b"));
     assert_eq!(
-        app.state().selected_details.as_ref().unwrap()["title"],
+        app.state().selected_details.as_ref().unwrap().title,
         "Movie B Full Metadata"
     );
     assert_eq!(
-        app.state().selected_details.as_ref().unwrap()["synopsis"],
-        "Correct synopsis for Movie B"
+        app.state()
+            .selected_details
+            .as_ref()
+            .unwrap()
+            .description
+            .as_deref(),
+        Some("Correct synopsis for Movie B")
     );
 }
 
@@ -234,16 +300,15 @@ fn test_addon_metadata_mapping_and_partial_data_degradation() {
         videos: vec![],
     };
 
-    let json_output = meta_detail_to_moviebox_json(&minimal);
+    let json_output = meta_detail_to_media_details(&minimal);
 
-    assert_eq!(json_output["id"], "tt9999999");
-    assert_eq!(json_output["title"], "Minimal Indie Film");
-    assert_eq!(json_output["subjectType"], 1);
-    assert_eq!(json_output["releaseDate"], "");
-    assert!(json_output["description"].is_null());
-    assert!(json_output["director"].is_null());
-    assert!(json_output["stars"].is_null());
-
+    assert_eq!(json_output.id.value, "tt9999999");
+    assert_eq!(json_output.title, "Minimal Indie Film");
+    assert_eq!(json_output.media_type, MediaType::Movie);
+    assert_eq!(json_output.year, None);
+    assert!(json_output.description.is_none());
+    assert!(json_output.director.is_none());
+    assert!(json_output.stars.is_none());
     let series_detail = MetaDetail {
         id: "tt8888888".to_string(),
         r#type: "series".to_string(),
@@ -300,21 +365,21 @@ fn test_addon_metadata_mapping_and_partial_data_degradation() {
         ],
     };
 
-    let series_json = meta_detail_to_moviebox_json(&series_detail);
+    let series_details = meta_detail_to_media_details(&series_detail);
 
-    assert_eq!(series_json["subjectType"], 2);
-    assert_eq!(series_json["releaseDate"], "2021");
-    assert_eq!(series_json["director"], "Director Name");
-    assert_eq!(series_json["stars"], "Actor One, Actor Two");
+    assert_eq!(series_details.media_type, MediaType::Series);
+    assert_eq!(series_details.year.as_deref(), Some("2021"));
+    assert_eq!(series_details.director.as_deref(), Some("Director Name"));
+    assert_eq!(
+        series_details.stars.as_deref(),
+        Some("Actor One, Actor Two")
+    );
 
-    let seasons = series_json["seasons"]["seasons"]
-        .as_array()
-        .expect("seasons array");
-    assert_eq!(seasons.len(), 2);
-    assert_eq!(seasons[0]["se"], 1);
-    assert_eq!(seasons[0]["maxEp"], 2);
-    assert_eq!(seasons[1]["se"], 2);
-    assert_eq!(seasons[1]["maxEp"], 1);
+    assert_eq!(series_details.seasons.len(), 2);
+    assert_eq!(series_details.seasons[0].number, 1);
+    assert_eq!(series_details.seasons[0].episodes.len(), 2);
+    assert_eq!(series_details.seasons[1].number, 2);
+    assert_eq!(series_details.seasons[1].episodes.len(), 1);
 }
 
 #[tokio::test]
@@ -335,11 +400,7 @@ async fn test_search_failure_vs_empty_result_distinction() {
         request_id: app.state().active_search_request,
         query: "xyznonexistent".to_string(),
         page: 1,
-        payload: serde_json::json!({
-            "results": [{
-                "subjects": []
-            }]
-        }),
+        items: vec![],
     })
     .await;
 
@@ -381,24 +442,24 @@ async fn test_mode_switch_stale_response_protection() {
     assert_eq!(app.state().mode(), AppMode::Addon);
     assert_ne!(app.state().provider_generation, streaming_generation);
 
-    let moviebox_payload = serde_json::json!({
-        "results": [{
-            "subjects": [{
-                "subjectId": "mb_12345",
-                "title": "Avatar",
-                "subjectType": 1,
-                "releaseDate": "2009",
-                "cover": { "url": "https://example.com/avatar.jpg" }
-            }]
-        }]
-    });
+    let moviebox_items = vec![CatalogItem {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "mb_12345".to_string(),
+        },
+        title: "Avatar".to_string(),
+        media_type: MediaType::Movie,
+        year: Some("2009".to_string()),
+        poster_url: Some("https://example.com/avatar.jpg".to_string()),
+        season_count: None,
+    }];
 
     app.handle_action(Action::SearchSuccess {
         context: streaming_context,
         request_id: 1,
         query: "avatar".to_string(),
         page: 1,
-        payload: moviebox_payload,
+        items: moviebox_items,
     })
     .await;
 

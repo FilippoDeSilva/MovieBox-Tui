@@ -1,6 +1,6 @@
 use crate::providers::models::{
-    CatalogItem, Episode, MediaDetails, MediaType, ProviderError, ProviderKind, ProviderMediaId,
-    Season, SubtitleOption,
+    AudioTrackOption, CatalogItem, Episode, MediaDetails, MediaType, ProviderError, ProviderKind,
+    ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
 };
 pub fn captions_json_to_options(payload: &serde_json::Value) -> Vec<SubtitleOption> {
     let Some(captions) = payload.get("extCaptions").and_then(|c| c.as_array()) else {
@@ -24,6 +24,73 @@ pub fn captions_json_to_options(payload: &serde_json::Value) -> Vec<SubtitleOpti
             })
         })
         .collect()
+}
+
+pub fn moviebox_subject_json_to_catalog_item(s: &serde_json::Value) -> Option<CatalogItem> {
+    let id_str = s.get("subjectId").or_else(|| s.get("id")).and_then(|v| {
+        if let Some(num) = v.as_i64() {
+            Some(num.to_string())
+        } else {
+            v.as_str().map(|str_val| str_val.to_string())
+        }
+    })?;
+
+    if id_str.is_empty() {
+        return None;
+    }
+
+    let title = s
+        .get("title")
+        .or_else(|| s.get("name"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("Unknown")
+        .to_string();
+
+    let stype = s
+        .get("subjectType")
+        .or_else(|| s.get("stype"))
+        .and_then(|st| st.as_i64())
+        .unwrap_or(1);
+
+    let media_type = if stype == 2 {
+        MediaType::Series
+    } else {
+        MediaType::Movie
+    };
+
+    let year = s
+        .get("releaseDate")
+        .or_else(|| s.get("year"))
+        .or_else(|| s.get("releaseInfo"))
+        .and_then(|y| y.as_str())
+        .map(crate::tui::text::extract_4digit_year)
+        .filter(|y| !y.is_empty());
+
+    let poster_url = s
+        .get("cover")
+        .and_then(|c| c.get("url"))
+        .or_else(|| s.get("coverUrl"))
+        .or_else(|| s.get("poster"))
+        .or_else(|| s.get("pic"))
+        .and_then(|u| u.as_str())
+        .map(|u| u.to_string());
+
+    let season_count = s
+        .get("season")
+        .and_then(|sc| sc.as_u64())
+        .map(|sc| sc as usize);
+
+    Some(CatalogItem {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: id_str,
+        },
+        title,
+        media_type,
+        year,
+        poster_url,
+        season_count,
+    })
 }
 
 pub fn moviebox_search_json_to_catalog(payload: &serde_json::Value) -> Vec<CatalogItem> {
@@ -54,73 +121,82 @@ pub fn moviebox_search_json_to_catalog(payload: &serde_json::Value) -> Vec<Catal
     };
 
     for s in subjects_slice {
-        let id_str = s
-            .get("subjectId")
-            .or_else(|| s.get("id"))
-            .and_then(|v| {
-                if let Some(num) = v.as_i64() {
-                    Some(num.to_string())
-                } else {
-                    v.as_str().map(|str_val| str_val.to_string())
-                }
-            })
-            .unwrap_or_default();
-
-        if id_str.is_empty() {
-            continue;
+        if let Some(item) = moviebox_subject_json_to_catalog_item(s) {
+            items.push(item);
         }
-
-        let title = s
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("Unknown")
-            .to_string();
-
-        let stype = s
-            .get("subjectType")
-            .or_else(|| s.get("stype"))
-            .and_then(|st| st.as_i64())
-            .unwrap_or(1);
-
-        let media_type = if stype == 2 {
-            MediaType::Series
-        } else {
-            MediaType::Movie
-        };
-
-        let year = s
-            .get("releaseDate")
-            .or_else(|| s.get("year"))
-            .and_then(|y| y.as_str())
-            .map(crate::tui::text::extract_4digit_year)
-            .filter(|y| !y.is_empty());
-
-        let poster_url = s
-            .get("cover")
-            .and_then(|c| c.get("url"))
-            .or_else(|| s.get("coverUrl"))
-            .and_then(|u| u.as_str())
-            .map(|u| u.to_string());
-
-        let season_count = s
-            .get("season")
-            .and_then(|sc| sc.as_u64())
-            .map(|sc| sc as usize);
-
-        items.push(CatalogItem {
-            id: ProviderMediaId {
-                provider: ProviderKind::MovieBox,
-                value: id_str,
-            },
-            title,
-            media_type,
-            year,
-            poster_url,
-            season_count,
-        });
     }
 
     items
+}
+
+pub fn moviebox_homepage_json_to_catalog(
+    payload: &serde_json::Value,
+) -> (
+    Vec<CatalogItem>,
+    std::collections::HashMap<String, crate::models::BrowseMetrics>,
+) {
+    let mut items = Vec::new();
+    let mut metrics_map = std::collections::HashMap::new();
+    let mut seen_ids = std::collections::HashSet::new();
+
+    let groups = payload
+        .get("items")
+        .and_then(|i| i.as_array())
+        .or_else(|| payload.as_array());
+
+    if let Some(groups_arr) = groups {
+        for group in groups_arr {
+            let mut group_subjects = Vec::new();
+            if let Some(banner) = group
+                .get("banner")
+                .and_then(|b| b.get("banners"))
+                .and_then(|b| b.as_array())
+            {
+                for b_item in banner {
+                    if let Some(subject) = b_item.get("subject") {
+                        group_subjects.push(subject);
+                    }
+                }
+            }
+            if let Some(custom_data) = group
+                .get("customData")
+                .and_then(|c| c.get("items"))
+                .and_then(|i| i.as_array())
+            {
+                for c_item in custom_data {
+                    if let Some(subject) = c_item.get("subject") {
+                        group_subjects.push(subject);
+                    }
+                }
+            }
+            if let Some(subjects) = group.get("subjects").and_then(|s| s.as_array()) {
+                for s in subjects {
+                    group_subjects.push(s);
+                }
+            }
+
+            for (index, subject_val) in group_subjects.into_iter().enumerate() {
+                if let Some(catalog_item) = moviebox_subject_json_to_catalog_item(subject_val) {
+                    let id = catalog_item.id.value.clone();
+                    if seen_ids.insert(id.clone()) {
+                        let mut metric = crate::service::extract_browse_metrics(subject_val);
+                        if metric.trending.is_none() {
+                            metric.trending = Some((1000 - index.min(999)) as f64);
+                        }
+                        metrics_map.insert(id, metric);
+                        items.push(catalog_item);
+                    }
+                }
+            }
+        }
+    }
+
+    (items, metrics_map)
+}
+
+pub fn moviebox_suggest_json_to_strings(payload: &serde_json::Value) -> Vec<String> {
+    let items = moviebox_search_json_to_catalog(payload);
+    items.into_iter().map(|item| item.title).collect()
 }
 
 pub fn moviebox_details_json_to_media_details(
@@ -272,6 +348,42 @@ pub fn moviebox_details_json_to_media_details(
         }
     }
 
+    let mut dubs = Vec::new();
+    if let Some(dubs_arr) = subject.get("dubs").and_then(|d| d.as_array()) {
+        for d in dubs_arr {
+            let subject_id = d
+                .get("subjectId")
+                .or_else(|| d.get("id"))
+                .and_then(|v| {
+                    if let Some(num) = v.as_i64() {
+                        Some(num.to_string())
+                    } else {
+                        v.as_str().map(|str_val| str_val.to_string())
+                    }
+                })
+                .unwrap_or_default();
+            let language = d
+                .get("lanName")
+                .or_else(|| d.get("language"))
+                .or_else(|| d.get("lang"))
+                .and_then(|l| l.as_str())
+                .unwrap_or("Unknown")
+                .to_string();
+            let label = d
+                .get("title")
+                .or_else(|| d.get("name"))
+                .or_else(|| d.get("lanName"))
+                .and_then(|l| l.as_str())
+                .unwrap_or(&language)
+                .to_string();
+            dubs.push(AudioTrackOption {
+                subject_id,
+                language,
+                label,
+            });
+        }
+    }
+
     Ok(MediaDetails {
         id: ProviderMediaId {
             provider: ProviderKind::MovieBox,
@@ -291,7 +403,129 @@ pub fn moviebox_details_json_to_media_details(
         duration,
         genres,
         seasons,
+        dubs,
     })
+}
+
+pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
+    if let Some(r) = item
+        .get("_addon_release")
+        .or_else(|| item.get("_fourk_release"))
+        .and_then(|val| serde_json::from_value::<Release>(val.clone()).ok())
+    {
+        return r;
+    }
+
+    let filename = item
+        .get("fileName")
+        .or_else(|| item.get("title"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown Release")
+        .to_string();
+
+    let resolution = item.get("resolution").and_then(|r| {
+        if let Some(n) = r.as_u64() {
+            Some(format!("{n}p"))
+        } else if let Some(n) = r.as_i64() {
+            Some(format!("{n}p"))
+        } else {
+            r.as_str().map(|s| s.to_string())
+        }
+    });
+
+    let codec = item
+        .get("codecName")
+        .or_else(|| item.get("codec"))
+        .and_then(|c| c.as_str())
+        .map(|s| s.to_string());
+
+    let language = item
+        .get("language")
+        .or_else(|| item.get("lanName"))
+        .and_then(|l| l.as_str())
+        .map(|s| s.to_string());
+
+    let size_bytes = item.get("size").and_then(|s| {
+        if let Some(n) = s.as_u64() {
+            Some(n)
+        } else if let Some(n) = s.as_i64() {
+            Some(n as u64)
+        } else if let Some(str_val) = s.as_str() {
+            str_val.parse::<u64>().ok()
+        } else {
+            None
+        }
+    });
+
+    let season = item.get("se").and_then(|v| {
+        if let Some(n) = v.as_u64() {
+            Some(n as usize)
+        } else if let Some(n) = v.as_i64() {
+            Some(n as usize)
+        } else {
+            v.as_str().and_then(|s| s.parse().ok())
+        }
+    });
+
+    let episode = item.get("ep").and_then(|v| {
+        if let Some(n) = v.as_u64() {
+            Some(n as usize)
+        } else if let Some(n) = v.as_i64() {
+            Some(n as usize)
+        } else {
+            v.as_str().and_then(|s| s.parse().ok())
+        }
+    });
+
+    let mut mirrors = Vec::new();
+    let resource_link = item
+        .get("resourceLink")
+        .or_else(|| item.get("url"))
+        .and_then(|l| l.as_str())
+        .filter(|s| !s.is_empty());
+
+    if let Some(link) = resource_link {
+        let label = item
+            .get("uploadBy")
+            .or_else(|| item.get("source"))
+            .and_then(|u| u.as_str())
+            .unwrap_or("Direct")
+            .to_string();
+
+        mirrors.push(SourceMirror {
+            label,
+            resolver_url: link.to_string(),
+            headers: vec![],
+            direct_file: false,
+        });
+    }
+
+    Release {
+        provider: ProviderKind::MovieBox,
+        filename,
+        quality: resolution,
+        codec,
+        language,
+        size_bytes,
+        season,
+        episode,
+        mirrors,
+    }
+}
+
+pub fn moviebox_resource_json_to_releases(payload: &serde_json::Value) -> Vec<Release> {
+    let items = if let Some(list) = payload.get("list").and_then(|l| l.as_array()) {
+        list.as_slice()
+    } else if let Some(arr) = payload.as_array() {
+        arr.as_slice()
+    } else {
+        &[]
+    };
+
+    items
+        .iter()
+        .map(moviebox_resource_item_to_release)
+        .collect()
 }
 
 #[cfg(test)]
@@ -367,5 +601,67 @@ mod tests {
         assert_eq!(details.imdb_rating.as_deref(), Some("8.7"));
         assert_eq!(details.duration.as_deref(), Some("169m"));
         assert_eq!(details.genres, vec!["Sci-Fi", "Adventure"]);
+    }
+
+    #[test]
+    fn test_moviebox_details_with_dubs_and_resource_conversion() {
+        let payload = json!({
+            "data": {
+                "subject": {
+                    "subjectId": "500",
+                    "title": "Money Heist",
+                    "subjectType": 2,
+                    "dubs": [
+                        { "subjectId": "500", "lanName": "Original", "title": "Spanish (Original)" },
+                        { "subjectId": "501", "lanName": "English", "title": "English Dub" }
+                    ],
+                    "seasons": {
+                        "seasons": [
+                            { "se": 1, "maxEp": 13 }
+                        ]
+                    }
+                }
+            }
+        });
+
+        let details = moviebox_details_json_to_media_details(&payload).unwrap();
+        assert!(details.is_series());
+        assert!(details.has_languages());
+        assert_eq!(details.dubs.len(), 2);
+        assert_eq!(details.dubs[0].subject_id, "500");
+        assert_eq!(details.dubs[0].language, "Original");
+        assert_eq!(details.dubs[1].subject_id, "501");
+        assert_eq!(details.dubs[1].language, "English");
+
+        let resource_payload = json!({
+            "list": [
+                {
+                    "fileName": "Money.Heist.S01E01.1080p.NF.WEB-DL.x265",
+                    "resolution": 1080,
+                    "codecName": "hevc",
+                    "size": "850000000",
+                    "se": 1,
+                    "ep": 1,
+                    "resourceLink": "https://stream.example.com/mh0101.mp4",
+                    "uploadBy": "NF"
+                }
+            ]
+        });
+
+        let releases = moviebox_resource_json_to_releases(&resource_payload);
+        assert_eq!(releases.len(), 1);
+        assert_eq!(
+            releases[0].filename,
+            "Money.Heist.S01E01.1080p.NF.WEB-DL.x265"
+        );
+        assert_eq!(releases[0].resolution_u64(), 1080);
+        assert_eq!(releases[0].codec.as_deref(), Some("hevc"));
+        assert_eq!(releases[0].season, Some(1));
+        assert_eq!(releases[0].episode, Some(1));
+        assert_eq!(
+            releases[0].direct_url(),
+            Some("https://stream.example.com/mh0101.mp4")
+        );
+        assert_eq!(releases[0].source_label(), "NF");
     }
 }

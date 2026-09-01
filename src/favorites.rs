@@ -14,6 +14,45 @@ pub struct FavoriteItem {
 }
 
 impl FavoriteItem {
+    pub fn from_details(provider: &str, details: &crate::models::MediaDetails) -> Self {
+        let title = crate::providers::moviebox::clean_moviebox_title(&details.title);
+        let title = if title.trim().is_empty() {
+            details.title.clone()
+        } else {
+            title
+        };
+        let stype = if details.is_series() { 2 } else { 1 };
+        let release_year = details.year.clone().unwrap_or_default();
+        let cover_url = details.cover_url().map(|s| s.to_string());
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        Self {
+            provider: provider.to_string(),
+            subject_id: details.id.value.clone(),
+            title,
+            cover_url,
+            stype,
+            release_year,
+            added_at: now,
+        }
+    }
+
+    pub fn to_search_result(&self) -> crate::models::SearchResult {
+        crate::models::SearchResult {
+            id: self.subject_id.clone(),
+            title: self.title.clone(),
+            stype: self.stype,
+            release_year: self.release_year.clone(),
+            cover_url: self.cover_url.clone(),
+            season: 0,
+            episode: 1,
+            provider: crate::models::ProviderKind::parse(&self.provider)
+                .unwrap_or(crate::models::ProviderKind::MovieBox),
+        }
+    }
+
     pub fn identity(&self) -> crate::models::SubjectIdentity<'_> {
         crate::models::SubjectIdentity {
             provider: &self.provider,

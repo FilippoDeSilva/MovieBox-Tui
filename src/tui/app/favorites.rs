@@ -33,37 +33,11 @@ impl App {
     fn current_favorite_candidate(&self) -> Option<crate::favorites::FavoriteItem> {
         match self.state.active_screen {
             Screen::Details => {
-                let subject_id = self.state.active_subject_id.clone()?;
                 let details = self.state.selected_details.as_ref()?;
                 let provider = self.current_subject_provider().cache_key().to_string();
-                let raw_title = details
-                    .get("title")
-                    .or_else(|| details.get("name"))
-                    .and_then(|t| t.as_str())
-                    .unwrap_or_default();
-                let title = crate::providers::moviebox::clean_moviebox_title(raw_title);
-                let stype = crate::tui::state::stype(details);
-                let release_year = details
-                    .get("releaseDate")
-                    .or_else(|| details.get("year"))
-                    .or_else(|| details.get("releaseInfo"))
-                    .and_then(|y| y.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let cover_url = details
-                    .get("cover")
-                    .and_then(|c| c.get("url"))
-                    .and_then(|u| u.as_str())
-                    .map(|s| s.to_string());
-                Some(crate::favorites::FavoriteItem {
-                    provider,
-                    subject_id,
-                    title,
-                    cover_url,
-                    stype,
-                    release_year,
-                    added_at: now_secs(),
-                })
+                Some(crate::favorites::FavoriteItem::from_details(
+                    &provider, details,
+                ))
             }
             Screen::Home => {
                 if self.state.favorites_focus {
@@ -156,15 +130,11 @@ impl App {
 
         self.state.active_screen = Screen::Details;
         self.state.active_subject_id = Some(subject_id.clone());
-        self.state.selected_details = Some(serde_json::json!({
-            "id": subject_id.clone(),
-            "subjectId": subject_id.clone(),
-            "title": item.title,
-            "subjectType": item.stype,
-            "releaseDate": item.release_year,
-            "cover": { "url": item.cover_url },
-        }));
-        self.state.selected_resources = None;
+        self.state.selected_details = Some(crate::models::MediaDetails::from_search_result(
+            &item.to_search_result(),
+            self.state.search_preview.as_ref(),
+        ));
+        self.state.selected_resources.clear();
         self.state.is_loading = true;
         self.state.is_fetching_streams = false;
         self.state.stream_error = None;

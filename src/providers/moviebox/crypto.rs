@@ -8,16 +8,21 @@ use url::Url;
 const SECRET_KEY_DEFAULT: &str = "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O";
 const SIGNATURE_BODY_MAX_BYTES: usize = 102_400;
 
+static DEFAULT_SECRET_BYTES: std::sync::LazyLock<Vec<u8>> =
+    std::sync::LazyLock::new(|| b64_decode(SECRET_KEY_DEFAULT));
+
 type HmacMd5 = Hmac<Md5>;
 
 fn md5_hex(data: &[u8]) -> String {
     let mut hasher = Md5::new();
     hasher.update(data);
-    hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect()
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(32);
+    for b in digest {
+        use std::fmt::Write;
+        let _ = write!(&mut hex, "{:02x}", b);
+    }
+    hex
 }
 
 fn b64_decode(val: &str) -> Vec<u8> {
@@ -135,9 +140,7 @@ pub fn generate_x_tr_signature(
     timestamp_ms: u64,
 ) -> String {
     let canonical = build_canonical_string(method, accept, content_type, url, body, timestamp_ms);
-    let secret_bytes = b64_decode(SECRET_KEY_DEFAULT);
-
-    let Ok(mut mac) = HmacMd5::new_from_slice(&secret_bytes) else {
+    let Ok(mut mac) = HmacMd5::new_from_slice(&DEFAULT_SECRET_BYTES) else {
         log::warn!("moviebox signature fallback: invalid HMAC key material");
         return format!("{}|2|", timestamp_ms);
     };

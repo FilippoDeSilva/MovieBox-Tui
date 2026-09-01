@@ -435,10 +435,17 @@ where
 
     let assembly = sidecar_path(destination, "assembling");
     let mut output = tokio::fs::File::create(&assembly).await?;
+    let mut copy_buffer = vec![0u8; 256 * 1024];
     for index in 0..segments {
         let path = segment_path(destination, index);
         let mut part = tokio::fs::File::open(&path).await?;
-        tokio::io::copy(&mut part, &mut output).await?;
+        loop {
+            let n = tokio::io::AsyncReadExt::read(&mut part, &mut copy_buffer).await?;
+            if n == 0 {
+                break;
+            }
+            tokio::io::AsyncWriteExt::write_all(&mut output, &copy_buffer[..n]).await?;
+        }
     }
     output.flush().await?;
     output.sync_data().await?;
@@ -532,8 +539,13 @@ async fn download_segment(
             .await?;
         let mut response = response;
         let mut written = existing;
+        let mut unbatched_bytes = 0u64;
+        let mut last_progress_send = Instant::now();
         loop {
             if cancel.load(Ordering::Relaxed) {
+                if unbatched_bytes > 0 {
+                    let _ = progress.send((unbatched_bytes, attempt)).await;
+                }
                 file.flush().await?;
                 return Err(DownloadError::Paused);
             }
@@ -543,14 +555,27 @@ async fn download_segment(
                     let bytes = chunk.len().min(remaining as usize);
                     file.write_all(&chunk[..bytes]).await?;
                     written += bytes as u64;
-                    let _ = progress.send((bytes as u64, attempt)).await;
+                    unbatched_bytes += bytes as u64;
+                    if unbatched_bytes >= 256 * 1024
+                        || last_progress_send.elapsed() >= Duration::from_millis(100)
+                    {
+                        let _ = progress.send((unbatched_bytes, attempt)).await;
+                        unbatched_bytes = 0;
+                        last_progress_send = Instant::now();
+                    }
                     if written == expected {
+                        if unbatched_bytes > 0 {
+                            let _ = progress.send((unbatched_bytes, attempt)).await;
+                        }
                         file.flush().await?;
                         file.sync_data().await?;
                         return Ok(());
                     }
                 }
                 Ok(Ok(None)) => {
+                    if unbatched_bytes > 0 {
+                        let _ = progress.send((unbatched_bytes, attempt)).await;
+                    }
                     file.flush().await?;
                     last_error = Some(DownloadError::Incomplete {
                         downloaded: written,
@@ -559,11 +584,17 @@ async fn download_segment(
                     break;
                 }
                 Ok(Err(error)) => {
+                    if unbatched_bytes > 0 {
+                        let _ = progress.send((unbatched_bytes, attempt)).await;
+                    }
                     file.flush().await?;
                     last_error = Some(DownloadError::Network(error));
                     break;
                 }
                 Err(_) => {
+                    if unbatched_bytes > 0 {
+                        let _ = progress.send((unbatched_bytes, attempt)).await;
+                    }
                     file.flush().await?;
                     last_error = Some(DownloadError::InvalidRange("read timeout".into()));
                     break;
