@@ -3,264 +3,66 @@
 ## [0.1.15] - 2026-09-03
 
 ### Added
-- **Multi-Resolution DASH Stream Detection & `[Multi]` Badge**:
-  - Implemented automatic recognition of adaptive multi-bitrate MPEG-DASH manifests (`index.mpd`), labeling them with a distinct `[Multi]` badge in the streams table.
-  - Sanitized release titles by stripping confusing raw CDN resolution suffixes (e.g. `_360P`) from MovieBox titles.
-- **MovieBox Current Playback API & Long-Lived Session Lifecycle (`src/providers/moviebox/`, `src/player.rs`, `src/tui/app/requests.rs`)**:
-  - Upgraded guest authentication to `POST /wefeed-mobile-bff/user-api/visitor-login` with a dedicated `MovieBoxSession` model that parses JWT claims (`userId`, `exp`).
-  - Added atomic disk session persistence (`~/.cache/moviebox-tui/moviebox_session.bin`), single-flight async initialization mutex, and automatic 401/403 recovery with single retry.
-  - Implemented `resolve_dash_manifest_from_policy` and `moviebox_play_info_json_to_releases` to decode CloudFront base64 statements into canonical MPEG-DASH manifests (`https://sacdn.hakunaymatata.com/dash/.../index.mpd`).
-  - Added multi-resolution stream releases (`1080p`, `720p`, `480p` HEVC) from stream descriptor representations.
-  - Updated `mpv` and `IINA` player invocations to forward authentication headers via `--http-header-fields` and `--ytdl-raw-options=add-header=...` for authenticated CloudFront DASH demuxing.
-- **Seekable 4KHDHub Stream Resolution & HubCloud Enhancements (`src/providers/fourkhdhub/`)**:
-  - Prioritized high-speed seekable Cloudflare R2 / S3 / FSL streams (`score = 0`) supporting `HTTP 206 Partial Content` with `Accept-Ranges: bytes` over non-seekable Google UserContent attachment downloads.
-  - Added automatic unwrapping and decoding of base64-encoded `watch-online` redirect URLs.
-  - Broadened download button selectors to recognize all HubCloud variations (`a#download`, `a.btn-primary`, `a.btn-success`, `a[href*='/download/']`, `a[href*='gamerxyt.com']`).
-  - Automatic URL normalization for raw stream URLs containing unencoded spaces and special characters using `percent_encoding::utf8_percent_encode`.
-  - Concurrently probe resolver candidate mirrors in chunks of 3 with a 4.0-second timeout via `futures::future::select_ok` for fast (<2s) playback start.
-  - Detect upstream HTML error notices (`"Failed to extract link"`, `"Token Expired"`, `"File Not Found"`, `"404"`), rejecting dead torrent mirrors immediately.
-- **Smooth Loading Transitions & Zero-Flicker View State Optimization (`src/tui/screens/home.rs`, `src/tui/screens/details.rs`, `src/tui/app/keyboard.rs`)**:
-  - Eliminated millisecond flashes of "No matches found" / "No results found" when submitting searches by synchronizing `is_loading` state on Enter and prioritizing `SearchViewState::Loading` in `search_view_state`.
-  - Prevented transient "No stream sources found" flash on the Details screen by displaying the stream loading spinner while either `is_fetching_streams` or `is_loading` is active.
-  - Added `has_streams_settled` and `has_search_settled` lifecycle tracking flags to ensure smooth visual transitions without state jumps during async operations.
-- **Ultra-Minimal No-Results Screen & 1:1 Hitboxes (`src/tui/screens/home.rs`, `src/tui/app/mouse.rs`)**:
-  - Clean, borderless search bar anchored at Row 0 with subtle `0 results` indicator in `theme.subtext1`, matching standard search position with zero layout jumping.
-  - Single headline naming the query and active provider.
-  - Dynamic 1:1 mouse-clickable action buttons (`[ Try on <Provider> (^P) ]`, `[ Clear Search (c) ]`).
-- **Responsive Details Header Layout & Content-Adaptive Sizing (`src/tui/screens/details.rs`)**:
-  - Content-adaptive header height dynamically sized based on metadata density (synopsis length, audio dubs, and badges).
-  - High-fidelity 2:3 aspect ratio poster thumbnail with responsive width clamping.
-  - Dedicated bold title row, separate badges row (IMDb, quality, release year), breathing spacer, and clean audio dubs fallback indicator.
-- **Seamless In-Place Provider Switching (`src/tui/screens/details.rs`, `src/tui/app/keyboard.rs`)**:
-  - Pressing `Ctrl+P` on the details screen re-queries the new provider for the current title without kicking the user back to the home landing.
-- **First-Run Discover Shelf (`src/tui/screens/home.rs`)**:
-  - Added curated discover shelf on the home landing screen when favorites are empty, providing immediate content discovery on first launch.
-- **Isolated Stream Selection Highlighting & Dedicated Table Header (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
-  - Fixed stream selection highlight bleeding over group and table column headers by separating the column header into a static, unselected header row at the top of the Streams pane in `theme.overlay0`.
-  - Rendered each stream as an atomic 1-line `ListItem`, ensuring Ratatui's `selection_style` background and `selection_symbol` apply exclusively to the selected stream row.
-  - Aligned table column headers (`RES`, `SIZE`, `MEDIA TAGS`, `SOURCE`, `UPLOADER`, `RELEASE`) across all 4 responsive tiers (<58, 58..85, 85..115, $\ge$115 cols).
-  - Simplified scroll indicator calculation and aligned mouse click hitboxes directly to stream rows.
-- **Strict Metadata & Preview Identity Isolation (`src/providers/models.rs`, `src/tui/app/requests.rs`, `src/tui/screens/details.rs`, `src/tui/screens/home.rs`, `src/tui/app/playback.rs`)**:
-  - Filtered `MediaDetails::from_search_result` to only consume `search_preview` when `preview.id.value == item.id && preview.id.provider == item.provider`, preventing stale metadata leakage when navigating search results quickly.
-  - Guarded `DetailsSuccess` metadata merging to only combine missing fields when `existing.id.value == id && existing.id.provider == details.id.provider`.
-  - Guarded synopsis fallback in `details.rs`, search result card badges in `home.rs`, and watch history duration/cover fallbacks in `playback.rs` with strict subject ID matching.
-- **Addon Provider Metadata Resolution & Crew Support (`src/providers/addons/`)**:
-  - Reordered `AddonClient::details` query priority to start with `"movie"` before `"series"`, returning immediately upon receiving valid matching metadata.
-  - Added support for plural and alternate crew and cast fields (`directors`, `writer`, `writers`, `stars`) in `MetaDetail` deserialization and adaptation.
-  - Prevented incorrect media type classification from corrupting stream queries to addon providers.
-- **Domain Factory Methods & Codebase Deduplication (`src/providers/models.rs`, `src/models.rs`, `src/history.rs`, `src/favorites.rs`, `src/tui/app/`)**:
-  - Centralized `MediaDetails::from_search_result(&item, preview)` constructor on `MediaDetails`, eliminating 100+ lines of duplicate fallback creation across `navigation.rs` and `favorites.rs`.
-  - Added `WatchHistoryItem::from_details` and `FavoriteItem::from_details` domain constructors consuming strongly typed `MediaDetails`.
-  - Added `SearchResult::from_catalog_item` and `FavoriteItem::to_search_result` for seamless domain conversion.
-- **Centralized Provider Resolution on `AppState` (`src/tui/state.rs`, `src/tui/screens/details.rs`, `src/tui/app/`)**:
-  - Implemented `AppState::provider_for_subject` and `AppState::current_subject_provider`, unifying provider mapping across `details.rs`, `navigation.rs`, `playback.rs`, `favorites.rs`, `download.rs`, `requests.rs`, `search.rs`, `system.rs`, and `mouse.rs`.
-  - Removed duplicate local helper functions in `details.rs` and `navigation.rs`.
-- **Stremio Addon Stream Canonical Deduplication & Word-Boundary Quality Matching (`src/providers/addons/`)**:
-  - Implemented word-boundary safe quality classification preventing false positives on words like "Shadow" or "Thunder".
-  - Canonical URL stream deduplication in `aggregator.rs`, consolidating multi-addon mirrors into unified `Release` records.
-- **Downloader Worker Batching & Buffered Multi-Segment Merging (`src/download.rs`)**:
-  - Batched worker progress reports every 256KB or 100ms, eliminating MPSC channel contention and CPU thrashing during multi-worker downloads.
-  - Upgraded multi-segment file assembly to use a 256KB buffered stream copy.
-- **Configuration & Storage Hardening (`src/config.rs`, `src/cache.rs`)**:
-  - Added corrupt config backup rotation to `.corrupt.<timestamp>` with error logging and parent directory creation safety.
-  - Single-syscall L2 disk cache reads (`fs::File::open` + reader) replacing redundant stat lookups.
-  - Windows atomic file replace hardening (`durable_replace` unlink fallback).
-- **TUI Virtualization & Responsive Terminal Hardening (`src/tui/screens/`, `src/tui/widgets/`, `src/tui/overlay.rs`)**:
-  - Stream list stack-allocated counter virtualization in `src/tui/screens/details.rs`.
-  - Zero-allocation `item_slot_rects` helper and direct block rendering in `src/tui/screens/home.rs`.
-  - Responsive Settings category tabs switching to compact pills (`[1:Gen] [2:Modes] [3:Theme] [4:Info]`) when terminal width < 55 columns, with modal layout width clamping in `overlay.rs`.
-- **100% Zero-JSON Internal Engine & Universal Domain Typing (`src/models.rs`, `src/providers/`, `src/service.rs`, `src/tui/`)**:
-  - Completely eliminated legacy JSON conversion adapters (`search_to_moviebox_json`, `details_to_moviebox_json`, `releases_to_moviebox_json`, `CatalogItem::to_moviebox_subject_json`, `MediaDetails::to_moviebox_details_json`, `Release::to_moviebox_resource_json`, `meta_detail_to_moviebox_json`, `metas_to_moviebox_search_json`), removing 250+ lines of redundant serialization boilerplate.
-  - Strongly typed the entire action event bus (`Action::SearchSuccess`, `Action::HomepageSuccess`, `Action::SuggestSuccess`, `Action::ShowSubtitlePopup`, `Action::ShowDownloadSubtitlePopup`, `Action::DetailsSuccess`, `Action::EpisodeStreamsReady`), transporting native Rust structs (`CatalogItem`, `MediaDetails`, `Release`, `SubtitleOption`, `BrowseMetrics`) with zero JSON boxing.
-  - Modernized `MovieBoxService` (`search_typed`, `details_typed`, `suggest`, `homepage`, `get_ext_captions`, `fetch_addon_catalog`), eliminating all untyped `serde_json::Value` service endpoints.
-- **Decoupled Provider Polymorphism & Addon `Provider` Trait Implementation (`src/providers/addons/`, `src/service.rs`)**:
-  - Implemented the `Provider` trait (`Provider::search` and `Provider::details`) natively on `AddonClient`, aggregating enabled catalog/meta addons internally.
-  - Streamlined `MovieBoxService::search_typed` and `details_typed` to use uniform polymorphic dispatch across all providers, eliminating 160+ lines of duplicate search and metadata loops.
-- **Consolidated Text & 4-Digit Year Normalization (`src/tui/text.rs`)**:
-  - Upgraded and consolidated `extract_4digit_year` into a high-performance UTF-8 byte-window extraction engine in `src/tui/text.rs`, reused across `fourkhdhub/parser.rs`, `dhakaflix/client.rs`, and addon adapters.
-- **Structured Categorized In-App Help Dialog (`src/tui/screens/help.rs`)**: Redesigned the interactive keybinding help menu (`?`) with balanced side-by-side columns: left column features dedicated `Navigation` and mode-specific `Actions` (`Play`, `Download`, `Favorite`, `Provider`), right column features `Content Modes` and `Commands & Shortcuts` (`/settings`, `/browse`, `/history`, `/favorites`, `/theme`, `/exit`). Eliminates split orphaned headers and guarantees clean 18-character key padding across all terminal sizes.
-- **`/exit` Slash Command (`src/tui/commands.rs`, `src/tui/app/search.rs`)**: Added `/exit` (with `/quit` and `/q` aliases) to the slash command engine, allowing users to cleanly exit the application and restore the terminal state directly from the search bar.
-- **Responsive Details Screen Layout & Narrow Terminal Polish (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
-  - **Narrow-Screen Dynamic Selector Pane Focus**: On compact terminal widths (<85 columns), renders the active selector pane (Audio, Seasons, or Episodes) with 100% available horizontal width instead of horizontally cramming 3 unreadable 14-character columns that cut off titles, language names, and season numbers.
-  - **Adaptive Pane Titles & Border Overflow Guard**: Dynamic title formatting for selector panes and streams headers (`"Streams · N available · X/Y"` $\to$ `"Streams · N (X/Y)"` $\to$ `"Streams (N)"`) preventing Ratatui border title truncations (`"● Audio · 4  1/"`).
-  - **Compact Header & Responsive Poster Guard**: Automatically suppresses the side-by-side poster column when width is <75 columns, giving full terminal width to the title, IMDb badge, metadata, and synopsis without tight character clipping.
-  - **Multi-Tier Responsive Stream Table Layout**: Added dedicated 4-tier column formatting across ultra-compact (<58 cols), compact (58..85 cols), standard (85..115 cols), and wide (>=115 cols) widths.
-- **Mode-Aware Dynamic Search Suggestions & Rotating Hints (`src/tui/screens/home.rs`)**: Mode-aware rotating search suggestion hints cycling at 4-second intervals across Streaming, Addon, and TV modes providing title recommendations, slash command discovery, and mode-specific tips with priority fallback for active status messages.
-- **Smooth Precision Beam Cursor & Active Keystroke Debounce (`src/tui/screens/home.rs`)**: High-contrast vertical beam cursor (`▎` in `theme.accent`, `█` on basic terminals) with zero gap spacing against ghosted placeholder text, balanced 500ms idle blinking cadence, and active typing debounce preventing mid-keystroke cursor flickering.
-- **Multi-`Esc` Search Results Return-to-Homepage Navigation (`src/tui/app/keyboard.rs`)**: Enhanced `Esc` navigation so pressing `Esc` from search results focuses the search input (`InputMode::Editing`), and pressing `Esc` again clears the search state and returns directly to the landing screen / homepage.
-- **Core Domain Typing & Modernized Provider Traits (`src/models.rs`, `src/providers/`)**:
-  - Refactored `Provider` and `ReleaseProvider` trait methods to return strongly typed domain models (`Result<Vec<CatalogItem>, ProviderError>`, `Result<MediaDetails, ProviderError>`, and `Result<Vec<Release>, ProviderError>`) instead of untyped `serde_json::Value` objects.
-  - Introduced structured, classified error boundaries (`ProviderError`) with automatic user notification formatting via `.user_message(provider)` and `From` conversions for provider client errors (`ScraperError`, `FourKHdHubError`, `CircleFtpError`, `DhakaFlixError`).
-  - Added strongly typed domain adapters (`moviebox_search_json_to_catalog`, `moviebox_details_json_to_media_details`, `meta_to_catalog_item`, `meta_detail_to_media_details`) and exposed `search_typed` and `details_typed` on `MovieBoxService`.
-- **In-Flight Async Task Tracking & Cancellation (`RequestTaskHandles`)**:
-  - Added `RequestTaskHandles` to `App` with atomic `JoinHandle::abort` cancellation triggers (`cancel_search`, `cancel_details`, `cancel_streams`, `cancel_suggest`, `cancel_homepage`, `cancel_all`), preventing stale network requests and CPU leaks when navigating or changing search queries.
-- **AppState Domain Partitioning & Sub-States (`src/tui/state.rs`)**:
-  - Partitioned the monolithic `AppState` into cohesive domain sub-states (`UiState`, `CatalogState`, `PlaybackState`, `DownloadState`) to decouple modal UI flags, search catalogs, playback handles, and download queues.
-- **Unified Header-Aware List Navigation (`src/tui/state.rs`, `src/tui/app/keyboard.rs`)**:
-  - Consolidated duplicate manager list wrapping, header-skipping, and step math into reusable helpers (`step_header_aware_list`, `step_tv_manager_selected`, `step_addon_manager_selected`, `first_*`, `last_*`).
-- **Unified Screen Layout & Mouse Hitbox Geometry (`src/tui/screens/details.rs`, `src/tui/app/mouse.rs`)**:
-  - Exported `DetailsScreenLayout` and `details_screen_layout` so both visual rendering and mouse hit-testing derive from identical calculated rect bounds across all viewport tiers.
-- **Centralized Slash Command Dispatch & Complete Command Inventory (`src/tui/commands.rs`, `src/tui/app/search.rs`)**:
-  - Centralized command input-clearing pre-conditions and expanded `SlashCommand::ALL` to all 19 registered variants.
-- **Unified Interactive Settings & Preferences Hub (`/settings`)**: Introduced a consolidated, mouse-friendly modal dialog replacing fragmented slash commands. Features 4 categorized tabs (`General`, `Content Modes`, `Appearance`, `Maintenance`), installed media player selection via interactive popup picker, live visual theme palette swatch picker integration, inline download directory editing, and multi-mode toggling with safety guards. Streamlined slash command autocomplete suggestions and in-app help overlays while retaining full legacy command compatibility.
-- **Details Screen Subtitles Shortcut (`[s]`)**: Added `s`/`S` keyboard shortcut on Details screen to open the subtitle language picker, matching mouse click and footer hints.
-- **Theme picker 3-point color swatches**: Rendered 3-point color swatches (`■ ■ ■` Accent | Surface | Base) previewing palette colors in `/theme`.
-- **Category origin pill badges**: Added `[MOVIES]`, `[SERIES]`, and `[DISCOVER]` category badges in the `/browse` preset dialog.
-- **Provider origin tags and resolution badges**: Displayed provider tags (`[MovieBox]`, `[4KHD]`, `[CircleFTP]`, `[DhakaFlix]`, `[Addon]`) and resolution badges (`[1080p]`, `[4K]`) on Home search result cards.
-- **Result position and pagination indicator**: Added contextual item counter and page indicators (`Item X of Y • Page N/M`) on search results.
-- **Contextual Details footer action bar**: Context-aware footer action bar with pane-specific shortcuts, `[f] Favorite`, and `[s] Subtitles`.
-- **Fixed-width, zero-padded episode items**: Aligned episode numbers (`EP 01`, `EP 02`, `EP 10`) with fixed-width watch state indicators and timestamps.
-- **Centralized UI widgets subsystem (`src/tui/widgets`)**: Standardized single-line text input fields (`render_single_line_input`), viewport-accurate Ratatui scrollbars (`render_scrollbar`), modal dialog framing and footer action bars (`ModalFrame`, `render_modal_footer`), and unified media badge and codec tag extraction (`badge.rs`) across search, details, and modal popups.
-- **Search suggestion source badges**: Added visual pill origin tags (`[CMD]`, `[HISTORY]`, `[FAVORITES]`, `[TV]`, `[SUGGEST]`) to dropdown suggestions for instant origin clarity.
-- **Responsive single-column result cards on narrow terminals (<75 cols)**: Dynamic single-column grid fallback on compact terminal windows ensuring titles, badges, ratings, and tags never clip or distort horizontally.
-- **Search result jump & pagination ergonomics (`Home`, `End`, `PageDown`, `PageUp`, `g`, `G`)**: In `Normal` mode on the search results screen, `Home` and `g` jump to the top result, `End` and `G` jump to the bottom result while automatically fetching the next page, and `PageDown`/`PageUp` page through results.
-- **1-Key direct watch history resume (`Space` / `P`)**: Pressing `Space` or `P` on any item in `/history` immediately launches direct playback for the recorded season and episode without manual Details navigation. Opening Details from history (`Enter`) pre-seeds selection to the recorded season/episode.
-- **Non-destructive `Esc` search navigation & `/clear`**: In `Normal` mode with active search results, pressing `Esc` focuses the search bar (`InputMode::Editing`) for quick query adjustments rather than wiping results; pressing `Esc` on an empty query or using `/clear` returns to landing cleanly.
-- **Actionable zero-results & multi-line wrapped error cards**: Zero-results states now display interactive guidance shortcuts (`[Ctrl+P] Switch provider`, `[/browse] Browse categories`, `[Ctrl+U] Clear`), and error states wrap full diagnostic descriptions with `[r] Retry request` and `[Esc] Back` action pills.
-- **Synopsis wrap line-clamping & Details fetch error fallback**: Synopsis paragraphs are now bounded by actual visual line capacity with `wrap_text` rather than raw character counts, and failed details fetches render an actionable error box (`[r] Retry fetch`, `[Esc] Back`) rather than hanging indefinitely on the loading spinner.
-- **Grapheme-safe search & text input centralization (`TextInputBuffer`)**: Unified all text editing across the main Search Bar, TV Playlist Manager, and Addon Manager with full grapheme-cluster awareness, horizontal cursor navigation (`Left`/`Right`, `Home`/`End`), forward deletion (`Delete`), backward deletion (`Backspace`), backward word deletion (`Ctrl+W`), and whole-line clearing (`Ctrl+U`).
-- **High-contrast media resolution badges & audio/codec tags**: Color-coded, high-contrast media resolution badges (`4K UHD`, `1080p FHD`, `720p HD`, `SD`) and granular audio/video codec tags (`HDR`, `DV`, `ATMOS`, `5.1`, `HEVC`, `AV1`, `BluRay`, `WEB-DL`, `REMUX`) in Details stream listings, with theme-aware foreground/background contrast styling and clean bracketed ASCII fallbacks on basic terminals.
-- **Smooth 10-frame Unicode Braille loading spinners**: Added fluid 10-frame Braille animation spinners (`⠋`, `⠙`, `⠹`, `⠸`, `⠼`, `⠴`, `⠦`, `⠧`, `⠇`, `⠏`) for search queries, metadata discovery, and stream fetching states, with graceful 2-character ASCII fallback (`..`) on basic terminals.
-- **Horizontal Details pane navigation (`Left`/`Right`/`h`/`l`)**: Added intuitive horizontal directional navigation (`Left`/`Right` and `h`/`l` vim keys) to smoothly cycle between Audio Languages, Seasons, Episodes, and Streams panes in the Details view alongside `Tab` and `Shift+Tab`.
-- **Surfaced backdrop container for slash command suggestions**: Autocomplete and slash command suggestions now render inside a dedicated `theme.surface0` background container with clear tree-branch hierarchy glyphs (`├─`, `└─` with `|-`, `\-` fallbacks) and aligned descriptions.
-- **Toast notification clearance & visual countdown progress bar**: Elevated toast notifications dynamically adjust their bottom clearance (`bottom_offset: 5`) when the active download gauge is visible to prevent visual collisions, and feature a live countdown progress bar (`━───` and `[==--]`) indicating remaining toast lifespan.
-- **Contextual terminal window titles**: Dynamically updates the terminal emulator window title based on active navigation state (`MovieBox-Tui — Streaming`, `MovieBox-Tui — Live TV`, `MovieBox-Tui — Addons`, and `MovieBox-Tui — {Title}` on Details screens).
-- **Modal graphic anti-bleed gating (`has_active_modal()`)**: Suppresses background Kitty, Sixel, and iTerm2 poster rendering whenever any modal overlay or dialog is active (Help, Theme picker, Browse categories, TV/Addon managers, Subtitles, Player picker, and Download confirmation), preventing terminal graphics from bleeding through popup borders and text.
-- **Catppuccin Latte light theme & Basic 16-color ANSI light palette**: Tuned Catppuccin Latte colors to meet WCAG AA contrast standards on light terminal backgrounds, and introduced a specialized 16-color ANSI light fallback palette (`Theme::fallback(true)`) ensuring crisp readability without truecolor support.
-- **Harmonized modal & picker navigation**: `Home` (jump to first), `End` (jump to last), `PageUp` (step -5), and `PageDown` (step +5) support across Browse categories, Theme picker, TV Playlist manager, and Addon manager dialogs.
-- **Download confirmation dialog key navigation**: `Tab` and `BackTab` (`Shift+Tab`) support for toggling between `[ Download ]` and `[ Cancel ]` action buttons in addition to `Left`/`Right`.
-- **Standardized status durations & helpers**: Semantic tick duration constants (`STATUS_TICKS_SHORT`, `STATUS_TICKS_DEFAULT`, `STATUS_TICKS_LONG`) and ergonomic `AppState` status helper methods replacing magic number literals across all TUI subsystems.
-- **Terminal Truecolor & Rendering Overhaul**:
-  - Native truecolor classification for `foot` and `alacritty` even when `COLORTERM` is stripped.
-  - Harmonized `is_termux_env` across player, filesystem, and updater modules.
-  - Theme autodetection now runs when no explicit theme is configured: `NO_COLOR` forces monochrome, truecolor terminals get full RGB palettes, strict 256-color terminals get quantized indexed palettes, ANSI-only terminals get the fallback palette, and an OSC 11 background query picks light/dark variants by measured luminance instead of `COLORFGBG` guesswork.
-  - Graphics salvage: terminals that answer kitty/sixel capability probes but no cell size (Windows Terminal sixel, iTerm2 over SSH) keep posters via default cell metrics instead of falling back to "No Poster".
-  - `MOVIEBOX_IMAGE_PROTOCOL=kitty|sixel|iterm2|none` and `MOVIEBOX_CELL_SIZE=WxH` overrides, documented in `--help`.
-  - Automatic re-probe on focus regain when the initial probe found nothing (covers tmux attach after startup), plus a `/probe` slash command.
-  - Kitty keyboard protocol (`DISAMBIGUATE_ESCAPE_CODES | REPORT_EVENT_TYPES`) for faster unambiguous keys on Ghostty/kitty/foot/WezTerm/Alacritty.
-- **Responsive result grid**: Results render in two columns at $\ge 110$ columns and three at $\ge 160$, with row-based `↑`/`↓`, item-step `←`/`→`, grid-aware click mapping, pagination, prefetching, and scroll clamping. Narrow terminals keep the classic single-column behavior.
-- **Contextual search bar status feedback**: Transient status messages (such as search clears, provider switching, and cache updates) display directly inside the search bar prompt in accent styling, returning to the mode placeholder when the timer expires.
-- **Scrollable help overlay**: Overflowing help content switches to a scrolled single column with position indicator; keyboard and wheel scrolling with key-swallowing so shortcuts no longer act behind the overlay.
-- **Viewport-adaptive caps**: Picker popup rows grow with terminal height (4–14), details selector height becomes viewport-proportional, and non-graphics terminals get a compact filmstrip poster placeholder.
-- **Search editing shortcuts & Tab suggestion completion**: `Tab` auto-completes regular search query suggestions in addition to slash commands; `Ctrl+U` clears the entire search input line and `Ctrl+W` deletes the previous word.
-- **Cursor shape & real input cursor**: `SetCursorStyle::SteadyBar` activates in input editing mode on supported terminals (Ghostty, Kitty, WezTerm, foot, Alacritty, Windows Terminal) and smoothly restores on normal mode, exit, or panic.
-- **Interactive toasts & gauge cancellation**: Clicking notification cards dismisses them; toast badges display kind icons (`ℹ`/`✔`/`⚠`/`✖`); clicking the active download gauge triggers cancellation.
-- **Details footer responsive threshold**: Single-row footer breakpoint adjusted to 86 columns in sync with mouse hit-testing, preventing button clipping on 70–85 column viewports.
-- **`f` and `*` favoriting parity**: Pressing `f`, `F`, or `*` on Home search results or the Favorites landing row toggles favorite status, matching Details.
-- **Streamlined `/toggle-*` slash commands**: Consolidated paired `/enable-*` and `/disable-*` commands into 4 primary toggles (`/toggle-tv`, `/toggle-addons`, `/toggle-bdix`, `/toggle-streaming`) with backward-compatible aliases.
+- **MovieBox MPEG-DASH Stream Playback**:
+  - Implemented visitor login authentication with JWT session tracking and atomic disk persistence (`~/.cache/moviebox-tui/moviebox_session.bin`).
+  - Added CloudFront DASH manifest resolution (`index.mpd`) labeled with `[Multi]` badge in stream listings for multi-resolution playback (`1080p`, `720p`, `480p`).
+  - Forwarded authentication headers and mobile `User-Agent` to `mpv`, `IINA`, and `VLC` for authenticated CloudFront DASH demuxing.
+- **Seekable 4KHDHub Stream Resolution**:
+  - Prioritized seekable Cloudflare R2, S3, and FSL stream mirrors (`HTTP 206 Partial Content`) over attachment downloads.
+  - Added automatic unwrapping of base64 `watch-online` redirect URLs and expanded HubCloud button selectors.
+  - Concurrently probe resolver mirror candidates in chunks of 3 with a 4-second timeout, filtering expired or broken links.
+- **Interactive Settings Hub (`/settings`)**:
+  - Added a unified 4-tab modal (`General`, `Content Modes`, `Appearance`, `Maintenance`) for media player selection, download directory configuration, live theme palette preview, and provider toggles.
+- **TUI Layout & Ergonomics**:
+  - Added `/exit` slash command (with `/quit` and `/q` aliases) to exit and restore the terminal directly from the search prompt.
+  - Added direct watch history resume on `Space` / `P` for the recorded season and episode.
+  - In-place provider switching (`Ctrl+P`) on the Details screen to re-query titles without returning to the landing screen.
+  - Multi-`Esc` navigation: first `Esc` returns focus to the search bar; second `Esc` clears the query and returns to the home landing.
+  - Added fluid 10-frame Unicode Braille loading spinners (`⠋⠙⠹...`) with ASCII fallbacks.
+  - Grapheme-cluster-safe text input (`TextInputBuffer`) across search, TV playlist, and addon inputs with `Ctrl+W`, `Ctrl+U`, `Delete`, and `Home`/`End` support.
+  - Added 4-tier responsive stream table layout and dynamic single-column fallback for narrow terminals (<85 cols).
+  - Added Kitty keyboard protocol support (`DISAMBIGUATE_ESCAPE_CODES`, `REPORT_EVENT_TYPES`) for lower latency input on supported terminals.
+  - Added terminal theme autodetection using OSC 11 background luminance queries, with `NO_COLOR` override support.
 
 ### Changed
-- **Streams Table Header & Column Width Expansion**: Replaced unavailable `DURATION` column (`--:--`) with `SOURCE` label, expanding `MEDIA TAGS` and `RELEASE` widths for enhanced tag readability.
-- **Theme Contrast & Readability**: Removed `Modifier::DIM` on metadata text and bullet separators; styled labels with high-contrast `theme.subtext1`.
-- **Search Prefetch Bounding**: Restricted initial prefetch burst to visible viewport bounds (`offset..offset + visible + 4`), reducing initial network requests by >60%.
-- **4KHDHub Preflight Probes**: Replaced open-range queries with bounded `Range: bytes=0-8191` to verify seekability without multi-gigabyte buffer transfers.
-- **Favorites Toggle Shortcut**: Standardized favorite toggling across all screens exclusively to `f` / `F`.
-- **Streamlined Playback & Shortcut Simplification (`src/tui/`)**: Removed redundant `[o] Open With` and dedicated `[s] Subtitles` picker shortcuts from Details footer action bars, keyboard handlers, mouse hitboxes, and help dialogs in favor of automatic subtitle stream handling and configuring default media players (`mpv`, `VLC`, `IINA`, `Android`) directly in the Settings Hub (`/settings`).
-- **Framed Zero-Results & Error State Cards**: Enclosed empty search results and query error states in styled, centered cards with pill headers (`SearchViewState::Error`, `SearchViewState::NoResults`) and actionable guidance pills (`[Ctrl+P] Switch Provider`, `[r] Retry`, `[Esc] Back`), with dedicated handling for empty `/favorites` queries (`"No favorites saved yet"`).
-- **Multi-Column Result Grid Gutter Arithmetic**: Refined `ResultMetrics` and `result_columns_for` column width calculations to account for explicit 1-character column gutters across 1, 2, 3, and 4-column tiers (with 4-column breakpoint at $\ge 220$ columns).
-- **Details Footer Split Threshold Synchronization**: Unified the single-row to dual-row footer threshold constant `DETAILS_FOOTER_SPLIT_THRESHOLD` ($86$ cols) across screen rendering (`details.rs`) and mouse click detection (`mouse.rs`).
-- **Confirmation Dialog Button Contrast**: Enhanced `[ Download ]` and `[ Cancel ]` button styling in confirmation modals with reverse/bold modifiers on basic terminals for WCAG AA visual contrast.
-- **Framed Landing Favorites Deck Styling & Alignment**: Enclosed the landing Favorites list in a matching bordered card with header border offset (`╭─ ★  Favorites ──╮` / `+- *  Favorites --+` on basic) with double-space icon breathing room, 1:1 vertical column alignment between header star `★` and selection pointer `▌`, and 1-character right breathing margin for item year/type tags (`2024 Movie `).
-- **MovieBox Client Version Spoofing Upgrade**: Updated MovieBox client identity spoofing to APK `v4.0.01.0813.03` with version codes `50020117..50020121` (`src/providers/moviebox/crypto.rs`), ensuring full backend compatibility and preventing notice video substitution.
-- **Explicit 480p and 360p Resolution Badges**: Standardized quality tags and badges for `480p` and `360p` across details stream tables and basic terminals, replacing generic `SD` labels.
-- **Homepage Landing Optical Spacing & Card Separation**: Increased vertical breathing margin between ASCII header and search deck, separated search input into a dedicated 3-row framed card, and formatted favorites as an aligned standalone deck with proper vertical rhythm.
-- **Streamlined 1-Line Mode Switcher**: Simplified bottom navigation bar to `[Ctrl+S] Stream · [Ctrl+T] TV · [Ctrl+A] Addon      [?] Help [q] Quit`, eliminating duplicate provider text.
-- **Clean Search Suggestion Dropdown Card**: Removed block background color styling on the outer borders and attached dropdown directly beneath the input prompt, eliminating contrasting 4-sided background halo artifacts.
-- **Streamlined Search Suggestions Dropdown**: Removed redundant `[SUGGEST]` badges on regular title queries, replaced tree branch glyphs with clean `▌ ` / `> ` selection indicators, and added full-width active row background styling.
-- **Streams List Tabular Column Alignment**: Standardized resolution badges to a uniform 7-column width and aligned file size, codec/media tags, duration, and uploader columns across all resolution tiers.
-- **Clean Streams Section Headers**: Replaced solid block badges on stream quality group headers with clean typographic labels (`1080p · 1 option`) eliminating double-box visual clutter.
-- **Search Card Focus State Differentiation**: Muted selection highlighting when search bar is in `Editing` mode to maintain clear visual hierarchy.
-- **Multi-Column Search Results Margin**: Added 1-column right margin on multi-column search results preventing overlap with the vertical scrollbar.
-- **Stabilized Landing Search Deck Width**: Standardized input deck layout width avoiding horizontal jitter while typing.
-- **Clean Ghosted Placeholder**: Rendered subtle `❯ █ Search movies and series...` prompt when search input is empty in editing mode.
-- **Grouped Secondary Stream Media Tags**: Secondary stream audio/video codec tags (`DV · ATMOS · HEVC`) now group with subtle `·` text separators rather than heavy boxes, preserving release title space.
-- **Responsive Mode Tabs**: Mode tabs on compact viewports dynamically abbreviate to `<76` (`[Ctrl+S] Stream`) and ultra-compact `<58` (`[S] Stream`), protecting them against collisions with the right-aligned utility bar.
-- **TV Mode Logo Responsiveness**: Terminal width `<80` triggers the narrower 33-column compact logo to render in TV mode, establishing clean margins on medium setups.
-- **Hitbox Splitting**: Synchronized horizontal clicks for mode tabs and the `[?] Help`/`[q] Quit` widgets by enforcing an exact `saturating_sub(19)` boundary layout.
-- **Bounded Hitbox**: Addressed dropdown autocompletion leakage. Mouse click events are now strictly clipped inside the computed dynamic bounds of the search suggestion dropdown list.
-- **Normal Mode Direct Clear Shortcut (`c` / `C`)**: Pressing `c` or `C` in `InputMode::Normal` clears the active search query instantly and clears search view states when not in an active download.
-- **Single-Column Grid Sequencing**: Standardized `<Left>` and `<Right>` movement behaviors in single-column grids so that `jump = 1` enforces granular sequential traversal.
-- **Vertical Picker Scaling**: Budget capacity for Picker rows has shifted to `(height - 6).clamp(4, 14)`, effectively granting 14 visible rows on a standard 24-row height layout.
-- **Help Layout Rendering Safety**: Wide but vertically short environments safely fall back to scrollable single-column views instead of broken two-column layout.
-- **Update Component Layout**: Brought the auto-updater window entirely into parity via `ModalFrame`, granting background area clearing overlays and standard unified outlines.
-- **Confirmation Footer Buttons**: Dropped redundant confirmation footers to inject dynamic, formatted `[ Download ] [ Cancel ]` dialog responses seamlessly inside confirmation views.
-- **Synopsis Clean Formatting**: Wrapped synopses auto-strip trailing punctuations (`.`, `,`, `!`, `?`, `:`, `;`) before truncating with an ellipsis (`…`).
-- **NO_COLOR Adjustments**: Added standard `Modifier::REVERSED` rendering on active item rows across Pickers and Results where `ColorSupport::NoColor` is enforced.
-- **CI Skip Conditions**: `Publish to Crates.io` and `Update Homebrew Formula` now skip gracefully when a Release run completed without publishing a new version; the live-network acceptance test is opt-in via `MOVIEBOX_LIVE_TESTS=1 cargo test --test real_acceptance -- --ignored`.
+- **Unified Favorite Keybinding**: Standardized favorite toggling across all screens exclusively on `f` / `F`.
+- **Search & Landing UX**:
+  - Anchored search bar at row 0 across empty, loading, and zero-results states to eliminate layout shifting.
+  - Structured zero-results and query error screens with actionable guidance shortcuts (`[Ctrl+P] Switch Provider`, `[r] Retry`, `[Esc] Back`).
+  - Enclosed landing favorites list in an aligned bordered card.
+- **Streams Table Display**:
+  - Replaced non-existent stream duration column with source and uploader columns, expanding room for codec and media tags.
+  - Grouped secondary stream audio/video codec tags (`DV`, `ATMOS`, `HEVC`) with subtle separator points.
+  - Isolated stream row selection highlight so background styling applies exclusively to the active stream row rather than table headers.
+- **MovieBox Client Spoofing**: Updated client identity headers to APK `v4.0.01` to ensure backend compatibility and avoid upgrade notice videos.
+- **Search Prefetching**: Bounded initial search prefetching to visible viewport bounds to reduce initial network requests.
 
 ### Fixed
-- **UI Freeze on `/browse`**: Offloaded poster image decoding and triangle downscaling entirely into background worker threads within `tokio::task::spawn_blocking`, eliminating main-thread event loop stalls.
-- **Trapped `Esc` Loop in Browse Mode**: Pressing `Esc` in browse mode now immediately exits to the home landing screen.
-- **Streams Panel Click Clamping**: Replaced `.min(streams_count - 1)` with strict bounds check so clicking empty panel space focuses the pane without triggering playback of index 0.
-- **Stale Preview Metadata Bleed**: Filtered `MediaDetails::from_search_result` to only consume `search_preview` when provider and ID match.
-- **Clippy Lints**: Resolved `clippy::manual_map` in `navigation.rs` and `clippy::if_same_then_else` in `details.rs`.
-- **Search Suggestions Background Halo Artifact**: Suppressed landing favorites background rendering when search suggestions are active and cleanly aligned dropdown container bounds, eliminating 4-sided dark shadow artifacts around suggestion borders.
-- **Search Suggestions Overlay Bleed**: Wrapped search suggestions in an elevated, bordered card with opaque background clearing (`theme.surface0`), and gated terminal graphics poster rendering while typing suggestions, eliminating text and image collisions over background search results.
-- **Season Download Stream Error Recovery**: Prevented download queue stalls when resolving individual episode stream URLs fails; failed streams report diagnostics and allow the remaining queue to continue.
-- **Favorites & Watch History Corruption Recovery**: Corrupted JSON configuration and history state files now rotate to `.corrupt` backups instead of hard deletion, preserving recoverable user data.
-- **MovieBox Stream URL Replacement with Upgrade Notice Video**: Fixed an issue where the MovieBox backend substituted movie and TV episode stream URLs with a 22-second app upgrade notice video (`1c7de0bd3393702d9191801f15f88f8d.mp4`) when legacy client version headers (`3.0.03.0529.03`) were detected.
-- **Mobile User-Agent Forwarding to Media Players & Downloader**: Forwarded the spoofed mobile `User-Agent` to external players (`mpv`, `VLC`, `IINA`) and the download HTTP client, preventing HTTP 428/403 errors when streaming or downloading from `bcdn.hakunaymatata.com`.
-- **Series Multi-Resolution Discovery Fallback**: Enhanced `fetch_collection_resolutions()` to inspect `list` array items when `collectionResolutions` is empty, sorting discovered qualities descending and defaulting to `[1080, 720, 480, 360]`.
-- **Details Screen Hit-Testing & Selector Alignment**: Aligned mouse hit-testing regions and season/episode selector column geometry across all compact, medium, and wide terminal tiers.
-- **Unicode Display Width in Input Widgets**: Single-line text input fields now compute column offsets using visual Unicode width instead of raw character counts, preventing CJK and multi-byte character overflow from wrapping box borders.
-- **M3U Playlist Channel Title Parsing**: Channel titles containing commas in `#EXTINF` metadata are now parsed without truncation, preserving complete channel display names.
-- **Subtitle Cache Purge Path Alignment**: Aligned `purge_stale_subtitles` with `resolve_subtitle_dir()` to ensure downloaded subtitle sidecars are cleaned automatically on startup.
-- **Android Termux Directory Resolution**: Added comprehensive fallback resolution for config, cache, and data directories when `dirs::*` returns `None` on Android Termux.
-- **Android Termux Self-Update Protection**: Added architecture guard preventing Termux from downloading incompatible glibc Linux ARM64 binaries that overwrite working Bionic installations.
-- **Windows UNC & Extended Path Escaping**: Preserved leading backslashes on Windows UNC (`\\server\share`) and extended-length (`\\?\`) paths when formatting player arguments.
-- **Windows Update Helper `find.exe` Qualification**: Explicitly qualified `%SystemRoot%\System32\find.exe` in the update helper `.bat` script to prevent shadowing by Git for Windows' `find.exe`.
-- **Windows NTFS Forbidden Character Sanitization**: Hardened tracker state file generation by stripping control characters and NTFS forbidden characters (`*`, `?`, `"`, `<`, `>`, `|`, `:`).
-- **Update Modal Keystroke Fallthrough**: Allowed non-modal navigation keystrokes to fall through to the active screen while the update banner is displayed.
-- **Playback & Stream Resolve State-Lock Fix (`playback.rs`, `download.rs`)**: Fixed an issue where failed or timed-out 4KHDHub/mirror resolutions left `is_resolving_playback` permanently set to `true`, preventing subsequent playback attempts; added a 15-second resolution timeout and enforced state resets on all error, cancellation, and modal dismissal paths.
-- **Poster Placeholder Overlap on Loaded Images**: Fixed a rendering bug on the Home results screen where the fallback placeholder widget was unconditionally drawn on top of loaded poster image protocols; the placeholder is now restricted to the `else` branch when an image is still fetching or unavailable.
-- **Results View Background Bleed-Through**: Added explicit area clearing for the results chunk before rendering search cards, eliminating ghost text artifacts (such as ASCII headers or landing row labels) bleeding through beneath unselected cards in multi-column grids.
-- **Modal Key Trapping & Isolation**: Structural modal gating prevents mode chords (`Ctrl+T`, `Ctrl+A`, `Ctrl+S`, `Ctrl+P`), download cancellation (`x`), and background pane navigation from leaking into open dialogs and inputs.
-- **Search Dropdown Alignment & Bleed**: Pinned the suggestion dropdown position to the search bar for stability, fixed layout starvation edge cases allowing background colors to bleed, and padded visual pill badges to standard widths.
-- **Search Bar View Normalization**: Search bar correctly fills terminal width rather than floating when active in empty, No Results, and Error states.
-- **Centered Text-Aligned Error Cards**: Replaced per-line centering on multiline diagnostic error states with block-level centering containing cleanly left-aligned text, making diagnostics far more readable.
-- **Adaptive No Results Layout**: Wrapped action pill shortcuts (`[Ctrl+P]`, `[/browse]`, `[Ctrl+U]`) across multiple lines rather than clipping on terminal windows narrower than 76 columns.
-- **Text Poster Fallback Clamp**: Fixed an edge case where text-based "No Poster" fallbacks expanded beyond visual limits in compact window modes.
-- **Results Metadata Line Truncation**: Added defensive truncation across styled multi-span metadata lines in search results to protect multi-column layouts from overflow crashes.
-- **TV & Addon Manager Visual Polish**: Aligned the selection cursor perfectly in TV playlist manager without introducing a visual shift, and switched the Addon Manager to `render_stateful_widget` enabling deep scrolling with vertical scrollbars.
-- **Dual-Column Help Overlay Layout**: Implemented a responsive two-column Help layout for wide viewports (>=90 cols), fitting the entire Help guide on one screen without scrolling.
-- **Picker & Stream List Mouse Offsets**: Rectified a bounds calculation mapping `click_in_picker` to the popup height instead of the active screen area which restricted clicks, and repaired stream-row mouse tracking which was previously ignoring `stream_scroll` offsets.
-- **Modal Exact Clears**: Replaced 3-column halo clear with exact popup bounding box clears, eliminating cutout artifacts on background cards and borders.
-- **Favorites Landing Navigation**: Pressing `Up` from the top favorite item cleanly returns focus to the search bar instead of getting stuck.
-- **Manager Shortcut Harmonization**: `Space` (toggle) and `Delete` (remove) are now supported across both TV Playlist and Addon managers.
-- **Details Synopsis & Theme Contrast**: Synopsis text styled with `theme.subtext1` for crisp readability; Nord overlay ramp and TokyoNight border luminance tuned.
-- **DNS Resolution on Android/Termux and Minimal Containers**: Replaced the reqwest `hickory-dns` feature flag with a custom resolver (`src/net.rs`) that reads the OS DNS configuration first (`/etc/resolv.conf`, registry on Windows) and falls back to embedded public resolvers (Cloudflare, Google, Quad9) when none exists. The previous approach failed every lookup on platforms without `/etc/resolv.conf` (hickory reads only the hardcoded `/etc/resolv.conf` path); the Termux `$PREFIX/etc/resolv.conf` installer workaround it required is removed.
-- **Crash on Multibyte Titles**: Year stripping sliced remote HTML titles at a raw byte offset and could abort the whole app on CJK/accented characters.
-- **Windows Self-Update Never Applied**: The staged binary lived inside a temporary directory deleted before the detached `.bat` helper ran, so the update silently never replaced the executable. Staging now persists beside the installed binary, the helper consumes and cleans it, and stale staging artifacts are swept at startup.
-- **State File Durability**: History/favorites/config writes fsync before rename and never delete the existing destination unless a replacement has succeeded.
-- **install.sh Correctness**: Install-directory fallback now happens outside the spinner subshell (reported path and shell-rc PATH edits previously used the wrong directory), INT/TERM exit cleanly instead of continuing, the version temp file is cleaned up on failure, PATH/profile matching is literal (regex-safe paths), missing `--version`/`--dir` values fail with clear errors, unknown arguments warn, trailing slashes in `--dir` are normalized, and reinstalling over a running binary avoids `ETXTBSY`.
-- **install.ps1 Hardening**: TLS 1.2 is enabled independently so older .NET stacks keep it even when TLS 1.3 is unavailable; User PATH updates are written through the registry preserving REG_EXPAND_SZ variables and use exact segment matching; the uninstaller removes its stale User PATH entry; `-Version 0.1.x` is accepted and normalized to `v0.1.x`.
-- **Mouse Click Accuracy**: Search-result hit testing uses the real scroll offset instead of deriving it from the selection, fixing clicks selecting or opening the wrong title after sorting or scrolling partway.
-- **Popup Geometry Parity**: Picker, TV-config, addon-manager, and download-confirm popups share one layout function between renderer and mouse handler, fixing off-by-one-row TV clicks, missed confirmation buttons on short summaries, skewed picker widths, and scroll-blind hit-testing on lists longer than eight rows.
-- **Text Layout Safety**: Details stream rows budget by display width rather than byte length (CJK uploaders/languages no longer overflow); suggestion descriptions, addon names, download gauge status, and playlist URLs truncate to their containers; notification card width no longer panics below 40 columns; addon URL input edits by grapheme clusters so CJK/emoji cursors stay aligned.
-- **Poster Memory Footprint**: Decoded posters are downscaled to $\le 512$px before caching, decoded/encoded cache sizes were right-sized (roughly 10× less RAM on low-end devices), failed posters retry after 10 minutes instead of being negatively cached forever, and prefetch shares one concurrency limiter instead of creating a new semaphore per scroll batch.
-- **Rendering & Input Polish**: The terminal graphics probe is capped at 400ms and runs off the UI thread (previously up to 2s of blank screen at startup); resize performs a single deferred clear instead of two flashes; grid poster width derives from real terminal cell metrics; the input caret blink keeps animating while typing; the mouse wheel scrolls contextually; `NO_COLOR` now overrides `MOVIEBOX_THEME`; strict 256-color terminals receive quantized indexed palettes rather than RGB sequences.
+- **Stream Playback & Resolver State**:
+  - Fixed an issue where timed-out or failed stream resolutions left the playback state locked, preventing subsequent playback attempts.
+  - Fixed empty stream panel click focusing the pane without inadvertently triggering playback of index 0.
+  - Prevented transient "No stream sources found" flash while metadata or streams are loading.
+- **Metadata & UI Isolation**:
+  - Guarded search preview metadata and details merging with strict provider and item ID checks, preventing stale metadata leakage when navigating quickly.
+  - Suppressed Sixel, Kitty, and iTerm2 poster graphics while modal dialogs or search dropdowns are open to prevent graphic bleed-through.
+  - Fixed poster placeholder widget incorrectly drawing over loaded images on the results screen.
+  - Fixed text wrapping panic on multibyte / CJK characters during title year extraction.
+- **Cross-Platform & Installation**:
+  - Windows: Fixed self-update batch script losing staged binary on process exit, preserved leading backslashes on UNC paths, and sanitized NTFS forbidden characters in tracker state filenames.
+  - Android (Termux): Added fallback directory resolution for config, cache, and data paths, and added architecture guard preventing incompatible glibc Linux ARM64 binaries from overwriting Termux installations.
+  - DNS: Replaced hardcoded `/etc/resolv.conf` requirement with custom resolver querying OS DNS first and falling back to public DNS (Cloudflare, Google, Quad9) on zero-config platforms.
+  - Installers: Hardened path quoting, signal handling, and TLS 1.2 negotiation in `install.sh` and `install.ps1`.
 
 ### Performance
-- **High-Performance MessagePack Binary Caching Engine (`src/cache.rs`)**:
-  - Replaced text-based JSON file caching with high-throughput binary serialization using `rmp-serde` (MessagePack) and a 4-byte magic signature (`MBC1`) with a versioned, self-healing TTL envelope (`CacheEnvelope<T>`).
-  - Delivers 10x–50x faster de/serialization performance and 60% reduced disk usage across search, details, streams, homepage, addon catalogs, and external captions.
-  - Multi-tier in-memory L1 fast path (`preview_cache`, `suggest_cache`, `homepage_cache`) eliminating redundant API calls and disk reads during active search and tab switching.
-  - Features self-healing fallback migration that automatically reads and cleanly upgrades legacy JSON cache files without panics.
-  - Standardized big-endian network byte order ensuring 100% cross-platform binary portability across macOS, Linux, Windows, and Android (Termux).
-- **Zero-Copy IPTV M3U Playlist Parser (`src/providers/tv/parser.rs`)**:
-  - Replaced format-based attribute extraction with a zero-copy single-pass slice scanner and `std::mem::take()`, eliminating ~300,000 allocations on 50k-channel playlists.
-- **Pre-Compiled Static CSS Selectors & High-Throughput Scrapers (`src/providers/fourkhdhub/`)**:
-  - Replaced 21+ dynamic `Selector::parse` calls per page with static `std::sync::LazyLock<Selector>` instances, completely eliminating CSS selector compilation overhead.
-  - Hardened preflight stream range checks to bounded `Range: bytes=0-8191`.
-- **Global Static DNS Resolver & HTTP Connection Pool Optimization (`src/net.rs`)**:
-  - Unified process-wide DNS caching via static `LazyLock<Arc<TokioResolver>>`, sharing resolver caches across all provider clients and background tasks.
-  - Enabled `.tcp_nodelay(true)`, `.tcp_keepalive(45s)`, `.pool_idle_timeout(90s)`, and `.pool_max_idle_per_host(8)` globally.
+- **MessagePack Binary Disk Cache (`src/cache.rs`)**: Replaced raw JSON disk caching with binary MessagePack serialization (`rmp-serde`) with magic signature `MBC1`, versioned envelopes, and automatic migration from legacy JSON caches.
+- **Zero-Copy IPTV M3U Parser (`src/providers/tv/parser.rs`)**: Converted playlist attribute parsing to single-pass slice scanning, eliminating bulk heap allocations on large playlists.
+- **Scraper Efficiency (`src/providers/fourkhdhub/`)**: Precompiled static CSS selectors using `LazyLock<Selector>` across scraping paths.
+- **Connection Pooling & DNS (`src/net.rs`)**: Shared static DNS resolver cache and tuned HTTP connection pool settings (`tcp_nodelay`, keepalive, idle timeouts).
 
 ### Removed
-- **Legacy JSON Conversion Adapters**: Deleted 250+ lines of redundant serialization adapters (`search_to_moviebox_json`, `details_to_moviebox_json`, `releases_to_moviebox_json`, `CatalogItem::to_moviebox_subject_json`, etc.) and `serde_json::Value` plumbing in favor of native Rust domain structs.
-- **Dead Code**: Deleted unused `downscale_for_cache` function in `src/service.rs`.
-- **Redundant Details Shortcuts**: Removed `[o] Open With` and `[s] Subtitles` in favor of `/settings` player selection and automatic subtitle detection.
-- **Obsolete `*` Favorite Shortcut**: Standardized favorite toggling exclusively on `f` / `F`.
+- Removed deprecated JSON conversion adapters and untyped `serde_json::Value` service endpoints in favor of strongly typed domain structs.
+- Removed redundant `[o] Open With` and `[s] Subtitles` Details shortcuts in favor of `/settings` media player selection and automatic subtitle loading.
+- Removed obsolete `*` favorite shortcut in favor of `f` / `F`.
 
 ## [0.1.14] - 2026-08-26
 
