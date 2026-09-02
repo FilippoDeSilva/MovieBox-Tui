@@ -185,6 +185,7 @@ pub struct PlaybackState {
     pub default_player: Option<String>,
     pub available_players: Vec<PlayerKind>,
     pub pending_play_link: Option<String>,
+    pub pending_playback_source: Option<crate::providers::models::PlaybackSource>,
     pub pending_open_with: bool,
 }
 
@@ -310,6 +311,8 @@ pub struct AppState {
     pub default_player: Option<String>,
     pub is_loading: bool,
     pub is_resolving_playback: bool,
+    pub has_streams_settled: bool,
+    pub has_search_settled: bool,
     pub is_playing: bool,
     pub last_playback_launch: std::time::Instant,
     pub status_message: String,
@@ -340,6 +343,7 @@ pub struct AppState {
     pub subtitle_list: Vec<(String, String)>,
     pub subtitle_list_state: ListState,
     pub pending_play_link: Option<String>,
+    pub pending_playback_source: Option<crate::providers::models::PlaybackSource>,
     pub pending_open_with: bool,
     pub basic_terminal: bool,
     pub bdix_enabled: bool,
@@ -472,6 +476,8 @@ impl Default for AppState {
             dirty: true,
             is_loading: false,
             is_resolving_playback: false,
+            has_streams_settled: false,
+            has_search_settled: false,
             is_playing: false,
             last_playback_launch: std::time::Instant::now()
                 .checked_sub(std::time::Duration::from_secs(5))
@@ -502,6 +508,7 @@ impl Default for AppState {
             subtitle_list: Vec::new(),
             subtitle_list_state: ListState::default(),
             pending_play_link: None,
+            pending_playback_source: None,
             pending_open_with: false,
             bdix_enabled: false,
             streaming_enabled: true,
@@ -583,6 +590,21 @@ impl AppState {
             .as_deref()
             .map(|id| self.provider_for_subject(id))
             .unwrap_or(self.active_provider)
+    }
+
+    pub fn next_provider(&self) -> ProviderKind {
+        let available_providers: Vec<ProviderKind> = crate::models::ProviderKind::ENABLED
+            .into_iter()
+            .filter(|p| !p.is_bdix() || self.bdix_enabled)
+            .collect();
+        if available_providers.is_empty() {
+            return self.active_provider;
+        }
+        let current = available_providers
+            .iter()
+            .position(|provider| *provider == self.active_provider)
+            .unwrap_or(0);
+        available_providers[(current + 1) % available_providers.len()]
     }
 
     pub fn notify(
@@ -746,6 +768,7 @@ impl AppState {
         self.is_homepage_mode = false;
         self.favorites_focus = false;
         self.favorites_landing_state.select(None);
+        self.has_search_settled = false;
     }
 
     pub fn clear_details_state(&mut self) {
@@ -764,6 +787,7 @@ impl AppState {
         self.resource_list_state.select(None);
         self.language_list_state.select(None);
         self.details_pane = DetailsPane::Streams;
+        self.has_streams_settled = false;
     }
 
     pub fn favorites_available(&self) -> bool {

@@ -12,6 +12,7 @@ fn theme_color(style: Style, fallback: Color) -> Color {
 
 pub fn resolution_label(resolution: i64) -> &'static str {
     match resolution {
+        -1 => "Multi",
         2160 | 4320 => "4K",
         1080 => "1080p",
         720 => "720p",
@@ -29,6 +30,7 @@ pub fn resolution_badge_spans<'a>(
 ) -> Vec<Span<'a>> {
     if basic_terminal {
         let (label, style) = match resolution {
+            -1 => ("[Multi]", theme.lavender.add_modifier(Modifier::BOLD)),
             2160 | 4320 => ("[4K]", theme.rating.add_modifier(Modifier::BOLD)),
             1080 => ("[1080p]", theme.highlight.add_modifier(Modifier::BOLD)),
             720 => ("[720p]", theme.teal.add_modifier(Modifier::BOLD)),
@@ -41,6 +43,15 @@ pub fn resolution_badge_spans<'a>(
     }
 
     let (badge_bg, contrast_fg, label) = match resolution {
+        -1 => (
+            theme_color(theme.lavender, Color::Rgb(180, 190, 254)),
+            if theme.is_light {
+                Color::White
+            } else {
+                theme_color(theme.crust, Color::Rgb(17, 17, 27))
+            },
+            " Multi ",
+        ),
         2160 | 4320 => (
             theme_color(theme.rating, Color::Rgb(249, 226, 175)),
             if theme.is_light {
@@ -343,6 +354,7 @@ mod tests {
 
     #[test]
     fn test_resolution_label() {
+        assert_eq!(resolution_label(-1), "Multi");
         assert_eq!(resolution_label(4320), "4K");
         assert_eq!(resolution_label(2160), "4K");
         assert_eq!(resolution_label(1080), "1080p");

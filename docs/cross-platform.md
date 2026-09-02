@@ -32,12 +32,13 @@ nothing, and on demand via `/probe`):
   through modal popups and overlays. `MOVIEBOX_NO_IMAGE=1` disables queries;
   `MOVIEBOX_IMAGE_PROTOCOL` forces a protocol; `MOVIEBOX_CELL_SIZE=WxH`
   overrides metrics.
-- **Colors & Themes**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB,
-  quantized 256-color palettes for strict terminals, and a 16-color ANSI fallback
-  palette (`Theme::fallback`); an OSC 11 background query picks light/dark variants.
-  Light mode themes (including Catppuccin Latte) are tuned for WCAG AA compliance,
-  ensuring high-contrast readability across light terminal backgrounds. An explicit
-  `MOVIEBOX_THEME` or saved theme always wins over autodetection.
+- **Colors & Themes**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB
+  (auto-detected across Ghostty, Kitty, WezTerm, iTerm2, Alacritty, Foot, Windows Terminal,
+  Hyper, Tabby, Warp, and VSCode), quantized 256-color palettes for strict terminals,
+  and a 16-color ANSI fallback palette (`Theme::fallback`); an OSC 11 background query
+  picks light/dark variants. Light mode themes (including Catppuccin Latte) are tuned for
+  WCAG AA compliance, ensuring high-contrast readability across light terminal backgrounds.
+  An explicit `MOVIEBOX_THEME` or saved theme always wins over autodetection.
 - **Keyboard & Cursor**: The kitty keyboard protocol (disambiguated escapes, event
   types) is requested at start and popped on exit; unsupported terminals
   ignore it. Real input cursor styling (`SetCursorStyle::SteadyBar`) activates

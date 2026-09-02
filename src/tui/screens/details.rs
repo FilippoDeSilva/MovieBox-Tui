@@ -1,4 +1,4 @@
-use crate::models::{MediaDetails, ProviderKind};
+use crate::models::MediaDetails;
 pub(crate) use crate::tui::widgets::{extract_media_tags, resolution_badge_spans};
 use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
@@ -32,8 +32,8 @@ impl DetailsLayoutTier {
 
     pub(crate) fn header_height(self, area: Rect, details: Option<&MediaDetails>) -> u16 {
         let (minimum, maximum, synopsis_limit, reserved_width) = match self {
-            Self::Wide => (5, 11, 4, 30),
-            Self::Medium => (5, 10, 3, 24),
+            Self::Wide => (5, 11, 4, 18),
+            Self::Medium => (5, 10, 3, 16),
             Self::Narrow => (4, 9, 3, 4),
             Self::Tiny => (4, 7, 2, 4),
         };
@@ -49,28 +49,25 @@ impl DetailsLayoutTier {
             return minimum.min(maximum);
         };
         let synopsis = details.description.as_deref().unwrap_or_default();
-        let show_poster = area.width >= 75 && details.poster_url.is_some();
+        let show_poster = !matches!(self, Self::Tiny | Self::Narrow)
+            && area.width >= 75
+            && details.poster_url.is_some();
         let text_width = area
             .width
             .saturating_sub(if show_poster { reserved_width } else { 4 })
             .max(20) as usize;
         let title = &details.title;
-        let title_rows = (crate::tui::text::width(title) + 14)
+        let title_rows = crate::tui::text::width(title)
             .div_ceil(text_width)
             .clamp(1, 2);
-        let has_tagline = details
-            .tagline
-            .as_ref()
-            .is_some_and(|t| !t.trim().is_empty());
         let has_cast = details.stars.as_ref().is_some_and(|s| !s.trim().is_empty());
-        let has_prints = details
-            .prints
+        let has_director = details
+            .director
             .as_ref()
-            .is_some_and(|p| !p.trim().is_empty());
-        let meta_lines = title_rows
-            + (if has_tagline { 1 } else { 0 })
-            + (if has_cast { 1 } else { 0 })
-            + (if has_prints { 1 } else { 0 });
+            .is_some_and(|d| !d.trim().is_empty());
+        let has_genres = !details.genres.is_empty();
+        let has_extra_meta = has_cast || has_director || has_genres;
+        let meta_lines = title_rows + 1 + 1 + (if has_extra_meta { 1 } else { 0 });
         let synopsis_rows = if synopsis.trim().is_empty() {
             0
         } else {
@@ -79,9 +76,9 @@ impl DetailsLayoutTier {
                 .clamp(1, synopsis_limit)
         };
         let content_rows = if show_poster {
-            (meta_lines + 1 + synopsis_rows).max(7)
+            (meta_lines + synopsis_rows).max(5)
         } else {
-            meta_lines + 1 + synopsis_rows
+            meta_lines + synopsis_rows
         };
         (content_rows as u16 + 2).clamp(minimum, maximum)
     }
@@ -331,7 +328,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         "N/A".to_string()
     };
     let duration = details.duration.as_deref().unwrap_or("N/A");
-    let country = "N/A";
     let imdb_rating = details.imdb_rating.as_deref().unwrap_or("N/A");
     let tagline = details.tagline.as_deref();
 
@@ -354,7 +350,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     frame.render_widget(details_block.clone(), header_area);
 
     let show_poster = !matches!(tier, DetailsLayoutTier::Tiny | DetailsLayoutTier::Narrow)
-        && inner_area.height >= 7
+        && inner_area.height >= 5
         && inner_area.width >= 75;
     let poster_width = if show_poster {
         let width_for_height = state
@@ -363,15 +359,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .zip(state.image_picker.as_ref())
             .map(|(image, picker)| {
                 let font_size = picker.font_size();
-                let font_w = font_size.width;
-                let font_h = font_size.height;
+                let font_w = font_size.width.max(1);
+                let font_h = font_size.height.max(1);
                 let area_h_px = (inner_area.height as f32) * (font_h as f32);
-                let aspect = image.width() as f32 / image.height() as f32;
+                let aspect = image.width() as f32 / (image.height() as f32).max(1.0);
                 let area_w_px = area_h_px * aspect;
-                ((area_w_px / font_w as f32).ceil() as u16).max(1)
+                ((area_w_px / font_w as f32).round() as u16).max(1)
             })
-            .unwrap_or_else(|| (inner_area.height as f32 * 1.5).ceil() as u16);
-        width_for_height.clamp(14, 28)
+            .unwrap_or_else(|| ((inner_area.height as f32 * (4.0 / 3.0)).round() as u16).max(6));
+        width_for_height.clamp(8, 22)
     } else {
         0
     };
@@ -379,7 +375,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     let meta_constraints = if show_poster {
         vec![
             Constraint::Length(poster_width),
-            Constraint::Length(1),
+            Constraint::Length(2),
             Constraint::Min(20),
         ]
     } else {
@@ -432,7 +428,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .border_type(crate::tui::overlay::border_type(state.basic_terminal))
                 .border_style(theme.surface0);
             let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
-            let placeholder_text = if state.basic_terminal {
+            let placeholder_text = if poster_area.height <= 5 {
+                if state.basic_terminal {
+                    format!("[Poster]\n{spinner}")
+                } else {
+                    format!("🖼️\n{spinner}")
+                }
+            } else if state.basic_terminal {
                 format!("\n\n  [Poster]\n    {spinner}")
             } else {
                 format!("\n\n  🖼️\n  {spinner}")
@@ -449,145 +451,197 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         inner_area
     };
 
-    let mut info_lines = vec![];
+    let text_width = meta_area.width as usize;
+    let total_height = meta_area.height as usize;
+
+    let mut rendered_lines: Vec<Line> = Vec::new();
+
+    let title_w = crate::tui::text::width(&title);
+    if title_w <= text_width {
+        rendered_lines.push(Line::from(vec![Span::styled(
+            title.clone(),
+            theme.title.add_modifier(Modifier::BOLD),
+        )]));
+    } else {
+        let wrapped_title = crate::tui::text::wrap_text(&title, text_width);
+        for line in wrapped_title.into_iter().take(2) {
+            rendered_lines.push(Line::from(vec![Span::styled(
+                line,
+                theme.title.add_modifier(Modifier::BOLD),
+            )]));
+        }
+    }
 
     let bullet_sep = if state.basic_terminal { " - " } else { " · " };
-    let mut header_spans = vec![
-        Span::styled(title.clone(), theme.title.add_modifier(Modifier::BOLD)),
-        Span::styled(bullet_sep, theme.overlay0),
+    let mut badge_spans = vec![
         Span::styled(year, theme.subtext1),
         Span::styled(bullet_sep, theme.overlay0),
         Span::styled(type_str, theme.accent.add_modifier(Modifier::BOLD)),
     ];
 
     if duration != "N/A" {
-        header_spans.push(Span::styled(bullet_sep, theme.overlay0));
-        header_spans.push(Span::styled(duration, theme.subtext1));
+        badge_spans.push(Span::styled(bullet_sep, theme.overlay0));
+        badge_spans.push(Span::styled(duration, theme.subtext1));
     }
 
     if imdb_rating != "N/A" {
-        header_spans.push(Span::styled(bullet_sep, theme.overlay0));
+        badge_spans.push(Span::styled(bullet_sep, theme.overlay0));
         if state.basic_terminal {
-            header_spans.push(Span::styled("IMDb ", theme.rating));
+            badge_spans.push(Span::styled("IMDb ", theme.rating));
         } else {
-            header_spans.push(Span::styled("★ ", theme.rating));
+            badge_spans.push(Span::styled("★ ", theme.rating));
         }
-        header_spans.push(Span::styled(
+        badge_spans.push(Span::styled(
             imdb_rating,
             theme.rating.add_modifier(Modifier::BOLD),
         ));
     }
 
-    info_lines.push(Line::from(header_spans));
-
-    if let Some(t) = tagline {
-        if !t.trim().is_empty() {
-            info_lines.push(Line::from(vec![Span::styled(
-                format!("\"{t}\""),
-                theme.subtext1.add_modifier(Modifier::ITALIC),
-            )]));
-        }
-    }
-
-    let mut meta_spans = Vec::new();
-    let mut add_meta_item = |label: &'static str, value: &str, color: Color| {
-        if value != "N/A" && !value.is_empty() {
-            if !meta_spans.is_empty() {
-                meta_spans.push(Span::styled(
-                    bullet_sep,
-                    theme.overlay0.add_modifier(Modifier::DIM),
-                ));
-            }
-            meta_spans.push(Span::styled(
-                format!("{label}: "),
-                theme.overlay0.add_modifier(Modifier::BOLD),
-            ));
-            meta_spans.push(Span::styled(value.to_string(), Style::default().fg(color)));
-        }
-    };
-
-    add_meta_item(
-        "Genre",
-        &genres,
-        theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
-    );
-    add_meta_item(
-        "Director",
-        details.director.as_deref().unwrap_or("N/A"),
-        theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
-    );
-    add_meta_item(
-        "Cast",
-        details.stars.as_deref().unwrap_or("N/A"),
-        theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
-    );
-    if !meta_spans.is_empty() {
-        info_lines.push(Line::from(meta_spans));
-    }
-
-    let mut tech_spans = Vec::new();
-    let mut add_tech_item = |label: &'static str, value: &str, color: Color| {
-        if value != "N/A" && !value.is_empty() {
-            if !tech_spans.is_empty() {
-                tech_spans.push(Span::styled(
-                    bullet_sep,
-                    theme.overlay0.add_modifier(Modifier::DIM),
-                ));
-            }
-            tech_spans.push(Span::styled(
-                format!("{label}: "),
-                theme.overlay0.add_modifier(Modifier::BOLD),
-            ));
-            tech_spans.push(Span::styled(value.to_string(), Style::default().fg(color)));
-        }
-    };
-
-    add_tech_item("Country", country, theme_color(theme.overlay1, Color::Gray));
-    add_tech_item(
-        "Prints",
-        details.prints.as_deref().unwrap_or("N/A"),
-        theme_color(theme.lavender, Color::Cyan),
-    );
-    add_tech_item(
-        "Audio",
-        details.audios.as_deref().unwrap_or("N/A"),
-        theme_color(theme.accent, Color::Yellow),
-    );
-
-    if !tech_spans.is_empty() {
-        info_lines.push(Line::from(tech_spans));
-    }
-    let info_height = info_lines.len() as u16;
-    let meta_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(info_height), Constraint::Min(0)])
-        .split(meta_area);
-
-    let info_p = Paragraph::new(info_lines);
-    frame.render_widget(info_p, meta_chunks[0]);
-
-    let max_lines = meta_chunks[1].height as usize;
-    let text_width = meta_chunks[1].width as usize;
-    let mut wrapped = crate::tui::text::wrap_text(intro, text_width);
-    if wrapped.len() > max_lines {
-        wrapped.truncate(max_lines);
-        if let Some(last) = wrapped.last_mut() {
-            let last_w = crate::tui::text::width(last);
-            if last_w + 3 <= text_width {
-                last.push_str("...");
+    let audio_str = details
+        .audios
+        .as_deref()
+        .filter(|s| !s.trim().is_empty() && *s != "N/A")
+        .map(|s| s.to_string())
+        .or_else(|| {
+            if !details.dubs.is_empty() {
+                let mut unique_langs = Vec::new();
+                for dub in &details.dubs {
+                    let lang = clean_language_name(&dub.language);
+                    if !unique_langs.contains(&lang) {
+                        unique_langs.push(lang);
+                    }
+                }
+                if !unique_langs.is_empty() {
+                    Some(unique_langs.join(", "))
+                } else {
+                    None
+                }
             } else {
-                let truncated =
-                    crate::tui::text::truncate_width(last, text_width.saturating_sub(3));
-                *last = format!("{}...", truncated);
+                None
+            }
+        });
+
+    if let Some(audios) = audio_str {
+        badge_spans.push(Span::styled(bullet_sep, theme.overlay1));
+        badge_spans.push(Span::styled(
+            "Audio: ",
+            theme.subtext1.add_modifier(Modifier::BOLD),
+        ));
+        badge_spans.push(Span::styled(audios, theme.accent));
+    }
+
+    let provider_name = details.id.provider.label();
+    if !provider_name.is_empty() {
+        badge_spans.push(Span::styled(bullet_sep, theme.overlay1));
+        badge_spans.push(Span::styled(provider_name.to_string(), theme.subtext1));
+    }
+
+    rendered_lines.push(Line::from(badge_spans));
+
+    if let Some(t) = tagline.filter(|t| !t.trim().is_empty()) {
+        rendered_lines.push(Line::from(vec![Span::styled(
+            format!("\"{t}\""),
+            theme.subtext1.add_modifier(Modifier::ITALIC),
+        )]));
+    }
+
+    let mut extra_meta_spans = Vec::new();
+    if !details.genres.is_empty() {
+        extra_meta_spans.push(Span::styled(
+            "Genre: ",
+            theme.subtext1.add_modifier(Modifier::BOLD),
+        ));
+        extra_meta_spans.push(Span::styled(
+            genres.clone(),
+            theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
+        ));
+    }
+    if let Some(dir) = details
+        .director
+        .as_deref()
+        .filter(|d| !d.trim().is_empty() && *d != "N/A")
+    {
+        if !extra_meta_spans.is_empty() {
+            extra_meta_spans.push(Span::styled(bullet_sep, theme.overlay1));
+        }
+        extra_meta_spans.push(Span::styled(
+            "Director: ",
+            theme.subtext1.add_modifier(Modifier::BOLD),
+        ));
+        extra_meta_spans.push(Span::styled(
+            dir.to_string(),
+            theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
+        ));
+    }
+    if let Some(cast) = details
+        .stars
+        .as_deref()
+        .filter(|s| !s.trim().is_empty() && *s != "N/A")
+    {
+        if !extra_meta_spans.is_empty() {
+            extra_meta_spans.push(Span::styled(bullet_sep, theme.overlay1));
+        }
+        extra_meta_spans.push(Span::styled(
+            "Cast: ",
+            theme.subtext1.add_modifier(Modifier::BOLD),
+        ));
+        extra_meta_spans.push(Span::styled(
+            cast.to_string(),
+            theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
+        ));
+    }
+    let has_extra_meta = !extra_meta_spans.is_empty();
+
+    let reserved_bottom = if has_extra_meta { 1 } else { 0 };
+    let remaining_height = total_height.saturating_sub(rendered_lines.len() + reserved_bottom);
+    let (include_spacer, max_synopsis_lines) = if remaining_height >= 2 {
+        (true, remaining_height.saturating_sub(1))
+    } else {
+        (false, remaining_height)
+    };
+
+    if include_spacer {
+        rendered_lines.push(Line::from(""));
+    }
+
+    if max_synopsis_lines > 0 {
+        let mut wrapped_synopsis = crate::tui::text::wrap_text(intro, text_width);
+        if wrapped_synopsis.len() > max_synopsis_lines {
+            wrapped_synopsis.truncate(max_synopsis_lines);
+            if let Some(last) = wrapped_synopsis.last_mut() {
+                let last_w = crate::tui::text::width(last);
+                if last_w + 3 <= text_width {
+                    last.push_str("...");
+                } else {
+                    let truncated =
+                        crate::tui::text::truncate_width(last, text_width.saturating_sub(3));
+                    *last = format!("{truncated}...");
+                }
             }
         }
+        for line in wrapped_synopsis {
+            rendered_lines.push(Line::from(vec![Span::styled(line, theme.subtext1)]));
+        }
     }
-    let syn_lines: Vec<Line> = wrapped
-        .into_iter()
-        .map(|line| Line::from(vec![Span::styled(line, theme.subtext1)]))
-        .collect();
-    let intro_p = Paragraph::new(syn_lines);
-    frame.render_widget(intro_p, meta_chunks[1]);
+
+    if has_extra_meta {
+        rendered_lines.push(Line::from(extra_meta_spans));
+    }
+
+    let top_offset = total_height.saturating_sub(rendered_lines.len()) / 2;
+    let final_lines = if top_offset > 0 {
+        let mut padded = Vec::with_capacity(total_height);
+        for _ in 0..top_offset {
+            padded.push(Line::from(""));
+        }
+        padded.extend(rendered_lines);
+        padded
+    } else {
+        rendered_lines
+    };
+
+    let meta_p = Paragraph::new(final_lines);
+    frame.render_widget(meta_p, meta_area);
 
     let has_languages = details.has_languages();
     let streams_count = state.selected_resources.len();
@@ -889,12 +943,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         unfocused_border_style(theme)
     };
 
+    let list = &state.selected_resources;
+    let visible_count = list.len();
+
     let streams_title = if streams_count > 0 {
         let selected = state
             .resource_list_state
             .selected()
             .unwrap_or(0)
-            .min(streams_count.saturating_sub(1));
+            .min(visible_count.saturating_sub(1));
         let marker = if streams_focused {
             focus_title_marker(state.basic_terminal)
         } else {
@@ -902,12 +959,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         };
         let avail = streams_area.width.saturating_sub(4) as usize;
         let title_full = format!(
-            " {marker}Streams ({streams_count}) · {}/{} ",
+            " {marker}Streams ({visible_count}) · {}/{} ",
             selected + 1,
-            streams_count
+            visible_count
         );
         if avail > 0 && crate::tui::text::width(&title_full) > avail {
-            let title_medium = format!(" {marker}Streams ({streams_count}) ");
+            let title_medium = format!(" {marker}Streams ({visible_count}) ");
             if crate::tui::text::width(&title_medium) <= avail {
                 title_medium
             } else {
@@ -933,7 +990,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         .border_style(streams_border)
         .padding(ratatui::widgets::Padding::horizontal(1));
 
-    let list = &state.selected_resources;
     if !list.is_empty() {
         let selected_idx = state.resource_list_state.selected();
 
@@ -941,9 +997,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .iter()
             .enumerate()
             .map(|(i, file)| {
-                let resolution = file.resolution_u64() as i64;
+                let resolution = file.resolution_i64();
                 let codec = file.codec.as_deref().unwrap_or("None");
-                let duration_str = "--:--".to_string();
 
                 let size_formatted = file
                     .size_bytes
@@ -969,10 +1024,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     metadata_style(theme)
                 };
 
-                let is_fourk = file.provider == ProviderKind::FourKHdHub;
                 let release_title = crate::tui::text::clean_stream_text(&file.filename);
                 let upload_by = crate::tui::text::clean_stream_text(file.source_label());
-                let source_count = file.mirrors.len() as u64;
                 let is_ultra_compact = streams_area.width < 58;
                 let is_compact = streams_area.width < 85;
                 let is_wide = streams_area.width >= 115;
@@ -1011,15 +1064,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let sep = if state.basic_terminal { " - " } else { " · " };
                 let tags_or_codec = tag_parts.join(sep);
 
-                let duration_col = if is_fourk && source_count > 0 {
-                    format!(
-                        "{source_count} mirr{}",
-                        if source_count == 1 { "or" } else { "ors" }
-                    )
-                } else {
-                    duration_str
-                };
-
                 if is_ultra_compact {
                     stream_spans.push(Span::styled(
                         crate::tui::text::truncate_width(&release_title, stream_width),
@@ -1042,10 +1086,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         secondary_style,
                     ));
                     stream_spans.push(Span::styled(
-                        format!("{duration_col:>8}   "),
-                        secondary_style,
-                    ));
-                    stream_spans.push(Span::styled(
                         format!("{:<14}  ", crate::tui::text::truncate_width(&upload_by, 14)),
                         secondary_style,
                     ));
@@ -1060,11 +1100,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         tags_or_codec
                     };
                     stream_spans.push(Span::styled(
-                        format!("{:<12}  ", crate::tui::text::truncate_width(&tags_col, 12)),
-                        secondary_style,
-                    ));
-                    stream_spans.push(Span::styled(
-                        format!("{duration_col:>8}   "),
+                        format!("{:<20}  ", crate::tui::text::truncate_width(&tags_col, 20)),
                         secondary_style,
                     ));
                     stream_spans.push(Span::styled(
@@ -1134,6 +1170,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let waiting_for_language = has_multiple_dubs && !state.language_chosen;
         let has_error = state.stream_error.is_some();
 
+        let is_loading_streams = state.is_fetching_streams
+            || state.is_loading
+            || state.pending_episode_fetch.is_some()
+            || !state.has_streams_settled;
+
         let msg = if waiting_for_language {
             "Choose an audio track to load streams.".to_string()
         } else if let Some(error) = &state.stream_error {
@@ -1144,24 +1185,31 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else {
                 format!("{error} — press r to retry or Ctrl+P to switch provider.")
             }
-        } else if state.is_fetching_streams || state.is_loading {
+        } else if is_loading_streams {
             let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
             if state.basic_terminal {
                 format!("Loading streams {spinner}")
             } else {
                 format!("{spinner}  Loading streams...")
             }
-        } else {
+        } else if state.has_streams_settled && state.selected_resources.is_empty() {
             format!(
                 "No stream sources found on {provider_label} — press Ctrl+P to try another provider, or r to retry."
             )
+        } else {
+            let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
+            if state.basic_terminal {
+                format!("Loading streams {spinner}")
+            } else {
+                format!("{spinner}  Loading streams...")
+            }
         };
 
         let style = if has_error {
             theme.error
         } else if waiting_for_language {
             theme.text_dim
-        } else if state.is_fetching_streams || state.is_loading {
+        } else if is_loading_streams {
             theme.lavender
         } else {
             theme.text_dim
@@ -1300,7 +1348,9 @@ pub(crate) fn episode_confirm_summary(state: &AppState) -> Vec<String> {
 fn selected_stream_summary(state: &AppState) -> Option<String> {
     let idx = state.resource_list_state.selected().unwrap_or(0);
     let resource = state.selected_resources.get(idx)?;
-    let resolution = if resource.resolution_u64() > 0 {
+    let resolution = if resource.is_multi_resolution() {
+        Some("Multi-Res".to_string())
+    } else if resource.resolution_u64() > 0 {
         Some(format!("{}p", resource.resolution_u64()))
     } else {
         None
@@ -1577,7 +1627,7 @@ fn render_workflow(
 }
 
 fn stream_table_header_spans(width: u16, theme: &Theme) -> Vec<Span<'static>> {
-    let header_style = theme.overlay0.add_modifier(Modifier::BOLD);
+    let header_style = theme.subtext1.add_modifier(Modifier::BOLD);
     if width < 58 {
         vec![Span::styled("  RES     SIZE     RELEASE", header_style)]
     } else if width < 85 {
@@ -1587,12 +1637,12 @@ fn stream_table_header_spans(width: u16, theme: &Theme) -> Vec<Span<'static>> {
         )]
     } else if width < 115 {
         vec![Span::styled(
-            "  RES     SIZE     MEDIA TAGS    DURATION   RELEASE",
+            "  RES     SIZE     MEDIA TAGS            RELEASE",
             header_style,
         )]
     } else {
         vec![Span::styled(
-            "  RES     SIZE     MEDIA TAGS            DURATION   UPLOADER        RELEASE",
+            "  RES     SIZE     MEDIA TAGS            SOURCE          RELEASE",
             header_style,
         )]
     }
@@ -1666,10 +1716,22 @@ fn details_footer(
             theme,
         ));
         secondary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group(
+            crate::tui::text::CTRL_P_STR,
+            "Provider",
+            false,
+            theme,
+        ));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_languages {
         primary.extend(footer_group("Enter", "Select", true, theme));
         primary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group(
+            crate::tui::text::CTRL_P_STR,
+            "Provider",
+            false,
+            theme,
+        ));
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_seasons {
@@ -1685,6 +1747,12 @@ fn details_footer(
             theme,
         ));
         primary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group(
+            crate::tui::text::CTRL_P_STR,
+            "Provider",
+            false,
+            theme,
+        ));
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_episodes {
@@ -1700,11 +1768,23 @@ fn details_footer(
             theme,
         ));
         primary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group(
+            crate::tui::text::CTRL_P_STR,
+            "Provider",
+            false,
+            theme,
+        ));
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else {
         primary.extend(footer_group("Enter", "Select", true, theme));
         primary.extend(footer_group("f", fav_label, false, theme));
+        secondary.extend(footer_group(
+            crate::tui::text::CTRL_P_STR,
+            "Provider",
+            false,
+            theme,
+        ));
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     }
@@ -1770,8 +1850,13 @@ mod tests {
         let spans_sd = resolution_badge_spans(480, &theme, false);
         assert_eq!(spans_sd[0].content, " 480p  ");
 
+        let spans_multi = resolution_badge_spans(-1, &theme, false);
+        assert_eq!(spans_multi[0].content, " Multi ");
+
         let basic_4k = resolution_badge_spans(2160, &theme, true);
         assert_eq!(basic_4k[0].content.trim(), "[4K]");
+        let basic_multi = resolution_badge_spans(-1, &theme, true);
+        assert_eq!(basic_multi[0].content.trim(), "[Multi]");
     }
 
     #[test]
@@ -1871,6 +1956,9 @@ mod tests {
         assert!(content.contains("RES"));
         assert!(content.contains("SIZE"));
         assert!(content.contains("MEDIA TAGS"));
+        assert!(content.contains("SOURCE"));
+        assert!(!content.contains("DURATION"));
+        assert!(!content.contains("--:--"));
         assert!(content.contains("1080p"));
         assert!(content.contains("720p"));
         assert!(content.contains("1.0GB"));
@@ -2324,5 +2412,189 @@ mod tests {
 
         assert!(content.contains("Breaking Bad"));
         assert!(content.contains("Portuguese (Brazil)"));
+    }
+    #[test]
+    fn test_details_header_compact_content_height() {
+        let details = MediaDetails {
+            id: ProviderMediaId {
+                provider: ProviderKind::MovieBox,
+                value: "ek_deewane".to_string(),
+            },
+            title: "Ek Deewane Ki Deewaniyat".to_string(),
+            media_type: MediaType::Movie,
+            year: Some("2025".to_string()),
+            description: Some("When a powerful politician falls for a strong-willed superstar, their passionate romance quickly spirals into a dangerous game of obsession, pride, and heartbreak.".to_string()),
+            tagline: None,
+            imdb_rating: Some("4.6".to_string()),
+            director: None,
+            stars: None,
+            prints: None,
+            audios: None,
+            poster_url: Some("https://example.com/poster.jpg".to_string()),
+            duration: Some("2h 20m".to_string()),
+            genres: vec![],
+            seasons: vec![],
+            dubs: vec![
+                AudioTrackOption {
+                    subject_id: "1".to_string(),
+                    language: "Original Audio".to_string(),
+                    label: "Original Audio".to_string(),
+                },
+                AudioTrackOption {
+                    subject_id: "2".to_string(),
+                    language: "Hindi dub".to_string(),
+                    label: "Hindi dub".to_string(),
+                },
+            ],
+        };
+
+        let area = Rect::new(0, 0, 120, 30);
+        let tier = DetailsLayoutTier::for_area(area);
+        let height = tier.header_height(area, Some(&details));
+        assert_eq!(height, 7);
+    }
+
+    #[test]
+    fn test_details_audio_fallback_from_dubs() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "ek_deewane".to_string(),
+                },
+                title: "Ek Deewane Ki Deewaniyat".to_string(),
+                media_type: MediaType::Movie,
+                year: Some("2025".to_string()),
+                description: Some(
+                    "When a powerful politician falls for a strong-willed superstar.".to_string(),
+                ),
+                tagline: None,
+                imdb_rating: Some("4.6".to_string()),
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: Some("https://example.com/poster.jpg".to_string()),
+                duration: Some("2h 20m".to_string()),
+                genres: vec![],
+                seasons: vec![],
+                dubs: vec![
+                    AudioTrackOption {
+                        subject_id: "1".to_string(),
+                        language: "Original Audio".to_string(),
+                        label: "Original Audio".to_string(),
+                    },
+                    AudioTrackOption {
+                        subject_id: "2".to_string(),
+                        language: "Hindi dub".to_string(),
+                        label: "Hindi dub".to_string(),
+                    },
+                ],
+            }),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("Ek Deewane Ki Deewaniyat"));
+        assert!(content.contains("2025"));
+        assert!(content.contains("Movie"));
+        assert!(content.contains("Audio: Original, Hindi"));
+        assert!(content.contains("MovieBox"));
+    }
+
+    #[test]
+    fn test_details_no_flash_on_unsettled_streams() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "ek_deewane".to_string(),
+                },
+                title: "Ek Deewane Ki Deewaniyat".to_string(),
+                media_type: MediaType::Movie,
+                year: Some("2025".to_string()),
+                description: Some("Description".to_string()),
+                tagline: None,
+                imdb_rating: Some("4.6".to_string()),
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: Some("2h 20m".to_string()),
+                genres: vec![],
+                seasons: vec![],
+                dubs: vec![
+                    AudioTrackOption {
+                        subject_id: "1".to_string(),
+                        language: "Original".to_string(),
+                        label: "Original".to_string(),
+                    },
+                    AudioTrackOption {
+                        subject_id: "2".to_string(),
+                        language: "Hindi".to_string(),
+                        label: "Hindi".to_string(),
+                    },
+                ],
+            }),
+            language_chosen: true,
+            has_streams_settled: false,
+            is_fetching_streams: false,
+            is_loading: false,
+            selected_resources: vec![],
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let content_unsettled = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<String>();
+
+        assert!(content_unsettled.contains("Loading streams"));
+        assert!(!content_unsettled.contains("No stream sources found"));
+
+        state.has_streams_settled = true;
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let content_settled = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<String>();
+
+        assert!(content_settled.contains("No stream sources found"));
     }
 }

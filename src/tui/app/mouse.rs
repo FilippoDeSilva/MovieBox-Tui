@@ -676,7 +676,41 @@ impl App {
         }
 
         let results_y = 2;
-        if row >= results_y && row < area.height.saturating_sub(1) {
+        if row >= results_y && row < area.height {
+            if self.state.search_results.is_empty() {
+                let next_label = self.state.next_provider().label();
+                let ctrl_p = crate::tui::text::CTRL_P_STR;
+                let (btn1, btn2) = crate::tui::screens::home::no_results_button_hitboxes(
+                    Rect {
+                        x: area.x,
+                        y: results_y,
+                        width: area.width,
+                        height: area.height.saturating_sub(results_y),
+                    },
+                    next_label,
+                    ctrl_p,
+                    self.state.is_tv_mode,
+                    self.state.is_addon_mode,
+                );
+                let pos = ratatui::layout::Position::new(col, row);
+                if btn1.contains(pos) {
+                    if self.state.is_tv_mode {
+                        self.action_sender.send(Action::TvReloadPlaylists).ok();
+                    } else if self.state.is_addon_mode {
+                        self.action_sender.send(Action::ShowAddonManager).ok();
+                    } else {
+                        self.cycle_provider();
+                    }
+                    return None;
+                }
+                if btn2.contains(pos) {
+                    self.state.clear_search_state();
+                    self.state.input_mode = InputMode::Normal;
+                    self.state.set_status_default("");
+                    return None;
+                }
+                return None;
+            }
             let metrics = self
                 .state
                 .result_metrics(area.height.saturating_sub(results_y + 1), area.width);
@@ -941,18 +975,24 @@ impl App {
             let streams_count = self.state.selected_resources.len();
 
             if streams_count > 0 {
-                let list_start_y = streams_area.y.saturating_add(2);
+                let list_start_y = if streams_area.height >= 4 {
+                    streams_area.y.saturating_add(2)
+                } else {
+                    streams_area.y.saturating_add(1)
+                };
                 let list_end_y = streams_area.bottom().saturating_sub(1);
                 if row >= list_start_y && row < list_end_y {
-                    let clicked_stream_row = (row - list_start_y)
-                        .saturating_add(self.state.resource_list_state.offset() as u16);
-                    let target_idx =
-                        (clicked_stream_row as usize).min(streams_count.saturating_sub(1));
+                    let relative_row = (row - list_start_y) as usize;
+                    let clicked_stream_idx = self
+                        .state
+                        .resource_list_state
+                        .offset()
+                        .saturating_add(relative_row);
 
-                    let prev_selected = self.state.resource_list_state.selected();
-                    self.state.resource_list_state.select(Some(target_idx));
-
-                    if prev_selected == Some(target_idx) {
+                    if clicked_stream_idx < streams_count {
+                        self.state
+                            .resource_list_state
+                            .select(Some(clicked_stream_idx));
                         if self.state.is_playing {
                             self.state.notify(
                                 NotificationKind::Warning,
@@ -1121,5 +1161,142 @@ fn click_in_picker(
         Some(Some(offset + (row - item_y) as usize))
     } else {
         Some(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{
+        AudioTrackOption, MediaDetails, MediaType, ProviderKind, ProviderMediaId, Release,
+    };
+    use crate::tui::action::Action;
+    use crate::tui::state::DetailsPane;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn test_details_streams_panel_click_empty_space_does_not_open_stream() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Details;
+        app.state.details_pane = DetailsPane::Languages;
+        app.state.selected_details = Some(MediaDetails {
+            id: ProviderMediaId {
+                provider: ProviderKind::MovieBox,
+                value: "test_movie".to_string(),
+            },
+            title: "Test Movie".to_string(),
+            media_type: MediaType::Movie,
+            year: Some("2025".to_string()),
+            description: Some("Short description".to_string()),
+            tagline: None,
+            imdb_rating: Some("4.6".to_string()),
+            director: None,
+            stars: None,
+            prints: None,
+            audios: None,
+            poster_url: Some("https://example.com/poster.jpg".to_string()),
+            duration: Some("2h".to_string()),
+            genres: vec![],
+            seasons: vec![],
+            dubs: vec![
+                AudioTrackOption {
+                    subject_id: "1".to_string(),
+                    language: "Original".to_string(),
+                    label: "Original".to_string(),
+                },
+                AudioTrackOption {
+                    subject_id: "2".to_string(),
+                    language: "Hindi".to_string(),
+                    label: "Hindi".to_string(),
+                },
+            ],
+        });
+        app.state.selected_resources = vec![Release {
+            provider: ProviderKind::MovieBox,
+            filename: "Movie.1080p.mkv".to_string(),
+            quality: Some("1080p".to_string()),
+            codec: Some("HEVC".to_string()),
+            language: None,
+            size_bytes: Some(1024 * 1024 * 1024),
+            season: None,
+            episode: None,
+            mirrors: vec![],
+        }];
+        app.state.resource_list_state.select(Some(0));
+
+        let area = Rect::new(0, 0, 120, 30);
+        let layout = crate::tui::screens::details::details_screen_layout(
+            area,
+            app.state.selected_details.as_ref(),
+        );
+        let bottom_area = layout.bottom_area;
+        let lower_chunks =
+            Layout::vertical([Constraint::Length(4), Constraint::Min(3)]).split(bottom_area);
+        let streams_area = lower_chunks[1];
+
+        let empty_space_row = streams_area.bottom().saturating_sub(3);
+        let action = app.handle_details_mouse(streams_area.x + 10, empty_space_row, area);
+        assert!(action.is_none());
+        assert_eq!(app.state.details_pane, DetailsPane::Streams);
+        assert_eq!(app.state.resource_list_state.selected(), Some(0));
+
+        let mut received_play = false;
+        while let Ok(act) = app.action_receiver.try_recv() {
+            if matches!(act, Action::PlayStream) {
+                received_play = true;
+            }
+        }
+        assert!(!received_play);
+
+        let stream_item_row = if streams_area.height >= 4 {
+            streams_area.y + 2
+        } else {
+            streams_area.y + 1
+        };
+        let action_stream = app.handle_details_mouse(streams_area.x + 10, stream_item_row, area);
+        assert!(action_stream.is_none());
+        assert_eq!(app.state.details_pane, DetailsPane::Streams);
+
+        let mut stream_played = false;
+        while let Ok(act) = app.action_receiver.try_recv() {
+            if matches!(act, Action::PlayStream) {
+                stream_played = true;
+            }
+        }
+        assert!(stream_played);
+    }
+
+    #[tokio::test]
+    async fn test_home_no_results_mouse_click_actions() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = crate::tui::state::InputMode::Normal;
+        app.state.active_provider = ProviderKind::FourKHdHub;
+        app.state.search_query.set_content("deewaniyat");
+        app.state.search_results = vec![];
+
+        let area = Rect::new(0, 0, 100, 30);
+        let results_y = 2;
+        let next_label = app.state.next_provider().label();
+        let ctrl_p = crate::tui::text::CTRL_P_STR;
+        let (btn1, btn2) = crate::tui::screens::home::no_results_button_hitboxes(
+            Rect {
+                x: area.x,
+                y: results_y,
+                width: area.width,
+                height: area.height.saturating_sub(results_y),
+            },
+            next_label,
+            ctrl_p,
+            app.state.is_tv_mode,
+            app.state.is_addon_mode,
+        );
+
+        app.handle_home_mouse(btn2.x + 1, btn2.y, area);
+        assert!(app.state.search_query.is_empty());
+
+        app.state.search_query.set_content("deewaniyat");
+        app.handle_home_mouse(btn1.x + 1, btn1.y, area);
+        assert_ne!(app.state.active_provider, ProviderKind::FourKHdHub);
     }
 }

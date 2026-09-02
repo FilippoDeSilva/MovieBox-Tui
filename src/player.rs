@@ -127,7 +127,9 @@ enum AndroidOpener {
 }
 
 fn is_termux_env() -> bool {
-    std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
+    cfg!(target_os = "android")
+        || std::env::var("TERMUX_VERSION").is_ok()
+        || std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
         || Path::new("/data/data/com.termux/files/usr").exists()
 }
 
@@ -310,14 +312,21 @@ fn mpv_command(
         for (name, value) in headers {
             if name.eq_ignore_ascii_case("user-agent") {
                 command.arg(format!("{prefix}user-agent={value}"));
+            } else if name.eq_ignore_ascii_case("referer") {
+                command.arg(format!("{prefix}referrer={value}"));
             }
         }
         let fields = headers
             .iter()
+            .filter(|(name, _)| {
+                !name.eq_ignore_ascii_case("user-agent") && !name.eq_ignore_ascii_case("referer")
+            })
             .map(|(name, value)| format!("{name}: {value}"))
             .collect::<Vec<_>>()
             .join(",");
-        command.arg(format!("{prefix}http-header-fields={fields}"));
+        if !fields.is_empty() {
+            command.arg(format!("{prefix}http-header-fields={fields}"));
+        }
 
         let ytdl_headers = headers
             .iter()
@@ -364,6 +373,10 @@ fn iina_command(
         c
     } else if cli_local.exists() {
         let mut c = Command::new(cli_local);
+        c.arg("--keep-running").arg("--no-stdin");
+        c
+    } else if let Some(path) = find_in_path("iina").or_else(|| find_in_path("iina-cli")) {
+        let mut c = Command::new(path);
         c.arg("--keep-running").arg("--no-stdin");
         c
     } else if iina_app_exists() {

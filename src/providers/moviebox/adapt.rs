@@ -514,28 +514,60 @@ pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
     }
 }
 
+pub fn is_deprecation_notice_url(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    lower.contains("1c7de0bd3393702d9191801f15f88f8d")
+        || lower.contains("9a0461bc39da389663bf3dbb17091d3f")
+        || lower.contains("/notice.mp4")
+        || lower.contains("notice")
+        || (lower.contains("macdn.aoneroom.com") && lower.contains("/other/"))
+}
+
 pub fn resolve_dash_manifest_from_policy(sign_cookie: &str) -> Option<String> {
     for part in sign_cookie.split(';') {
         let trimmed = part.trim();
-        if let Some(policy_b64) = trimmed.strip_prefix("CloudFront-Policy=") {
-            let mut padded = policy_b64.to_string();
-            let padding = (4 - padded.len() % 4) % 4;
-            padded.push_str(&"=".repeat(padding));
-            if let Ok(decoded_bytes) = base64::engine::general_purpose::STANDARD.decode(&padded) {
-                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded_bytes) {
-                    if let Some(resource) = json
-                        .get("Statement")
-                        .and_then(|s| s.as_array())
-                        .and_then(|arr| arr.first())
-                        .and_then(|st| st.get("Resource"))
-                        .and_then(|r| r.as_str())
-                    {
-                        let base_resource = resource.trim_end_matches('*').trim_end_matches('/');
-                        if !base_resource.is_empty() && base_resource.starts_with("http") {
-                            return Some(format!("{base_resource}/index.mpd"));
-                        }
-                    }
-                }
+        if let Some(policy_raw) = trimmed.strip_prefix("CloudFront-Policy=") {
+            let policy_clean = policy_raw.trim();
+            let mut normalized: String = policy_clean
+                .chars()
+                .map(|c| match c {
+                    '-' => '+',
+                    '_' => '=',
+                    '~' => '/',
+                    other => other,
+                })
+                .collect();
+
+            let padding = (4 - normalized.len() % 4) % 4;
+            if padding > 0 {
+                normalized.push_str(&"=".repeat(padding));
+            }
+
+            let Ok(decoded_bytes) =
+                base64::engine::general_purpose::STANDARD.decode(normalized.as_bytes())
+            else {
+                continue;
+            };
+
+            let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded_bytes) else {
+                continue;
+            };
+
+            let Some(resource) = json
+                .get("Statement")
+                .and_then(|s| s.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|st| st.get("Resource"))
+                .and_then(|r| r.as_str())
+            else {
+                continue;
+            };
+
+            let base_resource = resource.trim_end_matches('*').trim_end_matches('/');
+            if !base_resource.is_empty()
+                && (base_resource.starts_with("http://") || base_resource.starts_with("https://"))
+            {
+                return Some(format!("{base_resource}/index.mpd"));
             }
         }
     }
@@ -549,11 +581,11 @@ pub fn moviebox_play_info_json_to_releases(
     user_agent: &str,
 ) -> Vec<Release> {
     let data = payload.get("data").unwrap_or(payload);
-    let title_prefix = data
+    let raw_title_prefix = data
         .get("title")
         .and_then(|t| t.as_str())
         .unwrap_or("MovieBox Stream");
-
+    let title_prefix = crate::providers::moviebox::title::clean_moviebox_title(raw_title_prefix);
     let Some(streams) = data.get("streams").and_then(|s| s.as_array()) else {
         return Vec::new();
     };
@@ -596,63 +628,81 @@ pub fn moviebox_play_info_json_to_releases(
         let stream_url = stream.get("url").and_then(|u| u.as_str()).unwrap_or("");
 
         let manifest_url = resolve_dash_manifest_from_policy(sign_cookie).or_else(|| {
-            if stream_url.starts_with("http") {
+            if is_deprecation_notice_url(stream_url) {
+                None
+            } else if stream_url.starts_with("http") {
                 Some(stream_url.to_string())
             } else {
                 None
             }
         });
-
         let Some(playable_url) = manifest_url else {
             continue;
         };
+
+        let is_dash = playable_url.ends_with(".mpd") || format_type.eq_ignore_ascii_case("DASH");
+        let parsed_res_count = resolutions_str
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u32>().ok())
+            .count();
+        let is_multi_res = is_dash || parsed_res_count > 1;
 
         let mut headers = vec![
             ("Referer".to_string(), "https://sportslive.wine".to_string()),
             ("User-Agent".to_string(), user_agent.to_string()),
         ];
         if !sign_cookie.is_empty() {
-            headers.push(("Cookie".to_string(), sign_cookie.to_string()));
+            let clean_cookie = sign_cookie
+                .trim_end_matches(';')
+                .split(';')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("; ");
+            headers.push(("Cookie".to_string(), clean_cookie));
         }
 
-        let mut parsed_resolutions: Vec<u32> = resolutions_str
+        let max_res = resolutions_str
             .split(',')
             .filter_map(|s| s.trim().parse::<u32>().ok())
-            .collect();
-        parsed_resolutions.sort_by(|a, b| b.cmp(a));
-        parsed_resolutions.dedup();
-        if parsed_resolutions.is_empty() {
-            parsed_resolutions.push(1080);
-        }
+            .max()
+            .unwrap_or(1080);
 
-        for &res in &parsed_resolutions {
-            let quality = Some(format!("{res}p"));
-            let codec_disp = codec.as_deref().unwrap_or(format_type);
-            let filename = if season > 0 && episode > 0 {
-                format!("{title_prefix} S{season:02}E{episode:02} {res}p {codec_disp}")
-            } else {
-                format!("{title_prefix} {res}p {codec_disp}")
-            };
+        let quality = if is_multi_res {
+            Some("multi".to_string())
+        } else {
+            Some(format!("{max_res}p"))
+        };
+        let codec_disp = codec.as_deref().unwrap_or(format_type);
+        let res_label = if is_multi_res {
+            "Multi-Res".to_string()
+        } else {
+            format!("{max_res}p")
+        };
+        let filename = if season > 0 && episode > 0 {
+            format!("{title_prefix} S{season:02}E{episode:02} {res_label} {codec_disp}")
+        } else {
+            format!("{title_prefix} {res_label} {codec_disp}")
+        };
 
-            let mirror = SourceMirror {
-                label: format!("{res}p {codec_disp}"),
-                resolver_url: playable_url.clone(),
-                headers: headers.clone(),
-                direct_file: true,
-            };
+        let mirror = SourceMirror {
+            label: format!("{res_label} {codec_disp}"),
+            resolver_url: playable_url,
+            headers,
+            direct_file: true,
+        };
 
-            releases.push(Release {
-                provider: ProviderKind::MovieBox,
-                filename,
-                quality,
-                codec: codec.clone(),
-                language: None,
-                size_bytes,
-                season: if season > 0 { Some(season) } else { None },
-                episode: if episode > 0 { Some(episode) } else { None },
-                mirrors: vec![mirror],
-            });
-        }
+        releases.push(Release {
+            provider: ProviderKind::MovieBox,
+            filename,
+            quality,
+            codec: codec.clone(),
+            language: None,
+            size_bytes,
+            season: if season > 0 { Some(season) } else { None },
+            episode: if episode > 0 { Some(episode) } else { None },
+            mirrors: vec![mirror],
+        });
     }
 
     releases
@@ -857,11 +907,11 @@ mod tests {
         });
 
         let releases = moviebox_play_info_json_to_releases(&payload, 0, 0, "TestAgent/1.0");
-        assert_eq!(releases.len(), 3);
-        assert_eq!(releases[0].quality.as_deref(), Some("1080p"));
+        assert_eq!(releases.len(), 1);
+        assert_eq!(releases[0].quality.as_deref(), Some("multi"));
+        assert!(releases[0].is_multi_resolution());
+        assert_eq!(releases[0].resolution_i64(), -1);
         assert_eq!(releases[0].codec.as_deref(), Some("hevc"));
-        assert_eq!(releases[1].quality.as_deref(), Some("720p"));
-        assert_eq!(releases[2].quality.as_deref(), Some("480p"));
         assert_eq!(
             releases[0].direct_url(),
             Some("https://sacdn.example.com/dash/12345_0_0_1080_h265_518/index.mpd")
@@ -895,5 +945,156 @@ mod tests {
 
         let invalid_cookie = "CloudFront-Policy=invalid_base64;";
         assert_eq!(resolve_dash_manifest_from_policy(invalid_cookie), None);
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_policy_standard_base64() {
+        let policy_json = r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/item1/*","Condition":{"DateLessThan":{"AWS:EpochTime":1700000000}}}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cookie = format!(
+            "CloudFront-Policy={b64};CloudFront-Signature=abc;CloudFront-Key-Pair-Id=K123;"
+        );
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some("https://sacdn.hakunaymatata.com/dash/item1/index.mpd")
+        );
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_policy_with_dash_substitution() {
+        let policy_json =
+            r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/test_dash/*"}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cf_b64 = b64.replace('+', "-");
+        let cookie = format!("CloudFront-Policy={cf_b64};CloudFront-Signature=abc;");
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some("https://sacdn.hakunaymatata.com/dash/test_dash/index.mpd")
+        );
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_policy_with_underscore_substitution() {
+        let policy_json = r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/test_underscore/*"}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cf_b64 = b64.replace('=', "_");
+        let cookie = format!("CloudFront-Policy={cf_b64};CloudFront-Signature=abc;");
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some("https://sacdn.hakunaymatata.com/dash/test_underscore/index.mpd")
+        );
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_policy_with_tilde_substitution() {
+        let policy_json =
+            r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/test_tilde/*"}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cf_b64 = b64.replace('/', "~");
+        let cookie = format!("CloudFront-Policy={cf_b64};CloudFront-Signature=abc;");
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some("https://sacdn.hakunaymatata.com/dash/test_tilde/index.mpd")
+        );
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_policy_restores_missing_padding() {
+        let policy_json =
+            r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/test_pad/*"}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let unpadded = b64.trim_end_matches('=');
+        let cookie = format!("CloudFront-Policy={unpadded};CloudFront-Signature=abc;");
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some("https://sacdn.hakunaymatata.com/dash/test_pad/index.mpd")
+        );
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_from_malformed_policy() {
+        assert_eq!(
+            resolve_dash_manifest_from_policy("CloudFront-Policy=invalid!!not_b64"),
+            None
+        );
+        assert_eq!(
+            resolve_dash_manifest_from_policy("CloudFront-Policy=e30="),
+            None
+        );
+        assert_eq!(
+            resolve_dash_manifest_from_policy("SomeOtherCookie=123"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_resolve_dash_manifest_resource_conversion() {
+        let policy_json =
+            r#"{"Statement":[{"Resource":"https://sacdn.hakunaymatata.com/dash/example/*"}]}"#;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(policy_json.as_bytes());
+        let cookie = format!("CloudFront-Policy={b64};");
+        let resolved = resolve_dash_manifest_from_policy(&cookie);
+        assert_eq!(
+            resolved.as_deref(),
+            Some("https://sacdn.hakunaymatata.com/dash/example/index.mpd")
+        );
+    }
+
+    #[test]
+    fn test_notice_fallback_rejected_when_signed_policy_missing() {
+        let payload = json!({
+            "code": 0,
+            "data": {
+                "title": "Deprecation Notice Title",
+                "streams": [
+                    {
+                        "id": "1",
+                        "format": "MP4",
+                        "codecName": "h264",
+                        "resolutions": "480",
+                        "url": "https://macdn.aoneroom.com/other/2026/09/01/9a0461bc39da389663bf3dbb17091d3f.mp4",
+                        "signCookie": ""
+                    }
+                ]
+            }
+        });
+
+        let releases = moviebox_play_info_json_to_releases(&payload, 0, 0, "TestAgent/1.0");
+        assert!(
+            releases.is_empty(),
+            "Deprecation notice MP4 must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_legitimate_direct_stream_url_fallback_preserved() {
+        let payload = json!({
+            "code": 0,
+            "data": {
+                "title": "Legitimate Movie",
+                "streams": [
+                    {
+                        "id": "1",
+                        "format": "MP4",
+                        "codecName": "h264",
+                        "resolutions": "1080",
+                        "url": "https://cdn.example.com/legitimate_movie.mp4",
+                        "signCookie": ""
+                    }
+                ]
+            }
+        });
+
+        let releases = moviebox_play_info_json_to_releases(&payload, 0, 0, "TestAgent/1.0");
+        assert_eq!(releases.len(), 1);
+        assert_eq!(
+            releases[0].direct_url(),
+            Some("https://cdn.example.com/legitimate_movie.mp4")
+        );
     }
 }

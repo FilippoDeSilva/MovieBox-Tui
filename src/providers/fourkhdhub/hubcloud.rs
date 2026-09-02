@@ -4,7 +4,9 @@ use scraper::{Html, Selector};
 use std::net::IpAddr;
 use std::sync::LazyLock;
 
-static SEL_DOWNLOAD: LazyLock<Selector> = LazyLock::new(|| Selector::parse("a#download").unwrap());
+static SEL_DOWNLOAD: LazyLock<Selector> = LazyLock::new(|| {
+    Selector::parse("a#download, a.btn-primary, a.btn-success, a.btn[href*='/download/'], a[href*='/download/'], a[href*='gamerxyt.com'], a[href*='hubcloud.php']").unwrap()
+});
 static SEL_LINKS: LazyLock<Selector> = LazyLock::new(|| Selector::parse("a[href]").unwrap());
 
 pub async fn resolve(
@@ -48,6 +50,15 @@ pub async fn resolve(
             .filter_map(|node| {
                 let href = node.value().attr("href")?;
                 let label = node.text().collect::<String>();
+                if let Some(unwrapped) = unwrap_watch_online_url(href)
+                    && let Ok(valid) = validate_playback_url(&unwrapped)
+                {
+                    return Some((
+                        score(&valid, "Watch Online"),
+                        valid,
+                        "Watch Online".to_string(),
+                    ));
+                }
                 validate_playback_url(href).ok().map(|url| {
                     let url = pixeldrain_api_url(&url).unwrap_or(url);
                     (score(&url, &label), url, clean_label(&label))
@@ -96,6 +107,25 @@ fn extract_hubcloud_drive_url(html: &str) -> Option<String> {
         let host = url.host_str()?;
         (host.contains("hubcloud.") && url.path().starts_with("/drive/")).then(|| url.to_string())
     })
+}
+
+fn unwrap_watch_online_url(raw: &str) -> Option<String> {
+    let url = Url::parse(raw).ok()?;
+    if url.host_str().is_some_and(|h| h.contains("pages.dev")) {
+        let b64 = url
+            .query_pairs()
+            .find(|(k, _)| k == "u")
+            .map(|(_, v)| v.into_owned())?;
+        use base64::Engine;
+        let decoded_bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64.as_bytes())
+            .ok()?;
+        let decoded_str = String::from_utf8(decoded_bytes).ok()?;
+        if decoded_str.starts_with("https://") {
+            return Some(decoded_str);
+        }
+    }
+    None
 }
 
 fn extract_script_pixeldrain_urls(html: &str) -> Vec<String> {
@@ -256,28 +286,31 @@ fn is_public_ip(address: IpAddr) -> bool {
 
 pub fn score(url: &str, label: &str) -> u8 {
     let value = format!("{} {}", url, label).to_ascii_lowercase();
-    if value.contains("googleusercontent.com")
-        || value.contains("googlevideo.com")
-        || value.contains("testzip.php")
-        || value.contains("vcloud.php")
-        || value.contains("drive.php")
-        || value.contains("gpdl.")
+    if value.contains("cloudflarestorage.com")
+        || value.contains("r2.cloudflarestorage.com")
+        || value.contains("fsl server")
+        || value.contains("r2.dev")
+        || value.contains("workers.dev")
+        || value.contains("watch online")
     {
         0
+    } else if value.contains("storage.googleapis.com")
+        || value.contains("hubcloud.cx/re/")
+        || value.contains("hubcloud.fans/re/")
+    {
+        1
     } else if value.contains("pixeldrain.com")
         || value.contains("pixeldrain.dev")
         || value.contains("pixel.hubcloud.")
         || value.contains("pixeldrain")
     {
-        1
-    } else if value.contains("storage.googleapis.com")
-        || value.contains("hubcloud.cx/re/")
-        || value.contains("hubcloud.fans/re/")
-    {
         2
-    } else if value.contains("workers.dev")
-        || value.contains("r2.dev")
-        || value.contains("terapiyo")
+    } else if value.contains("googleusercontent.com")
+        || value.contains("googlevideo.com")
+        || value.contains("testzip.php")
+        || value.contains("vcloud.php")
+        || value.contains("drive.php")
+        || value.contains("gpdl.")
     {
         3
     } else {
@@ -319,22 +352,29 @@ mod tests {
     #[test]
     fn scores_mirrors_by_priority() {
         assert_eq!(
-            score("https://hubcloud.cx/testzip.php?id=123", "Fast Direct"),
+            score(
+                "https://c357acb6.r2.cloudflarestorage.com/file.mkv",
+                "FSL Server"
+            ),
             0
-        );
-        assert_eq!(score("https://gpdl.example.com/stream", "Google Drive"), 0);
-        assert_eq!(
-            score("https://pixeldrain.com/api/file/abc?download", "PixelDrain"),
-            1
-        );
-        assert_eq!(
-            score("https://storage.googleapis.com/bucket/file.mkv", "Storage"),
-            2
         );
         assert_eq!(
             score("https://worker.sub.workers.dev/file.mkv", "Cloudflare"),
+            0
+        );
+        assert_eq!(
+            score("https://storage.googleapis.com/bucket/file.mkv", "Storage"),
+            1
+        );
+        assert_eq!(
+            score("https://pixeldrain.com/api/file/abc?download", "PixelDrain"),
+            2
+        );
+        assert_eq!(
+            score("https://hubcloud.cx/testzip.php?id=123", "Fast Direct"),
             3
         );
+        assert_eq!(score("https://gpdl.example.com/stream", "Google Drive"), 3);
         assert_eq!(score("https://unknown-mirror.org/file.mkv", "Unknown"), 4);
     }
 }

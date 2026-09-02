@@ -23,15 +23,21 @@ enum SearchViewState {
 fn search_view_state(state: &AppState) -> SearchViewState {
     if state.input_mode == InputMode::Editing {
         SearchViewState::Editing
-    } else if state.is_loading {
+    } else if state.is_loading
+        || (!state.has_search_settled
+            && (!state.search_query.trim().is_empty()
+                || state.active_browse_preset.is_some()
+                || state.active_addon_catalog.is_some()))
+    {
         SearchViewState::Loading
     } else if state.search_error.is_some() {
         SearchViewState::Error
     } else if !state.search_results.is_empty() {
         SearchViewState::Results
-    } else if !state.search_query.trim().is_empty()
-        || state.active_browse_preset.is_some()
-        || state.active_addon_catalog.is_some()
+    } else if state.has_search_settled
+        && (!state.search_query.trim().is_empty()
+            || state.active_browse_preset.is_some()
+            || state.active_addon_catalog.is_some())
     {
         SearchViewState::NoResults
     } else {
@@ -236,10 +242,9 @@ fn render_search_state(
         return;
     }
 
-    let mut card_width = area.width.min(64);
     let query = crate::tui::text::truncate_width(
         &state.search_query,
-        card_width.saturating_sub(10) as usize,
+        area.width.min(64).saturating_sub(10) as usize,
     );
 
     let ctrl_p = crate::tui::text::CTRL_P_STR;
@@ -299,7 +304,8 @@ fn render_search_state(
             }
         }
         SearchViewState::NoResults => {
-            let symbol = if state.basic_terminal { "-" } else { "·" };
+            let provider_label = state.active_provider.label();
+            let next_provider = state.next_provider();
             let msg = if let Some(preset) = state.active_browse_preset {
                 format!("No items found for {}", preset.label())
             } else if let Some(catalog) = &state.active_addon_catalog {
@@ -311,66 +317,48 @@ fn render_search_state(
             {
                 "No favorites saved yet".to_string()
             } else if !state.search_query.trim().is_empty() {
-                format!("No matches for “{query}”")
+                format!("No results for “{query}” on {provider_label}")
             } else {
                 "No results found".to_string()
             };
-            lines.push(Line::from(vec![
-                Span::styled(format!("{symbol} "), theme.text_dim),
-                Span::styled(msg, theme.text.add_modifier(Modifier::BOLD)),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                msg,
+                theme.text.add_modifier(Modifier::BOLD),
+            )]));
             lines.push(Line::from(""));
 
             let pills = if state.is_tv_mode {
                 vec![
-                    Span::styled("[", theme.text_dim),
-                    Span::styled("/tv", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Playlists", theme.subtext1),
-                    Span::styled(bullet, theme.text_dim),
-                    Span::styled("[", theme.text_dim),
+                    Span::styled("[ Reload Playlists (", theme.subtext1),
                     Span::styled("r", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Reload Playlist", theme.subtext1),
-                    Span::styled(bullet, theme.text_dim),
-                    Span::styled("[", theme.text_dim),
+                    Span::styled(") ]", theme.subtext1),
+                    Span::raw("        "),
+                    Span::styled("[ Clear Search (", theme.subtext1),
                     Span::styled("c", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Clear", theme.subtext1),
+                    Span::styled(") ]", theme.subtext1),
                 ]
             } else if state.is_addon_mode {
                 vec![
-                    Span::styled("[", theme.text_dim),
+                    Span::styled("[ Addon Manager (", theme.subtext1),
                     Span::styled(ctrl_p, theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Change Catalog", theme.subtext1),
-                    Span::styled(bullet, theme.text_dim),
-                    Span::styled("[", theme.text_dim),
-                    Span::styled("/addons", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Manage Addons", theme.subtext1),
-                    Span::styled(bullet, theme.text_dim),
-                    Span::styled("[", theme.text_dim),
+                    Span::styled(") ]", theme.subtext1),
+                    Span::raw("        "),
+                    Span::styled("[ Clear Search (", theme.subtext1),
                     Span::styled("c", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Clear", theme.subtext1),
+                    Span::styled(") ]", theme.subtext1),
                 ]
             } else {
                 vec![
-                    Span::styled("[", theme.text_dim),
+                    Span::styled(
+                        format!("[ Try on {} (", next_provider.label()),
+                        theme.subtext1,
+                    ),
                     Span::styled(ctrl_p, theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Switch Provider", theme.subtext1),
-                    Span::styled(bullet, theme.text_dim),
-                    Span::styled("[", theme.text_dim),
-                    Span::styled("/browse", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Categories", theme.subtext1),
-                    Span::styled(bullet, theme.text_dim),
-                    Span::styled("[", theme.text_dim),
+                    Span::styled(") ]", theme.subtext1),
+                    Span::raw("        "),
+                    Span::styled("[ Clear Search (", theme.subtext1),
                     Span::styled("c", theme.shortcut),
-                    Span::styled("] ", theme.text_dim),
-                    Span::styled("Clear", theme.subtext1),
+                    Span::styled(") ]", theme.subtext1),
                 ]
             };
 
@@ -385,7 +373,7 @@ fn render_search_state(
                     "Search request failed"
                 }
             });
-            let wrap_width = card_width.saturating_sub(8).max(10) as usize;
+            let wrap_width = area.width.min(72).saturating_sub(8).max(10) as usize;
             let wrapped_err_lines = crate::tui::text::wrap_text(err_text, wrap_width);
 
             lines.push(Line::from(vec![
@@ -426,50 +414,36 @@ fn render_search_state(
         _ => return,
     };
 
-    let max_line_width = lines.iter().map(|l| l.width()).max().unwrap_or(0) as u16;
-    if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
-        card_width = (max_line_width + 4)
-            .clamp(32, area.width.saturating_sub(2))
-            .min(72);
-    } else if view == SearchViewState::Loading {
-        card_width = (max_line_width + 2)
-            .clamp(24, area.width.saturating_sub(2))
-            .min(64);
-    }
-
-    let is_boxed = matches!(view, SearchViewState::Error | SearchViewState::NoResults);
+    let is_boxed = view == SearchViewState::Error;
     let card_height = if is_boxed {
-        (lines.len() as u16 + 2).min(area.height)
+        (lines.len() as u16 + 4).min(area.height)
     } else {
-        (lines.len() as u16).min(area.height)
+        lines.len() as u16
+    };
+    let card_y = if is_boxed {
+        area.y + area.height.saturating_sub(card_height) / 2
+    } else {
+        area.y + area.height.saturating_sub(card_height) / 3
     };
     let card = Rect {
-        x: area.x + area.width.saturating_sub(card_width) / 2,
-        y: area.y + area.height.saturating_sub(card_height) / 2,
-        width: card_width,
+        x: area.x,
+        y: card_y,
+        width: area.width,
         height: card_height,
     };
 
     if is_boxed && card.height >= 3 {
-        let (border_style, title_text, title_style) = if view == SearchViewState::Error {
-            (
-                theme.error,
-                " Error ",
-                theme.error.add_modifier(Modifier::BOLD),
-            )
-        } else {
-            (
-                theme.muted,
-                " No Results ",
-                theme.subtext1.add_modifier(Modifier::BOLD),
-            )
-        };
+        let (border_style, title_text, title_style) = (
+            theme.error,
+            " Error ",
+            theme.error.add_modifier(Modifier::BOLD),
+        );
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(crate::tui::overlay::border_type(state.basic_terminal))
             .border_style(border_style)
             .title(Line::from(vec![Span::styled(title_text, title_style)]))
-            .padding(ratatui::widgets::Padding::horizontal(1));
+            .padding(ratatui::widgets::Padding::new(2, 2, 1, 1));
         frame.render_widget(
             Paragraph::new(lines)
                 .block(block)
@@ -477,13 +451,44 @@ fn render_search_state(
             card,
         );
     } else {
-        let alignment = if matches!(view, SearchViewState::Error | SearchViewState::NoResults) {
-            Alignment::Left
-        } else {
-            Alignment::Center
-        };
-        frame.render_widget(Paragraph::new(lines).alignment(alignment), card);
+        frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), card);
     }
+}
+
+pub(crate) fn no_results_button_hitboxes(
+    area: Rect,
+    next_provider_label: &str,
+    ctrl_p: &str,
+    is_tv_mode: bool,
+    is_addon_mode: bool,
+) -> (Rect, Rect) {
+    let btn1_w = if is_tv_mode {
+        24
+    } else if is_addon_mode {
+        19 + ctrl_p.len() as u16
+    } else {
+        (14 + next_provider_label.len() + ctrl_p.len()) as u16
+    };
+    let btn2_w = 20;
+    let sep_w = 8;
+    let total_w = btn1_w + sep_w + btn2_w;
+    let start_x = area.x + area.width.saturating_sub(total_w) / 2;
+    let card_y = area.y + area.height.saturating_sub(3) / 3;
+    let btn_y = card_y + 2;
+
+    let btn1 = Rect {
+        x: start_x,
+        y: btn_y,
+        width: btn1_w,
+        height: 1,
+    };
+    let btn2 = Rect {
+        x: start_x + btn1_w + sep_w,
+        y: btn_y,
+        width: btn2_w,
+        height: 1,
+    };
+    (btn1, btn2)
 }
 pub(crate) fn render_favorites_landing(
     frame: &mut Frame,
@@ -640,6 +645,82 @@ pub(crate) fn render_favorites_landing(
                 .alignment(Alignment::Center),
             pill_area,
         );
+    }
+}
+
+pub(crate) fn render_discover_landing(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    theme: &Theme,
+) {
+    if area.height < 3 || area.width < 20 {
+        return;
+    }
+
+    let presets = [
+        ("Trending Movies", "/browse · Popular & In-Theaters"),
+        ("Top Rated Series", "/browse · Award-Winning TV"),
+        ("New Releases", "/browse · Latest 4K & HD Additions"),
+        ("Curated Catalogs", "/browse · Explore Genres"),
+    ];
+
+    let card_width = search_deck_width(area, state, true);
+    let row_count = presets.len() as u16;
+    let content_height = (row_count + 2).min(area.height);
+
+    let card_area = Rect {
+        x: area.x + area.width.saturating_sub(card_width) / 2,
+        y: area.y,
+        width: card_width,
+        height: content_height,
+    };
+
+    let (bar, compass) = if state.basic_terminal {
+        ("-", "*")
+    } else {
+        ("─", "✦")
+    };
+    let block = Block::default()
+        .title(format!("{bar} {compass}  Discover & Quick Categories "))
+        .title_style(theme.subtext1)
+        .borders(Borders::ALL)
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+        .border_style(theme.surface1);
+
+    frame.render_widget(block, card_area);
+
+    let inner_area = card_area.inner(Margin {
+        vertical: 1,
+        horizontal: 1,
+    });
+    if inner_area.height == 0 || inner_area.width == 0 {
+        return;
+    }
+
+    for (curr_y, (title, desc)) in (inner_area.y..inner_area.bottom()).zip(presets) {
+        let pointer = if state.basic_terminal { " - " } else { " · " };
+        let tag_len = crate::tui::text::width(desc);
+        let title_w = crate::tui::text::width(title);
+        let margins_len = 4;
+        let pad_len = (inner_area.width as usize).saturating_sub(margins_len + title_w + tag_len);
+
+        let line = Line::from(vec![
+            Span::raw("  "),
+            Span::styled(pointer, theme.accent),
+            Span::styled(title, theme.text.add_modifier(Modifier::BOLD)),
+            Span::raw(" ".repeat(pad_len)),
+            Span::styled(desc, theme.text_dim),
+            Span::raw(" "),
+        ]);
+
+        let row_area = Rect {
+            x: inner_area.x,
+            y: curr_y,
+            width: inner_area.width,
+            height: 1,
+        };
+        frame.render_widget(Paragraph::new(line), row_area);
     }
 }
 
@@ -818,6 +899,8 @@ fn render_search_bar(
         } else if !is_query_empty {
             if is_ultra_compact {
                 ("[Enter]".to_string(), theme.accent)
+            } else if view == SearchViewState::NoResults {
+                ("[0 results]".to_string(), theme.text_dim)
             } else {
                 ("[Enter] Search".to_string(), theme.accent)
             }
@@ -1011,6 +1094,8 @@ fn render_search_bar(
             } else {
                 Some(format!("Item {} of {}", selected_num, total))
             }
+        } else if view == SearchViewState::NoResults {
+            Some("0 results".to_string())
         } else {
             None
         };
@@ -1122,6 +1207,106 @@ fn render_search_bar(
     }
 }
 
+fn home_bottom_bar_spans(
+    state: &AppState,
+    theme: &Theme,
+    width: u16,
+    modal_active: bool,
+) -> Vec<Span<'static>> {
+    let compact_tabs = width < 76;
+    let ultra_compact_tabs = width < 58;
+
+    let ctrl_s = if ultra_compact_tabs || compact_tabs {
+        "S"
+    } else {
+        crate::tui::text::CTRL_S_STR
+    };
+    let ctrl_t = if ultra_compact_tabs || compact_tabs {
+        "T"
+    } else {
+        crate::tui::text::CTRL_T_STR
+    };
+    let ctrl_a = if ultra_compact_tabs || compact_tabs {
+        "A"
+    } else {
+        crate::tui::text::CTRL_A_STR
+    };
+
+    let current_mode = state.mode();
+    let mut bar_spans: Vec<Span<'static>> = Vec::new();
+    let shortcut_style = if modal_active {
+        theme.muted
+    } else {
+        theme.shortcut
+    };
+    let bracket_style = if modal_active {
+        theme.muted
+    } else {
+        theme.text_dim
+    };
+    let text_style = if modal_active {
+        theme.muted
+    } else {
+        theme.text_dim
+    };
+
+    let sep = if state.basic_terminal {
+        " - "
+    } else if compact_tabs {
+        " · "
+    } else {
+        "  ·  "
+    };
+
+    if state.streaming_enabled && current_mode != crate::tui::state::AppMode::Streaming {
+        bar_spans.push(Span::styled("[", bracket_style));
+        bar_spans.push(Span::styled(ctrl_s, shortcut_style));
+        bar_spans.push(Span::styled("] ", bracket_style));
+        bar_spans.push(Span::styled("Stream", text_style));
+    }
+
+    if state.tv_enabled && current_mode != crate::tui::state::AppMode::Tv {
+        if !bar_spans.is_empty() {
+            bar_spans.push(Span::raw(sep));
+        }
+        bar_spans.push(Span::styled("[", bracket_style));
+        bar_spans.push(Span::styled(ctrl_t, shortcut_style));
+        bar_spans.push(Span::styled("] ", bracket_style));
+        bar_spans.push(Span::styled("TV", text_style));
+    }
+
+    if state.addons_enabled && current_mode != crate::tui::state::AppMode::Addon {
+        if !bar_spans.is_empty() {
+            bar_spans.push(Span::raw(sep));
+        }
+        bar_spans.push(Span::styled("[", bracket_style));
+        bar_spans.push(Span::styled(ctrl_a, shortcut_style));
+        bar_spans.push(Span::styled("] ", bracket_style));
+        bar_spans.push(Span::styled("Addon", text_style));
+    }
+
+    if !bar_spans.is_empty() {
+        let util_gap = if compact_tabs { "    " } else { "       " };
+        bar_spans.push(Span::raw(util_gap));
+    }
+
+    bar_spans.push(Span::styled("[", bracket_style));
+    bar_spans.push(Span::styled("?", shortcut_style));
+    bar_spans.push(Span::styled("] ", bracket_style));
+    if !ultra_compact_tabs {
+        bar_spans.push(Span::styled("Help", text_style));
+        bar_spans.push(Span::raw("  "));
+    }
+    bar_spans.push(Span::styled("[", bracket_style));
+    bar_spans.push(Span::styled("q", shortcut_style));
+    bar_spans.push(Span::styled("] ", bracket_style));
+    if !ultra_compact_tabs {
+        bar_spans.push(Span::styled("Quit", text_style));
+    }
+
+    bar_spans
+}
+
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
     let is_actively_typing =
         state.last_search_edit.elapsed() < std::time::Duration::from_millis(500);
@@ -1231,98 +1416,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         if state.favorites_landing_visible() && !state.tv_config_popup {
             render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
+        } else if !state.is_tv_mode && !state.tv_config_popup && area.height >= 26 {
+            render_discover_landing(frame, vertical_chunks[rows.favorites], state, theme);
         }
-        let compact_tabs = area.width < 76;
-        let ultra_compact_tabs = area.width < 58;
-
-        let ctrl_s = if ultra_compact_tabs || compact_tabs {
-            "S"
-        } else {
-            crate::tui::text::CTRL_S_STR
-        };
-        let ctrl_t = if ultra_compact_tabs || compact_tabs {
-            "T"
-        } else {
-            crate::tui::text::CTRL_T_STR
-        };
-        let ctrl_a = if ultra_compact_tabs || compact_tabs {
-            "A"
-        } else {
-            crate::tui::text::CTRL_A_STR
-        };
-
-        let current_mode = state.mode();
-        let mut bar_spans: Vec<Span> = Vec::new();
-        let shortcut_style = if modal_active {
-            theme.muted
-        } else {
-            theme.shortcut
-        };
-        let bracket_style = if modal_active {
-            theme.muted
-        } else {
-            theme.text_dim
-        };
-        let text_style = if modal_active {
-            theme.muted
-        } else {
-            theme.text_dim
-        };
-
-        let sep = if state.basic_terminal {
-            " - "
-        } else if compact_tabs {
-            " · "
-        } else {
-            "  ·  "
-        };
-
-        if state.streaming_enabled && current_mode != crate::tui::state::AppMode::Streaming {
-            bar_spans.push(Span::styled("[", bracket_style));
-            bar_spans.push(Span::styled(ctrl_s, shortcut_style));
-            bar_spans.push(Span::styled("] ", bracket_style));
-            bar_spans.push(Span::styled("Stream", text_style));
-        }
-
-        if state.tv_enabled && current_mode != crate::tui::state::AppMode::Tv {
-            if !bar_spans.is_empty() {
-                bar_spans.push(Span::raw(sep));
-            }
-            bar_spans.push(Span::styled("[", bracket_style));
-            bar_spans.push(Span::styled(ctrl_t, shortcut_style));
-            bar_spans.push(Span::styled("] ", bracket_style));
-            bar_spans.push(Span::styled("TV", text_style));
-        }
-
-        if state.addons_enabled && current_mode != crate::tui::state::AppMode::Addon {
-            if !bar_spans.is_empty() {
-                bar_spans.push(Span::raw(sep));
-            }
-            bar_spans.push(Span::styled("[", bracket_style));
-            bar_spans.push(Span::styled(ctrl_a, shortcut_style));
-            bar_spans.push(Span::styled("] ", bracket_style));
-            bar_spans.push(Span::styled("Addon", text_style));
-        }
-
-        if !bar_spans.is_empty() {
-            let util_gap = if compact_tabs { "    " } else { "       " };
-            bar_spans.push(Span::raw(util_gap));
-        }
-
-        bar_spans.push(Span::styled("[", bracket_style));
-        bar_spans.push(Span::styled("?", shortcut_style));
-        bar_spans.push(Span::styled("] ", bracket_style));
-        if !ultra_compact_tabs {
-            bar_spans.push(Span::styled("Help", text_style));
-            bar_spans.push(Span::raw("  "));
-        }
-        bar_spans.push(Span::styled("[", bracket_style));
-        bar_spans.push(Span::styled("q", shortcut_style));
-        bar_spans.push(Span::styled("] ", bracket_style));
-        if !ultra_compact_tabs {
-            bar_spans.push(Span::styled("Quit", text_style));
-        }
-
+        let bar_spans = home_bottom_bar_spans(state, theme, area.width, modal_active);
         let bottom_bar_area = vertical_chunks[rows.mode_row];
         frame.render_widget(
             Paragraph::new(Line::from(bar_spans)).alignment(Alignment::Center),
@@ -1334,36 +1431,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             return;
         }
 
-        let has_results = !state.search_results.is_empty();
-        let suggestion_height =
-            if state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty() {
-                state.search_suggestions.len().min(6) as u16 + 3
-            } else {
-                0
-            };
-        let chunks = if has_results {
-            Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Min(0),
-                ])
-                .split(area)
-        } else {
-            Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Length(suggestion_height),
-                    Constraint::Length(0),
-                    Constraint::Min(0),
-                ])
-                .split(area)
-        };
-
-        let results_chunk = if has_results { chunks[2] } else { chunks[4] };
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(0),
+            ])
+            .split(area);
+        let results_chunk = chunks[2];
         search_bar_area = Rect {
             x: chunks[0].x + 2,
             width: chunks[0].width.saturating_sub(4),
@@ -1378,7 +1454,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             show_cursor,
             false,
         );
-
         let list_block = Block::default();
         if !state.search_results.is_empty() {
             let poster_width = if state.image_supported {
@@ -1828,7 +1903,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 state.basic_terminal,
             );
         } else {
-            render_search_state(frame, chunks[4], state, theme, view);
+            render_search_state(frame, results_chunk, state, theme, view);
         }
     }
 
@@ -3048,5 +3123,69 @@ mod tests {
         }
         assert!(addon_rendered.contains("[Addons"));
         assert!(addon_rendered.contains("Search movies and series via addons…"));
+    }
+
+    #[test]
+    fn test_search_view_state_loading_before_settle() {
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            is_loading: false,
+            has_search_settled: false,
+            search_results: vec![],
+            ..Default::default()
+        };
+        state.search_query.set_content("Inception");
+
+        assert_eq!(search_view_state(&state), SearchViewState::Loading);
+
+        state.has_search_settled = true;
+        assert_eq!(search_view_state(&state), SearchViewState::NoResults);
+
+        state.search_results.push(crate::models::SearchResult {
+            id: "1".to_string(),
+            title: "Inception".to_string(),
+            stype: 1,
+            release_year: "2010".to_string(),
+            provider: crate::models::ProviderKind::MovieBox,
+            cover_url: None,
+            season: 0,
+            episode: 0,
+        });
+        assert_eq!(search_view_state(&state), SearchViewState::Results);
+    }
+
+    #[test]
+    fn test_no_results_screen_layout_and_elements() {
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            is_loading: false,
+            has_search_settled: true,
+            search_results: vec![],
+            ..Default::default()
+        };
+        state.search_query.set_content("deewaniyat");
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 100, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("deewaniyat"));
+        assert!(content.contains("0 results"));
+        assert!(content.contains("No results for “deewaniyat” on MovieBox"));
+        assert!(content.contains("Try on 4KHDHub"));
+        assert!(content.contains("Clear Search"));
     }
 }

@@ -64,14 +64,16 @@ Adding a new streaming or BDIX provider to MovieBox TUI takes 3 simple steps:
   pipelines to satisfy CDN anti-bot checks.
 - Multi-resolution discovery (`fetch_collection_resolutions`) dynamically discovers available
   stream resolutions with descending quality sorting.
+- Multi-resolution DASH manifests (`index.mpd`) and adaptive streams are labeled with a distinct
+  `[Multi]` badge, stripping confusing raw CDN resolution tags from release titles.
 - Title normalization lives in `moviebox/title.rs` (`clean_moviebox_title`).
 
 ## 4KHDHub
 
 - `client.rs::resolve_release` resolves release mirrors concurrently using bounded-concurrency probing (`select_ok` in batches of 3) with a 3.5s per-probe timeout.
 - Direct links undergo automatic path percent-encoding normalization (`validate_playback_url`) to handle filenames containing unencoded spaces, brackets, and special characters.
-- Preflight probes issue an **open-range** probe (`Range: bytes=0-`) and inspect response bodies for expired mirror errors (`"Failed to extract link"`, `"Token Expired"`, `"404"`) to fail fast on expired torrents.
-- `hubcloud.rs` scores and prioritizes candidate streams (Fast Direct Google/CDN $\to$ PixelDrain $\to$ Storage $\to$ Workers $\to$ Fallbacks).
+- Preflight probes issue a bounded range probe (`Range: bytes=0-8191`) and inspect response bodies for expired mirror errors (`"Failed to extract link"`, `"Token Expired"`, `"404"`) to fail fast on expired torrents.
+- `hubcloud.rs` scores and prioritizes candidate streams (Cloudflare R2 / S3 / Seekable Streams $\to$ Storage $\to$ PixelDrain API $\to$ Google UserContent / Direct Attachments), automatically decoding base64 `Watch Online` mirrors (`vdplay.pages.dev/?u=...`).
 - **Multilingual audio detection**: `parser.rs::detect_language` parses release titles and
   metadata for 30+ regional and international languages (Hindi, Tamil, Telugu, Kannada,
   Malayalam, Bengali, Marathi, Punjabi, Gujarati, Urdu, Japanese, Korean, Chinese, Spanish,

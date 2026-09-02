@@ -148,6 +148,8 @@ pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str)
         || term.contains("truecolor")
         || term.contains("kitty")
         || term.contains("ghostty")
+        || term.starts_with("foot")
+        || term.contains("alacritty")
         || std::env::var("WT_SESSION").is_ok()
         || term_program == "iTerm.app"
         || term_program == "Hyper"
@@ -966,6 +968,11 @@ mod tests {
         );
         assert_eq!(
             classify_terminal("", "xterm-256color", "ghostty"),
+            ColorSupport::Truecolor
+        );
+        assert_eq!(classify_terminal("", "foot", ""), ColorSupport::Truecolor);
+        assert_eq!(
+            classify_terminal("", "alacritty", ""),
             ColorSupport::Truecolor
         );
         assert_eq!(

@@ -24,9 +24,14 @@ impl App {
         if self.state.is_tv_mode {
             return;
         }
-        if provider == self.state.active_provider {
-            return;
-        }
+        let previous_query = if !self.state.search_query.trim().is_empty() {
+            Some(self.state.search_query.trim().to_string())
+        } else {
+            self.state
+                .selected_details
+                .as_ref()
+                .map(|details| details.title.trim().to_string())
+        };
         self.prepare_image_soft_refresh();
         self.reset_mode_state();
         self.state.active_provider = provider;
@@ -36,6 +41,8 @@ impl App {
         self.state.selected_episode = 1;
         self.state.language_chosen = false;
         self.state.stream_pool.clear();
+        self.state.has_streams_settled = false;
+        self.state.has_search_settled = false;
         self.state
             .cancel_download
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -64,9 +71,10 @@ impl App {
                 let _ = client.init().await;
             });
         }
-        let trimmed = self.state.search_query.trim();
-        if !trimmed.is_empty() && !trimmed.starts_with('/') {
-            let query = trimmed.to_string();
+        if let Some(query) = previous_query.filter(|q| !q.is_empty() && !q.starts_with('/')) {
+            self.state.search_query.set_content(&query);
+            self.state.is_loading = true;
+            self.state.has_search_settled = false;
             let context = self.prepare_search_request(&query);
             self.run_search_request(query, false, context);
         }
@@ -276,6 +284,7 @@ impl App {
             self.state.selected_episode = ep;
             self.state.resource_list_state.select(None);
             self.state.stream_error = None;
+            self.state.has_streams_settled = false;
             self.state.active_resource_request = self.state.active_resource_request.wrapping_add(1);
 
             let memory_cached = self
@@ -362,6 +371,7 @@ impl App {
                     self.state.subtitle_popup = false;
                     self.state.is_download_subtitle_popup = false;
                     self.state.pending_play_link = None;
+                    self.state.pending_playback_source = None;
                     self.state.pending_open_with = false;
                     self.state.subtitle_list.clear();
                     self.state.subtitle_list_state.select(None);
@@ -383,6 +393,17 @@ impl App {
                 }
                 match self.state.active_screen {
                     Screen::Home => {
+                        if self.state.active_browse_preset.is_some()
+                            || self.state.active_addon_catalog.is_some()
+                            || self.state.is_homepage_mode
+                        {
+                            self.state.active_browse_preset = None;
+                            self.state.active_addon_catalog = None;
+                            self.state.is_homepage_mode = false;
+                            self.state.clear_search_state();
+                            self.state.set_status_default("");
+                            return None;
+                        }
                         if !self.state.search_results.is_empty() {
                             self.state.input_mode = InputMode::Editing;
                             self.state.favorites_focus = false;
@@ -440,6 +461,10 @@ impl App {
                     self.state.resource_list_state.select(None);
                     self.state.language_chosen = true;
                     self.state.language_list_state.select(Some(idx));
+                    self.state.is_loading = true;
+                    self.state.is_fetching_streams = true;
+                    self.state.has_streams_settled = false;
+                    self.state.stream_error = None;
                     if self.state.active_subject_id.as_deref() == Some(&next_id) {
                         if !self.state.stream_pool.contains_key(&next_id) {
                             self.state.set_status_default("Loading streams...");
@@ -720,8 +745,25 @@ impl App {
                 if self.state.subtitle_popup {
                     self.state.subtitle_popup = false;
                     let idx = self.state.subtitle_list_state.selected().unwrap_or(0);
-                    let sub_url = self.state.subtitle_list.get(idx).map(|(_, u)| u.clone());
-                    if let Some(link) = self.state.pending_play_link.take() {
+                    let sub_url = self
+                        .state
+                        .subtitle_list
+                        .get(idx)
+                        .map(|(_, u)| u.clone())
+                        .filter(|s| !s.is_empty());
+                    if let Some(mut source) = self.state.pending_playback_source.take() {
+                        source.subtitle = sub_url;
+                        let default_player = self.preferred_playback_player(&source);
+                        if let Some(player) = default_player {
+                            self.action_sender
+                                .send(Action::LaunchPlayback(player, source))
+                                .ok();
+                        } else {
+                            self.action_sender
+                                .send(Action::ShowPlaybackPicker(source))
+                                .ok();
+                        }
+                    } else if let Some(link) = self.state.pending_play_link.take() {
                         self.action_sender
                             .send(Action::LaunchMpv(link, sub_url))
                             .ok();

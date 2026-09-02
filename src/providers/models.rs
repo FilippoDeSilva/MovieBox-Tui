@@ -226,6 +226,12 @@ pub struct Release {
     pub mirrors: Vec<SourceMirror>,
 }
 impl Release {
+    pub fn is_multi_resolution(&self) -> bool {
+        self.quality
+            .as_deref()
+            .is_some_and(|q| q.eq_ignore_ascii_case("multi") || q.eq_ignore_ascii_case("multi-res"))
+    }
+
     pub fn resolution_u64(&self) -> u64 {
         self.quality
             .as_deref()
@@ -233,6 +239,13 @@ impl Release {
             .unwrap_or(1080)
     }
 
+    pub fn resolution_i64(&self) -> i64 {
+        if self.is_multi_resolution() {
+            -1
+        } else {
+            self.resolution_u64() as i64
+        }
+    }
     pub fn source_label(&self) -> &str {
         self.mirrors
             .first()

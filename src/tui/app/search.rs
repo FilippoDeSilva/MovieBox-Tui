@@ -475,6 +475,7 @@ impl App {
         self.state.selected_details = None;
         self.state.selected_resources.clear();
         self.state.is_loading = true;
+        self.state.has_search_settled = false;
         self.state.search_error = None;
         self.state.search_list_state.select(Some(0));
         self.state.search_suggestions.clear();
@@ -504,6 +505,7 @@ impl App {
         self.state.selected_details = None;
         self.state.selected_resources.clear();
         self.state.is_loading = true;
+        self.state.has_search_settled = false;
         self.state.search_error = None;
         self.state.search_list_state.select(Some(0));
         self.state.search_suggestions.clear();
@@ -592,6 +594,7 @@ impl App {
         self.state.current_page = page;
         self.state.active_screen = Screen::Home;
         self.state.is_loading = true;
+        self.state.has_search_settled = false;
         self.state.search_error = None;
         if page == 1 {
             self.state.active_preview_request = self.state.active_preview_request.wrapping_add(1);
@@ -877,8 +880,8 @@ impl App {
         let visible = self.state.effective_visible_items().max(6);
 
         let base_start = offset.min(selected);
-        let start = base_start.saturating_sub(6);
-        let end = (offset + visible + 14).min(total);
+        let start = base_start.saturating_sub(2);
+        let end = (offset + visible + 4).min(total);
 
         if start < end {
             let slice: Vec<(String, Option<String>, ProviderKind)> = self.state.search_results

@@ -489,6 +489,7 @@ impl App {
                             self.state.input_mode = InputMode::Normal;
                             if !query.starts_with('/') {
                                 self.state.is_loading = true;
+                                self.state.has_search_settled = false;
                                 self.state.search_error = None;
                             }
                             self.state.search_suggestions.clear();
@@ -889,6 +890,8 @@ impl App {
                             if self.state.search_results.is_empty()
                                 && !self.state.search_query.trim().is_empty()
                             {
+                                self.state.is_loading = true;
+                                self.state.has_search_settled = false;
                                 self.action_sender
                                     .send(Action::Search {
                                         query: self.state.search_query.trim().to_string(),
@@ -1026,7 +1029,7 @@ impl App {
                             }
                         }
                     }
-                    KeyCode::Char('q') => {
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
                         self.action_sender.send(Action::Quit).ok();
                     }
                     KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -1297,5 +1300,35 @@ mod tests {
         assert!(app.state.search_query.is_empty());
         assert!(app.state.search_results.is_empty());
         assert_eq!(app.state.search_list_state.selected(), None);
+    }
+
+    #[tokio::test]
+    async fn test_browse_esc_returns_to_homepage() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.active_browse_preset = Some(crate::models::BrowsePreset::Trending);
+        app.state.search_results = vec![crate::models::SearchResult {
+            id: "1".to_string(),
+            title: "Awarapan 2".to_string(),
+            stype: 1,
+            release_year: "2026".to_string(),
+            provider: crate::models::ProviderKind::MovieBox,
+            cover_url: None,
+            season: 0,
+            episode: 0,
+        }];
+        app.state.search_list_state.select(Some(0));
+
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        while let Ok(action) = app.action_receiver.try_recv() {
+            app.handle_action(action).await;
+        }
+
+        assert!(app.state.active_browse_preset.is_none());
+        assert!(app.state.search_results.is_empty());
+        assert_eq!(app.state.search_list_state.selected(), None);
+        assert_eq!(app.state.input_mode, InputMode::Normal);
     }
 }

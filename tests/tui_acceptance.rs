@@ -774,6 +774,7 @@ async fn test_no_results_and_error_state_rendering_hints() {
     // No results view
     app.state_mut().active_screen = Screen::Home;
     app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().has_search_settled = true;
     app.state_mut()
         .set_mode(moviebox_tui::tui::state::AppMode::Streaming);
     app.state_mut().active_provider = moviebox_tui::providers::models::ProviderKind::MovieBox;
@@ -784,10 +785,9 @@ async fn test_no_results_and_error_state_rendering_hints() {
     terminal.draw(|frame| app.draw(frame)).unwrap();
     let content = terminal.backend().buffer().content();
     let text: String = content.iter().map(|c| c.symbol()).collect();
-    assert!(text.contains("Switch Provider"));
-    assert!(text.contains("Categories"));
-    assert!(text.contains("Clear"));
-
+    assert!(text.contains("No results for “nonexistent_movie_xyz” on MovieBox"));
+    assert!(text.contains("Try on 4KHDHub"));
+    assert!(text.contains("Clear Search"));
     // Error view
     app.state_mut().search_error =
         Some("Failed to connect to MovieBox provider: connection refused by server".to_string());

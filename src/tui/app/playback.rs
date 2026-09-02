@@ -4,7 +4,7 @@ use crate::tui::text::parse_duration_seconds;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 impl App {
-    fn preferred_playback_player(
+    pub(super) fn preferred_playback_player(
         &self,
         source: &crate::providers::models::PlaybackSource,
     ) -> Option<crate::tui::state::PlayerKind> {
@@ -417,8 +417,25 @@ impl App {
                     return None;
                 }
                 if self.state.active_screen == Screen::Details
-                    && let Some(link) = self.get_selected_link()
+                    && let Some(release) = self.get_selected_release()
                 {
+                    let Some(first_mirror) = release.mirrors.first().cloned() else {
+                        self.state.is_resolving_playback = false;
+                        self.state.notify(
+                            NotificationKind::Error,
+                            "Playback unavailable",
+                            "No playable mirrors were found for this release.",
+                        );
+                        return None;
+                    };
+                    let direct_source = crate::providers::models::PlaybackSource {
+                        provider: release.provider,
+                        url: first_mirror.resolver_url.clone(),
+                        headers: first_mirror.headers.clone(),
+                        subtitle: None,
+                        source_label: first_mirror.label.clone(),
+                    };
+                    let default_player = self.preferred_playback_player(&direct_source);
                     let subject_id = self
                         .state
                         .selected_details
@@ -433,9 +450,10 @@ impl App {
                             "Preparing playback",
                             "Fetching subtitles.",
                         );
+                        self.state.pending_playback_source = Some(direct_source.clone());
                         let service = self.service.clone();
                         let sender = self.action_sender.clone();
-                        let link_clone = link.clone();
+                        let source_clone = direct_source.clone();
                         tokio::spawn(async move {
                             let cached = tokio::task::spawn_blocking({
                                 let subject_id = subject_id.clone();
@@ -447,7 +465,7 @@ impl App {
                             .flatten();
                             if let Some(res) = cached {
                                 sender
-                                    .send(Action::ShowSubtitlePopup(link_clone.clone(), res))
+                                    .send(Action::ShowSubtitlePopup(source_clone.url.clone(), res))
                                     .ok();
                                 return;
                             }
@@ -468,15 +486,31 @@ impl App {
                                             &res_for_cache,
                                         );
                                     });
-                                    sender.send(Action::ShowSubtitlePopup(link_clone, res)).ok();
+                                    sender
+                                        .send(Action::ShowSubtitlePopup(source_clone.url, res))
+                                        .ok();
                                 }
                                 _ => {
-                                    sender.send(Action::LaunchMpv(link_clone, None)).ok();
+                                    if let Some(player) = default_player {
+                                        sender
+                                            .send(Action::LaunchPlayback(player, source_clone))
+                                            .ok();
+                                    } else {
+                                        sender.send(Action::ShowPlaybackPicker(source_clone)).ok();
+                                    }
                                 }
                             }
                         });
                     } else {
-                        self.action_sender.send(Action::LaunchMpv(link, None)).ok();
+                        if let Some(player) = default_player {
+                            self.action_sender
+                                .send(Action::LaunchPlayback(player, direct_source))
+                                .ok();
+                        } else {
+                            self.action_sender
+                                .send(Action::ShowPlaybackPicker(direct_source))
+                                .ok();
+                        }
                     }
                 } else {
                     self.state.is_resolving_playback = false;
@@ -496,7 +530,20 @@ impl App {
                     self.state.subtitle_list_state.select(Some(0));
                     self.state.pending_play_link = Some(link);
                 } else {
-                    self.action_sender.send(Action::LaunchMpv(link, None)).ok();
+                    if let Some(source) = self.state.pending_playback_source.take() {
+                        let default_player = self.preferred_playback_player(&source);
+                        if let Some(player) = default_player {
+                            self.action_sender
+                                .send(Action::LaunchPlayback(player, source))
+                                .ok();
+                        } else {
+                            self.action_sender
+                                .send(Action::ShowPlaybackPicker(source))
+                                .ok();
+                        }
+                    } else {
+                        self.action_sender.send(Action::LaunchMpv(link, None)).ok();
+                    }
                 }
             }
             Action::ShowDownloadSubtitlePopup(subtitles) => {
@@ -598,11 +645,16 @@ impl App {
                 self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
                 self.state.last_playback_launch = std::time::Instant::now();
-                let headers = vec![(
-                    "User-Agent".to_string(),
-                    self.service.client.user_agent().to_string(),
-                )];
-                self.launch_player(kind, link, sub, headers);
+                if let Some(mut source) = self.state.pending_playback_source.take() {
+                    source.subtitle = sub;
+                    self.launch_player(kind, source.url, source.subtitle, source.headers);
+                } else {
+                    let headers = vec![(
+                        "User-Agent".to_string(),
+                        self.service.client.user_agent().to_string(),
+                    )];
+                    self.launch_player(kind, link, sub, headers);
+                }
             }
             Action::LaunchPlayback(kind, source) => {
                 self.state.is_resolving_playback = false;

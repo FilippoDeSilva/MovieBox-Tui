@@ -269,19 +269,18 @@ impl MovieBoxService {
 }
 
 pub async fn decode_poster(bytes: Vec<u8>) -> Option<Arc<image::DynamicImage>> {
-    tokio::task::spawn_blocking(move || image::load_from_memory(&bytes))
-        .await
-        .ok()?
-        .ok()
-        .map(Arc::new)
-}
-
-pub fn downscale_for_cache(img: &Arc<image::DynamicImage>) -> Arc<image::DynamicImage> {
-    const MAX_DIM: u32 = 512;
-    if img.width().max(img.height()) <= MAX_DIM {
-        return Arc::clone(img);
-    }
-    Arc::new(img.resize(MAX_DIM, MAX_DIM, image::imageops::FilterType::Triangle))
+    tokio::task::spawn_blocking(move || {
+        let img = image::load_from_memory(&bytes).ok()?;
+        const MAX_DIM: u32 = 512;
+        let downscaled = if img.width().max(img.height()) <= MAX_DIM {
+            img
+        } else {
+            img.resize(MAX_DIM, MAX_DIM, image::imageops::FilterType::Triangle)
+        };
+        Some(Arc::new(downscaled))
+    })
+    .await
+    .ok()?
 }
 
 pub fn metric_value(item: &serde_json::Value, keys: &[&str]) -> Option<f64> {
@@ -388,4 +387,23 @@ pub fn resolve_download_dir(custom_dir: Option<&Path>) -> PathBuf {
     }
 
     ensure_moviebox_subdir(&base_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_decode_poster_caps_dimensions() {
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        let img = image::DynamicImage::new_rgb8(800, 600);
+        img.write_to(&mut buffer, image::ImageFormat::Png).unwrap();
+        let bytes = buffer.into_inner();
+
+        let decoded = decode_poster(bytes).await.unwrap();
+        assert!(decoded.width() <= 512);
+        assert!(decoded.height() <= 512);
+        assert_eq!(decoded.width(), 512);
+        assert_eq!(decoded.height(), 384);
+    }
 }

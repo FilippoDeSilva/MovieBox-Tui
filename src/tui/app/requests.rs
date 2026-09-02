@@ -115,6 +115,8 @@ impl App {
                 self.state.suggest_index = None;
                 self.state.search_suggestions.clear();
                 self.state.input_mode = InputMode::Normal;
+                self.state.is_loading = true;
+                self.state.has_search_settled = false;
                 self.action_sender
                     .send(Action::Search {
                         query,
@@ -233,6 +235,8 @@ impl App {
                 self.state.active_addon_catalog = None;
                 self.state.browse_list_state.select(None);
                 self.state.search_query.clear();
+                self.state.is_loading = true;
+                self.state.has_search_settled = false;
                 self.action_sender
                     .send(Action::FetchHomepage {
                         tab_id: "2".to_string(),
@@ -296,6 +300,7 @@ impl App {
                 self.state.current_page = page;
                 self.state.search_error = None;
                 self.state.is_loading = false;
+                self.state.has_search_settled = true;
                 if page <= 1 {
                     self.state.search_results.clear();
                 }
@@ -464,6 +469,7 @@ impl App {
                     context.provider.cache_key()
                 );
                 self.state.is_loading = false;
+                self.state.has_search_settled = true;
                 if page <= 1 {
                     self.state.search_results.clear();
                     self.state.search_list_state.select(None);
@@ -494,6 +500,7 @@ impl App {
                     return None;
                 }
                 self.state.is_loading = false;
+                self.state.has_search_settled = true;
                 if page == 1 {
                     self.state.search_results.clear();
                     self.state.search_error = None;
@@ -563,6 +570,7 @@ impl App {
                 }
                 log::error!("discover failed: {err}");
                 self.state.is_loading = false;
+                self.state.has_search_settled = true;
                 self.state.search_error = Some(format!("Discover failed: {err}"));
                 self.state.search_results.clear();
                 self.state.search_list_state.select(None);
@@ -830,11 +838,10 @@ impl App {
             Action::SearchPosterLoaded(id, img_opt) => {
                 self.state.in_flight_posters.remove(&id);
                 if let Some(img) = img_opt {
-                    let cached = crate::service::downscale_for_cache(&img);
                     self.state
                         .image_cache
-                        .put(id.clone(), std::sync::Arc::clone(&cached));
-                    self.state.search_posters.put(id, cached);
+                        .put(id.clone(), std::sync::Arc::clone(&img));
+                    self.state.search_posters.put(id, img);
                 } else {
                     self.state.failed_posters.put(id, std::time::Instant::now());
                 }
@@ -1152,6 +1159,10 @@ impl App {
             }
 
             Action::InitStreamPool(subject_id) => {
+                self.state.is_loading = true;
+                self.state.is_fetching_streams = true;
+                self.state.has_streams_settled = false;
+                self.state.stream_error = None;
                 if self.provider_for_subject(&subject_id) != ProviderKind::MovieBox {
                     self.state
                         .stream_pool
@@ -1243,6 +1254,7 @@ impl App {
                 let request_id = self.state.active_resource_request;
                 self.state.is_loading = true;
                 self.state.is_fetching_streams = true;
+                self.state.has_streams_settled = false;
                 self.state.selected_resources.clear();
                 self.state.stream_error = None;
 
@@ -1780,6 +1792,7 @@ impl App {
                 self.state.selected_resources = filtered;
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
+                self.state.has_streams_settled = true;
                 self.state.stream_error = None;
                 self.state
                     .resource_list_state
@@ -1851,6 +1864,7 @@ impl App {
                 self.state.auto_play_on_ready = false;
                 self.state.is_loading = false;
                 self.state.is_fetching_streams = false;
+                self.state.has_streams_settled = true;
                 self.state.selected_resources.clear();
                 self.state.resource_list_state.select(None);
                 self.state.stream_error = Some(err.clone());

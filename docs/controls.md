@@ -58,9 +58,9 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 ## Mode-Specific Controls
 
 ### Streaming Mode
-- **`Ctrl+P`**: Cycle content providers (`MovieBox` $\to$ `4KHDHub` $\to$ `BDIX`).
+- **`Ctrl+P`**: Cycle content providers (`MovieBox` $\to$ `4KHDHub` $\to$ `BDIX`). On the Details screen, re-searches and fetches alternate streams for the current movie in-place.
 - **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Audio Languages, Seasons, Episodes, Streams).
-- **`Enter`**: Play with default player.
+- **`Enter`**: Play selected stream or open selected title.
 - **`d`**: Download current episode or full season batch.
 - **`r`**: Refresh search results / stream list.
 - **`f`**: Favorite / unfavorite the selected title (Home & Details screens).
@@ -93,7 +93,7 @@ All popup dialogs (Theme picker, Browse categories, Player picker, TV Manager, A
 | **Click search result row** | Select item and load preview; click again to open full details |
 | **Click Favorites row (landing)** | Select a starred title; click again to open it |
 | **Click "+N more • /favorites"** | Open the full favorites list |
-| **Click audio / season / episode / stream** | Switch audio language, change season, select episode, or start playback |
+| **Click audio / season / episode / stream** | Switch audio language, change season, or select episode; click a specific stream row to play; click empty stream pane space to focus without playing |
 | **Click footer buttons** | Switch provider / mode, open help (`[?]`), or quit (`[q]`) |
 | **Click modal buttons** | Choose a theme, subtitles, player, or confirm actions |
 | **Click outside a modal** | Dismiss popup dialog |
