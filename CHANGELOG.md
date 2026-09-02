@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.15] - 2026-09-03
 
 ### Added
 - **Multi-Resolution DASH Stream Detection & `[Multi]` Badge**:
