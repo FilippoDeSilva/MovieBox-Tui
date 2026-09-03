@@ -26,6 +26,10 @@
 - **Responsive Mobile Installer Headers (`install.sh` & `install.ps1`)**:
   - Implemented dynamic terminal column detection (`tput cols`, `stty size`, and `$COLUMNS` in `install.sh`; `$Host.UI.RawUI.WindowSize.Width` in `install.ps1`) with automatic multi-tier banner sizing.
   - Eliminated ASCII art banner wrapping and visual corruption on narrow mobile viewports (e.g. Android Termux portrait mode at 40–55 columns) by rendering an adaptive 31-column compact half-block banner (`█▀▄▀█...`) and dynamic horizontal centering.
+- **Android Termux Static-PIE & TLS Alignment**:
+  - Linked `aarch64-unknown-linux-musl` target as static-PIE (`-C relocation-model=pic -C link-arg=-pie`) to produce `ET_DYN` (ELF `e_type: 0x0003`) binaries accepted by Android Bionic's `/system/bin/linker64`, resolving runtime failure (`unexpected e_type: 2`).
+  - Added 64-byte `PT_TLS` alignment anchor in `src/main.rs` to satisfy Android Bionic's ARM64 TLS segment minimum alignment validation.
+  - Added automated ELF `e_type` and `PT_TLS` validation checks to `.github/workflows/release.yml` and a post-installation execution smoke test to `install.sh`.
 ### Removed
 - Removed vestigial `ShowPlaybackPicker` and `ShowPlayerPicker` action variants and playback picker state fields in favor of direct compatible player dispatch.
 - **Redundant Slash Commands**:

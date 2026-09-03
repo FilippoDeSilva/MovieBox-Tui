@@ -549,6 +549,13 @@ install_binary() {
 run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary || exit 1
 log_success "[4/4] Binary installed to $APP_PATH"
 
+if [ "$DRY_RUN" -eq 0 ]; then
+    if ! "$APP_PATH" --version >/dev/null 2>&1; then
+        log_error "Installed binary failed execution smoke test ($APP_PATH)."
+        exit 1
+    fi
+fi
+
 SHELL_MODIFIED=""
 if [ "$NO_MODIFY_PATH" -eq 0 ]; then
     if ! echo "$PATH" | tr ':' '\n' | grep -Fqx "$INSTALL_DIR"; then

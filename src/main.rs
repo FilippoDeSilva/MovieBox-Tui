@@ -4,6 +4,14 @@ use moviebox_tui::tui::app::App;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+core::arch::global_asm!(
+    ".pushsection .tbss.bionic_tls_align_anchor,\"awTR\",@nobits",
+    ".balign 64",
+    "bionic_tls_align_anchor:",
+    ".zero 64",
+    ".popsection",
+);
 struct TerminalGuard;
 
 fn restore_terminal() {
