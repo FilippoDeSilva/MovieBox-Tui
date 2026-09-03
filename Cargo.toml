@@ -1,7 +1,6 @@
 [package]
 name = "moviebox-tui"
 exclude = [
-    "assets/",
     "docs/",
     "Formula/",
     ".github/",

@@ -7,6 +7,16 @@
   - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
   - Streamlined `/config` as a direct alias for `/settings`.
 
+- **Automation Workflows & Installer Hardening**:
+  - Added bounded execution timeouts (`timeout-minutes`) across all CI and release pipeline jobs to prevent runner hangs.
+  - Accelerated release preflight by eliminating redundant cross-compilation target toolchain downloads during source packaging.
+  - Streamlined Homebrew formula updater (`homebrew.yml`) by parsing the release's attested `SHA256SUMS` manifest directly with strict 64-char hex validation, eliminating redundant ~50MB archive downloads.
+  - Added on-device binary execution smoke tests to `install.ps1` and enhanced `install.sh` error diagnostics with API version resolution fallbacks.
+- **Documentation & User Guide Streamlining**:
+  - Overhauled root `README.md` into a developer-focused technical guide, pruning marketing copy, redundant comparison tables, and promotional buzzwords.
+  - Added structured media player setup guide with package manager commands (`brew`, `apt`, `winget`).
+  - Updated macOS Homebrew installation with explicit `brew trust` step required by Homebrew 6.0+ for third-party taps.
+  - Streamlined quickstart section to reference in-app interactive help (`?`) and `docs/controls.md`, preventing documentation drift.
 ### Fixed
 - **Direct Playback & Header Compatibility**:
   - Eliminated vestigial in-stream "Open with" popup that blocked playback when only VLC was installed, routing playback directly to the preferred compatible player.
@@ -32,6 +42,7 @@
   - Added automated ELF `e_type` and `PT_TLS` validation checks to `.github/workflows/release.yml` and a post-installation execution smoke test to `install.sh`.
 ### Removed
 - Removed vestigial `ShowPlaybackPicker` and `ShowPlayerPicker` action variants and playback picker state fields in favor of direct compatible player dispatch.
+- Removed unreferenced static screenshot assets (`assets/`), reducing repository clone size by ~1.3MB.
 - **Redundant Slash Commands**:
   - Pruned 10+ legacy slash commands (`/download-dir`, `/clear-cache`, `/update`, `/github`, `/probe`, `/toggle-update`, `/toggle-bdix`, `/toggle-streaming`, `/toggle-tv`, `/toggle-addons`, `/enable-*`, `/disable-*`) superseded by the interactive Settings Hub.
   - Removed 300+ lines of redundant command execution and file write probing in `src/tui/app/search.rs`.

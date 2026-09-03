@@ -29,7 +29,7 @@ in `providers/mod.rs` give every client a shared, strictly-typed async trait sha
 - `ReleaseProvider::episode_streams(&self, id: &str, season: usize, episode: usize) -> Result<Vec<Release>, ProviderError>`: Returns the typed `Release` list for release-based providers.
 - `ProviderError`: Standardized error boundary (`Network`, `RateLimited`, `NotFound`, `Parsing`, `Unavailable`) with `.user_message(provider)` generating clean UI toast notifications.
 
-### 100% Zero-JSON Architecture & High-Performance Binary Caching
+### Strongly Typed Architecture & Binary Disk Caching
 
 All internal state (`AppState`), UI screens (`details.rs`, `home.rs`), and the action event bus transport native Rust structs directly:
 - `CatalogItem` / `SearchResult` for search results and discover catalogs.

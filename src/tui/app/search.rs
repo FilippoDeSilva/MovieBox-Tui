@@ -120,6 +120,15 @@ impl App {
                 Some(true)
             }
             crate::tui::commands::ParsedCommand::Settings => {
+                if trimmed.eq_ignore_ascii_case("/config") {
+                    if self.state.is_tv_mode {
+                        self.action_sender.send(Action::ShowTvConfig).ok();
+                        return Some(true);
+                    } else if self.state.is_addon_mode {
+                        self.action_sender.send(Action::ShowAddonManager).ok();
+                        return Some(true);
+                    }
+                }
                 self.action_sender.send(Action::ToggleSettingsPopup).ok();
                 Some(true)
             }

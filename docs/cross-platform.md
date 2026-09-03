@@ -44,9 +44,9 @@ prevent escape sequence probe leakage (`Gi=31...`):
   types) is requested at start and popped on exit; unsupported terminals
   ignore it. Real input cursor styling (`SetCursorStyle::SteadyBar`) activates
   during text editing modes on supported terminals.
-- **Loading & Progress Animations**: Fluid 10-frame Unicode Braille loading
-  spinners (`⠋ ⠙ ⠹ ...`) render during search, metadata discovery, and stream
-  fetching, falling back to clean text indicators (`..`) on basic/dumb terminals.
+- **Loading & Progress Indicators**: Unicode Braille loading spinners (`⠋ ⠙ ⠹ ...`)
+  render during search, metadata discovery, and stream fetching, falling back to
+  clean text indicators (`..`) on basic/dumb terminals.
 - **Window Titles**: Contextual terminal emulator window titles are emitted dynamically
   reflecting active navigation mode and title (`MovieBox-Tui — Streaming`,
   `MovieBox-Tui — Live TV`, `MovieBox-Tui — Addons`, `MovieBox-Tui — {Title}`).

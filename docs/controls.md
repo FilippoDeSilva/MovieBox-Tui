@@ -113,6 +113,8 @@ Type these commands directly into the search bar:
 | `/list` | TV | View live TV channels |
 | `/exit` | All | Exit application and return to shell (aliases `/quit`, `/q`) |
 
+## Help Menu Overlay
+
 - Open with `?`; close with `?`, `Esc`, or `q`.
 - `↑`/`↓`, `PageUp`/`PageDown`, and the mouse wheel scroll long content.
 - Other keys are ignored while help is open.

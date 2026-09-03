@@ -1,6 +1,6 @@
 # MovieBox-Tui Documentation
 
-This folder documents the project so that anyone — human or AI — can understand how it
+This folder documents the project so that anyone can understand how it
 works without reading the whole codebase. The documents summarize the current module
 layout, runtime behavior, and operational workflows in prose tied to the source tree.
 
