@@ -53,6 +53,7 @@ prevent escape sequence probe leakage (`Gi=31...`):
 - **Terminal classification**: `TERM=dumb`/`linux` fall back to a basic UI.
 - Focus events re-render in place without clearing; results render in two
   columns from 110 columns wide (three from 160).
+- **Responsive Installers**: Both Unix (`install.sh`) and Windows (`install.ps1`) installation scripts query terminal width dynamically (`tput cols` / `stty size` / `$Host.UI.RawUI.WindowSize.Width`), adapting the header across wide (72-column block art), compact (31-column 2-line half-block art for mobile/Termux portrait mode), and minimal (text-only) tiers with dynamic horizontal centering to prevent line wrapping.
 ## Network & TLS portability
 
 - **TLS Engine**: Uses `rustls` with embedded Mozilla roots (`webpki-roots`) across all targets (macOS, Linux, Windows, Android/Termux). The release binary has no OpenSSL runtime dependency; the `ring` cryptography backend is compiled into the binary by the platform build toolchain.

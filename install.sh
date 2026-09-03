@@ -182,12 +182,33 @@ clear_screen() {
     fi
 }
 
+get_terminal_cols() {
+    local cols=""
+    if [ -n "${COLUMNS:-}" ] && [[ "$COLUMNS" =~ ^[0-9]+$ ]] && [ "$COLUMNS" -gt 0 ]; then
+        cols="$COLUMNS"
+    elif [ -t 1 ] || [ -t 2 ]; then
+        cols=$(tput cols 2>/dev/null || true)
+        if [ -z "$cols" ] || [ "$cols" -le 0 ] 2>/dev/null; then
+            cols=$(stty size 2>/dev/null | awk '{print $2}')
+        fi
+    fi
+    if [ -z "$cols" ] || [ "$cols" -le 0 ] 2>/dev/null; then
+        cols=80
+    fi
+    printf "%s" "$cols"
+}
+
 print_header() {
     clear_screen
-    if [ "$IS_COLOR" -eq 1 ] && [ "$IS_TTY" -eq 1 ]; then
-        printf "%b\n" "$CURSOR_HIDE"
-        printf "%b%b" "$C_BOLD" "$C_MAUVE"
-        local lines=(
+    local cols
+    cols=$(get_terminal_cols)
+
+    local lines=()
+    local banner_width=0
+
+    if [ "$cols" -ge 76 ]; then
+        banner_width=72
+        lines=(
             "███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗"
             "████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝"
             "██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ "
@@ -195,22 +216,60 @@ print_header() {
             "██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗"
             "╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝"
         )
+    elif [ "$cols" -ge 36 ]; then
+        banner_width=31
+        lines=(
+            "█▀▄▀█ █▀█ █ █ █ █▀▀ █▀▄ █▀█ ▀▄▀"
+            "█ ▀ █ █▄█ ▀▄▀ █ ██▄ █▄▀ █▄█ █ █"
+        )
+    else
+        banner_width=12
+        lines=(
+            "MovieBox-TUI"
+        )
+    fi
+
+    local banner_pad=0
+    if [ "$cols" -gt "$banner_width" ]; then
+        banner_pad=$(( (cols - banner_width) / 2 ))
+    fi
+
+    local sub="Official Installer"
+    local sub_len=${#sub}
+    local sub_pad=0
+    if [ "$cols" -gt "$sub_len" ]; then
+        sub_pad=$(( (cols - sub_len) / 2 ))
+    fi
+
+    if [ "$IS_COLOR" -eq 1 ] && [ "$IS_TTY" -eq 1 ]; then
+        printf "%b\n" "$CURSOR_HIDE"
+        printf "%b%b" "$C_BOLD" "$C_MAUVE"
         for line in "${lines[@]}"; do
-            printf "%s\n" "$line"
+            if [ "$banner_pad" -gt 0 ]; then
+                printf "%*s%s\n" "$banner_pad" "" "$line"
+            else
+                printf "%s\n" "$line"
+            fi
             sleep 0.02
         done
-        printf "%b%b                           Official Installer%b%b\n\n" "$C_SAPPHIRE" "$C_BOLD" "$C_RESET" "$CURSOR_SHOW"
+        if [ "$sub_pad" -gt 0 ]; then
+            printf "%*s%b%b%s%b%b\n\n" "$sub_pad" "" "$C_SAPPHIRE" "$C_BOLD" "$sub" "$C_RESET" "$CURSOR_SHOW"
+        else
+            printf "%b%b%s%b%b\n\n" "$C_SAPPHIRE" "$C_BOLD" "$sub" "$C_RESET" "$CURSOR_SHOW"
+        fi
     else
-        cat << 'EOF'
-███╗   ███╗  ██████╗  ██╗   ██╗ ██╗ ███████╗ ██████╗   ██████╗  ██╗  ██╗
-████╗ ████║ ██╔═══██╗ ██║   ██║ ██║ ██╔════╝ ██╔══██╗ ██╔═══██╗ ╚██╗██╔╝
-██╔████╔██║ ██║   ██║ ██║   ██║ ██║ █████╗   ██████╔╝ ██║   ██║  ╚███╔╝ 
-██║╚██╔╝██║ ██║   ██║ ╚██╗ ██╔╝ ██║ ██╔══╝   ██╔══██╗ ██║   ██║  ██╔██╗ 
-██║ ╚═╝ ██║ ╚██████╔╝  ╚████╔╝  ██║ ███████╗ ██████╔╝ ╚██████╔╝ ██╔╝ ██╗
-╚═╝     ╚═╝  ╚═════╝    ╚═══╝   ╚═╝ ╚══════╝ ╚═════╝   ╚═════╝  ╚═╝  ╚═╝
-                           Official Installer
-
-EOF
+        for line in "${lines[@]}"; do
+            if [ "$banner_pad" -gt 0 ]; then
+                printf "%*s%s\n" "$banner_pad" "" "$line"
+            else
+                printf "%s\n" "$line"
+            fi
+        done
+        if [ "$sub_pad" -gt 0 ]; then
+            printf "%*s%s\n\n" "$sub_pad" "" "$sub"
+        else
+            printf "%s\n\n" "$sub"
+        fi
     fi
 }
 

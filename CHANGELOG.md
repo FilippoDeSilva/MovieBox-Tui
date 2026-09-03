@@ -18,6 +18,9 @@
   - Prevented raw Kitty APC escape sequence leak (`Gi=31...`) on macOS `Terminal.app` and legacy non-graphics consoles by skipping graphics stdio probes.
   - Removed unsafe mid-session stdio graphics re-probing on `FocusChange` events.
 
+- **Responsive Mobile Installer Headers (`install.sh` & `install.ps1`)**:
+  - Implemented dynamic terminal column detection (`tput cols`, `stty size`, and `$COLUMNS` in `install.sh`; `$Host.UI.RawUI.WindowSize.Width` in `install.ps1`) with automatic multi-tier banner sizing.
+  - Eliminated ASCII art banner wrapping and visual corruption on narrow mobile viewports (e.g. Android Termux portrait mode at 40–55 columns) by rendering an adaptive 31-column compact half-block banner (`█▀▄▀█...`) and dynamic horizontal centering.
 ### Removed
 - Removed vestigial `ShowPlaybackPicker` and `ShowPlayerPicker` action variants and playback picker state fields in favor of direct compatible player dispatch.
 - **Redundant Slash Commands**:
