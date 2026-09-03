@@ -31,7 +31,7 @@ The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
 - **TTL**: Streams expire after 2h; search/details/captions/manifests after 24h; homepage/catalogs after 1h; remote TV playlists after 24h; images after 30 days. Local M3U files are reread from disk directly without caching.
 - **Atomic writes**: Entries are written to a unique temp file (`path.with_extension("tmp-PID-STAMP")`) and atomically replaced (`durable_replace`), preventing truncated or corrupt files on unexpected exits.
 - **Validation**: Empty search or stream results are never written or served from cache.
-- **Purge**: Background cleanup runs at startup to delete entries older than 7 days. `/clear-cache` purges the entire cache tree and resets in-memory LRUs.
+- **Purge**: Background cleanup runs at startup to delete entries older than 7 days. `/settings` $\to$ Maintenance $\to$ Clear Cache purges the entire cache tree and resets in-memory LRUs.
 
 ## In-memory caches (AppState)
 

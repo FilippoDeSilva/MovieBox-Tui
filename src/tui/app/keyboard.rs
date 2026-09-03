@@ -38,7 +38,7 @@ impl App {
                         self.state.set_status_short("Switched to TV Mode.");
                     } else {
                         self.state
-                            .set_status_short("TV Mode is disabled. Use /enable-tv to enable.");
+                            .set_status_short("TV Mode is disabled. Use /settings to enable.");
                     }
                     return None;
                 }
@@ -47,16 +47,15 @@ impl App {
                         self.action_sender.send(Action::ToggleAddonMode).ok();
                         self.state.set_status_short("Switched to Addon Mode.");
                     } else {
-                        self.state.set_status_short(
-                            "Addon Mode is disabled. Use /enable-addons to enable.",
-                        );
+                        self.state
+                            .set_status_short("Addon Mode is disabled. Use /settings to enable.");
                     }
                     return None;
                 }
                 if let KeyCode::Char('s') = key.code {
                     if !self.state.streaming_enabled {
                         self.state.set_status_short(
-                            "Streaming Mode is disabled. Use /enable-streaming to enable.",
+                            "Streaming Mode is disabled. Use /settings to enable.",
                         );
                     } else if !self.state.is_tv_mode && !self.state.is_addon_mode {
                         self.state.set_status_short("Already in Streaming Mode.");
@@ -67,38 +66,9 @@ impl App {
                     return None;
                 }
                 if let KeyCode::Char('p') = key.code {
-                    if self.state.is_tv_mode {
-                        self.state.notify(
-                            crate::tui::overlay::NotificationKind::Info,
-                            "TV Mode",
-                            "Provider cycling is only available in Streaming Mode.",
-                        );
-                    } else if self.state.is_addon_mode {
-                        self.action_sender.send(Action::ShowAddonManager).ok();
-                    } else {
+                    if !self.state.is_tv_mode && !self.state.is_addon_mode {
                         self.cycle_provider();
                     }
-                    return None;
-                }
-            } else if !self.state.addon_input_active && !self.state.tv_input_active {
-                if let KeyCode::Char('u') = key.code {
-                    if self.state.active_screen == Screen::Home {
-                        self.state.clear_search_state();
-                        self.state.input_mode = InputMode::Normal;
-                        self.state.set_status_default("Search cleared.");
-                        return None;
-                    }
-                }
-                return None;
-            }
-            if let KeyCode::Char('u') = key.code {
-                if self.state.active_screen == Screen::Home
-                    && !self.state.addon_input_active
-                    && !self.state.tv_input_active
-                {
-                    self.state.clear_search_state();
-                    self.state.input_mode = InputMode::Normal;
-                    self.state.set_status_default("Search cleared.");
                     return None;
                 }
             }

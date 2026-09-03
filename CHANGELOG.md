@@ -2,19 +2,28 @@
 
 ## [Unreleased]
 
+### Changed
+- **Provider Switching Shortcut**:
+  - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
+  - Streamlined `/config` as a direct alias for `/settings`.
+
 ### Fixed
 - **Direct Playback & Header Compatibility**:
   - Eliminated vestigial in-stream "Open with" popup that blocked playback when only VLC was installed, routing playback directly to the preferred compatible player.
   - Prevented silent player overrides: when a user explicitly selects a default player (e.g. VLC) that cannot satisfy stream authentication headers (e.g. MovieBox signed DASH manifests), the app now halts playback and warns the user with actionable detected alternatives instead of silently launching an unselected player.
-  - Added structured `PlaybackResolution` engine with dynamic context-aware notifications across playback resolution, download operations, and `/download-dir` commands.
+  - Added structured `PlaybackResolution` engine with dynamic context-aware notifications across playback resolution and download operations.
   - Expanded Windows `mpv.exe` detection across winget (`MPV Player`, `mpv-player`), portable `C:\mpv`, and user directory paths.
 
 - **Terminal Graphics Probe Leak**:
   - Prevented raw Kitty APC escape sequence leak (`Gi=31...`) on macOS `Terminal.app` and legacy non-graphics consoles by skipping graphics stdio probes.
   - Removed unsafe mid-session stdio graphics re-probing on `FocusChange` events.
+
 ### Removed
 - Removed vestigial `ShowPlaybackPicker` and `ShowPlayerPicker` action variants and playback picker state fields in favor of direct compatible player dispatch.
-
+- **Redundant Slash Commands**:
+  - Pruned 10+ legacy slash commands (`/download-dir`, `/clear-cache`, `/update`, `/github`, `/probe`, `/toggle-update`, `/toggle-bdix`, `/toggle-streaming`, `/toggle-tv`, `/toggle-addons`, `/enable-*`, `/disable-*`) superseded by the interactive Settings Hub.
+  - Removed 300+ lines of redundant command execution and file write probing in `src/tui/app/search.rs`.
+  - Removed duplicate unreachable `Ctrl+U` key handling in `src/tui/app/keyboard.rs`.
 ## [0.1.15] - 2026-09-03
 
 ### Added

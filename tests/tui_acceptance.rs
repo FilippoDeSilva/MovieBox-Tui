@@ -355,33 +355,13 @@ async fn test_full_user_journey_mode_switching_and_theme_selection() {
 }
 
 #[tokio::test]
-async fn test_download_dir_reset_user_journey() {
-    let mut app = App::new();
-    let custom_path = std::path::PathBuf::from("/custom/moviebox/downloads");
-    app.state_mut().download_dir = Some(custom_path.clone());
-    assert_eq!(app.state().download_dir, Some(custom_path));
-
-    app.handle_action(Action::Search {
-        query: "/download-dir reset".to_string(),
-        force_refresh: false,
-    })
-    .await;
-
-    assert!(app.state().download_dir.is_none());
-    assert!(!app.state().notifications.is_empty());
-    let notif = app.state().notifications.back().unwrap();
-    assert_eq!(notif.title, "Download Directory");
-    assert!(notif.message.contains("Reset to default"));
-}
-
-#[tokio::test]
 async fn test_esc_key_cancels_slash_command_and_clears_search_bar() {
     let mut app = App::new();
     app.state_mut().update_available = None;
     app.state_mut().show_theme_popup = false;
     app.state_mut().show_browse_popup = false;
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query.set_content("/download-dir");
+    app.state_mut().search_query.set_content("/settings");
 
     let esc_key = crossterm::event::KeyEvent::new(
         crossterm::event::KeyCode::Esc,
@@ -797,4 +777,35 @@ async fn test_no_results_and_error_state_rendering_hints() {
     assert!(text_err.contains("Retry"));
     assert!(text_err.contains("Switch Provider"));
     assert!(text_err.contains("Back"));
+}
+#[tokio::test]
+async fn test_ctrl_p_scoped_strictly_to_streaming_mode() {
+    let mut app = App::new();
+    let ctrl_p = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('p'),
+        crossterm::event::KeyModifiers::CONTROL,
+    );
+
+    app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Streaming);
+    let initial_provider = app.state().active_provider;
+    app.handle_action(Action::Key(ctrl_p)).await;
+    assert_ne!(app.state().active_provider, initial_provider);
+
+    app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Tv);
+    app.state_mut().is_tv_mode = true;
+    app.state_mut().tv_enabled = true;
+    app.state_mut().tv_config_popup = false;
+    app.handle_action(Action::Key(ctrl_p)).await;
+    assert!(!app.state().tv_config_popup);
+
+    app.state_mut()
+        .set_mode(moviebox_tui::tui::state::AppMode::Addon);
+    app.state_mut().is_tv_mode = false;
+    app.state_mut().is_addon_mode = true;
+    app.state_mut().addons_enabled = true;
+    app.state_mut().addon_manager_popup = false;
+    app.handle_action(Action::Key(ctrl_p)).await;
+    assert!(!app.state().addon_manager_popup);
 }

@@ -238,8 +238,8 @@ async fn test_grand_user_journey_complete_lifecycle() {
     assert!(app.state().download_progress.is_none());
 
     app.state_mut().input_mode = InputMode::Editing;
-    app.state_mut().search_query.set_content("/download-dir");
-    assert_eq!(app.state().search_query, "/download-dir");
+    app.state_mut().search_query.set_content("/settings");
+    assert_eq!(app.state().search_query, "/settings");
 
     let esc_key = crossterm::event::KeyEvent::new(
         crossterm::event::KeyCode::Esc,

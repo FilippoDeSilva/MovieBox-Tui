@@ -56,7 +56,6 @@ pub fn build_help_columns(
         left.push(help_section_header("TV Actions", theme));
         left.push(help_row("[Enter]", "Play Selected Channel", theme));
         left.push(help_row("[r]", "Reload M3U Playlists", theme));
-        left.push(help_row("/config", "Manage TV Playlists", theme));
         left.push(help_row("/list", "Show All TV Channels", theme));
     } else if state.is_addon_mode {
         left.push(help_section_header("Addon Actions", theme));
@@ -64,7 +63,6 @@ pub fn build_help_columns(
         left.push(help_row("[d]", "Download Video Stream", theme));
         left.push(help_row("[f]", "Favorite / Unfavorite Title", theme));
         left.push(help_row("[s]", "Subtitles Picker (Details)", theme));
-        left.push(help_row("[Ctrl+P]", "Open Addon Manager", theme));
         left.push(help_row("[r]", "Refresh Catalog / Streams", theme));
     } else {
         left.push(help_section_header("Streaming Actions", theme));

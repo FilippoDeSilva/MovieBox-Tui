@@ -31,7 +31,10 @@ fn test_settings_command_parsing_and_aliases() {
         SlashCommand::parse("/options"),
         Some(ParsedCommand::Settings)
     );
-    assert_eq!(SlashCommand::parse("/config"), Some(ParsedCommand::Config));
+    assert_eq!(
+        SlashCommand::parse("/config"),
+        Some(ParsedCommand::Settings)
+    );
     assert_eq!(SlashCommand::parse("/help"), Some(ParsedCommand::Help));
     assert_eq!(SlashCommand::parse("/?"), Some(ParsedCommand::Help));
 

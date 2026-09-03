@@ -1317,7 +1317,7 @@ impl App {
                                     id,
                                     season,
                                     episode,
-                                    "No streaming addons are currently installed or enabled.\nPress Ctrl+P or open /config to install/enable a stream provider.".into(),
+                                    "No streaming addons are currently installed or enabled.\nOpen /settings to install/enable a stream provider.".into(),
                                 ))
                                 .ok();
                             return;

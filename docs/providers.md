@@ -15,7 +15,7 @@ shared typed models in `providers/models.rs` and the moviebox JSON schema used b
 | `Addons`        | `providers/addons`         | Community HTTP addons (Cinemeta, streams).  |
 
 BDIX sources are only reachable from supported Bangladeshi ISPs and are hidden by
-default (`bdix_enabled` in config; `/enable-bdix`).
+default (`bdix_enabled` in config; `/settings` $\to$ Content Modes $\to$ BDIX Sources).
 
 ## Shared Provider Contract
 

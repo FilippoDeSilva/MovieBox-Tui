@@ -73,10 +73,9 @@ All popup dialogs (Theme picker, Browse categories, Settings Media Player picker
 ### Live TV Mode
 - **`Enter`**: Play selected TV channel immediately with default player.
 - **`r`**: Reload all active M3U playlist sources.
-- **`/config`**: Open TV Playlist Manager dialog (`Space` to activate, `Delete`/`d` to remove).
 - **`/list`**: Show all loaded channels.
 ### Addon Mode (HTTP Addons)
-- **`Ctrl+P` / `/config`**: Open Addon Manager dialog (`Space` to toggle, `Delete`/`d` to remove).
+- **`/settings`**: Open Settings Hub to manage addons and configuration.
 - **`Enter`**: Select title or play resolved stream.
 - **`d`**: Download HTTP stream release.
 - **`r`**: Refresh addon catalog search results.
@@ -104,7 +103,7 @@ Type these commands directly into the search bar:
 
 | Command | Applicable Mode | Action |
 | :--- | :--- | :--- |
-| `/settings` | All | Open interactive Settings & Preferences Hub (configuration, modes, players, maintenance) |
+| `/settings` | All | Open interactive Settings & Preferences Hub (aliases `/config`, `/pref`, `/preferences`, `/options`) |
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
 | `/history` | Streaming / Addon | View watch history with latest progress |
 | `/favorites` | Streaming / Addon | View all starred titles |
@@ -112,18 +111,7 @@ Type these commands directly into the search bar:
 | `/clear` | All | Clear search results and return to landing |
 | `/help` | All | Open interactive keybinding help menu (alias `/?`) |
 | `/list` | TV | View live TV channels |
-| `/config` | All | Open mode-specific configuration dialog (TV Playlists, Addons, or Settings) |
-| `/download-dir [path]` | All | View or configure custom media download folder (`reset` for default) |
-| `/update` | All | Trigger interactive manual update check against GitHub |
-| `/clear-cache` | All | Evict temporary cache files and image artifacts |
-| `/github` | All | Open MovieBox-TUI GitHub repository in default browser |
-| `/toggle-update` | All | Toggle automatic update checks on startup |
-| `/toggle-bdix` | Streaming | Toggle BDIX FTP scrapers on/off |
-| `/toggle-streaming` | All | Toggle Streaming Mode content availability |
 | `/exit` | All | Exit application and return to shell (aliases `/quit`, `/q`) |
-| `/toggle-tv` | All | Toggle TV Mode IPTV player |
-| `/toggle-addons` | All | Toggle Addon Mode HTTP metadata/stream extensions |
-| `/probe` | All | Re-probe terminal graphics protocol support (Kitty, Sixel, iTerm2) |
 
 - Open with `?`; close with `?`, `Esc`, or `q`.
 - `↑`/`↓`, `PageUp`/`PageDown`, and the mouse wheel scroll long content.
