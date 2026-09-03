@@ -137,14 +137,10 @@ impl App {
     pub(super) async fn probe_terminal(&mut self) {
         use ratatui_image::picker::{Capability, ProtocolType};
 
-        self.state.image_probe_attempts = self.state.image_probe_attempts.saturating_add(1);
-        self.state.last_image_probe = Some(std::time::Instant::now());
-
         match Self::forced_protocol() {
             Some(ForcedProtocol::None) => {
                 self.state.image_supported = false;
                 self.state.image_picker = None;
-                self.state.initial_probe_failed = false;
                 return;
             }
             forced => {
@@ -225,7 +221,6 @@ impl App {
         if matches!(picker.protocol_type(), ProtocolType::Halfblocks) {
             self.state.image_supported = false;
             self.state.image_picker = None;
-            self.state.initial_probe_failed = !capabilities_empty;
             return;
         }
         self.accept_picker(picker);
@@ -238,7 +233,6 @@ impl App {
         }
         self.state.image_picker = Some(picker);
         self.state.image_supported = true;
-        self.state.initial_probe_failed = false;
     }
 
     async fn query_picker(&self) -> Option<ratatui_image::picker::Picker> {
@@ -459,10 +453,9 @@ impl App {
             Action::PlayStream
             | Action::ShowSubtitlePopup(..)
             | Action::ShowDownloadSubtitlePopup(..)
-            | Action::ShowPlaybackPicker(..)
-            | Action::ShowPlayerPicker(..)
             | Action::LaunchMpv(..)
             | Action::LaunchPlayback(..)
+            | Action::DispatchPlayback(..)
             | Action::LaunchPlayer(..)
             | Action::MarkWatched(..)
             | Action::UpdateProgress { .. }
@@ -735,19 +728,14 @@ impl App {
                 .iter()
                 .map(|k| k.label().to_string())
                 .collect::<Vec<_>>();
-            let (title, confirm_label) = if self.state.settings_player_picker {
-                ("Default Media Player", "Select")
-            } else {
-                ("Open with", "Open")
-            };
             crate::tui::overlay::picker(
                 frame,
                 area,
                 &items,
                 &mut self.state.player_picker_state,
                 crate::tui::overlay::PickerSpec {
-                    title,
-                    confirm_label,
+                    title: "Default Media Player",
+                    confirm_label: "Select",
                     minimum_width: 24,
                 },
                 &self.theme,

@@ -57,11 +57,7 @@ impl App {
                 .iter()
                 .map(|k| k.label().to_string())
                 .collect::<Vec<_>>();
-            let confirm_label = if self.state.settings_player_picker {
-                "Select"
-            } else {
-                "Open"
-            };
+            let confirm_label = "Select";
             match click_in_picker(
                 crate::tui::overlay::picker_layout(area, &items, confirm_label, 24),
                 col,

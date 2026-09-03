@@ -9,12 +9,12 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 
 - macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, and MacPorts).
 - Linux: mpv, then VLC (probing Native `$PATH`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, and `flatpak run`).
-- Windows: mpv, then VLC (probing `Program Files`, `LOCALAPPDATA\Programs`, `Microsoft\WindowsApps`, Scoop `scoop\shims`, and Chocolatey).
+- Windows: mpv, then VLC (probing `Program Files` including WinGet `MPV Player` and `mpv-player`, `LOCALAPPDATA\Programs`, `WinGet\Links`, portable `C:\mpv`, Scoop `scoop\shims`, and Chocolatey).
 - Android/Termux: `mpv` (if installed via `pkg install mpv`), or Android intent chooser (`termux-open`, `termux-open-url`, or `termux-am`).
 
 Resolution runs once at startup and is cached (`OnceLock`). A preferred player can be
 forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`,
-`vlc`, `android`), which reorders the list. The media player picker in the Settings Hub (`/settings`) lists every detected player on your system and saves your selection to `config.json` unless overridden by `MOVIEBOX_PLAYER`.
+`vlc`, `android`), which reorders the list. The media player picker in the Settings Hub (`/settings`) lists every detected player on your system and saves your selection to `config.json` unless overridden by `MOVIEBOX_PLAYER`. Playback launches directly using the preferred compatible player without intermediate modal dialogs.
 
 ## Command construction
 
@@ -31,11 +31,10 @@ by the image picker, then clamped to a fixed range.
 ## Headers
 
 Playback sources (for example 4KHD and MovieBox) may carry `Referer`/`User-Agent` headers.
-MovieBox sources forward the client's spoofed Android/Cronet `User-Agent` to satisfy CDN
-stream requirements. mpv/IINA send them via `http-header-fields` (`--http-header-fields=...`
-or `--mpv-http-header-fields=...`), while VLC maps them to `--http-referrer` / `--http-user-agent`.
-The `supports_headers` gate in `app/playback.rs` warns when a player cannot satisfy a source's headers.
-
+MovieBox DASH streams additionally carry signed `Cookie` headers for CloudFront authentication.
+mpv/IINA send them via `http-header-fields` (`--http-header-fields=...` or `--mpv-http-header-fields=...`),
+while VLC maps them to `--http-referrer` / `--http-user-agent`.
+The `supports_headers` gate in `app/playback.rs` validates whether a player can satisfy required stream headers. MovieBox-TUI strictly respects the user's configured default player: if the chosen player cannot satisfy a stream's headers (such as VLC attempting to play signed MovieBox DASH manifests with cookie requirements), playback will not silently fall back to an alternative player. Instead, an explicit warning notification informs the user of the exact incompatibility and lists available compatible alternatives (e.g. mpv) or the option to switch providers with `Ctrl+P`.
 ## Subtitles
 
 - mpv receives the remote subtitle URL directly (`--sub-file=<url>`); mpv fetches it

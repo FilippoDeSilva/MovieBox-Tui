@@ -479,9 +479,13 @@ fn mpv_executable() -> Option<String> {
             #[cfg(target_os = "windows")]
             {
                 candidates.push(r"C:\Program Files\mpv\mpv.exe".to_string());
+                candidates.push(r"C:\Program Files\MPV Player\mpv.exe".to_string());
+                candidates.push(r"C:\Program Files\mpv-player\mpv.exe".to_string());
                 candidates.push(r"C:\Program Files (x86)\mpv\mpv.exe".to_string());
+                candidates.push(r"C:\mpv\mpv.exe".to_string());
                 if let Ok(local) = std::env::var("LOCALAPPDATA") {
                     candidates.push(format!(r"{local}\Programs\mpv\mpv.exe"));
+                    candidates.push(format!(r"{local}\Microsoft\WinGet\Links\mpv.exe"));
                 }
                 if let Ok(appdata) = std::env::var("APPDATA") {
                     candidates.push(format!(r"{appdata}\mpv\mpv.exe"));
@@ -492,6 +496,8 @@ fn mpv_executable() -> Option<String> {
                             .to_string_lossy()
                             .into_owned(),
                     );
+                    candidates.push(home.join(r"mpv\mpv.exe").to_string_lossy().into_owned());
+                    candidates.push(home.join(r"bin\mpv.exe").to_string_lossy().into_owned());
                 }
                 candidates.push(r"C:\ProgramData\chocolatey\bin\mpv.exe".to_string());
             }

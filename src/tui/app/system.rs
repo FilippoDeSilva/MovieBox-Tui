@@ -108,15 +108,6 @@ impl App {
             }
 
             Action::FocusChange => {
-                if self.state.initial_probe_failed
-                    && self.state.image_probe_attempts < 3
-                    && self
-                        .state
-                        .last_image_probe
-                        .is_none_or(|probe| probe.elapsed() >= std::time::Duration::from_secs(30))
-                {
-                    self.probe_terminal().await;
-                }
                 self.prepare_image_soft_refresh();
             }
 
@@ -448,9 +439,6 @@ impl App {
                             if !self.state.available_players.is_empty() {
                                 self.state.settings_player_picker = true;
                                 self.state.player_picker_popup = true;
-                                self.state.player_picker_playback = None;
-                                self.state.player_picker_link = None;
-                                self.state.player_picker_subtitle = None;
                                 let selected_idx =
                                     self.state
                                         .default_player

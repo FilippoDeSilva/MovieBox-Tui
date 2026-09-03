@@ -244,11 +244,13 @@ impl App {
 
                 if raw_arg.eq_ignore_ascii_case("reset") || raw_arg.eq_ignore_ascii_case("default")
                 {
+                    let default_path =
+                        crate::logging::sanitize_path(self.resolve_download_base_dir());
                     if self.state.download_dir.is_none() {
                         self.state.notify(
                             NotificationKind::Info,
                             "Download Directory",
-                            "Already using system default (~/Downloads/MovieBox-TUI)",
+                            format!("Already using system default ({default_path})"),
                         );
                     } else {
                         self.state.download_dir = None;
@@ -256,7 +258,7 @@ impl App {
                         self.state.notify(
                             NotificationKind::Success,
                             "Download Directory",
-                            "Reset to default (~/Downloads/MovieBox-TUI)",
+                            format!("Reset to default ({default_path})"),
                         );
                     }
                     return Some(true);

@@ -3,16 +3,142 @@ use crate::providers::models::ProviderKind;
 use crate::tui::text::parse_duration_seconds;
 use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum PlaybackResolution {
+    Available(crate::tui::state::PlayerKind),
+    ExplicitPlayerIncompatible {
+        chosen: crate::tui::state::PlayerKind,
+        compatible_alternatives: Vec<crate::tui::state::PlayerKind>,
+    },
+    NoCompatiblePlayer {
+        available: Vec<crate::tui::state::PlayerKind>,
+    },
+    NoPlayersInstalled,
+}
+
 impl App {
-    pub(super) fn preferred_playback_player(
+    pub(super) fn resolve_playback_player(
         &self,
         source: &crate::providers::models::PlaybackSource,
-    ) -> Option<crate::tui::state::PlayerKind> {
-        self.state
+    ) -> PlaybackResolution {
+        if self.state.available_players.is_empty() {
+            return PlaybackResolution::NoPlayersInstalled;
+        }
+
+        let preferred = std::env::var("MOVIEBOX_PLAYER")
+            .ok()
+            .and_then(|value| crate::tui::state::PlayerKind::parse(&value))
+            .or_else(|| {
+                self.state
+                    .default_player
+                    .as_deref()
+                    .filter(|p| !p.eq_ignore_ascii_case("auto"))
+                    .and_then(crate::tui::state::PlayerKind::parse)
+            });
+
+        if let Some(chosen) = preferred {
+            if self.state.available_players.contains(&chosen) {
+                if crate::tui::player::supports_headers(chosen, &source.headers) {
+                    return PlaybackResolution::Available(chosen);
+                }
+                let compatible_alternatives = self
+                    .state
+                    .available_players
+                    .iter()
+                    .copied()
+                    .filter(|&k| {
+                        k != chosen && crate::tui::player::supports_headers(k, &source.headers)
+                    })
+                    .collect::<Vec<_>>();
+                return PlaybackResolution::ExplicitPlayerIncompatible {
+                    chosen,
+                    compatible_alternatives,
+                };
+            }
+        }
+
+        if let Some(player) = self
+            .state
             .available_players
             .iter()
             .copied()
             .find(|kind| crate::tui::player::supports_headers(*kind, &source.headers))
+        {
+            PlaybackResolution::Available(player)
+        } else {
+            PlaybackResolution::NoCompatiblePlayer {
+                available: self.state.available_players.clone(),
+            }
+        }
+    }
+
+    pub(super) fn dispatch_playback_or_notify(
+        &mut self,
+        source: crate::providers::models::PlaybackSource,
+    ) {
+        match self.resolve_playback_player(&source) {
+            PlaybackResolution::Available(player) => {
+                self.action_sender
+                    .send(Action::LaunchPlayback(player, source))
+                    .ok();
+            }
+            PlaybackResolution::ExplicitPlayerIncompatible {
+                chosen,
+                compatible_alternatives,
+            } => {
+                self.state.is_resolving_playback = false;
+                self.state.pending_playback_source = None;
+                let provider_name = source.provider.label();
+                let chosen_name = chosen.label();
+                let body = if !compatible_alternatives.is_empty() {
+                    let alternatives_str = compatible_alternatives
+                        .iter()
+                        .map(|k| k.label())
+                        .collect::<Vec<_>>()
+                        .join(" or ");
+                    format!(
+                        "{} cannot play this {} stream due to required authentication headers. Set {} as default in /settings, or press Ctrl+P for 4KHDHub.",
+                        chosen_name, provider_name, alternatives_str
+                    )
+                } else {
+                    format!(
+                        "{} cannot play this {} stream due to required authentication headers. Install a compatible player (mpv) or press Ctrl+P for 4KHDHub.",
+                        chosen_name, provider_name
+                    )
+                };
+                self.state.notify(
+                    NotificationKind::Warning,
+                    format!("{chosen_name} Incompatible"),
+                    body,
+                );
+            }
+            PlaybackResolution::NoCompatiblePlayer { available } => {
+                self.state.is_resolving_playback = false;
+                self.state.pending_playback_source = None;
+                let players_str = available
+                    .iter()
+                    .map(|k| k.label())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let provider_name = source.provider.label();
+                self.state.notify(
+                    NotificationKind::Error,
+                    "Incompatible Media Player",
+                    format!(
+                        "None of your detected players ({players_str}) support authentication headers required by {provider_name} streams. Install mpv or press Ctrl+P for 4KHDHub."
+                    ),
+                );
+            }
+            PlaybackResolution::NoPlayersInstalled => {
+                self.state.is_resolving_playback = false;
+                self.state.pending_playback_source = None;
+                self.state.notify(
+                    NotificationKind::Error,
+                    "No Media Player Found",
+                    "Install mpv, IINA, or VLC to enable video playback.",
+                );
+            }
+        }
     }
 
     fn build_watch_history_item(&self) -> Option<crate::history::WatchHistoryItem> {
@@ -333,7 +459,11 @@ impl App {
                         self.state.notify(
                             NotificationKind::Info,
                             "Preparing playback",
-                            "Resolving the selected mirror.",
+                            format!(
+                                "Resolving {} from {}...",
+                                first_mirror.label,
+                                release.provider.label()
+                            ),
                         );
                         let direct_source = crate::providers::models::PlaybackSource {
                             provider: release.provider,
@@ -342,22 +472,11 @@ impl App {
                             subtitle: None,
                             source_label: first_mirror.label.clone(),
                         };
-                        let default_player = self.preferred_playback_player(&direct_source);
-                        let available_players = self.state.available_players.clone();
                         let client = if release.provider == ProviderKind::Addons
                             || release.provider == ProviderKind::BdixCircleFtp
                             || release.provider == ProviderKind::BdixDhakaFlix
                         {
-                            let sender_clone = self.action_sender.clone();
-                            if let Some(player) = default_player {
-                                sender_clone
-                                    .send(Action::LaunchPlayback(player, direct_source))
-                                    .ok();
-                            } else {
-                                sender_clone
-                                    .send(Action::ShowPlaybackPicker(direct_source))
-                                    .ok();
-                            }
+                            self.dispatch_playback_or_notify(direct_source);
                             return None;
                         } else {
                             match self.service.fourk_client.clone() {
@@ -382,18 +501,7 @@ impl App {
                             .await;
                             match result {
                                 Ok(Ok(source)) => {
-                                    let default_player =
-                                        available_players.iter().copied().find(|kind| {
-                                            crate::tui::player::supports_headers(
-                                                *kind,
-                                                &source.headers,
-                                            )
-                                        });
-                                    if let Some(player) = default_player {
-                                        sender.send(Action::LaunchPlayback(player, source)).ok();
-                                    } else {
-                                        sender.send(Action::ShowPlaybackPicker(source)).ok();
-                                    }
+                                    sender.send(Action::DispatchPlayback(source)).ok();
                                 }
                                 Ok(Err(error)) => {
                                     log::error!("4KHDHub resolve failed: {error}");
@@ -435,7 +543,6 @@ impl App {
                         subtitle: None,
                         source_label: first_mirror.label.clone(),
                     };
-                    let default_player = self.preferred_playback_player(&direct_source);
                     let subject_id = self
                         .state
                         .selected_details
@@ -448,7 +555,7 @@ impl App {
                         self.state.notify(
                             NotificationKind::Info,
                             "Preparing playback",
-                            "Fetching subtitles.",
+                            format!("Fetching subtitles for {}...", release.filename),
                         );
                         self.state.pending_playback_source = Some(direct_source.clone());
                         let service = self.service.clone();
@@ -491,26 +598,12 @@ impl App {
                                         .ok();
                                 }
                                 _ => {
-                                    if let Some(player) = default_player {
-                                        sender
-                                            .send(Action::LaunchPlayback(player, source_clone))
-                                            .ok();
-                                    } else {
-                                        sender.send(Action::ShowPlaybackPicker(source_clone)).ok();
-                                    }
+                                    sender.send(Action::DispatchPlayback(source_clone)).ok();
                                 }
                             }
                         });
                     } else {
-                        if let Some(player) = default_player {
-                            self.action_sender
-                                .send(Action::LaunchPlayback(player, direct_source))
-                                .ok();
-                        } else {
-                            self.action_sender
-                                .send(Action::ShowPlaybackPicker(direct_source))
-                                .ok();
-                        }
+                        self.dispatch_playback_or_notify(direct_source);
                     }
                 } else {
                     self.state.is_resolving_playback = false;
@@ -531,16 +624,7 @@ impl App {
                     self.state.pending_play_link = Some(link);
                 } else {
                     if let Some(source) = self.state.pending_playback_source.take() {
-                        let default_player = self.preferred_playback_player(&source);
-                        if let Some(player) = default_player {
-                            self.action_sender
-                                .send(Action::LaunchPlayback(player, source))
-                                .ok();
-                        } else {
-                            self.action_sender
-                                .send(Action::ShowPlaybackPicker(source))
-                                .ok();
-                        }
+                        self.dispatch_playback_or_notify(source);
                     } else {
                         self.action_sender.send(Action::LaunchMpv(link, None)).ok();
                     }
@@ -581,23 +665,16 @@ impl App {
                     None => {
                         self.state.notify(
                             NotificationKind::Error,
-                            "Player unavailable",
-                            "Install mpv, IINA, or VLC.",
+                            "Player Unavailable",
+                            "Install mpv, IINA, or VLC to enable playback.",
                         );
                     }
                     Some(kind) => {
-                        let player_name = match kind {
-                            crate::tui::state::PlayerKind::Mpv => "MPV",
-                            crate::tui::state::PlayerKind::Iina => "IINA",
-                            crate::tui::state::PlayerKind::Vlc => "VLC",
-                            crate::tui::state::PlayerKind::AndroidIntent => "Android Player",
-                        };
                         self.state.notify(
                             NotificationKind::Info,
-                            "Opening player",
-                            format!("Launching {player_name}."),
+                            "Opening Player",
+                            format!("Launching {}.", kind.label()),
                         );
-
                         self.action_sender
                             .send(Action::LaunchPlayer(kind, link, subtitle_url))
                             .ok();
@@ -605,42 +682,6 @@ impl App {
                 }
             }
 
-            Action::ShowPlaybackPicker(source) => {
-                self.state.is_resolving_playback = false;
-                if self.state.available_players.is_empty() {
-                    self.state.set_status_default(
-                        "No media player found. Install mpv, IINA, VLC, or use Android Player.",
-                    );
-                    return None;
-                }
-                self.state.show_help = false;
-                self.state.tv_config_popup = false;
-                self.state.player_picker_popup = true;
-                self.state.player_picker_playback = Some(source);
-                self.state.player_picker_link = None;
-                self.state.player_picker_subtitle = None;
-                self.state.player_picker_state.select(Some(0));
-                self.state.subtitle_popup = false;
-            }
-            Action::ShowPlayerPicker(link, subtitle) => {
-                self.state.is_resolving_playback = false;
-                if self.state.available_players.is_empty() {
-                    self.state.notify(
-                        NotificationKind::Error,
-                        "Player unavailable",
-                        "Install mpv, IINA, VLC, or use Android Player.",
-                    );
-                    return None;
-                }
-                self.state.show_help = false;
-                self.state.tv_config_popup = false;
-                self.state.player_picker_popup = true;
-                self.state.player_picker_playback = None;
-                self.state.player_picker_link = Some(link);
-                self.state.player_picker_subtitle = subtitle;
-                self.state.player_picker_state.select(Some(0));
-                self.state.subtitle_popup = false;
-            }
             Action::LaunchPlayer(kind, link, sub) => {
                 self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
@@ -661,13 +702,21 @@ impl App {
                 self.state.player_picker_popup = false;
                 self.state.last_playback_launch = std::time::Instant::now();
                 if !crate::tui::player::supports_headers(kind, &source.headers) {
-                    self.state.set_status_long(format!(
-                        "This source needs headers {} cannot provide; use mpv or IINA.",
-                        kind.label()
-                    ));
+                    self.state.notify(
+                        NotificationKind::Error,
+                        format!("{} Incompatible", kind.label()),
+                        format!(
+                            "{} cannot play this {} stream because it requires authentication headers.",
+                            kind.label(),
+                            source.provider.label(),
+                        ),
+                    );
                     return None;
                 }
                 self.launch_player(kind, source.url, source.subtitle, source.headers);
+            }
+            Action::DispatchPlayback(source) => {
+                self.dispatch_playback_or_notify(source);
             }
             Action::MarkWatched(item) => {
                 self.state.history.mark_watched(item);
@@ -772,22 +821,68 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_playback_resolving_lock_resets_on_picker_and_player_actions() {
+    async fn test_playback_resolving_lock_resets_on_incompatible_player() {
         let mut app = crate::tui::app::App::new();
         app.state.is_resolving_playback = true;
+        app.state.available_players = vec![crate::tui::state::PlayerKind::Vlc];
 
-        app.handle_playback(crate::tui::action::Action::ShowPlaybackPicker(
-            crate::providers::models::PlaybackSource::bare(
-                crate::providers::models::ProviderKind::MovieBox,
-                "https://example.com/stream.m3u8",
-                None,
-            ),
-        ))
-        .await;
+        let source = crate::providers::models::PlaybackSource {
+            provider: crate::providers::models::ProviderKind::MovieBox,
+            url: "https://example.com/index.mpd".to_string(),
+            headers: vec![("Cookie".to_string(), "CloudFront-Policy=test".to_string())],
+            subtitle: None,
+            source_label: "Multi-Res".to_string(),
+        };
+
+        app.dispatch_playback_or_notify(source);
 
         assert!(!app.state.is_resolving_playback);
+        assert!(app.state.pending_playback_source.is_none());
+        assert!(!app.state.player_picker_popup);
+        assert!(!app.state.notifications.is_empty());
     }
+    #[tokio::test]
+    async fn test_explicit_player_incompatible_does_not_launch_alternative() {
+        let mut app = crate::tui::app::App::new();
+        app.state.available_players = vec![
+            crate::tui::state::PlayerKind::Mpv,
+            crate::tui::state::PlayerKind::Vlc,
+        ];
+        app.state.default_player = Some("vlc".to_string());
 
+        let source = crate::providers::models::PlaybackSource {
+            provider: crate::providers::models::ProviderKind::MovieBox,
+            url: "https://example.com/index.mpd".to_string(),
+            headers: vec![("Cookie".to_string(), "CloudFront-Policy=test".to_string())],
+            subtitle: None,
+            source_label: "Multi-Res".to_string(),
+        };
+
+        let resolution = app.resolve_playback_player(&source);
+        assert_eq!(
+            resolution,
+            super::PlaybackResolution::ExplicitPlayerIncompatible {
+                chosen: crate::tui::state::PlayerKind::Vlc,
+                compatible_alternatives: vec![crate::tui::state::PlayerKind::Mpv],
+            }
+        );
+
+        app.state.is_resolving_playback = true;
+        app.dispatch_playback_or_notify(source);
+
+        assert!(!app.state.is_resolving_playback);
+        assert!(app.state.pending_playback_source.is_none());
+        assert!(!app.state.player_picker_popup);
+
+        let notification = app.state.notifications.back().expect("notification posted");
+        assert_eq!(notification.title, "VLC Incompatible");
+        assert!(
+            notification
+                .message
+                .contains("VLC cannot play this MovieBox stream")
+        );
+        assert!(notification.message.contains("mpv"));
+    }
     #[tokio::test]
     async fn test_playback_resolving_lock_resets_on_player_crash() {
         let mut app = crate::tui::app::App::new();

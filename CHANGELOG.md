@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Direct Playback & Header Compatibility**:
+  - Eliminated vestigial in-stream "Open with" popup that blocked playback when only VLC was installed, routing playback directly to the preferred compatible player.
+  - Prevented silent player overrides: when a user explicitly selects a default player (e.g. VLC) that cannot satisfy stream authentication headers (e.g. MovieBox signed DASH manifests), the app now halts playback and warns the user with actionable detected alternatives instead of silently launching an unselected player.
+  - Added structured `PlaybackResolution` engine with dynamic context-aware notifications across playback resolution, download operations, and `/download-dir` commands.
+  - Expanded Windows `mpv.exe` detection across winget (`MPV Player`, `mpv-player`), portable `C:\mpv`, and user directory paths.
+
+- **Terminal Graphics Probe Leak**:
+  - Prevented raw Kitty APC escape sequence leak (`Gi=31...`) on macOS `Terminal.app` and legacy non-graphics consoles by skipping graphics stdio probes.
+  - Removed unsafe mid-session stdio graphics re-probing on `FocusChange` events.
+### Removed
+- Removed vestigial `ShowPlaybackPicker` and `ShowPlayerPicker` action variants and playback picker state fields in favor of direct compatible player dispatch.
+
 ## [0.1.15] - 2026-09-03
 
 ### Added

@@ -1,8 +1,6 @@
 #[derive(Debug, Clone)]
 pub enum Action {
     FocusChange,
-    ShowPlayerPicker(String, Option<String>),
-    ShowPlaybackPicker(crate::providers::models::PlaybackSource),
     LaunchPlayer(crate::tui::state::PlayerKind, String, Option<String>),
     Tick,
     Key(crossterm::event::KeyEvent),
@@ -146,6 +144,7 @@ pub enum Action {
         crate::tui::state::PlayerKind,
         crate::providers::models::PlaybackSource,
     ),
+    DispatchPlayback(crate::providers::models::PlaybackSource),
     MarkWatched(crate::history::WatchHistoryItem),
     UpdateProgress {
         item: crate::history::WatchHistoryItem,

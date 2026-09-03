@@ -116,8 +116,8 @@ impl App {
             .store(false, std::sync::atomic::Ordering::SeqCst);
         self.state.notify(
             NotificationKind::Info,
-            "Download started",
-            "Partial data will be preserved.",
+            "Download Started",
+            format!("Downloading {base_name}.{extension} (resumable)."),
         );
 
         let cancel = self.state.cancel_download.clone();
@@ -304,8 +304,12 @@ impl App {
                         };
                         self.state.notify(
                             NotificationKind::Info,
-                            "Preparing download",
-                            "Resolving the selected mirror.",
+                            "Preparing Download",
+                            format!(
+                                "Resolving {} from {}...",
+                                first_mirror.label,
+                                release.provider.label()
+                            ),
                         );
                         let client = if release.provider == ProviderKind::Addons
                             || release.provider == ProviderKind::BdixCircleFtp

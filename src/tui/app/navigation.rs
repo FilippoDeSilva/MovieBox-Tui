@@ -359,9 +359,6 @@ impl App {
                 if self.state.player_picker_popup {
                     self.state.is_resolving_playback = false;
                     self.state.player_picker_popup = false;
-                    self.state.player_picker_link = None;
-                    self.state.player_picker_subtitle = None;
-                    self.state.player_picker_playback = None;
                     self.state.player_picker_state.select(None);
                     self.state.settings_player_picker = false;
                     return None;
@@ -372,7 +369,6 @@ impl App {
                     self.state.is_download_subtitle_popup = false;
                     self.state.pending_play_link = None;
                     self.state.pending_playback_source = None;
-                    self.state.pending_open_with = false;
                     self.state.subtitle_list.clear();
                     self.state.subtitle_list_state.select(None);
                     return None;
@@ -717,28 +713,9 @@ impl App {
                 if self.state.player_picker_popup {
                     let idx = self.state.player_picker_state.selected().unwrap_or(0);
                     if let Some(player) = self.state.available_players.get(idx).copied() {
-                        if let Some(source) = self.state.player_picker_playback.clone() {
-                            if !crate::tui::player::supports_headers(player, &source.headers) {
-                                self.state.set_status_long(format!(
-                                    "{} cannot play this source; choose mpv or IINA.",
-                                    player.label()
-                                ));
-                                return None;
-                            }
-                        }
                         self.state.player_picker_popup = false;
                         self.remember_player_preference(player);
                         self.state.settings_player_picker = false;
-                        if let Some(source) = self.state.player_picker_playback.take() {
-                            self.action_sender
-                                .send(Action::LaunchPlayback(player, source))
-                                .ok();
-                        } else if let Some(link) = self.state.player_picker_link.take() {
-                            let sub = self.state.player_picker_subtitle.take();
-                            self.action_sender
-                                .send(Action::LaunchPlayer(player, link, sub))
-                                .ok();
-                        }
                     }
                     return None;
                 }
@@ -753,16 +730,7 @@ impl App {
                         .filter(|s| !s.is_empty());
                     if let Some(mut source) = self.state.pending_playback_source.take() {
                         source.subtitle = sub_url;
-                        let default_player = self.preferred_playback_player(&source);
-                        if let Some(player) = default_player {
-                            self.action_sender
-                                .send(Action::LaunchPlayback(player, source))
-                                .ok();
-                        } else {
-                            self.action_sender
-                                .send(Action::ShowPlaybackPicker(source))
-                                .ok();
-                        }
+                        self.dispatch_playback_or_notify(source);
                     } else if let Some(link) = self.state.pending_play_link.take() {
                         self.action_sender
                             .send(Action::LaunchMpv(link, sub_url))

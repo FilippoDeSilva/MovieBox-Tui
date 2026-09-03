@@ -20,8 +20,9 @@ the release checks in [`release-checklist.md`](release-checklist.md).
 ## Terminal capabilities
 
 The app probes the terminal at startup via `ratatui_image` (400ms cap,
-off the UI thread; retried on focus regain if the first probe found
-nothing, and on demand via `/probe`):
+off the UI thread; on-demand via `/probe`). Non-graphics terminals (e.g.
+macOS `Apple_Terminal`, legacy Windows `conhost`, and `TERM=dumb/linux/cygwin`)
+are skipped to prevent escape sequence probe leakage (`Gi=31...`):
 
 - **Poster rendering**: Sixel, Kitty, and iTerm2 protocols where the probe
   detects them. Terminals that report kitty/sixel capability but no cell
