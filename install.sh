@@ -589,11 +589,11 @@ if [ "$NO_MODIFY_PATH" -eq 0 ]; then
 fi
 
 PLAYER_DETECTED=""
-if command -v mpv >/dev/null 2>&1; then
+if command -v mpv >/dev/null 2>&1 || [ -d "/Applications/mpv.app" ] || [ -d "$HOME/Applications/mpv.app" ] || [ -f "$HOME/.local/share/flatpak/exports/bin/io.mpv.Mpv" ] || [ -f "/var/lib/flatpak/exports/bin/io.mpv.Mpv" ]; then
     PLAYER_DETECTED="mpv"
-elif command -v iina >/dev/null 2>&1 || command -v iina-cli >/dev/null 2>&1; then
+elif command -v iina >/dev/null 2>&1 || command -v iina-cli >/dev/null 2>&1 || [ -d "/Applications/IINA.app" ] || [ -d "$HOME/Applications/IINA.app" ]; then
     PLAYER_DETECTED="IINA"
-elif command -v vlc >/dev/null 2>&1; then
+elif command -v vlc >/dev/null 2>&1 || [ -d "/Applications/VLC.app" ] || [ -d "$HOME/Applications/VLC.app" ] || [ -f "$HOME/.local/share/flatpak/exports/bin/org.videolan.VLC" ] || [ -f "/var/lib/flatpak/exports/bin/org.videolan.VLC" ]; then
     PLAYER_DETECTED="VLC"
 elif command -v termux-open >/dev/null 2>&1; then
     PLAYER_DETECTED="Android Player (termux-open)"

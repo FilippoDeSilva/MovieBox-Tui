@@ -119,6 +119,7 @@ fn build_player_process_command(executable: &str) -> Command {
     }
 }
 
+#[derive(Debug, Clone)]
 enum AndroidOpener {
     TermuxOpen(String),
     TermuxOpenUrl(String),
@@ -134,76 +135,81 @@ fn is_termux_env() -> bool {
 }
 
 fn android_opener() -> Option<AndroidOpener> {
-    if let Some(custom) = configured_executable("MOVIEBOX_ANDROID_PLAYER_PATH") {
-        if custom.ends_with("termux-open-url") {
-            return Some(AndroidOpener::TermuxOpenUrl(custom));
-        } else if custom.ends_with("termux-am") || custom.ends_with("/am") {
-            return Some(AndroidOpener::TermuxAm(custom));
-        } else {
-            return Some(AndroidOpener::TermuxOpen(custom));
-        }
-    }
+    static CACHED: std::sync::OnceLock<Option<AndroidOpener>> = std::sync::OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            if let Some(custom) = configured_executable("MOVIEBOX_ANDROID_PLAYER_PATH") {
+                if custom.ends_with("termux-open-url") {
+                    return Some(AndroidOpener::TermuxOpenUrl(custom));
+                } else if custom.ends_with("termux-am") || custom.ends_with("/am") {
+                    return Some(AndroidOpener::TermuxAm(custom));
+                } else {
+                    return Some(AndroidOpener::TermuxOpen(custom));
+                }
+            }
 
-    let is_termux = is_termux_env();
+            let is_termux = is_termux_env();
 
-    if let Ok(prefix) = std::env::var("PREFIX") {
-        let termux_open = format!("{prefix}/bin/termux-open");
-        if Path::new(&termux_open).is_file() {
-            return Some(AndroidOpener::TermuxOpen(termux_open));
-        }
-        let termux_open_url = format!("{prefix}/bin/termux-open-url");
-        if Path::new(&termux_open_url).is_file() {
-            return Some(AndroidOpener::TermuxOpenUrl(termux_open_url));
-        }
-        let termux_am = format!("{prefix}/bin/termux-am");
-        if Path::new(&termux_am).is_file() {
-            return Some(AndroidOpener::TermuxAm(termux_am));
-        }
-        let am_bin = format!("{prefix}/bin/am");
-        if Path::new(&am_bin).is_file() {
-            return Some(AndroidOpener::TermuxAm(am_bin));
-        }
-    }
+            if let Ok(prefix) = std::env::var("PREFIX") {
+                let termux_open = format!("{prefix}/bin/termux-open");
+                if Path::new(&termux_open).is_file() {
+                    return Some(AndroidOpener::TermuxOpen(termux_open));
+                }
+                let termux_open_url = format!("{prefix}/bin/termux-open-url");
+                if Path::new(&termux_open_url).is_file() {
+                    return Some(AndroidOpener::TermuxOpenUrl(termux_open_url));
+                }
+                let termux_am = format!("{prefix}/bin/termux-am");
+                if Path::new(&termux_am).is_file() {
+                    return Some(AndroidOpener::TermuxAm(termux_am));
+                }
+                let am_bin = format!("{prefix}/bin/am");
+                if Path::new(&am_bin).is_file() {
+                    return Some(AndroidOpener::TermuxAm(am_bin));
+                }
+            }
 
-    let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
-    if Path::new(termux_open_static).is_file() {
-        return Some(AndroidOpener::TermuxOpen(termux_open_static.to_string()));
-    }
-    let termux_open_url_static = "/data/data/com.termux/files/usr/bin/termux-open-url";
-    if Path::new(termux_open_url_static).is_file() {
-        return Some(AndroidOpener::TermuxOpenUrl(
-            termux_open_url_static.to_string(),
-        ));
-    }
-    let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
-    if Path::new(termux_am_static).is_file() {
-        return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
-    }
-    let termux_am_bin_static = "/data/data/com.termux/files/usr/bin/am";
-    if Path::new(termux_am_bin_static).is_file() {
-        return Some(AndroidOpener::TermuxAm(termux_am_bin_static.to_string()));
-    }
+            let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
+            if Path::new(termux_open_static).is_file() {
+                return Some(AndroidOpener::TermuxOpen(termux_open_static.to_string()));
+            }
+            let termux_open_url_static = "/data/data/com.termux/files/usr/bin/termux-open-url";
+            if Path::new(termux_open_url_static).is_file() {
+                return Some(AndroidOpener::TermuxOpenUrl(
+                    termux_open_url_static.to_string(),
+                ));
+            }
+            let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
+            if Path::new(termux_am_static).is_file() {
+                return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
+            }
+            let termux_am_bin_static = "/data/data/com.termux/files/usr/bin/am";
+            if Path::new(termux_am_bin_static).is_file() {
+                return Some(AndroidOpener::TermuxAm(termux_am_bin_static.to_string()));
+            }
 
-    if let Some(path) = find_in_path("termux-open") {
-        return Some(AndroidOpener::TermuxOpen(path));
-    }
-    if let Some(path) = find_in_path("termux-open-url") {
-        return Some(AndroidOpener::TermuxOpenUrl(path));
-    }
-    if let Some(path) = find_in_path("termux-am") {
-        return Some(AndroidOpener::TermuxAm(path));
-    }
+            if let Some(path) = find_in_path("termux-open") {
+                return Some(AndroidOpener::TermuxOpen(path));
+            }
+            if let Some(path) = find_in_path("termux-open-url") {
+                return Some(AndroidOpener::TermuxOpenUrl(path));
+            }
+            if let Some(path) = find_in_path("termux-am") {
+                return Some(AndroidOpener::TermuxAm(path));
+            }
 
-    if !is_termux {
-        if Path::new("/system/bin/am").is_file() {
-            return Some(AndroidOpener::SystemAm("/system/bin/am".to_string()));
-        }
-        if let Some(path) = find_in_path("am") {
-            return Some(AndroidOpener::SystemAm(path));
-        }
-    }
+            if !is_termux {
+                if Path::new("/system/bin/am").is_file() {
+                    return Some(AndroidOpener::SystemAm("/system/bin/am".to_string()));
+                }
+                if let Some(path) = find_in_path("am") {
+                    return Some(AndroidOpener::SystemAm(path));
+                }
+            }
 
-    None
+            None
+        })
+        .clone()
 }
 
 fn android_intent_command(url: &str) -> Command {
@@ -351,6 +357,51 @@ fn mpv_command(
 }
 
 #[cfg(target_os = "macos")]
+#[derive(Debug, Clone)]
+enum IinaResolution {
+    Cli(String),
+    AppFallback,
+}
+
+#[cfg(target_os = "macos")]
+fn iina_resolution() -> Option<IinaResolution> {
+    static CACHED: std::sync::OnceLock<Option<IinaResolution>> = std::sync::OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            if let Some(executable) = configured_executable("MOVIEBOX_IINA_PATH") {
+                return Some(IinaResolution::Cli(executable));
+            }
+
+            let cli_global = "/Applications/IINA.app/Contents/MacOS/iina-cli";
+            if Path::new(cli_global).exists() {
+                return Some(IinaResolution::Cli(cli_global.to_string()));
+            }
+
+            if let Some(home) = dirs::home_dir() {
+                let cli_local = home.join("Applications/IINA.app/Contents/MacOS/iina-cli");
+                if cli_local.exists() {
+                    return Some(IinaResolution::Cli(
+                        cli_local.to_string_lossy().into_owned(),
+                    ));
+                }
+            }
+
+            if let Some(path) = find_in_path("iina").or_else(|| find_in_path("iina-cli")) {
+                return Some(IinaResolution::Cli(path));
+            }
+
+            if Path::new("/Applications/IINA.app").exists()
+                || dirs::home_dir().is_some_and(|home| home.join("Applications/IINA.app").exists())
+            {
+                return Some(IinaResolution::AppFallback);
+            }
+
+            None
+        })
+        .clone()
+}
+
+#[cfg(target_os = "macos")]
 fn iina_command(
     url: &str,
     subtitle: Option<&str>,
@@ -359,32 +410,19 @@ fn iina_command(
     resume_seconds: Option<u64>,
     tracker: Option<(&str, &str, usize, usize)>,
 ) -> Command {
-    let configured = configured_executable("MOVIEBOX_IINA_PATH");
-    let cli_global = std::path::Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
-    let cli_local = dirs::home_dir()
-        .map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli"))
-        .unwrap_or_default();
-
-    let mut command = if let Some(executable) = configured {
-        Command::new(executable)
-    } else if cli_global.exists() {
-        let mut c = Command::new(cli_global);
-        c.arg("--keep-running").arg("--no-stdin");
-        c
-    } else if cli_local.exists() {
-        let mut c = Command::new(cli_local);
-        c.arg("--keep-running").arg("--no-stdin");
-        c
-    } else if let Some(path) = find_in_path("iina").or_else(|| find_in_path("iina-cli")) {
-        let mut c = Command::new(path);
-        c.arg("--keep-running").arg("--no-stdin");
-        c
-    } else if iina_app_exists() {
-        let mut c = Command::new("open");
-        c.arg("-a").arg("IINA").arg(url);
-        return c;
-    } else {
-        Command::new("iina")
+    let resolution = iina_resolution();
+    let mut command = match resolution {
+        Some(IinaResolution::Cli(executable)) => {
+            let mut c = Command::new(executable);
+            c.arg("--keep-running").arg("--no-stdin");
+            c
+        }
+        Some(IinaResolution::AppFallback) => {
+            let mut c = Command::new("open");
+            c.arg("-a").arg("IINA").arg(url);
+            return c;
+        }
+        None => Command::new("iina"),
     };
 
     let mpv = mpv_command(
@@ -466,14 +504,39 @@ fn vlc_command(
     command
 }
 
+fn probe_player_executable(
+    env_var: &str,
+    candidates: &[String],
+    bin_names: &[&str],
+    flatpak_id: Option<&str>,
+) -> Option<String> {
+    if let Some(executable) = configured_executable(env_var) {
+        return Some(executable);
+    }
+
+    for path in candidates {
+        if Path::new(path).is_file() {
+            return Some(path.to_string());
+        }
+    }
+
+    for bin in bin_names {
+        if let Some(path) = find_in_path(bin) {
+            return Some(path);
+        }
+    }
+
+    if let Some(id) = flatpak_id {
+        flatpak_executable(id)
+    } else {
+        None
+    }
+}
+
 fn mpv_executable() -> Option<String> {
     static CACHED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     CACHED
         .get_or_init(|| {
-            if let Some(executable) = configured_executable("MOVIEBOX_MPV_PATH") {
-                return Some(executable);
-            }
-
             let mut candidates = Vec::new();
 
             #[cfg(target_os = "windows")]
@@ -513,7 +576,9 @@ fn mpv_executable() -> Option<String> {
                     );
                 }
                 candidates.push("/opt/homebrew/bin/mpv".to_string());
+                candidates.push("/opt/local/bin/mpv".to_string());
                 candidates.push("/usr/local/bin/mpv".to_string());
+                candidates.push("/bin/mpv".to_string());
             }
 
             #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -534,13 +599,8 @@ fn mpv_executable() -> Option<String> {
                 candidates.push("/var/lib/snapd/snap/bin/mpv".to_string());
                 candidates.push("/usr/bin/mpv".to_string());
                 candidates.push("/usr/local/bin/mpv".to_string());
+                candidates.push("/bin/mpv".to_string());
                 candidates.push("/app/bin/mpv".to_string());
-            }
-
-            for path in candidates {
-                if Path::new(&path).is_file() {
-                    return Some(path);
-                }
             }
 
             let bin_names = if cfg!(target_os = "windows") {
@@ -549,13 +609,12 @@ fn mpv_executable() -> Option<String> {
                 &["mpv", "io.mpv.Mpv"][..]
             };
 
-            for bin in bin_names {
-                if let Some(path) = find_in_path(bin) {
-                    return Some(path);
-                }
-            }
-
-            flatpak_executable("io.mpv.Mpv")
+            probe_player_executable(
+                "MOVIEBOX_MPV_PATH",
+                &candidates,
+                bin_names,
+                Some("io.mpv.Mpv"),
+            )
         })
         .clone()
 }
@@ -564,10 +623,6 @@ fn vlc_executable() -> Option<String> {
     static CACHED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     CACHED
         .get_or_init(|| {
-            if let Some(executable) = configured_executable("MOVIEBOX_VLC_PATH") {
-                return Some(executable);
-            }
-
             let mut candidates = Vec::new();
 
             #[cfg(target_os = "windows")]
@@ -602,7 +657,9 @@ fn vlc_executable() -> Option<String> {
                     );
                 }
                 candidates.push("/opt/homebrew/bin/vlc".to_string());
+                candidates.push("/opt/local/bin/vlc".to_string());
                 candidates.push("/usr/local/bin/vlc".to_string());
+                candidates.push("/bin/vlc".to_string());
             }
 
             #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -623,13 +680,8 @@ fn vlc_executable() -> Option<String> {
                 candidates.push("/var/lib/snapd/snap/bin/vlc".to_string());
                 candidates.push("/usr/bin/vlc".to_string());
                 candidates.push("/usr/local/bin/vlc".to_string());
+                candidates.push("/bin/vlc".to_string());
                 candidates.push("/app/bin/vlc".to_string());
-            }
-
-            for path in candidates {
-                if Path::new(&path).is_file() {
-                    return Some(path);
-                }
             }
 
             let bin_names = if cfg!(target_os = "windows") {
@@ -638,42 +690,24 @@ fn vlc_executable() -> Option<String> {
                 &["vlc", "org.videolan.VLC"][..]
             };
 
-            for bin in bin_names {
-                if let Some(path) = find_in_path(bin) {
-                    return Some(path);
-                }
-            }
-
-            flatpak_executable("org.videolan.VLC")
+            probe_player_executable(
+                "MOVIEBOX_VLC_PATH",
+                &candidates,
+                bin_names,
+                Some("org.videolan.VLC"),
+            )
         })
         .clone()
 }
 
 #[cfg(target_os = "macos")]
 fn iina_available() -> bool {
-    configured_executable("MOVIEBOX_IINA_PATH").is_some()
-        || iina_app_exists()
-        || executable_on_path("iina")
-        || executable_on_path("iina-cli")
-}
-
-#[cfg(target_os = "macos")]
-fn iina_app_exists() -> bool {
-    Path::new("/Applications/IINA.app").exists()
-        || dirs::home_dir().is_some_and(|home| home.join("Applications/IINA.app").exists())
+    iina_resolution().is_some()
 }
 
 #[cfg(target_os = "macos")]
 fn iina_cli_exists() -> bool {
-    let cli_global = Path::new("/Applications/IINA.app/Contents/MacOS/iina-cli");
-    let cli_local = dirs::home_dir()
-        .map(|h| h.join("Applications/IINA.app/Contents/MacOS/iina-cli"))
-        .unwrap_or_default();
-    configured_executable("MOVIEBOX_IINA_PATH").is_some()
-        || cli_global.exists()
-        || cli_local.exists()
-        || executable_on_path("iina")
-        || executable_on_path("iina-cli")
+    matches!(iina_resolution(), Some(IinaResolution::Cli(_)))
 }
 
 fn flatpak_executable(app_id: &str) -> Option<String> {

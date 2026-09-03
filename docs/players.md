@@ -5,12 +5,12 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 
 ## Detection
 
-`player::detect()` returns players in priority order:
+`player::detect()` (powered by a centralized `probe_player_executable` engine) returns players in priority order, resolving and caching paths statically:
 
-- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, and MacPorts).
-- Linux: mpv, then VLC (probing Native `$PATH`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, and `flatpak run`).
+- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, MacPorts `/opt/local/bin`, and standard `/bin`).
+- Linux: mpv, then VLC (probing Native `$PATH`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, standard `/bin`, and `flatpak run`).
 - Windows: mpv, then VLC (probing `Program Files` including WinGet `MPV Player` and `mpv-player`, `LOCALAPPDATA\Programs`, `WinGet\Links`, portable `C:\mpv`, Scoop `scoop\shims`, and Chocolatey).
-- Android/Termux: `mpv` (if installed via `pkg install mpv`), or Android intent chooser (`termux-open`, `termux-open-url`, or `termux-am`).
+- Android/Termux: `mpv` (if installed via `pkg install mpv`), or Android intent chooser (`termux-open`, `termux-open-url`, `termux-am`, or `/system/bin/am`).
 
 Resolution runs once at startup and is cached (`OnceLock`). A preferred player can be
 forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`,

@@ -329,9 +329,9 @@ if (-not $NoModifyPath) {
 }
 
 $PlayerDetected = ""
-if (Get-Command "mpv" -ErrorAction SilentlyContinue) {
+if ((Get-Command "mpv" -ErrorAction SilentlyContinue) -or (Test-Path "C:\Program Files\mpv\mpv.exe") -or (Test-Path "C:\Program Files\MPV Player\mpv.exe") -or (Test-Path "C:\mpv\mpv.exe") -or (Test-Path "$env:LOCALAPPDATA\Programs\mpv\mpv.exe")) {
     $PlayerDetected = "mpv"
-} elseif (Get-Command "vlc" -ErrorAction SilentlyContinue) {
+} elseif ((Get-Command "vlc" -ErrorAction SilentlyContinue) -or (Test-Path "C:\Program Files\VideoLAN\VLC\vlc.exe") -or (Test-Path "C:\Program Files (x86)\VideoLAN\VLC\vlc.exe") -or (Test-Path "$env:LOCALAPPDATA\Programs\VLC\vlc.exe")) {
     $PlayerDetected = "VLC"
 }
 

@@ -18,6 +18,11 @@
   - Prevented raw Kitty APC escape sequence leak (`Gi=31...`) on macOS `Terminal.app` and legacy non-graphics consoles by skipping graphics stdio probes.
   - Removed unsafe mid-session stdio graphics re-probing on `FocusChange` events.
 
+- **High-Performance Player Detection Engine (`src/player.rs`)**:
+  - Centralized OS executable probing (`mpv`, `vlc`, `IINA`) into a single `probe_player_executable` engine, stripping ~150 lines of duplicate path traversal.
+  - Added static caching (`OnceLock`) to `IINA` resolution and Android Termux Intent detection, eliminating repeated expensive filesystem IO and PATH lookups during playback launches.
+  - Expanded candidate resolution: added macOS MacPorts (`/opt/local/bin/*`) and standard `/bin/*` locations.
+  - Aligned installer (`install.sh`, `install.ps1`) player detection with the app engine, explicitly probing standard `/Applications/*.app` and `C:\Program Files` deployments so GUI installations are correctly discovered immediately post-install.
 - **Responsive Mobile Installer Headers (`install.sh` & `install.ps1`)**:
   - Implemented dynamic terminal column detection (`tput cols`, `stty size`, and `$COLUMNS` in `install.sh`; `$Host.UI.RawUI.WindowSize.Width` in `install.ps1`) with automatic multi-tier banner sizing.
   - Eliminated ASCII art banner wrapping and visual corruption on narrow mobile viewports (e.g. Android Termux portrait mode at 40–55 columns) by rendering an adaptive 31-column compact half-block banner (`█▀▄▀█...`) and dynamic horizontal centering.
