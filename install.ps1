@@ -310,6 +310,14 @@ try {
     try { Unblock-File -Path $ExtractedExe -ErrorAction SilentlyContinue } catch {}
     Move-Item -Path $ExtractedExe -Destination $ExePath -Force
     try { Unblock-File -Path $ExePath -ErrorAction SilentlyContinue } catch {}
+    try {
+        $SmokeOutput = (& $ExePath --version 2>&1 | Out-String)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Binary execution test failed: $SmokeOutput"
+        }
+    } catch {
+        throw "Binary execution test failed: $_"
+    }
     Write-Success "[4/4] Binary installed to $ExePath"
 } catch {
     Remove-Item $TempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -360,7 +368,7 @@ Write-Host "    $ moviebox-tui" -ForegroundColor Green
 Write-Host ""
 
 if (-not $PlayerDetected) {
-    Write-Host "  [i] Note: A media player (mpv, VLC, or IINA) is recommended for video playback.`n" -ForegroundColor Cyan
+    Write-Host "  [i] Note: A media player (mpv or VLC) is recommended for video playback.`n" -ForegroundColor Cyan
 }
 
 if ($PathModified) {

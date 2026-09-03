@@ -16,6 +16,7 @@ jobs:
   hygiene:
     name: Hygiene
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -28,6 +29,16 @@ jobs:
       - run: cargo fmt --check
       - name: Validate Unix installer syntax
         run: bash -n install.sh
+      - name: Validate Windows installer syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
       - run: cargo check --all-targets --all-features --locked
       - run: cargo clippy --all-targets --all-features --locked -- -D warnings
       - name: Audit dependencies
@@ -41,6 +52,7 @@ jobs:
   build-and-test:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -57,14 +69,3 @@ jobs:
       - run: cargo test --all-features --locked
       - name: Smoke-test binary startup
         run: cargo run --all-features --locked -- --version
-      - name: Validate Windows installer syntax
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | Format-List
-            exit 1
-          }

@@ -63,12 +63,22 @@ jobs:
           echo "tag=$VERSION" >> $GITHUB_OUTPUT
 
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION"
-          curl -fsSL "$BASE_URL/MovieBox_macOS_Universal.tar.gz" -o macos.tar.gz
-          curl -fsSL "$BASE_URL/MovieBox_Linux_x64.tar.gz" -o linux-x64.tar.gz
-          curl -fsSL "$BASE_URL/MovieBox_Linux_arm64.tar.gz" -o linux-arm64.tar.gz
-          echo "macos_sha=$(sha256sum macos.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
-          echo "linux_x64_sha=$(sha256sum linux-x64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
-          echo "linux_arm64_sha=$(sha256sum linux-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          curl -fsSL --retry 3 "$BASE_URL/SHA256SUMS" -o SHA256SUMS
+
+          macos_sha=$(awk '$2 == "MovieBox_macOS_Universal.tar.gz" {print $1}' SHA256SUMS)
+          linux_x64_sha=$(awk '$2 == "MovieBox_Linux_x64.tar.gz" {print $1}' SHA256SUMS)
+          linux_arm64_sha=$(awk '$2 == "MovieBox_Linux_arm64.tar.gz" {print $1}' SHA256SUMS)
+
+          for sha in "$macos_sha" "$linux_x64_sha" "$linux_arm64_sha"; do
+            if [[ ! "$sha" =~ ^[0-9a-fA-F]{64}$ ]]; then
+              echo "::error::Invalid or missing SHA256 checksum in release manifest: $sha"
+              exit 1
+            fi
+          done
+
+          echo "macos_sha=$macos_sha" >> $GITHUB_OUTPUT
+          echo "linux_x64_sha=$linux_x64_sha" >> $GITHUB_OUTPUT
+          echo "linux_arm64_sha=$linux_arm64_sha" >> $GITHUB_OUTPUT
 
       - name: Update Formula
         if: ${{ steps.release_gate.outputs.update != 'false' }}

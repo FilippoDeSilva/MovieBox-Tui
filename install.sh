@@ -416,12 +416,14 @@ resolve_version() {
     fi
 
     local release_header
-    release_header=$(curl -fsSI "https://github.com/$REPO/releases/latest") || {
-        log_error "Failed to contact GitHub for latest release."
-        return 1
-    }
-    local tag
-    tag=$(printf "%s" "$release_header" | grep -i '^location:' | awk -F '/' '{print $NF}' | tr -d '\r\n')
+    release_header=$(curl -fsSI "https://github.com/$REPO/releases/latest" 2>/dev/null || true)
+    local tag=""
+    if [ -n "$release_header" ]; then
+        tag=$(printf "%s" "$release_header" | grep -i '^location:' | awk -F '/' '{print $NF}' | tr -d '\r\n')
+    fi
+    if [ -z "$tag" ]; then
+        tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name":' | head -1 | awk -F '"' '{print $4}' || true)
+    fi
     if [ -z "$tag" ]; then
         log_error "Could not resolve latest release version from GitHub."
         return 1
@@ -461,7 +463,7 @@ if [ -n "$EXISTING_BIN" ] && [ -x "$EXISTING_BIN" ]; then
             printf "\n  %b%s%b %b%s%b\n" "$C_YELLOW" "ℹ" "$C_RESET" "$C_TEXT" "MovieBox-TUI $TARGET_VERSION is already installed at $EXISTING_BIN." "$C_RESET"
             printf "  Choose an action: [1] Reinstall  [2] Uninstall  [3] Exit: "
             if [ -e /dev/tty ]; then
-                read -r user_choice </dev/tty || user_choice="3"
+                read -r user_choice </dev/tty 2>/dev/null || user_choice="3"
             else
                 read -r user_choice || user_choice="3"
             fi
@@ -550,12 +552,12 @@ run_spinner "[4/4] Installing binary to $INSTALL_DIR" install_binary || exit 1
 log_success "[4/4] Binary installed to $APP_PATH"
 
 if [ "$DRY_RUN" -eq 0 ]; then
-    if ! "$APP_PATH" --version >/dev/null 2>&1; then
-        log_error "Installed binary failed execution smoke test ($APP_PATH)."
+    if ! smoke_output=$("$APP_PATH" --version 2>&1); then
+        log_error "Installed binary failed execution smoke test ($APP_PATH):"
+        printf "  %s\n" "$smoke_output" >&2
         exit 1
     fi
 fi
-
 SHELL_MODIFIED=""
 if [ "$NO_MODIFY_PATH" -eq 0 ]; then
     if ! echo "$PATH" | tr ':' '\n' | grep -Fqx "$INSTALL_DIR"; then
@@ -596,16 +598,23 @@ if [ "$NO_MODIFY_PATH" -eq 0 ]; then
 fi
 
 PLAYER_DETECTED=""
-if command -v mpv >/dev/null 2>&1 || [ -d "/Applications/mpv.app" ] || [ -d "$HOME/Applications/mpv.app" ] || [ -f "$HOME/.local/share/flatpak/exports/bin/io.mpv.Mpv" ] || [ -f "/var/lib/flatpak/exports/bin/io.mpv.Mpv" ]; then
-    PLAYER_DETECTED="mpv"
-elif command -v iina >/dev/null 2>&1 || command -v iina-cli >/dev/null 2>&1 || [ -d "/Applications/IINA.app" ] || [ -d "$HOME/Applications/IINA.app" ]; then
-    PLAYER_DETECTED="IINA"
-elif command -v vlc >/dev/null 2>&1 || [ -d "/Applications/VLC.app" ] || [ -d "$HOME/Applications/VLC.app" ] || [ -f "$HOME/.local/share/flatpak/exports/bin/org.videolan.VLC" ] || [ -f "/var/lib/flatpak/exports/bin/org.videolan.VLC" ]; then
-    PLAYER_DETECTED="VLC"
-elif command -v termux-open >/dev/null 2>&1; then
-    PLAYER_DETECTED="Android Player (termux-open)"
+if [ "$OS" = "Darwin" ]; then
+    if command -v iina >/dev/null 2>&1 || command -v iina-cli >/dev/null 2>&1 || [ -d "/Applications/IINA.app" ] || [ -d "$HOME/Applications/IINA.app" ]; then
+        PLAYER_DETECTED="IINA"
+    elif command -v mpv >/dev/null 2>&1 || [ -d "/Applications/mpv.app" ] || [ -d "$HOME/Applications/mpv.app" ]; then
+        PLAYER_DETECTED="mpv"
+    elif command -v vlc >/dev/null 2>&1 || [ -d "/Applications/VLC.app" ] || [ -d "$HOME/Applications/VLC.app" ]; then
+        PLAYER_DETECTED="VLC"
+    fi
+else
+    if command -v mpv >/dev/null 2>&1 || [ -f "$HOME/.local/share/flatpak/exports/bin/io.mpv.Mpv" ] || [ -f "/var/lib/flatpak/exports/bin/io.mpv.Mpv" ]; then
+        PLAYER_DETECTED="mpv"
+    elif command -v vlc >/dev/null 2>&1 || [ -f "$HOME/.local/share/flatpak/exports/bin/org.videolan.VLC" ] || [ -f "/var/lib/flatpak/exports/bin/org.videolan.VLC" ]; then
+        PLAYER_DETECTED="VLC"
+    elif command -v termux-open >/dev/null 2>&1; then
+        PLAYER_DETECTED="Android Player (termux-open)"
+    fi
 fi
-
 printf "\n"
 printf "  %b✔ MovieBox-Tui %s successfully installed!%b\n\n" "$C_GREEN" "$TARGET_VERSION" "$C_RESET"
 printf "  %b•%b %bBinary:%b  %b%s%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_TEXT" "$APP_PATH" "$C_RESET"

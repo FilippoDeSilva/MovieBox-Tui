@@ -15,6 +15,7 @@ jobs:
   check-version:
     name: Check Version
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.check.outputs.version }}
       is_new: ${{ steps.check.outputs.is_new }}
@@ -26,7 +27,7 @@ jobs:
           VERSION=$(grep '^version =' Cargo.toml | head -1 | awk -F'"' '{print $2}')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          if gh release view "v$VERSION" &>/dev/null; then
+          if gh release view "v$VERSION" --repo "${{ github.repository }}" &>/dev/null; then
             echo "is_new=false" >> $GITHUB_OUTPUT
             echo "Release v$VERSION already exists. Skipping build."
           else
@@ -41,12 +42,12 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.90.0
-          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl,x86_64-apple-darwin,aarch64-apple-darwin,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "release-preflight"
@@ -57,6 +58,7 @@ jobs:
     needs: [check-version, preflight]
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -181,6 +183,7 @@ jobs:
     needs: [check-version, build]
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: macos-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -218,6 +221,7 @@ jobs:
     needs: [check-version, build, build-macos-universal]
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       attestations: write
       contents: write
