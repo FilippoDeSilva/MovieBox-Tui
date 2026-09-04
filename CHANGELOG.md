@@ -24,12 +24,24 @@
 - **Empirical Performance Standards & Benchmark Testing Guidelines**:
   - Added strict performance verification standards requiring empirical before-and-after measurements (runtime latency, allocations, frame render latency, I/O syscalls, binary footprint) across hot paths.
   - Documented standardized performance benchmark reporting format in `docs/testing.md` for reproducible optimization audits.
+- **Centralized Poster Placeholder & UI Animation Widgets**:
+  - Extracted reusable `render_poster_placeholder` widget to `src/tui/widgets/poster.rs`, standardizing placeholder containers, loading dots, and geometry clamping across Home and Details screens.
+  - Centralized `loading_spinner` in `src/tui/widgets`, providing uniform ASCII fallback (`..`, `...`) on basic terminals and animated Braille frames on modern terminals.
+  - Added zero-allocation cursor helpers (`cursor_prefix_str`, `cursor_column_offset`, `cursor_split_parts`) to `TextInputBuffer`, replacing dynamic vector and string allocations with zero-copy slices during typing and cursor blinking.
+  - Added `step_list_selection` to `src/tui/state.rs`, centralizing bounds-safe list stepping for PageUp and PageDown navigation across browse, theme, and favorites lists.
+  - Added `clear_poster_cache` and `clear_poster_protocols` to `AppState`, guaranteeing consistent flushing of in-flight requests, LRU image handles, and terminal protocols across provider switches and search resets.
 ### Removed
 - **Poster Graphics Configuration & Halfblocks Engine**:
   - Removed Unicode Halfblocks poster engine (`▀`/`▄`), eliminating low-resolution cell distortion, font scanlines, and terminal redraw lag during list scrolling.
   - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` $\to$ Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
 
 ### Fixed
+- **Resilient Cross-Platform Cache Clearing & In-Flight Task Isolation**:
+  - Hardened `clear_all_cache` with recursive directory contents deletion, leaving the root directory node intact to prevent `ERROR_ACCESS_DENIED` and `ERROR_SHARING_VIOLATION` failures when Windows processes or shells hold folder handles.
+  - Added Windows read-only attribute clearing before unlinking locked files.
+  - Included external Android subtitle cache directory (`~/storage/downloads/moviebox_subs`) and temporary system subtitle caches in the cache purge sequence.
+  - Connected `Action::ClearCache` directly to `self.request_tasks.cancel_all()` and added cancellation guards in `spawn_search_posters`, preventing in-flight background requests from writing stale responses or posters immediately after cache clearance.
+  - Propagated concrete filesystem `Result<(), String>` to `Action::CacheCleared`, replacing hardcoded success notifications with real error reporting.
 - **Unified Search Result Selection Background**:
   - Unified search result card selection highlight across the entire item slot (`item_area`), eliminating fragmented background rendering between cursor indicators, posters, and text columns.
   - Removed redundant poster sub-area buffer clearing before image rendering, preventing selection background clipping and black gutter artifacts on the right edge of posters.
@@ -41,6 +53,8 @@
   - Pre-registered media playback on launch (`record_start`), ensuring immediate watch history persistence for Android intent dispatchers (`termux-open`, `am start`) and app fallbacks.
   - Added self-healing recovery in `reconcile_from_dir`: pre-seeded pending state files carry metadata (`title`, `cover_url`, `stype`, `release_year`), restoring new items into watch history even after sudden terminal exits or reboots.
   - Implemented smart series episode advancement: completing an episode automatically cues the next episode (`episode + 1` or next season) on resume (`Space`/`P`) and in the Details view.
+- **Details View Empty Stream Source Label Geometry**:
+  - Replaced verbose empty stream message with a compact string (`No stream sources found on {provider} (Ctrl+P to switch provider, r to retry)`), preventing awkward multi-line text wrapping on standard 80-column terminals.
 - **Standardized 'No Art' Poster Containers Across Terminals**:
   - Replaced robot eyes and broken infinite loading spinners with clean, static, centered `No Art` bordered blocks across search results and details screens on terminals without graphics support.
   - Preserved full-fidelity native GPU graphics rendering on supported terminals while standardizing card geometry and poster container boundaries across all platforms.

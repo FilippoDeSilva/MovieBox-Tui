@@ -1,3 +1,4 @@
+use crate::tui::widgets::render_poster_placeholder;
 use crate::tui::{
     state::{AppState, InputMode},
     theme::Theme,
@@ -47,68 +48,6 @@ fn search_view_state(state: &AppState) -> SearchViewState {
 
 pub(crate) fn slash_command_description(cmd: &str, state: &AppState) -> Option<&'static str> {
     crate::tui::commands::SlashCommand::description_for(cmd, state)
-}
-
-pub(crate) fn render_poster_placeholder(
-    frame: &mut Frame,
-    area: Rect,
-    theme: &Theme,
-    basic_terminal: bool,
-    is_in_flight: bool,
-    tick: u64,
-) {
-    if area.width < 2 || area.height < 2 {
-        return;
-    }
-    let border_type = crate::tui::overlay::border_type(basic_terminal);
-    let border_style = if is_in_flight {
-        theme.lavender
-    } else {
-        theme.surface1
-    };
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(border_type)
-        .border_style(border_style);
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    if inner.height == 0 || inner.width == 0 {
-        return;
-    }
-
-    let pad_top = inner.height.saturating_sub(1) / 2;
-    let text_area = Rect {
-        x: inner.x,
-        y: inner.y + pad_top,
-        width: inner.width,
-        height: 1.min(inner.height),
-    };
-
-    if is_in_flight {
-        let dots = match (tick / 4) % 4 {
-            0 => "·",
-            1 => "··",
-            2 => "···",
-            _ => "····",
-        };
-        let p = Paragraph::new(dots)
-            .style(theme.lavender)
-            .alignment(Alignment::Center);
-        frame.render_widget(p, text_area);
-    } else {
-        let label = if inner.width >= 8 {
-            if basic_terminal { "[No Art]" } else { "No Art" }
-        } else if inner.width >= 6 {
-            "No Art"
-        } else {
-            "·"
-        };
-        let p = Paragraph::new(label)
-            .style(theme.overlay0)
-            .alignment(Alignment::Center);
-        frame.render_widget(p, text_area);
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -255,10 +194,8 @@ fn render_search_state(
                 };
                 lines.push(Line::from(vec![Span::styled(text, theme.lavender)]));
             } else {
-                const SPINNER_FRAMES: [&str; 10] =
-                    ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
                 let spinner =
-                    SPINNER_FRAMES[(state.tick_count as usize / 2) % SPINNER_FRAMES.len()];
+                    crate::tui::widgets::loading_spinner(state.tick_count, state.basic_terminal);
                 let text = if let Some(preset) = state.active_browse_preset {
                     format!("Loading {}", preset.label())
                 } else if let Some(catalog) = &state.active_addon_catalog {
@@ -988,20 +925,11 @@ fn search_content(
             format!("{prefix}{content}")
         }
     } else if editing && !real_cursor {
-        let segments = state.search_query.graphemes();
-        let cursor = state.search_query.cursor();
+        let (before, cursor_grapheme, after) = state.search_query.cursor_split_parts();
         let cursor_char = if show_cursor {
             if state.basic_terminal { "█" } else { "▎" }
-        } else if cursor < segments.len() {
-            segments[cursor]
         } else {
-            " "
-        };
-        let before: String = segments.iter().take(cursor).copied().collect();
-        let after: String = if cursor < segments.len() {
-            segments.iter().skip(cursor + 1).copied().collect()
-        } else {
-            String::new()
+            cursor_grapheme
         };
         let full = format!("{before}{cursor_char}{after}");
         let truncated = crate::tui::text::truncate_width(&full, available);
@@ -1199,20 +1127,11 @@ fn render_search_bar(
                 ])
             }
         } else if editing && !real_cursor && !modal_active {
-            let segments = state.search_query.graphemes();
-            let cursor = state.search_query.cursor();
+            let (before, cursor_grapheme, after) = state.search_query.cursor_split_parts();
             let cursor_char = if show_cursor {
                 if state.basic_terminal { "█" } else { "▎" }
-            } else if cursor < segments.len() {
-                segments[cursor]
             } else {
-                " "
-            };
-            let before: String = segments.iter().take(cursor).copied().collect();
-            let after: String = if cursor < segments.len() {
-                segments.iter().skip(cursor + 1).copied().collect()
-            } else {
-                String::new()
+                cursor_grapheme
             };
             Line::from(vec![
                 Span::styled(prefix, prefix_style),
@@ -1243,11 +1162,9 @@ fn render_search_bar(
             let cx = if is_query_empty {
                 search_split[0].x + prefix_width
             } else {
-                let segments = state.search_query.graphemes();
-                let cursor = state.search_query.cursor();
-                let before_cursor: String = segments.into_iter().take(cursor).collect();
-                let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
-                (search_split[0].x + prefix_width + before_cursor_width)
+                (search_split[0].x
+                    + prefix_width
+                    + state.search_query.cursor_column_offset() as u16)
                     .min(search_split[0].right().saturating_sub(1))
             };
             frame.set_cursor_position((cx, search_split[0].y));
@@ -1344,20 +1261,11 @@ fn render_search_bar(
                 ])
             }
         } else if editing && !real_cursor {
-            let segments = state.search_query.graphemes();
-            let cursor = state.search_query.cursor();
+            let (before, cursor_grapheme, after) = state.search_query.cursor_split_parts();
             let cursor_char = if show_cursor {
                 if state.basic_terminal { "█" } else { "▎" }
-            } else if cursor < segments.len() {
-                segments[cursor]
             } else {
-                " "
-            };
-            let before: String = segments.iter().take(cursor).copied().collect();
-            let after: String = if cursor < segments.len() {
-                segments.iter().skip(cursor + 1).copied().collect()
-            } else {
-                String::new()
+                cursor_grapheme
             };
             Line::from(vec![
                 Span::styled(prefix, theme.accent),
@@ -1380,11 +1288,9 @@ fn render_search_bar(
                     (content_row[0].x + prefix_width).min(content_row[0].right().saturating_sub(1));
                 (cx, content_row[0].y)
             } else {
-                let segments = state.search_query.graphemes();
-                let cursor = state.search_query.cursor();
-                let before_cursor: String = segments.into_iter().take(cursor).collect();
-                let before_cursor_width = crate::tui::text::width(&before_cursor) as u16;
-                let cx = (content_row[0].x + prefix_width + before_cursor_width)
+                let cx = (content_row[0].x
+                    + prefix_width
+                    + state.search_query.cursor_column_offset() as u16)
                     .min(content_row[0].right().saturating_sub(1));
                 (cx, content_row[0].y)
             };

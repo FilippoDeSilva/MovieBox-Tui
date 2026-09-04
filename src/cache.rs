@@ -490,16 +490,146 @@ pub fn set_captions_cache_typed(subject_id: &str, resource_id: &str, captions: &
     set_typed_cache(&path, CACHE_EXPIRY_SECS, captions);
 }
 
-pub fn clear_all_cache() {
+fn resilient_remove_file(path: &Path) -> std::io::Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            #[cfg(windows)]
+            if let Ok(metadata) = fs::metadata(path) {
+                let mut permissions = metadata.permissions();
+                if permissions.readonly() {
+                    permissions.set_readonly(false);
+                    if fs::set_permissions(path, permissions).is_ok() {
+                        return fs::remove_file(path);
+                    }
+                }
+            }
+            Err(err)
+        }
+    }
+}
+
+pub fn clear_directory_contents(dir: &Path) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    let mut errors = Vec::new();
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(err) => {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                return Ok(());
+            }
+            return Err(format!("failed to read directory {}: {err}", dir.display()));
+        }
+    };
+
+    for entry in entries.flatten() {
+        let child_path = entry.path();
+        match entry.file_type() {
+            Ok(ft) if ft.is_dir() => {
+                if let Err(err) = clear_directory_contents(&child_path) {
+                    errors.push(err);
+                }
+                if let Err(err) = fs::remove_dir(&child_path) {
+                    if err.kind() != std::io::ErrorKind::NotFound {
+                        errors.push(format!(
+                            "failed to remove directory {}: {err}",
+                            child_path.display()
+                        ));
+                    }
+                }
+            }
+            _ => {
+                if let Err(err) = resilient_remove_file(&child_path) {
+                    if err.kind() != std::io::ErrorKind::NotFound {
+                        errors.push(format!(
+                            "failed to remove file {}: {err}",
+                            child_path.display()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
+fn purge_subtitle_cache_files(dir: &Path, errors: &mut Vec<String>) {
+    if !dir.exists() {
+        return;
+    }
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(err) => {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                errors.push(format!(
+                    "failed to read subtitle directory {}: {err}",
+                    dir.display()
+                ));
+            }
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                let lower = ext.to_ascii_lowercase();
+                if matches!(lower.as_str(), "srt" | "vtt" | "sub" | "ass" | "tmp") {
+                    if let Err(err) = resilient_remove_file(&path) {
+                        if err.kind() != std::io::ErrorKind::NotFound {
+                            errors.push(format!(
+                                "failed to remove subtitle file {}: {err}",
+                                path.display()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn clear_all_cache() -> Result<(), String> {
+    let mut errors = Vec::new();
     let path = crate::config::cache_dir();
     if path.exists() {
-        let _ = fs::remove_dir_all(&path);
+        if let Err(err) = clear_directory_contents(&path) {
+            errors.push(err);
+        }
     }
     if let Some(data_dir) = crate::config::data_dir() {
         let legacy = data_dir.join("iptv_cache");
         if legacy.exists() {
-            let _ = fs::remove_dir_all(&legacy);
+            if let Err(err) = clear_directory_contents(&legacy) {
+                errors.push(err);
+            }
+            let _ = fs::remove_dir(&legacy);
         }
+    }
+    if let Some(home) = dirs::home_dir() {
+        let storage = home.join("storage/downloads/moviebox_subs");
+        if storage.exists() {
+            purge_subtitle_cache_files(&storage, &mut errors);
+        }
+    }
+    let temp_subs = std::env::temp_dir().join("moviebox-tui").join("subs");
+    if temp_subs.exists() {
+        purge_subtitle_cache_files(&temp_subs, &mut errors);
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }
 
@@ -681,5 +811,42 @@ mod tests {
         );
         assert_eq!(md5_hex(""), "d41d8cd98f00b204e9800998ecf8427e");
         assert_ne!(md5_hex("query1"), md5_hex("query2"));
+    }
+    #[test]
+    fn test_clear_directory_contents_removes_nested_entries_and_preserves_root() {
+        let dir = unique_dir("clear_nested");
+        let sub1 = dir.join("moviebox").join("details");
+        let sub2 = dir.join("moviebox").join("images");
+        let sub3 = dir.join("tv_playlists");
+        fs::create_dir_all(&sub1).expect("create sub1");
+        fs::create_dir_all(&sub2).expect("create sub2");
+        fs::create_dir_all(&sub3).expect("create sub3");
+
+        fs::write(sub1.join("detail_1.cache"), b"details").expect("write detail");
+        fs::write(sub2.join("img_1.bin"), b"image").expect("write img");
+        fs::write(sub3.join("channels.m3u"), b"m3u").expect("write m3u");
+        fs::write(dir.join("root_file.tmp"), b"root").expect("write root file");
+
+        let result = clear_directory_contents(&dir);
+        assert!(result.is_ok());
+        assert!(dir.exists());
+        let remaining = fs::read_dir(&dir).expect("read dir").count();
+        assert_eq!(remaining, 0);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_clear_directory_contents_handles_nonexistent_directory() {
+        let dir = unique_dir("nonexistent");
+        let missing = dir.join("missing_sub");
+        let result = clear_directory_contents(&missing);
+        assert!(result.is_ok());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_clear_all_cache_returns_ok() {
+        let result = clear_all_cache();
+        assert!(result.is_ok());
     }
 }

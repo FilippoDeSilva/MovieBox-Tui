@@ -71,6 +71,29 @@ impl TextInputBuffer {
             .map(|(idx, _)| idx)
             .unwrap_or(self.content.len())
     }
+    pub fn cursor_prefix_str(&self) -> &str {
+        &self.content[..self.cursor_byte_offset()]
+    }
+
+    pub fn cursor_column_offset(&self) -> usize {
+        width(self.cursor_prefix_str())
+    }
+
+    pub fn cursor_split_parts(&self) -> (&str, &str, &str) {
+        let cursor_byte = self.cursor_byte_offset();
+        let before = &self.content[..cursor_byte];
+        if cursor_byte >= self.content.len() {
+            (before, " ", "")
+        } else {
+            let mut indices = self.content[cursor_byte..].grapheme_indices(true);
+            if let Some((_, grapheme)) = indices.next() {
+                let after_offset = cursor_byte + grapheme.len();
+                (before, grapheme, &self.content[after_offset..])
+            } else {
+                (before, " ", "")
+            }
+        }
+    }
 
     pub fn insert(&mut self, c: char) {
         let offset = self.cursor_byte_offset();
@@ -799,5 +822,30 @@ mod tests {
         assert_eq!(extract_4digit_year("2024-05-12"), "2024");
         assert_eq!(extract_4digit_year("No year here"), "");
         assert_eq!(extract_4digit_year("Not A Year (20x4)"), "");
+    }
+    #[test]
+    fn test_text_input_buffer_cursor_helpers() {
+        let mut buf = TextInputBuffer::from_str("hello");
+        assert_eq!(buf.cursor_prefix_str(), "hello");
+        assert_eq!(buf.cursor_column_offset(), 5);
+        assert_eq!(buf.cursor_split_parts(), ("hello", " ", ""));
+
+        buf.set_cursor(2);
+        assert_eq!(buf.cursor_prefix_str(), "he");
+        assert_eq!(buf.cursor_column_offset(), 2);
+        assert_eq!(buf.cursor_split_parts(), ("he", "l", "lo"));
+
+        buf.set_cursor(0);
+        assert_eq!(buf.cursor_prefix_str(), "");
+        assert_eq!(buf.cursor_column_offset(), 0);
+        assert_eq!(buf.cursor_split_parts(), ("", "h", "ello"));
+
+        let mut cjk_buf = TextInputBuffer::from_str("电影");
+        assert_eq!(cjk_buf.cursor_prefix_str(), "电影");
+        assert_eq!(cjk_buf.cursor_column_offset(), 4);
+        cjk_buf.set_cursor(1);
+        assert_eq!(cjk_buf.cursor_prefix_str(), "电");
+        assert_eq!(cjk_buf.cursor_column_offset(), 2);
+        assert_eq!(cjk_buf.cursor_split_parts(), ("电", "影", ""));
     }
 }

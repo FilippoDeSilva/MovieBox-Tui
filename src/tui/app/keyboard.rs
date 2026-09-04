@@ -170,20 +170,18 @@ impl App {
                     }
                 }
                 KeyCode::PageUp => {
-                    if total_count > 0 {
-                        let cur = self.state.browse_list_state.selected().unwrap_or(0);
-                        self.state
-                            .browse_list_state
-                            .select(Some(cur.saturating_sub(5)));
-                    }
+                    crate::tui::state::step_list_selection(
+                        &mut self.state.browse_list_state,
+                        total_count,
+                        -5,
+                    );
                 }
                 KeyCode::PageDown => {
-                    if total_count > 0 {
-                        let cur = self.state.browse_list_state.selected().unwrap_or(0);
-                        self.state
-                            .browse_list_state
-                            .select(Some((cur + 5).min(total_count - 1)));
-                    }
+                    crate::tui::state::step_list_selection(
+                        &mut self.state.browse_list_state,
+                        total_count,
+                        5,
+                    );
                 }
                 KeyCode::Enter => {
                     let index = self.state.browse_list_state.selected().unwrap_or(0);
@@ -282,10 +280,12 @@ impl App {
                 }
                 KeyCode::PageUp => {
                     let total = crate::tui::theme::AVAILABLE_THEMES.len();
-                    if total > 0 {
-                        let cur = self.state.theme_list_state.selected().unwrap_or(0);
-                        let next = cur.saturating_sub(5);
-                        self.state.theme_list_state.select(Some(next));
+                    crate::tui::state::step_list_selection(
+                        &mut self.state.theme_list_state,
+                        total,
+                        -5,
+                    );
+                    if let Some(next) = self.state.theme_list_state.selected() {
                         let selected_theme = crate::tui::theme::AVAILABLE_THEMES[next].to_string();
                         self.action_sender
                             .send(Action::SelectTheme(selected_theme))
@@ -294,10 +294,12 @@ impl App {
                 }
                 KeyCode::PageDown => {
                     let total = crate::tui::theme::AVAILABLE_THEMES.len();
-                    if total > 0 {
-                        let cur = self.state.theme_list_state.selected().unwrap_or(0);
-                        let next = (cur + 5).min(total - 1);
-                        self.state.theme_list_state.select(Some(next));
+                    crate::tui::state::step_list_selection(
+                        &mut self.state.theme_list_state,
+                        total,
+                        5,
+                    );
+                    if let Some(next) = self.state.theme_list_state.selected() {
                         let selected_theme = crate::tui::theme::AVAILABLE_THEMES[next].to_string();
                         self.action_sender
                             .send(Action::SelectTheme(selected_theme))
@@ -829,14 +831,12 @@ impl App {
                         }
                         KeyCode::PageDown => {
                             if self.state.favorites_focus {
-                                let cur =
-                                    self.state.favorites_landing_state.selected().unwrap_or(0);
                                 let total = self.state.landing_deck_items_count();
-                                if total > 0 {
-                                    self.state
-                                        .favorites_landing_state
-                                        .select(Some((cur + 5).min(total - 1)));
-                                }
+                                crate::tui::state::step_list_selection(
+                                    &mut self.state.favorites_landing_state,
+                                    total,
+                                    5,
+                                );
                             } else if !self.state.search_results.is_empty() {
                                 let step = self
                                     .state
@@ -859,11 +859,12 @@ impl App {
                         }
                         KeyCode::PageUp => {
                             if self.state.favorites_focus {
-                                let cur =
-                                    self.state.favorites_landing_state.selected().unwrap_or(0);
-                                self.state
-                                    .favorites_landing_state
-                                    .select(Some(cur.saturating_sub(5)));
+                                let total = self.state.landing_deck_items_count();
+                                crate::tui::state::step_list_selection(
+                                    &mut self.state.favorites_landing_state,
+                                    total,
+                                    -5,
+                                );
                             } else if !self.state.search_results.is_empty() {
                                 let step = self
                                     .state

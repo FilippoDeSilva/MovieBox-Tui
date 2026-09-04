@@ -51,14 +51,9 @@ impl App {
         self.state.download_queue.clear();
         self.state.download_queue_total = 0;
         self.state.is_waiting_for_download_stream = false;
-        self.state.search_posters.clear();
-        self.state.failed_posters.clear();
-        self.state.search_poster_protocols.clear();
-        self.state.in_flight_posters.clear();
+        self.state.clear_poster_cache();
         self.state.image_cache.clear();
         self.state.preview_cache.clear();
-        self.state.poster_image = None;
-        self.state.poster_protocol = None;
         self.state.search_list_state.select(None);
         self.state.resource_list_state.select(None);
         self.state.dirty = true;
@@ -105,8 +100,7 @@ impl App {
     }
 
     pub(super) fn prepare_image_soft_refresh(&mut self) {
-        self.state.poster_protocol = None;
-        self.state.search_poster_protocols.clear();
+        self.state.clear_poster_protocols();
         self.state.dirty = true;
     }
 

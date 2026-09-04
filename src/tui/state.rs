@@ -754,10 +754,7 @@ impl AppState {
         self.active_browse_preset = None;
         self.active_addon_catalog = None;
         self.browse_metrics.clear();
-        self.poster_image = None;
-        self.poster_protocol = None;
-        self.failed_posters.clear();
-        self.in_flight_posters.clear();
+        self.clear_poster_cache();
         self.result_scroll = 0;
         self.search_list_state.select(None);
         self.is_homepage_mode = false;
@@ -1024,6 +1021,19 @@ impl AppState {
         };
         Some(pb)
     }
+    pub fn clear_poster_cache(&mut self) {
+        self.poster_image = None;
+        self.poster_protocol = None;
+        self.search_posters.clear();
+        self.search_poster_protocols.clear();
+        self.failed_posters.clear();
+        self.in_flight_posters.clear();
+    }
+
+    pub fn clear_poster_protocols(&mut self) {
+        self.poster_protocol = None;
+        self.search_poster_protocols.clear();
+    }
 }
 
 pub fn cycle_list_selection(state: &mut ListState, total_items: usize, forward: bool) {
@@ -1043,6 +1053,21 @@ pub fn cycle_list_selection(state: &mut ListState, total_items: usize, forward: 
             Some(0) | None => max,
             Some(i) => i.saturating_sub(1),
         }
+    };
+    state.select(Some(next));
+}
+
+pub fn step_list_selection(state: &mut ListState, total_items: usize, step: isize) {
+    if total_items == 0 {
+        state.select(None);
+        return;
+    }
+    let max = total_items.saturating_sub(1);
+    let cur = state.selected().unwrap_or(0);
+    let next = if step < 0 {
+        cur.saturating_sub(step.unsigned_abs())
+    } else {
+        (cur + step as usize).min(max)
     };
     state.select(Some(next));
 }
@@ -1402,5 +1427,37 @@ mod tests {
 
         state.cycle_settings_player(false);
         assert_eq!(state.default_player.as_deref(), Some("mpv"));
+    }
+    #[test]
+    fn test_step_list_selection() {
+        let mut state = ListState::default();
+        step_list_selection(&mut state, 0, 5);
+        assert_eq!(state.selected(), None);
+
+        step_list_selection(&mut state, 10, 5);
+        assert_eq!(state.selected(), Some(5));
+
+        step_list_selection(&mut state, 10, 10);
+        assert_eq!(state.selected(), Some(9));
+
+        step_list_selection(&mut state, 10, -3);
+        assert_eq!(state.selected(), Some(6));
+
+        step_list_selection(&mut state, 10, -20);
+        assert_eq!(state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_clear_poster_cache() {
+        let mut state = AppState::default();
+        state.in_flight_posters.insert("p1".to_string());
+        state
+            .failed_posters
+            .put("p2".to_string(), std::time::Instant::now());
+        state.clear_poster_cache();
+        assert!(state.in_flight_posters.is_empty());
+        assert!(state.failed_posters.is_empty());
+        assert!(state.poster_image.is_none());
+        assert!(state.poster_protocol.is_none());
     }
 }

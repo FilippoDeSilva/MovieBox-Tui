@@ -474,12 +474,7 @@ impl App {
                     self.state.search_results.clear();
                     self.state.search_list_state.select(None);
                     self.state.search_preview = None;
-                    self.state.poster_image = None;
-                    self.state.poster_protocol = None;
-                    self.state.search_posters.clear();
-                    self.state.failed_posters.clear();
-                    self.state.search_poster_protocols.clear();
-                    self.state.in_flight_posters.clear();
+                    self.state.clear_poster_cache();
                 }
                 self.state.search_error = Some(err.clone());
                 self.state
@@ -575,12 +570,7 @@ impl App {
                 self.state.search_results.clear();
                 self.state.search_list_state.select(None);
                 self.state.search_preview = None;
-                self.state.poster_image = None;
-                self.state.poster_protocol = None;
-                self.state.search_posters.clear();
-                self.state.failed_posters.clear();
-                self.state.search_poster_protocols.clear();
-                self.state.in_flight_posters.clear();
+                self.state.clear_poster_cache();
                 self.state
                     .set_status_default(format!("Discover failed: {}", err));
             }

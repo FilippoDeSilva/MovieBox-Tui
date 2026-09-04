@@ -1,5 +1,8 @@
 use crate::models::MediaDetails;
-pub(crate) use crate::tui::widgets::{extract_media_tags, resolution_badge_spans};
+pub(crate) use crate::tui::widgets::{
+    extract_media_tags, loading_spinner as stream_loading_spinner, render_poster_placeholder,
+    resolution_badge_spans,
+};
 use crate::tui::{state::AppState, theme::Theme};
 use ratatui::{
     Frame,
@@ -421,45 +424,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     }
                 }
             }
-        } else if state.image_supported && (state.is_loading || state.preview_loading) {
-            let loading_block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-                .border_style(theme.surface0);
-            let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
-            let placeholder_text = if poster_area.height <= 5 {
-                if state.basic_terminal {
-                    format!("[Poster]\n{spinner}")
-                } else {
-                    format!("🖼️\n{spinner}")
-                }
-            } else if state.basic_terminal {
-                format!("\n\n  [Poster]\n    {spinner}")
-            } else {
-                format!("\n\n  🖼️\n  {spinner}")
-            };
-            let placeholder = Paragraph::new(placeholder_text)
-                .alignment(Alignment::Center)
-                .style(theme.overlay0)
-                .block(loading_block);
-            frame.render_widget(placeholder, poster_area);
         } else {
-            let art_block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-                .border_style(theme.surface0);
-            let label = if state.basic_terminal {
-                "[No Art]"
-            } else {
-                "No Art"
-            };
-            let pad_top = poster_area.height.saturating_sub(3) / 2;
-            let content = format!("{}{label}", "\n".repeat(pad_top as usize));
-            let placeholder = Paragraph::new(content)
-                .alignment(Alignment::Center)
-                .style(theme.overlay0)
-                .block(art_block);
-            frame.render_widget(placeholder, poster_area);
+            let is_in_flight = state.image_supported && (state.is_loading || state.preview_loading);
+            render_poster_placeholder(
+                frame,
+                poster_area,
+                theme,
+                state.basic_terminal,
+                is_in_flight,
+                state.tick_count,
+            );
         }
 
         chunks[2]
@@ -1274,7 +1248,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
         } else if state.has_streams_settled && state.selected_resources.is_empty() {
             format!(
-                "No stream sources found on {provider_label} — press Ctrl+P to try another provider, or r to retry."
+                "No stream sources found on {provider_label} (Ctrl+P to switch provider, r to retry)"
             )
         } else {
             let spinner = stream_loading_spinner(state.tick_count, state.basic_terminal);
@@ -1538,21 +1512,6 @@ fn unfocused_title_style(theme: &Theme) -> Style {
 
 fn metadata_style(theme: &Theme) -> Style {
     theme.subtext1
-}
-
-const BRAILLE_SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-pub(crate) fn stream_loading_spinner(tick_count: u64, basic_terminal: bool) -> &'static str {
-    if basic_terminal {
-        match (tick_count / 4) % 4 {
-            0 => "..",
-            1 => "...",
-            2 => "....",
-            _ => "..",
-        }
-    } else {
-        BRAILLE_SPINNER[(tick_count as usize) % BRAILLE_SPINNER.len()]
-    }
 }
 
 fn with_selection_surface(style: Style, basic_terminal: bool, theme: &Theme) -> Style {

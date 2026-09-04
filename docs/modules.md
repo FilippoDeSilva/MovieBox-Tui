@@ -103,6 +103,7 @@ src/
       input.rs       Single-line text input field rendering with grapheme cursor and truncation.
       modal.rs       Modal dialog frame builder (ModalFrame) and centered footer key action bars.
       scrollbar.rs   Viewport-accurate vertical scrollbars.
+      poster.rs      Standardized poster placeholder container with in-flight loading animation.
       settings.rs    Interactive 4-tab Settings Hub modal widget.
 
   tui/app/           The application object (App) and all behavior.

@@ -60,7 +60,8 @@ src/
     screens/                    render-only modules (home, details, help)
     terminal.rs                 terminal capability probes
     theme.rs                    color themes
-    text.rs                     grapheme-safe text helpers
+    widgets/                    reusable widgets (badge, input, modal, poster, scrollbar, settings)
+    text.rs                     grapheme-safe text helpers and zero-allocation cursor slicing
 ```
 
 ## The event loop

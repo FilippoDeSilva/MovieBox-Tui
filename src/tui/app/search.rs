@@ -651,6 +651,7 @@ impl App {
         let sender = self.action_sender.clone();
         let service = self.service.clone();
         let semaphore = self.state.poster_fetch_semaphore.clone();
+        let cancel_token = self.state.fetch_cancel.clone();
 
         tokio::spawn(async move {
             let sem = semaphore;
@@ -658,9 +659,13 @@ impl App {
                 let permit = sem.clone().acquire_owned().await.ok();
                 let tx = sender.clone();
                 let service = service.clone();
+                let cancel = cancel_token.clone();
 
                 tokio::spawn(async move {
                     let _permit = permit;
+                    if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                        return;
+                    }
                     let id_clone = id.clone();
                     if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
                         let id_c = id_clone.clone();
@@ -685,6 +690,9 @@ impl App {
                     if let Some(url) = resolved_url {
                         if !url.is_empty() {
                             if let Some(bytes) = service.fetch_poster_bytes(&url).await {
+                                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                                    return;
+                                }
                                 let bytes_clone = bytes.clone();
                                 let id_c = id.clone();
                                 let _ = tokio::task::spawn_blocking(move || {
@@ -695,6 +703,10 @@ impl App {
                                     );
                                 })
                                 .await;
+
+                                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                                    return;
+                                }
 
                                 if let Some(img) = network::decode_poster(bytes).await {
                                     tx.send(Action::SearchPosterLoaded(id, Some(img))).ok();

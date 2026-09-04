@@ -33,8 +33,7 @@ impl App {
                     if time.elapsed() >= std::time::Duration::from_millis(300) {
                         self.state.last_resize_time = None;
                         self.state.clear_terminal_before_draw = true;
-                        self.state.poster_protocol = None;
-                        self.state.search_poster_protocols.clear();
+                        self.state.clear_poster_protocols();
                     }
                 }
                 if needs_redraw {
@@ -113,8 +112,7 @@ impl App {
 
             Action::Resize(w, h) => {
                 self.state.last_resize_time = Some((std::time::Instant::now(), w, h));
-                self.state.poster_protocol = None;
-                self.state.search_poster_protocols.clear();
+                self.state.clear_poster_protocols();
                 self.state.dirty = true;
             }
 
@@ -211,15 +209,13 @@ impl App {
             },
 
             Action::ClearCache => {
+                self.request_tasks.cancel_all();
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
-                    let result = tokio::task::spawn_blocking(|| {
-                        crate::cache::clear_all_cache();
-                        Ok::<(), String>(())
-                    })
-                    .await
-                    .map_err(|error| format!("cache clear task failed: {error}"))
-                    .and_then(|result| result);
+                    let result = tokio::task::spawn_blocking(crate::cache::clear_all_cache)
+                        .await
+                        .map_err(|error| format!("cache clear task failed: {error}"))
+                        .and_then(|result| result);
                     sender.send(Action::CacheCleared(result)).ok();
                 });
                 self.state

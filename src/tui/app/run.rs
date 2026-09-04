@@ -98,8 +98,7 @@ impl App {
                     log::debug!("terminal clear warning: {err}");
                     let _ = terminal.backend_mut().clear();
                 }
-                self.state.poster_protocol = None;
-                self.state.search_poster_protocols.clear();
+                self.state.clear_poster_protocols();
                 self.state.clear_terminal_before_draw = false;
                 self.state.dirty = true;
             }
@@ -1021,10 +1020,8 @@ impl App {
         )
         .render(frame, popup_area, area);
 
-        let spinner = crate::tui::screens::details::stream_loading_spinner(
-            self.state.tick_count,
-            self.state.basic_terminal,
-        );
+        let spinner =
+            crate::tui::widgets::loading_spinner(self.state.tick_count, self.state.basic_terminal);
 
         let target_version = self
             .state

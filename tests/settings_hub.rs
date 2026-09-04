@@ -378,3 +378,39 @@ fn test_expand_download_path() {
         Some(std::path::PathBuf::from("/tmp/moviebox_downloads"))
     );
 }
+
+#[tokio::test]
+async fn test_settings_hub_clear_cache_activation_and_notification() {
+    let mut app = App::new();
+    app.handle_action(Action::ShowSettingsPopup).await;
+    assert!(app.state().show_settings_popup);
+
+    app.handle_action(Action::SelectSettingsCategory(
+        SettingsCategory::StorageInfo,
+    ))
+    .await;
+    assert_eq!(app.state().settings_category, SettingsCategory::StorageInfo);
+    assert_eq!(app.state().settings_selected_row, 0);
+
+    app.handle_action(Action::SettingsActivateRow).await;
+    let clearing = app.state().notifications.back();
+    assert_eq!(clearing.map(|n| n.title.as_str()), Some("Clearing Cache"));
+
+    app.handle_action(Action::ClearCache).await;
+    assert!(!app.state().show_settings_popup);
+    assert_eq!(
+        app.state().active_screen,
+        moviebox_tui::tui::state::Screen::Home
+    );
+
+    app.handle_action(Action::CacheCleared(Ok(()))).await;
+    let notification = app.state().notifications.back();
+    assert!(notification.is_some());
+    assert_eq!(notification.unwrap().title, "Cache Cleared");
+
+    app.handle_action(Action::CacheCleared(Err("filesystem error".to_string())))
+        .await;
+    let err_notification = app.state().notifications.back();
+    assert!(err_notification.is_some());
+    assert_eq!(err_notification.unwrap().title, "Cache Clear Failed");
+}
