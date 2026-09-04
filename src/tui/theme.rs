@@ -151,6 +151,7 @@ pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str)
         || term.starts_with("foot")
         || term.contains("alacritty")
         || std::env::var("WT_SESSION").is_ok()
+        || cfg!(target_os = "windows")
         || term_program == "iTerm.app"
         || term_program == "Hyper"
         || term_program == "Tabby"
@@ -158,14 +159,14 @@ pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str)
         || term_program == "WarpTerminal"
         || term_program == "vscode"
         || term_program == "ghostty";
-    if truecolor {
-        return ColorSupport::Truecolor;
-    }
-    let basic = term == "dumb" || term == "linux" || term.contains("fbterm");
+    let basic =
+        term == "dumb" || term == "linux" || term.contains("fbterm") || term.starts_with("vt");
     let apple_term = term.contains("apple") || term_program == "Apple_Terminal";
     let has_256 = term.contains("256") || term.contains("xterm") || term.contains("screen");
     if basic || (apple_term && !has_256) || term == "xterm" {
         ColorSupport::Basic
+    } else if truecolor {
+        ColorSupport::Truecolor
     } else if has_256 {
         ColorSupport::Color256
     } else {
@@ -467,18 +468,18 @@ impl Theme {
         Self {
             border: Style::default().fg(Color::DarkGray),
             border_focus: Style::default()
-                .fg(Color::Blue)
+                .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
             text: Style::default().fg(Color::White),
             text_dim: Style::default().fg(Color::Gray),
             title: Style::default()
-                .fg(Color::Magenta)
+                .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
             highlight: Style::default()
-                .fg(Color::Blue)
+                .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
             header: Style::default()
-                .fg(Color::Magenta)
+                .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
             error: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             success: Style::default().fg(Color::Green),
@@ -490,7 +491,7 @@ impl Theme {
                 .add_modifier(Modifier::BOLD),
             muted: Style::default().fg(Color::DarkGray),
             teal: Style::default().fg(Color::Cyan),
-            lavender: Style::default().fg(Color::Blue),
+            lavender: Style::default().fg(Color::Cyan),
             sapphire: Style::default().fg(Color::Cyan),
             subtext1: Style::default().fg(Color::White),
             base: Color::Black,
@@ -1026,6 +1027,37 @@ mod tests {
             fallback_light.success,
             fallback_light.shortcut,
             fallback_light.accent,
+        ] {
+            assert!(
+                style
+                    .fg
+                    .map(|c| !matches!(c, Color::Rgb(..)))
+                    .unwrap_or(true)
+            );
+        }
+    }
+    #[test]
+    fn fallback_dark_uses_high_contrast_ansi_palette() {
+        let fallback_dark = Theme::fallback(false);
+        assert!(!fallback_dark.is_light);
+        assert_eq!(fallback_dark.text.fg, Some(Color::White));
+        assert_eq!(fallback_dark.base, Color::Black);
+        assert_eq!(fallback_dark.border_focus.fg, Some(Color::Cyan));
+        assert_eq!(fallback_dark.title.fg, Some(Color::Cyan));
+        assert_eq!(fallback_dark.highlight.fg, Some(Color::Cyan));
+
+        for style in [
+            fallback_dark.border,
+            fallback_dark.border_focus,
+            fallback_dark.text,
+            fallback_dark.text_dim,
+            fallback_dark.title,
+            fallback_dark.highlight,
+            fallback_dark.header,
+            fallback_dark.error,
+            fallback_dark.success,
+            fallback_dark.shortcut,
+            fallback_dark.accent,
         ] {
             assert!(
                 style

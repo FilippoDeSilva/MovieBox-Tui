@@ -285,6 +285,22 @@ async fn test_settings_appearance_theme_cycle_and_popup() {
     .await;
     assert!(app.state().show_settings_popup);
     assert!(!app.state().show_theme_popup);
+    app.handle_action(Action::Key(KeyEvent::new(
+        KeyCode::Down,
+        KeyModifiers::empty(),
+    )))
+    .await;
+    assert_eq!(app.state().settings_selected_row, 1);
+    assert_eq!(app.state().poster_mode, "auto");
+
+    app.handle_action(Action::SettingsAdjustValue(true)).await;
+    assert_eq!(app.state().poster_mode, "halfblocks");
+
+    app.handle_action(Action::SettingsAdjustValue(true)).await;
+    assert_eq!(app.state().poster_mode, "off");
+
+    app.handle_action(Action::SettingsAdjustValue(true)).await;
+    assert_eq!(app.state().poster_mode, "auto");
 
     app.handle_action(Action::CloseSettingsPopup).await;
     assert!(!app.state().show_settings_popup);

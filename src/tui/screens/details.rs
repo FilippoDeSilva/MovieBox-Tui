@@ -358,13 +358,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .as_ref()
             .zip(state.image_picker.as_ref())
             .map(|(image, picker)| {
-                let font_size = picker.font_size();
-                let font_w = font_size.width.max(1);
-                let font_h = font_size.height.max(1);
-                let area_h_px = (inner_area.height as f32) * (font_h as f32);
-                let aspect = image.width() as f32 / (image.height() as f32).max(1.0);
-                let area_w_px = area_h_px * aspect;
-                ((area_w_px / font_w as f32).round() as u16).max(1)
+                if matches!(
+                    picker.protocol_type(),
+                    ratatui_image::picker::ProtocolType::Halfblocks
+                ) {
+                    ((inner_area.height as f32 * 0.75).round() as u16).clamp(8, 20)
+                } else {
+                    let font_size = picker.font_size();
+                    let font_w = font_size.width.max(1);
+                    let font_h = font_size.height.max(1);
+                    let area_h_px = (inner_area.height as f32) * (font_h as f32);
+                    let aspect = image.width() as f32 / (image.height() as f32).max(1.0);
+                    let area_w_px = area_h_px * aspect;
+                    ((area_w_px / font_w as f32).round() as u16).max(1)
+                }
             })
             .unwrap_or_else(|| ((inner_area.height as f32 * (4.0 / 3.0)).round() as u16).max(6));
         width_for_height.clamp(8, 22)
@@ -394,6 +401,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 let img_width = poster_area.width;
                 let img_height = poster_area.height;
                 if img_width > 0 && img_height > 0 {
+                    crate::tui::clear_area(frame, poster_area, theme);
                     if let Some((proto_area, proto)) = &mut state.poster_protocol {
                         if proto_area.width == img_width && proto_area.height == img_height {
                             let image_widget = ratatui_image::Image::new(proto);
@@ -1479,7 +1487,7 @@ fn with_selection_surface(style: Style, basic_terminal: bool, theme: &Theme) -> 
     if basic_terminal {
         style
     } else {
-        style.bg(theme_color(theme.surface0, theme.base))
+        style.bg(theme_color(theme.surface1, theme.base))
     }
 }
 

@@ -278,14 +278,21 @@ fn render_category_rows(
         SettingsCategory::StorageInfo => render_storage_settings(frame, rows_area, state, theme),
     }
 }
+fn has_active_settings_popup(state: &AppState) -> bool {
+    state.settings_player_picker
+        || state.show_theme_popup
+        || state.player_picker_popup
+        || state.show_browse_popup
+        || state.settings_download_dir_input.is_some()
+}
 
 struct SettingRow<'a> {
     is_selected: bool,
+    has_active_popup: bool,
     label: &'a str,
     subtext: &'a str,
     value_spans: Vec<Span<'a>>,
 }
-
 fn on_off_spans<'a>(enabled: bool, theme: &Theme, basic_terminal: bool) -> Vec<Span<'a>> {
     if enabled {
         vec![Span::styled(
@@ -318,13 +325,14 @@ fn render_row(
     if area.height == 0 || area.width == 0 {
         return;
     }
-    let cursor = if row.is_selected {
+    let is_active_selection = row.is_selected && !row.has_active_popup;
+    let cursor = if is_active_selection {
         if basic_terminal { "> " } else { "▸ " }
     } else {
         "  "
     };
 
-    let cursor_style = if row.is_selected {
+    let cursor_style = if is_active_selection {
         if basic_terminal {
             theme.text.add_modifier(Modifier::BOLD)
         } else {
@@ -334,14 +342,16 @@ fn render_row(
         Style::default()
     };
 
-    let label_style = if row.is_selected {
+    let label_style = if is_active_selection {
         theme.highlight.add_modifier(Modifier::BOLD)
+    } else if row.is_selected {
+        theme.text.add_modifier(Modifier::BOLD)
     } else {
         theme.text
     };
 
-    let row_bg = if row.is_selected && !basic_terminal {
-        Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+    let row_bg = if is_active_selection && !basic_terminal {
+        Style::default().bg(theme.surface1.fg.unwrap_or(theme.base))
     } else {
         Style::default()
     };
@@ -397,6 +407,7 @@ fn render_row(
 
 fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     let row_rects = settings_row_rects_in_area(area, 3);
+    let has_active_popup = has_active_settings_popup(state);
 
     if let Some(&row_area) = row_rects.first() {
         let is_selected = state.settings_selected_row == 0;
@@ -406,6 +417,7 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Automatic Updates",
                 subtext: "Check GitHub for new releases on startup",
                 value_spans,
@@ -441,6 +453,7 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Default Media Player",
                 subtext: "Preferred player launched for video streams",
                 value_spans,
@@ -502,6 +515,7 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Download Folder",
                 subtext: "Directory for saving downloaded videos & subtitles",
                 value_spans,
@@ -514,6 +528,7 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
 
 fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     let row_rects = settings_row_rects_in_area(area, 4);
+    let has_active_popup = has_active_settings_popup(state);
 
     if let Some(&row_area) = row_rects.first() {
         let is_selected = state.settings_selected_row == 0;
@@ -523,6 +538,7 @@ fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Streaming Mode",
                 subtext: "MovieBox & 4KHDHub streaming catalog",
                 value_spans,
@@ -540,6 +556,7 @@ fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "BDIX FTP Mirrors",
                 subtext: "Local high-speed BDIX optical mirrors for streaming",
                 value_spans,
@@ -557,6 +574,7 @@ fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Live TV Mode",
                 subtext: "Live IPTV channels and custom M3U playlists",
                 value_spans,
@@ -574,6 +592,7 @@ fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Addon Mode",
                 subtext: "Community HTTP Stremio addons and metadata",
                 value_spans,
@@ -585,7 +604,8 @@ fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState
 }
 
 fn render_appearance_settings(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
-    let row_rects = settings_row_rects_in_area(area, 1);
+    let row_rects = settings_row_rects_in_area(area, 2);
+    let has_active_popup = has_active_settings_popup(state);
 
     let theme_name = if state.active_theme_kind.is_empty() {
         "Mocha"
@@ -609,6 +629,7 @@ fn render_appearance_settings(frame: &mut Frame, area: Rect, state: &AppState, t
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Theme",
                 subtext: "Active color theme and palette styling",
                 value_spans,
@@ -618,8 +639,34 @@ fn render_appearance_settings(frame: &mut Frame, area: Rect, state: &AppState, t
         );
     }
 
-    if area.height >= 5 {
-        let info_y = area.y + 3;
+    if let Some(&row_area) = row_rects.get(1) {
+        let is_selected = state.settings_selected_row == 1;
+        let value_spans = vec![Span::styled(
+            state.poster_mode_label(),
+            if state.basic_terminal {
+                theme.text.add_modifier(Modifier::BOLD)
+            } else {
+                theme.accent.add_modifier(Modifier::BOLD)
+            },
+        )];
+
+        render_row(
+            frame,
+            row_area,
+            SettingRow {
+                is_selected,
+                has_active_popup,
+                label: "Poster Graphics",
+                subtext: "Native terminal protocols, Halfblocks or disabled",
+                value_spans,
+            },
+            theme,
+            state.basic_terminal,
+        );
+    }
+
+    if area.height >= 7 {
+        let info_y = area.y + 5;
         let info_area = Rect {
             x: area.x,
             y: info_y,
@@ -648,19 +695,21 @@ fn render_appearance_settings(frame: &mut Frame, area: Rect, state: &AppState, t
 
 fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     let row_rects = settings_row_rects_in_area(area, 3);
+    let has_active_popup = has_active_settings_popup(state);
 
     if let Some(&row_area) = row_rects.first() {
         let is_selected = state.settings_selected_row == 0;
+        let is_active_selected = is_selected && !has_active_popup;
         let glyph = if state.basic_terminal { ">" } else { "▸" };
         let value_spans = vec![Span::styled(
             format!("Purge {glyph}"),
             if state.basic_terminal {
-                if is_selected {
+                if is_active_selected {
                     theme.text.add_modifier(Modifier::BOLD)
                 } else {
                     theme.text_dim
                 }
-            } else if is_selected {
+            } else if is_active_selected {
                 theme.error.add_modifier(Modifier::BOLD)
             } else {
                 theme.error
@@ -671,6 +720,7 @@ fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Clear Disk Cache",
                 subtext: "Remove temporary cached images and responses",
                 value_spans,
@@ -682,6 +732,7 @@ fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, them
 
     if let Some(&row_area) = row_rects.get(1) {
         let is_selected = state.settings_selected_row == 1;
+        let is_active_selected = is_selected && !has_active_popup;
         let value_spans = if state.is_checking_updates {
             vec![Span::styled(
                 "Checking...",
@@ -696,12 +747,12 @@ fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             vec![Span::styled(
                 format!("Check {glyph}"),
                 if state.basic_terminal {
-                    if is_selected {
+                    if is_active_selected {
                         theme.text.add_modifier(Modifier::BOLD)
                     } else {
                         theme.text_dim
                     }
-                } else if is_selected {
+                } else if is_active_selected {
                     theme.sapphire.add_modifier(Modifier::BOLD)
                 } else {
                     theme.sapphire
@@ -713,6 +764,7 @@ fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "Check for Updates",
                 subtext: "Query GitHub API for latest binary releases",
                 value_spans,
@@ -724,16 +776,17 @@ fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, them
 
     if let Some(&row_area) = row_rects.get(2) {
         let is_selected = state.settings_selected_row == 2;
+        let is_active_selected = is_selected && !has_active_popup;
         let glyph = if state.basic_terminal { "->" } else { "↗" };
         let value_spans = vec![Span::styled(
             format!("Open {glyph}"),
             if state.basic_terminal {
-                if is_selected {
+                if is_active_selected {
                     theme.text.add_modifier(Modifier::BOLD)
                 } else {
                     theme.text_dim
                 }
-            } else if is_selected {
+            } else if is_active_selected {
                 theme.lavender.add_modifier(Modifier::BOLD)
             } else {
                 theme.lavender
@@ -744,6 +797,7 @@ fn render_storage_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             row_area,
             SettingRow {
                 is_selected,
+                has_active_popup,
                 label: "GitHub Repository",
                 subtext: "Open project homepage in default web browser",
                 value_spans,
@@ -1056,5 +1110,75 @@ mod tests {
         let clicked_subtext =
             settings_row_at(popup, SettingsCategory::General, 40, row_rects[0].y + 1);
         assert_eq!(clicked_subtext, Some(0));
+    }
+    #[test]
+    fn test_render_settings_modal_suppresses_selection_during_popup() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let theme = Theme::mocha();
+        let mut state = AppState {
+            show_settings_popup: true,
+            settings_player_picker: true,
+            settings_category: SettingsCategory::General,
+            settings_selected_row: 1,
+            ..Default::default()
+        };
+
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let rendered = (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("Default Media Player"));
+        assert!(!rendered.contains("▸ Default Media Player"));
+    }
+    #[test]
+    fn test_render_appearance_labels() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let theme = Theme::mocha();
+        let mut state = AppState {
+            show_settings_popup: true,
+            settings_category: SettingsCategory::Appearance,
+            settings_selected_row: 0,
+            ..Default::default()
+        };
+
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let rendered = (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("Theme"));
+        assert!(rendered.contains("Poster Graphics"));
+        assert!(rendered.contains("Auto"));
+
+        let popup = Rect::new(4, 4, 76, 17);
+        let rows = settings_row_rects(popup, SettingsCategory::Appearance);
+        assert_eq!(rows.len(), 2);
     }
 }

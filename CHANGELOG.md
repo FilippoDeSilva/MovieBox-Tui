@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Added
+- **Optimized Halfblocks Poster Engine & Universal Windows PowerShell Support**:
+  - Implemented 24-bit TrueColor Unicode Halfblocks poster graphics engine (`▀`/`▄`) with dedicated 11x6 cell resolution (132 sub-pixels) and selection highlight isolation.
+  - Added interactive `Poster Graphics` configuration to Settings Hub (`/settings` $\to$ Appearance) with `[ Auto | Halfblocks | Off ]` modes, persisted to `config.json`.
+  - Added `MOVIEBOX_IMAGE_PROTOCOL=halfblocks` environment variable override to force character-cell posters in standard Windows PowerShell, legacy consoles, and basic terminals.
+  - Added explicit buffer clearing (`clear_area`) before rasterizing posters on search results and details screens, preventing ghost character tearing during fast list scrolling.
+- **Windows TrueColor & High-Contrast Terminal Theming**:
+  - Enabled 24-bit TrueColor auto-detection by default on Windows 10/11 (`conhost.exe`, Windows Terminal, PowerShell, CMD), ensuring Windows users receive rich Catppuccin themes out of the box.
+  - Overhauled 16-color ANSI dark fallback palette (`Theme::fallback`), replacing low-contrast dark blue and magenta with high-contrast cyan accents for borders, titles, headers, and highlights.
+  - Added background row selection suppression in Settings Hub when modal popups (media player picker, theme picker, download directory input) are active, directing 100% of user focus to floating dialogs.
+  - Added solid opaque backdrops to `ModalFrame` and clamped popup picker minimum height to 7 rows, eliminating bleed-through and visual crowding on single-item selections.
+  - Elevated active selection surface styling to `theme.surface1` with accent-highlighted cursor indicators (`▌ ` / `▸ `) across lists and settings rows.
 - **In-App Self-Update Engine Hardening**:
   - Added deterministic fallback download URL generation for GitHub release assets and `SHA256SUMS` when unauthenticated API requests encounter HTTP 403 rate limits.
   - Added active in-flight self-update progress modal (`draw_updating_modal`) featuring animated Braille spinners, version upgrade indicators (`v{old} → v{new}`), and real-time status steps.

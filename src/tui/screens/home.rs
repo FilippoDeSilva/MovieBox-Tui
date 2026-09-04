@@ -1480,13 +1480,20 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .image_picker
                     .as_ref()
                     .map(|picker| {
-                        let font = picker.font_size();
-                        let pixel_height =
-                            u64::from(state.poster_rows.max(3)) * u64::from(font.height.max(1));
-                        let pixel_width = pixel_height * 2 / 3;
-                        u16::try_from(pixel_width.div_ceil(u64::from(font.width.max(1))))
-                            .unwrap_or(u16::MAX)
-                            .max(6)
+                        if matches!(
+                            picker.protocol_type(),
+                            ratatui_image::picker::ProtocolType::Halfblocks
+                        ) {
+                            11_u16
+                        } else {
+                            let font = picker.font_size();
+                            let pixel_height =
+                                u64::from(state.poster_rows.max(3)) * u64::from(font.height.max(1));
+                            let pixel_width = pixel_height * 2 / 3;
+                            u16::try_from(pixel_width.div_ceil(u64::from(font.width.max(1))))
+                                .unwrap_or(u16::MAX)
+                                .max(6)
+                        }
                     })
                     .unwrap_or_else(|| state.poster_rows.saturating_mul(4).div_ceil(3).max(6))
             } else {
@@ -1542,17 +1549,21 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     height: metrics.poster_rows_eff,
                 };
 
+                let (highlight_area, poster_area, text_area) =
+                    item_slot_rects(item_area, poster_width);
+
                 let is_selected = Some(i) == selected_idx;
                 if is_selected && !is_editing {
                     let selected_bg = theme.surface0.fg.unwrap_or(theme.base);
                     frame.render_widget(
                         Block::default().style(Style::default().bg(selected_bg)),
-                        item_area,
+                        text_area,
+                    );
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(selected_bg)),
+                        highlight_area,
                     );
                 }
-
-                let (highlight_area, poster_area, text_area) =
-                    item_slot_rects(item_area, poster_width);
 
                 if is_selected {
                     let (indicator_sym, indicator_style) = if is_editing {
@@ -1608,6 +1619,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         }
                         if let Some((_, proto)) = state.search_poster_protocols.peek(&res.id) {
                             if !state.has_active_modal() {
+                                crate::tui::clear_area(frame, p_area, theme);
                                 frame.render_widget(ratatui_image::Image::new(proto), p_area);
                             }
                         }

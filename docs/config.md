@@ -18,6 +18,7 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `addons_enabled`    | bool           | Enable Addon Mode navigation in bottom dock (`/settings` $\to$ Content Modes).              |
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
 | `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
+| `poster_mode`       | string         | Poster graphics mode: `auto` (default), `halfblocks` (character cells), `off` (disabled).                   |
 
 ## Interactive Settings Hub (`/settings`)
 
@@ -25,7 +26,7 @@ All settings in `config.json` can be configured interactively inside the applica
 
 - **General**: Toggle automatic update checks, choose default media player (`mpv`, `VLC`, `IINA`, `Android`), and edit download folder path.
 - **Content Modes**: Enable or disable Streaming Mode, BDIX FTP sources, Live TV (IPTV), and HTTP Addons with safety guards (preventing 0 active modes).
-- **Appearance**: Cycle color themes live with real-time palette swatches or launch the visual theme swatch picker.
+- **Appearance**: Cycle color themes live with real-time palette swatches, select poster graphics mode (`Auto`, `Halfblocks`, `Off`), or launch the visual theme swatch picker.
 - **Maintenance**: Purge disk cache, query GitHub for release updates, and view repository information.
 ## Other persisted files
 
@@ -49,7 +50,7 @@ All settings in `config.json` can be configured interactively inside the applica
 | `MOVIEBOX_FOURKHDHUB_URL` | Override the 4KHDHub base URL.                                                    |
 | `MOVIEBOX_THEME`          | Force a theme (e.g. `Mocha`, `Latte`, `Macchiato`, `Frappe`, `Nord`, `TokyoNight`, `Dracula`, `Gruvbox`, `RosePine`). When unset and no saved theme exists, the app auto-detects: `NO_COLOR` wins, truecolor terminals get full palettes, 256-color terminals get quantized palettes, and the OSC 11 background query picks light/dark variants with WCAG AA contrast. |
 | `MOVIEBOX_NO_IMAGE`       | Disable poster image queries (set to `1` or `true`).                              |
-| `MOVIEBOX_IMAGE_PROTOCOL` | Force poster graphics protocol: `kitty`, `sixel`, `iterm2`, or `none`.            |
+| `MOVIEBOX_IMAGE_PROTOCOL` | Override image protocol (`kitty`, `sixel`, `iterm2`, `halfblocks`, or `none`/`off`). |
 | `MOVIEBOX_CELL_SIZE`      | Override terminal cell size as `WxH` (e.g. `10x20`) for poster scaling.           |
 
 ## CLI

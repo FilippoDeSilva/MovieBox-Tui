@@ -18,6 +18,7 @@ pub struct Config {
     pub addons_enabled: bool,
     pub default_player: Option<String>,
     pub download_dir: Option<String>,
+    pub poster_mode: String,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -33,6 +34,7 @@ impl Default for Config {
             addons_enabled: false,
             default_player: None,
             download_dir: None,
+            poster_mode: "auto".to_string(),
         }
     }
 }
@@ -262,5 +264,6 @@ mod tests {
         let json = serde_json::to_string(&config).expect("serialize");
         let deserialized: Config = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.active_mode, config.active_mode);
+        assert_eq!(deserialized.poster_mode, "auto");
     }
 }

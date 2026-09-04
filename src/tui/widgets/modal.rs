@@ -32,12 +32,18 @@ impl<'a> ModalFrame<'a> {
 
     pub fn render(&self, frame: &mut Frame, area: Rect, full_area: Rect) -> Rect {
         overlay::clear_modal_area(frame, full_area, area, self.theme);
+        let block_style = if self.basic_terminal {
+            Style::default()
+        } else {
+            Style::default().bg(self.theme.mantle.fg.unwrap_or(self.theme.base))
+        };
         let block = Block::default()
             .title(format!(" {} ", self.title.trim()))
             .title_style(self.theme.title)
             .borders(Borders::ALL)
             .border_type(overlay::border_type(self.basic_terminal))
-            .border_style(self.border_style.unwrap_or(self.theme.lavender));
+            .border_style(self.border_style.unwrap_or(self.theme.lavender))
+            .style(block_style);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         inner

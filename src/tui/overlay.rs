@@ -41,7 +41,7 @@ pub fn picker_layout(
     centered(
         area,
         content_width as u16,
-        visible_rows as u16 + 4,
+        (visible_rows as u16 + 4).max(7),
         minimum_width,
         64,
     )
@@ -447,14 +447,24 @@ pub(crate) fn key_hint(key: &str, action: &str, theme: &Theme) -> Span<'static> 
 }
 
 pub(crate) fn selection_style(theme: &Theme, basic_terminal: bool) -> Style {
-    let mut style = theme.text.add_modifier(Modifier::BOLD);
+    let style = if theme.is_light {
+        theme.text
+    } else {
+        theme.highlight
+    }
+    .add_modifier(Modifier::BOLD);
     if crate::tui::theme::ColorSupport::current() == crate::tui::theme::ColorSupport::NoColor {
-        style = style.add_modifier(Modifier::REVERSED);
+        return style.add_modifier(Modifier::REVERSED);
     }
     if basic_terminal {
         style.add_modifier(Modifier::UNDERLINED)
     } else {
-        style.bg(theme.surface0.fg.unwrap_or(theme.base))
+        let bg_color = if theme.is_light {
+            theme.surface1.fg.unwrap_or(ratatui::style::Color::DarkGray)
+        } else {
+            theme.surface1.fg.unwrap_or(theme.base)
+        };
+        style.bg(bg_color)
     }
 }
 
@@ -811,5 +821,12 @@ mod tests {
             .collect::<String>();
         assert!(content.contains("[MOVIES]"));
         assert!(content.contains("Popular Movies"));
+    }
+    #[test]
+    fn test_picker_layout_minimum_height_clamped_to_seven() {
+        let area = Rect::new(0, 0, 80, 24);
+        let items = vec!["Single Item".to_string()];
+        let layout = picker_layout(area, &items, "Open", 20);
+        assert!(layout.height >= 7);
     }
 }

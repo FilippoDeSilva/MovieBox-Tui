@@ -27,19 +27,26 @@ prevent escape sequence probe leakage (`Gi=31...`):
 - **Poster rendering**: Sixel, Kitty, and iTerm2 protocols where the probe
   detects them. Terminals that report kitty/sixel capability but no cell
   size (Windows Terminal sixel, iTerm2 over SSH) are salvaged with default
-  cell metrics. True Halfblocks-only terminals show a compact filmstrip
-  placeholder instead. All poster image rendering is automatically gated
-  behind `has_active_modal()` to prevent image protocol graphic bleed
+  cell metrics. In `Auto` mode, non-graphics terminals (e.g. standard Windows
+  PowerShell / conhost, macOS Apple_Terminal) gracefully display clean text
+  placeholders (`· ·` on Home, `No Art` on Details) to prevent scroll tearing.
+  Users can opt in to 24-bit TrueColor Unicode character-cell posters (`▀`/`▄`)
+  by setting `Poster Graphics: Halfblocks` in `/settings` (Appearance) or
+  `MOVIEBOX_IMAGE_PROTOCOL=halfblocks`. All poster image rendering is
+  automatically gated behind `has_active_modal()` to prevent graphic bleed
   through modal popups and overlays. `MOVIEBOX_NO_IMAGE=1` disables queries;
   `MOVIEBOX_IMAGE_PROTOCOL` forces a protocol; `MOVIEBOX_CELL_SIZE=WxH`
   overrides metrics.
 - **Colors & Themes**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB
   (auto-detected across Ghostty, Kitty, WezTerm, iTerm2, Alacritty, Foot, Windows Terminal,
-  Hyper, Tabby, Warp, and VSCode), quantized 256-color palettes for strict terminals,
-  and a 16-color ANSI fallback palette (`Theme::fallback`); an OSC 11 background query
+  Hyper, Tabby, Warp, and VSCode; enabled by default on Windows 10/11 console host and Windows Terminal),
+  quantized 256-color palettes for strict terminals, and a tuned high-contrast 16-color ANSI
+  fallback palette (`Theme::fallback`) using crisp cyan accents; an OSC 11 background query
   picks light/dark variants. Light mode themes (including Catppuccin Latte) are tuned for
   WCAG AA compliance, ensuring high-contrast readability across light terminal backgrounds.
-  An explicit `MOVIEBOX_THEME` or saved theme always wins over autodetection.
+  Modal pickers feature solid opaque backdrops, minimum 7-row breathing room, and background
+  selection suppression to isolate dialog focus. An explicit `MOVIEBOX_THEME` or saved theme
+  always wins over autodetection.
 - **Keyboard & Cursor**: The kitty keyboard protocol (disambiguated escapes, event
   types) is requested at start and popped on exit; unsupported terminals
   ignore it. Real input cursor styling (`SetCursorStyle::SteadyBar`) activates
