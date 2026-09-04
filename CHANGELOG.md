@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-09-05
+
 ### Added
 - **Home Landing Deck Continue Watching & Multi-Tab Navigation**:
   - Implemented interactive multi-tab landing deck on the Home screen supporting both `Continue Watching` and `Favorites`.
