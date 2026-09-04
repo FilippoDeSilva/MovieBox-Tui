@@ -139,7 +139,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     let max_lines = left_col.len().max(right_col.len());
     let capacity = area.height.saturating_sub(6).max(4) as usize;
 
-    let two_columns = area.width >= 86 && capacity >= max_lines.saturating_sub(4);
+    let two_columns = area.width >= 102 && capacity >= max_lines.saturating_sub(4);
 
     if !two_columns && all_lines.len() > capacity {
         let max_scroll = all_lines.len().saturating_sub(capacity);

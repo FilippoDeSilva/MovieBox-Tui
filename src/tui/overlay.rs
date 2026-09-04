@@ -610,16 +610,21 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
     const UPDATE_SEGMENT: u16 = 18;
     const OPEN_SEGMENT: u16 = 26;
     const DISMISS_SEGMENT: u16 = 12;
-    let footer_width = UPDATE_SEGMENT + OPEN_SEGMENT + DISMISS_SEGMENT;
 
     let popup_area = centered(area, desired_w, desired_h, min_w.min(area.width), max_w);
+    let (update_seg, open_seg, dismiss_seg) = if popup_area.width < 58 {
+        (12, 10, 10)
+    } else {
+        (UPDATE_SEGMENT, OPEN_SEGMENT, DISMISS_SEGMENT)
+    };
+    let footer_width = update_seg + open_seg + dismiss_seg;
+
     let button_row_y = popup_area.y + popup_area.height.saturating_sub(2);
     let inner_width = popup_area.width.saturating_sub(2);
     let footer_start = popup_area.x + 1 + inner_width.saturating_sub(footer_width) / 2;
-    let update_btn_end_x = footer_start + UPDATE_SEGMENT;
-    let open_btn_end_x = update_btn_end_x + OPEN_SEGMENT;
-    let open_button_midpoint_x = update_btn_end_x + OPEN_SEGMENT / 2;
-
+    let update_btn_end_x = footer_start + update_seg;
+    let open_btn_end_x = update_btn_end_x + open_seg;
+    let open_button_midpoint_x = update_btn_end_x + open_seg / 2;
     UpdateModalLayout {
         popup_area,
         display_count,

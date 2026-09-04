@@ -82,7 +82,7 @@ impl DetailsLayoutTier {
         };
         (content_rows as u16 + 2).clamp(minimum, maximum)
     }
-    pub(crate) fn footer_height(self, width: u16) -> u16 {
+    pub fn footer_height(self, width: u16) -> u16 {
         if width >= DETAILS_FOOTER_SPLIT_THRESHOLD {
             1
         } else {
@@ -91,7 +91,7 @@ impl DetailsLayoutTier {
     }
 }
 
-pub const DETAILS_FOOTER_SPLIT_THRESHOLD: u16 = 80;
+pub const DETAILS_FOOTER_SPLIT_THRESHOLD: u16 = 106;
 
 pub(crate) fn visible_selector_panes(
     available_panes: &[crate::tui::state::DetailsPane],
@@ -529,16 +529,37 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             }
         });
 
+    let bullet_w = crate::tui::text::width(bullet_sep);
+    let provider_name = details.id.provider.label();
+    let provider_w = if !provider_name.is_empty() {
+        bullet_w + crate::tui::text::width(provider_name)
+    } else {
+        0
+    };
+    let current_badge_w: usize = badge_spans
+        .iter()
+        .map(|s| crate::tui::text::width(&s.content))
+        .sum();
+
     if let Some(audios) = audio_str {
-        badge_spans.push(Span::styled(bullet_sep, theme.overlay1));
-        badge_spans.push(Span::styled(
-            "Audio: ",
-            theme.subtext1.add_modifier(Modifier::BOLD),
-        ));
-        badge_spans.push(Span::styled(audios, theme.accent));
+        let label_w = 7;
+        if current_badge_w + provider_w + bullet_w + label_w + 4 <= text_width {
+            badge_spans.push(Span::styled(bullet_sep, theme.overlay1));
+            badge_spans.push(Span::styled(
+                "Audio: ",
+                theme.subtext1.add_modifier(Modifier::BOLD),
+            ));
+            let available_audio_w =
+                text_width.saturating_sub(current_badge_w + provider_w + bullet_w + label_w);
+            let display_audios = if crate::tui::text::width(&audios) > available_audio_w {
+                crate::tui::text::truncate_width(&audios, available_audio_w)
+            } else {
+                audios
+            };
+            badge_spans.push(Span::styled(display_audios, theme.accent));
+        }
     }
 
-    let provider_name = details.id.provider.label();
     if !provider_name.is_empty() {
         badge_spans.push(Span::styled(bullet_sep, theme.overlay1));
         badge_spans.push(Span::styled(provider_name.to_string(), theme.subtext1));
@@ -554,49 +575,92 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     }
 
     let mut extra_meta_spans = Vec::new();
+    let mut extra_meta_w = 0;
     if !details.genres.is_empty() {
-        extra_meta_spans.push(Span::styled(
-            "Genre: ",
-            theme.subtext1.add_modifier(Modifier::BOLD),
-        ));
-        extra_meta_spans.push(Span::styled(
-            genres.clone(),
-            theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
-        ));
+        let label_w = 7;
+        let val_w = crate::tui::text::width(&genres);
+        if label_w + 4 <= text_width {
+            extra_meta_spans.push(Span::styled(
+                "Genre: ",
+                theme.subtext1.add_modifier(Modifier::BOLD),
+            ));
+            let available_genre_w = text_width.saturating_sub(label_w);
+            let display_genres = if val_w > available_genre_w {
+                crate::tui::text::truncate_width(&genres, available_genre_w)
+            } else {
+                genres.clone()
+            };
+            extra_meta_w += label_w + crate::tui::text::width(&display_genres);
+            extra_meta_spans.push(Span::styled(
+                display_genres,
+                theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
+            ));
+        }
     }
     if let Some(dir) = details
         .director
         .as_deref()
         .filter(|d| !d.trim().is_empty() && *d != "N/A")
     {
-        if !extra_meta_spans.is_empty() {
-            extra_meta_spans.push(Span::styled(bullet_sep, theme.overlay1));
+        let sep_w = if !extra_meta_spans.is_empty() {
+            bullet_w
+        } else {
+            0
+        };
+        let label_w = 10;
+        let val_w = crate::tui::text::width(dir);
+        if extra_meta_w + sep_w + label_w + 4 <= text_width {
+            if !extra_meta_spans.is_empty() {
+                extra_meta_spans.push(Span::styled(bullet_sep, theme.overlay1));
+            }
+            extra_meta_spans.push(Span::styled(
+                "Director: ",
+                theme.subtext1.add_modifier(Modifier::BOLD),
+            ));
+            let available_dir_w = text_width.saturating_sub(extra_meta_w + sep_w + label_w);
+            let display_dir = if val_w > available_dir_w {
+                crate::tui::text::truncate_width(dir, available_dir_w)
+            } else {
+                dir.to_string()
+            };
+            extra_meta_w += sep_w + label_w + crate::tui::text::width(&display_dir);
+            extra_meta_spans.push(Span::styled(
+                display_dir,
+                theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
+            ));
         }
-        extra_meta_spans.push(Span::styled(
-            "Director: ",
-            theme.subtext1.add_modifier(Modifier::BOLD),
-        ));
-        extra_meta_spans.push(Span::styled(
-            dir.to_string(),
-            theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
-        ));
     }
     if let Some(cast) = details
         .stars
         .as_deref()
         .filter(|s| !s.trim().is_empty() && *s != "N/A")
     {
-        if !extra_meta_spans.is_empty() {
-            extra_meta_spans.push(Span::styled(bullet_sep, theme.overlay1));
+        let sep_w = if !extra_meta_spans.is_empty() {
+            bullet_w
+        } else {
+            0
+        };
+        let label_w = 6;
+        let val_w = crate::tui::text::width(cast);
+        if extra_meta_w + sep_w + label_w + 4 <= text_width {
+            if !extra_meta_spans.is_empty() {
+                extra_meta_spans.push(Span::styled(bullet_sep, theme.overlay1));
+            }
+            extra_meta_spans.push(Span::styled(
+                "Cast: ",
+                theme.subtext1.add_modifier(Modifier::BOLD),
+            ));
+            let available_cast_w = text_width.saturating_sub(extra_meta_w + sep_w + label_w);
+            let display_cast = if val_w > available_cast_w {
+                crate::tui::text::truncate_width(cast, available_cast_w)
+            } else {
+                cast.to_string()
+            };
+            extra_meta_spans.push(Span::styled(
+                display_cast,
+                theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
+            ));
         }
-        extra_meta_spans.push(Span::styled(
-            "Cast: ",
-            theme.subtext1.add_modifier(Modifier::BOLD),
-        ));
-        extra_meta_spans.push(Span::styled(
-            cast.to_string(),
-            theme_color(theme.subtext1, theme.text.fg.unwrap_or(Color::White)),
-        ));
     }
     let has_extra_meta = !extra_meta_spans.is_empty();
 
@@ -1711,6 +1775,11 @@ fn details_footer(
     } else {
         "Favorite"
     };
+    let show_provider = !state.is_addon_mode
+        && !state
+            .selected_details
+            .as_ref()
+            .is_some_and(|d| d.id.provider == crate::providers::ProviderKind::Addons);
 
     let mut primary = Vec::new();
     let mut secondary = Vec::new();
@@ -1724,22 +1793,26 @@ fn details_footer(
             theme,
         ));
         secondary.extend(footer_group("f", fav_label, false, theme));
-        secondary.extend(footer_group(
-            crate::tui::text::CTRL_P_STR,
-            "Provider",
-            false,
-            theme,
-        ));
+        if show_provider {
+            secondary.extend(footer_group(
+                crate::tui::text::CTRL_P_STR,
+                "Provider",
+                false,
+                theme,
+            ));
+        }
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_languages {
         primary.extend(footer_group("Enter", "Select", true, theme));
         primary.extend(footer_group("f", fav_label, false, theme));
-        secondary.extend(footer_group(
-            crate::tui::text::CTRL_P_STR,
-            "Provider",
-            false,
-            theme,
-        ));
+        if show_provider {
+            secondary.extend(footer_group(
+                crate::tui::text::CTRL_P_STR,
+                "Provider",
+                false,
+                theme,
+            ));
+        }
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_seasons {
@@ -1755,12 +1828,14 @@ fn details_footer(
             theme,
         ));
         primary.extend(footer_group("f", fav_label, false, theme));
-        secondary.extend(footer_group(
-            crate::tui::text::CTRL_P_STR,
-            "Provider",
-            false,
-            theme,
-        ));
+        if show_provider {
+            secondary.extend(footer_group(
+                crate::tui::text::CTRL_P_STR,
+                "Provider",
+                false,
+                theme,
+            ));
+        }
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else if is_episodes {
@@ -1776,23 +1851,27 @@ fn details_footer(
             theme,
         ));
         primary.extend(footer_group("f", fav_label, false, theme));
-        secondary.extend(footer_group(
-            crate::tui::text::CTRL_P_STR,
-            "Provider",
-            false,
-            theme,
-        ));
+        if show_provider {
+            secondary.extend(footer_group(
+                crate::tui::text::CTRL_P_STR,
+                "Provider",
+                false,
+                theme,
+            ));
+        }
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     } else {
         primary.extend(footer_group("Enter", "Select", true, theme));
         primary.extend(footer_group("f", fav_label, false, theme));
-        secondary.extend(footer_group(
-            crate::tui::text::CTRL_P_STR,
-            "Provider",
-            false,
-            theme,
-        ));
+        if show_provider {
+            secondary.extend(footer_group(
+                crate::tui::text::CTRL_P_STR,
+                "Provider",
+                false,
+                theme,
+            ));
+        }
         secondary.extend(footer_group("Tab", "Streams", false, theme));
         secondary.extend(footer_group("Esc", "Back", false, theme));
     }
@@ -2171,7 +2250,7 @@ mod tests {
 
         state.details_pane = crate::tui::state::DetailsPane::Streams;
         state.subtitle_list = vec![("English".to_string(), "http://sub".to_string())];
-        let (primary, secondary) = details_footer(&state, &theme, 100);
+        let (primary, secondary) = details_footer(&state, &theme, 120);
         let mut all_spans = primary;
         all_spans.extend(secondary);
         let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
@@ -2179,10 +2258,25 @@ mod tests {
         assert!(!footer_text.contains("[o] Open With"));
         assert!(footer_text.contains("[d] Download"));
         assert!(footer_text.contains("[f] Favorite"));
+        assert!(footer_text.contains("Provider"));
         assert!(footer_text.contains("[Esc] Back"));
 
+        let (compact_primary, compact_secondary) = details_footer(&state, &theme, 90);
+        let mut compact_spans = compact_primary;
+        compact_spans.extend(compact_secondary);
+        let compact_text: String = compact_spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(compact_text.contains("[d] Save"));
+
+        state.is_addon_mode = true;
+        let (addon_primary, addon_secondary) = details_footer(&state, &theme, 120);
+        let mut addon_spans = addon_primary;
+        addon_spans.extend(addon_secondary);
+        let addon_text: String = addon_spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(!addon_text.contains("Provider"));
+        state.is_addon_mode = false;
+
         state.details_pane = crate::tui::state::DetailsPane::Seasons;
-        let (primary, secondary) = details_footer(&state, &theme, 100);
+        let (primary, secondary) = details_footer(&state, &theme, 120);
         let mut all_spans = primary;
         all_spans.extend(secondary);
         let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();
@@ -2193,7 +2287,7 @@ mod tests {
         assert!(footer_text.contains("[Esc] Back"));
 
         state.details_pane = crate::tui::state::DetailsPane::Episodes;
-        let (primary, secondary) = details_footer(&state, &theme, 100);
+        let (primary, secondary) = details_footer(&state, &theme, 120);
         let mut all_spans = primary;
         all_spans.extend(secondary);
         let footer_text: String = all_spans.iter().map(|s| s.content.as_ref()).collect();

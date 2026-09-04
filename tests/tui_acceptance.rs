@@ -809,3 +809,50 @@ async fn test_ctrl_p_scoped_strictly_to_streaming_mode() {
     app.handle_action(Action::Key(ctrl_p)).await;
     assert!(!app.state().addon_manager_popup);
 }
+#[tokio::test]
+async fn test_tui_layout_truncation_and_bounds() {
+    let sizes = [(50, 14), (60, 18), (80, 24), (120, 30)];
+    let mut app = App::new();
+
+    for (w, h) in sizes {
+        let backend = TestBackend::new(w, h);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        app.state_mut().active_screen = Screen::Home;
+        app.state_mut().has_search_settled = true;
+        app.state_mut().search_results.clear();
+        app.state_mut().search_query.set_content("some_query");
+        let res = terminal.draw(|frame| app.draw(frame));
+        assert!(res.is_ok());
+
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
+        if w < 56 {
+            assert!(text.contains("Try Provider") || text.contains("Clear"));
+        } else {
+            assert!(text.contains("Clear Search"));
+        }
+
+        app.state_mut().show_settings_popup = true;
+        let res_settings = terminal.draw(|frame| app.draw(frame));
+        assert!(res_settings.is_ok());
+        app.state_mut().show_settings_popup = false;
+
+        app.state_mut().download_progress = Some(50.0);
+        app.state_mut().download_status = Some("Downloading item".to_string());
+        let res_download = terminal.draw(|frame| app.draw(frame));
+        assert!(res_download.is_ok());
+        app.state_mut().download_progress = None;
+    }
+
+    let tier = moviebox_tui::tui::screens::details::DetailsLayoutTier::Narrow;
+    assert_eq!(tier.footer_height(80), 2);
+    assert_eq!(tier.footer_height(105), 2);
+    assert_eq!(tier.footer_height(106), 1);
+    assert_eq!(tier.footer_height(120), 1);
+}

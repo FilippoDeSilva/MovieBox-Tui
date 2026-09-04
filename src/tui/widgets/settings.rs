@@ -24,9 +24,21 @@ pub fn category_tab_rects(
 ) -> Vec<(SettingsCategory, Rect)> {
     let mut results = Vec::new();
     let mut current_x = tabs_area.x;
+    let compact = tabs_area.width < 52;
+    let gap = if compact { 2 } else { 5 };
 
     for cat in SettingsCategory::ALL {
-        let width = crate::tui::text::width(cat.title()) as u16;
+        let title = if compact {
+            match cat {
+                SettingsCategory::General => "1:Gen",
+                SettingsCategory::ContentModes => "2:Modes",
+                SettingsCategory::Appearance => "3:Theme",
+                SettingsCategory::StorageInfo => "4:Info",
+            }
+        } else {
+            cat.title()
+        };
+        let width = crate::tui::text::width(title) as u16;
         if current_x + width <= tabs_area.right() {
             results.push((
                 cat,
@@ -38,7 +50,7 @@ pub fn category_tab_rects(
                 },
             ));
         }
-        current_x = current_x.saturating_add(width).saturating_add(5);
+        current_x = current_x.saturating_add(width).saturating_add(gap);
     }
     results
 }
@@ -358,7 +370,6 @@ fn render_row(
 
     let cursor_width = crate::tui::text::width(cursor);
     let label_width = crate::tui::text::width(row.label);
-    let total_left_width = cursor_width + label_width;
 
     let right_width: usize = row
         .value_spans
@@ -367,11 +378,20 @@ fn render_row(
         .sum();
 
     let right_margin = 1;
-    let pad = (area.width as usize).saturating_sub(total_left_width + right_width + right_margin);
+    let area_width = area.width as usize;
+    let max_label_w = area_width.saturating_sub(cursor_width + right_width + right_margin + 1);
+    let display_label = if label_width > max_label_w && max_label_w >= 4 {
+        crate::tui::text::truncate_width(row.label, max_label_w)
+    } else {
+        row.label.to_string()
+    };
+    let display_label_w = crate::tui::text::width(&display_label);
+    let pad =
+        area_width.saturating_sub(cursor_width + display_label_w + right_width + right_margin);
 
     let mut line1_spans = Vec::new();
     line1_spans.push(Span::styled(cursor, cursor_style));
-    line1_spans.push(Span::styled(row.label, label_style));
+    line1_spans.push(Span::styled(display_label, label_style));
     if pad > 0 {
         line1_spans.push(Span::raw(" ".repeat(pad)));
     } else {
@@ -379,13 +399,20 @@ fn render_row(
     }
     line1_spans.extend(row.value_spans);
     line1_spans.push(Span::raw(" ".repeat(right_margin)));
+
     let subtext_indent = "  ";
-    let subtext_width = crate::tui::text::width(row.subtext);
-    let subtext_pad = (area.width as usize).saturating_sub(subtext_indent.len() + subtext_width);
+    let max_subtext_w = area_width.saturating_sub(subtext_indent.len());
+    let display_subtext = if crate::tui::text::width(row.subtext) > max_subtext_w {
+        crate::tui::text::truncate_width(row.subtext, max_subtext_w)
+    } else {
+        row.subtext.to_string()
+    };
+    let subtext_width = crate::tui::text::width(&display_subtext);
+    let subtext_pad = area_width.saturating_sub(subtext_indent.len() + subtext_width);
     let mut line2_spans = Vec::new();
     line2_spans.push(Span::raw(subtext_indent));
     line2_spans.push(Span::styled(
-        row.subtext,
+        display_subtext,
         if row.is_selected {
             theme.subtext1
         } else {
@@ -395,7 +422,6 @@ fn render_row(
     if subtext_pad > 0 {
         line2_spans.push(Span::raw(" ".repeat(subtext_pad)));
     }
-
     let lines = if area.height >= 2 {
         vec![Line::from(line1_spans), Line::from(line2_spans)]
     } else {
@@ -470,7 +496,9 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
             let input_str = input.as_str();
             let cursor_idx = input.cursor().min(input_str.len());
             let (before, after) = input_str.split_at(cursor_idx);
-            let truncated_before = crate::tui::text::truncate_width(before, 26);
+            let input_budget = (row_area.width as usize).saturating_sub(21).clamp(10, 60);
+            let truncated_before =
+                crate::tui::text::truncate_width(before, input_budget.saturating_sub(4));
             if state.basic_terminal {
                 vec![
                     Span::styled(truncated_before, theme.text),
@@ -500,7 +528,8 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
                 .unwrap_or_else(|| {
                     crate::logging::sanitize_path(crate::service::resolve_download_dir(None))
                 });
-            let truncated = crate::tui::text::truncate_width(&path_str, 28);
+            let path_budget = (row_area.width as usize).saturating_sub(21).clamp(10, 60);
+            let truncated = crate::tui::text::truncate_middle_width(&path_str, path_budget);
             vec![Span::styled(
                 truncated,
                 if state.basic_terminal {
@@ -1110,6 +1139,24 @@ mod tests {
         let clicked_subtext =
             settings_row_at(popup, SettingsCategory::General, 40, row_rects[0].y + 1);
         assert_eq!(clicked_subtext, Some(0));
+
+        let compact_popup = Rect::new(2, 2, 54, 16);
+        assert_eq!(
+            settings_category_tab_at(compact_popup, 6, 3, false, SettingsCategory::General),
+            Some(SettingsCategory::General)
+        );
+        assert_eq!(
+            settings_category_tab_at(compact_popup, 14, 3, false, SettingsCategory::General),
+            Some(SettingsCategory::ContentModes)
+        );
+        assert_eq!(
+            settings_category_tab_at(compact_popup, 23, 3, false, SettingsCategory::General),
+            Some(SettingsCategory::Appearance)
+        );
+        assert_eq!(
+            settings_category_tab_at(compact_popup, 32, 3, false, SettingsCategory::General),
+            Some(SettingsCategory::StorageInfo)
+        );
     }
     #[test]
     fn test_render_settings_modal_suppresses_selection_during_popup() {

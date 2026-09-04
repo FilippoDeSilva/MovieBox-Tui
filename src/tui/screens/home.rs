@@ -324,36 +324,55 @@ fn render_search_state(
             )]));
             lines.push(Line::from(""));
 
+            let is_compact_btn = area.width < 56;
+            let sep = if is_compact_btn { "  " } else { "        " };
             let pills = if state.is_tv_mode {
+                let (btn1_label, btn2_label) = if is_compact_btn {
+                    ("[ Reload (", "[ Clear (")
+                } else {
+                    ("[ Reload Playlists (", "[ Clear Search (")
+                };
                 vec![
-                    Span::styled("[ Reload Playlists (", theme.subtext1),
+                    Span::styled(btn1_label, theme.subtext1),
                     Span::styled("r", theme.shortcut),
                     Span::styled(") ]", theme.subtext1),
-                    Span::raw("        "),
-                    Span::styled("[ Clear Search (", theme.subtext1),
+                    Span::raw(sep),
+                    Span::styled(btn2_label, theme.subtext1),
                     Span::styled("c", theme.shortcut),
                     Span::styled(") ]", theme.subtext1),
                 ]
             } else if state.is_addon_mode {
+                let (btn1_label, btn2_label) = if is_compact_btn {
+                    ("[ Addons (", "[ Clear (")
+                } else {
+                    ("[ Addon Manager (", "[ Clear Search (")
+                };
                 vec![
-                    Span::styled("[ Addon Manager (", theme.subtext1),
+                    Span::styled(btn1_label, theme.subtext1),
                     Span::styled(ctrl_p, theme.shortcut),
                     Span::styled(") ]", theme.subtext1),
-                    Span::raw("        "),
-                    Span::styled("[ Clear Search (", theme.subtext1),
+                    Span::raw(sep),
+                    Span::styled(btn2_label, theme.subtext1),
                     Span::styled("c", theme.shortcut),
                     Span::styled(") ]", theme.subtext1),
                 ]
             } else {
+                let btn2_label = if is_compact_btn {
+                    "[ Clear ("
+                } else {
+                    "[ Clear Search ("
+                };
+                let btn1_label = if is_compact_btn {
+                    "[ Try Provider (".to_string()
+                } else {
+                    format!("[ Try on {} (", next_provider.label())
+                };
                 vec![
-                    Span::styled(
-                        format!("[ Try on {} (", next_provider.label()),
-                        theme.subtext1,
-                    ),
+                    Span::styled(btn1_label, theme.subtext1),
                     Span::styled(ctrl_p, theme.shortcut),
                     Span::styled(") ]", theme.subtext1),
-                    Span::raw("        "),
-                    Span::styled("[ Clear Search (", theme.subtext1),
+                    Span::raw(sep),
+                    Span::styled(btn2_label, theme.subtext1),
                     Span::styled("c", theme.shortcut),
                     Span::styled(") ]", theme.subtext1),
                 ]
@@ -459,15 +478,26 @@ pub(crate) fn no_results_button_hitboxes(
     is_tv_mode: bool,
     is_addon_mode: bool,
 ) -> (Rect, Rect) {
-    let btn1_w = if is_tv_mode {
-        24
-    } else if is_addon_mode {
-        19 + ctrl_p.len() as u16
+    let is_compact_btn = area.width < 56;
+    let (btn1_w, btn2_w, sep_w) = if is_compact_btn {
+        let b1 = if is_tv_mode {
+            14
+        } else if is_addon_mode {
+            12 + ctrl_p.len() as u16
+        } else {
+            18 + ctrl_p.len() as u16
+        };
+        (b1, 13, 2)
     } else {
-        (14 + next_provider_label.len() + ctrl_p.len()) as u16
+        let b1 = if is_tv_mode {
+            24
+        } else if is_addon_mode {
+            19 + ctrl_p.len() as u16
+        } else {
+            (14 + next_provider_label.len() + ctrl_p.len()) as u16
+        };
+        (b1, 20, 8)
     };
-    let btn2_w = 20;
-    let sep_w = 8;
     let total_w = btn1_w + sep_w + btn2_w;
     let start_x = area.x + area.width.saturating_sub(total_w) / 2;
     let card_y = area.y + area.height.saturating_sub(3) / 3;
@@ -713,9 +743,18 @@ pub(crate) fn render_discover_landing(
 
     for (curr_y, (title, desc)) in (inner_area.y..inner_area.bottom()).zip(presets) {
         let pointer = if state.basic_terminal { " - " } else { " · " };
-        let tag_len = crate::tui::text::width(desc);
+        let pointer_w = crate::tui::text::width(pointer);
         let title_w = crate::tui::text::width(title);
-        let margins_len = 6;
+        let margins_len = 2 + pointer_w + 1;
+        let max_desc_w = (inner_area.width as usize).saturating_sub(title_w + margins_len + 1);
+        let display_desc = if max_desc_w >= 4 && crate::tui::text::width(desc) > max_desc_w {
+            crate::tui::text::truncate_width(desc, max_desc_w)
+        } else if max_desc_w < 4 {
+            String::new()
+        } else {
+            desc.to_string()
+        };
+        let tag_len = crate::tui::text::width(&display_desc);
         let pad_len = (inner_area.width as usize).saturating_sub(margins_len + title_w + tag_len);
 
         let line = Line::from(vec![
@@ -723,7 +762,7 @@ pub(crate) fn render_discover_landing(
             Span::styled(pointer, theme.accent),
             Span::styled(title, theme.text.add_modifier(Modifier::BOLD)),
             Span::raw(" ".repeat(pad_len)),
-            Span::styled(desc, theme.text_dim),
+            Span::styled(display_desc, theme.text_dim),
             Span::raw(" "),
         ]);
 
@@ -896,8 +935,7 @@ fn render_search_bar(
                 if is_ultra_compact {
                     "[Addons]".to_string()
                 } else {
-                    let sep = if state.basic_terminal { "-" } else { "·" };
-                    format!("[Addons {sep} {ctrl_p}]")
+                    "[Addon Mode]".to_string()
                 }
             } else {
                 let label = state.active_provider.label();
@@ -936,8 +974,7 @@ fn render_search_bar(
             let text = if is_ultra_compact {
                 "[Addons]".to_string()
             } else {
-                let sep = if state.basic_terminal { "-" } else { "·" };
-                format!("[Addons {sep} {ctrl_p}]")
+                "[Addon Mode]".to_string()
             };
             let style = if state.basic_terminal {
                 theme.teal
@@ -990,12 +1027,16 @@ fn render_search_bar(
             && !state.status_message.is_empty()
             && is_query_empty
             && !editing;
+        let available_text_w =
+            (search_split[0].width as usize).saturating_sub(prefix_width as usize + 2);
+        let raw_placeholder = if has_status {
+            state.status_message.as_str()
+        } else {
+            dynamic_search_placeholder(state)
+        };
+        let placeholder_text = crate::tui::text::truncate_width(raw_placeholder, available_text_w);
         let search_line = if is_query_empty {
-            let placeholder_text = if has_status {
-                state.status_message.as_str()
-            } else {
-                dynamic_search_placeholder(state)
-            };
+            let placeholder_text = placeholder_text.as_str();
 
             if editing && !modal_active {
                 let cursor_char = if state.basic_terminal { "█" } else { "▎" };
@@ -1890,14 +1931,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             theme.text_dim,
                         ));
                     }
-                    if res.release_year != "Unknown" && !res.release_year.is_empty() {
+                    let has_year = res.release_year != "Unknown" && !res.release_year.is_empty();
+                    if has_year {
                         row2_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
                         row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
                     }
 
-                    row2_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                    row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
-
+                    if text_area.width >= 36 || !has_year {
+                        row2_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
+                        row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                    }
                     row2_spans.push(crate::tui::widgets::badge::provider_badge_span(
                         res.provider,
                         theme,
@@ -1999,13 +2042,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         TvManagerRow::Playlist(index) => {
                             let source =
                                 state.tv_playlists.get(*index).cloned().unwrap_or_default();
-                            let url_budget = (inner_area.width as usize).saturating_sub(6).max(12);
+                            let index_str = format!("{}", index + 1);
+                            let url_budget = (inner_area.width as usize)
+                                .saturating_sub(index_str.len() + 6)
+                                .max(10);
                             let display_source =
                                 crate::tui::text::truncate_middle_width(&source, url_budget);
                             ratatui::widgets::ListItem::new(ratatui::text::Line::from(vec![
                                 ratatui::text::Span::raw(" "),
                                 ratatui::text::Span::styled(
-                                    format!("{} {}", index + 1, display_source),
+                                    format!("{} {}", index_str, display_source),
                                     theme.text,
                                 ),
                             ]))
@@ -2138,9 +2184,29 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 } else {
                     ratatui::text::Span::styled("[ ] ", theme.text_dim)
                 };
+                let mut badges = Vec::new();
+                let mut badges_w = 0;
+                if a.is_core() {
+                    badges.push(ratatui::text::Span::styled("[Core] ", theme.lavender));
+                    badges_w += 7;
+                }
+                if a.provides_meta {
+                    badges.push(ratatui::text::Span::styled("[Meta] ", theme.sapphire));
+                    badges_w += 7;
+                }
+                if a.provides_stream {
+                    badges.push(ratatui::text::Span::styled("[Streams] ", theme.rating));
+                    badges_w += 10;
+                }
+                if a.provides_catalog {
+                    badges.push(ratatui::text::Span::styled("[Catalog]", theme.teal));
+                    badges_w += 9;
+                }
+                let prefix_w = 2;
+                let check_w = 4;
                 let name_budget = (inner_area.width as usize)
-                    .saturating_sub(3 + 4 + 12)
-                    .max(10);
+                    .saturating_sub(prefix_w + check_w + badges_w + 2)
+                    .max(8);
                 let addon_label = format!("{} v{} ", a.name, a.version.as_deref().unwrap_or("1.0"));
                 let name = ratatui::text::Span::styled(
                     crate::tui::text::truncate_width(&addon_label, name_budget),
@@ -2150,19 +2216,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         theme.text
                     },
                 );
-                let mut badges = Vec::new();
-                if a.is_core() {
-                    badges.push(ratatui::text::Span::styled("[Core] ", theme.lavender));
-                }
-                if a.provides_meta {
-                    badges.push(ratatui::text::Span::styled("[Meta] ", theme.sapphire));
-                }
-                if a.provides_stream {
-                    badges.push(ratatui::text::Span::styled("[Streams] ", theme.rating));
-                }
-                if a.provides_catalog {
-                    badges.push(ratatui::text::Span::styled("[Catalog]", theme.teal));
-                }
                 let mut spans = vec![ratatui::text::Span::raw(" "), prefix, check, name];
                 spans.extend(badges);
                 items.push(ratatui::widgets::ListItem::new(ratatui::text::Line::from(
@@ -3263,7 +3316,7 @@ mod tests {
             }
             addon_rendered.push('\n');
         }
-        assert!(addon_rendered.contains("[Addons"));
+        assert!(addon_rendered.contains("[Addon Mode]"));
         assert!(addon_rendered.contains("Search movies and series via addons…"));
     }
 

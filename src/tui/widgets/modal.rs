@@ -37,8 +37,10 @@ impl<'a> ModalFrame<'a> {
         } else {
             Style::default().bg(self.theme.mantle.fg.unwrap_or(self.theme.base))
         };
+        let title_budget = (area.width as usize).saturating_sub(4);
+        let display_title = crate::tui::text::truncate_width(self.title.trim(), title_budget);
         let block = Block::default()
-            .title(format!(" {} ", self.title.trim()))
+            .title(format!(" {display_title} "))
             .title_style(self.theme.title)
             .borders(Borders::ALL)
             .border_type(overlay::border_type(self.basic_terminal))

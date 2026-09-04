@@ -44,6 +44,24 @@
   - Updated macOS Homebrew installation with explicit `brew trust` step required by Homebrew 6.0+ for third-party taps.
   - Streamlined quickstart section to reference in-app interactive help (`?`) and `docs/controls.md`, preventing documentation drift.
 ### Fixed
+- **Responsive Text Sizing & Layout Truncation**:
+  - Raised Details footer split threshold (`DETAILS_FOOTER_SPLIT_THRESHOLD`) to 106 columns, ensuring shortcuts use a clean 2-row layout on terminals between 80 and 105 columns without clipping.
+  - Omitted `[Ctrl+P] Provider` hint from the Details footer when in Addon mode or viewing addon streams, recovering 18 columns of footer space.
+  - Added line-width budgeting to Details metadata: audios and extra metadata (Genre, Director, Cast) now dynamically truncate to available row width without wrapping beyond their allocated lines.
+  - Synchronized Settings tab hit-testing (`category_tab_rects`) with compact rendering (`popup_area.width < 58`), resolving mouse click target divergence on compact terminals.
+  - Added dynamic subtext and label truncation in Settings rows, preventing 2-row Paragraph wrapping and off-screen line displacement.
+  - Replaced hardcoded path truncation in Settings download directory with dynamic middle truncation (`truncate_middle_width`), maximizing displayed path length while fitting compact rows.
+  - Added dynamic description truncation to Home discover categories card, preventing overflow on narrow (50–54 col) screens.
+  - Added responsive compact labels (`[Try Provider (P)]` and `[Clear (c)]`) and narrowed separation to No-Results buttons when terminal width is under 56 columns.
+  - Removed obsolete `Ctrl+P` hint from search bar mode pill in Addon mode, replacing it with `[Addon Mode]`.
+  - Added available width clamping to non-landing search bar placeholders and status messages to prevent 1-row Paragraph wrapping.
+  - Omitted redundant media type separator in search results metadata when terminal width is under 36 columns and release year is present, keeping provider badges intact.
+  - Budgeted list entry lengths in TV Playlists and Addon Manager popups to fit within inner popup bounds regardless of installed badge counts.
+  - Raised Help menu two-column threshold to 102 columns to prevent keybinding description truncation.
+  - Added compact title formatting to download gauge when width is under 60 columns.
+  - Added compact button formatting (`[u] Update  [o] Web  [Esc] Back`) to Update Modal on terminals under 60 columns.
+  - Added compact header formatting to Updating progress modal when inner width is under 42 columns.
+  - Added title boundary protection to `ModalFrame`, truncating overly long titles to preserve border integrity.
 - **Resilient Configuration & Accurate Metadata**:
   - Safeguarded user TV playlists (`tv_config.json`) and HTTP addons (`addons_config.json`): replaced destructive error-swallowing deletion with timestamped `.corrupt.{timestamp}` file rotation and sanitized logging on JSON parse failures.
   - Eliminated fabricated S01E01 fallback in addon metadata adapter, accurately reporting empty series episodes when an upstream catalog entry lacks episode records instead of injecting unplayable dummy data.

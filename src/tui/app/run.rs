@@ -668,20 +668,37 @@ impl App {
                     .unwrap_or("Downloading...");
 
                 let budget = (dl_area.width as usize).saturating_sub(10);
-                let status_text =
-                    crate::tui::text::truncate_width(status, budget.saturating_sub(30).max(8));
+                let is_compact_gauge = dl_area.width < 60;
+                let status_sub = if is_compact_gauge { 16 } else { 30 };
+                let status_text = crate::tui::text::truncate_width(
+                    status,
+                    budget.saturating_sub(status_sub).max(8),
+                );
                 let title_text = if self.state.download_queue_total > 0 {
                     let total = self.state.download_queue_total;
                     let remaining = self.state.download_queue.len();
                     let current = total - remaining;
-                    format!(
-                        " Download: S{:02}E{:02} ({}/{}) | {} [X] Cancel ",
-                        self.state.selected_season,
-                        self.state.selected_episode,
-                        current,
-                        total,
-                        status_text
-                    )
+                    if is_compact_gauge {
+                        format!(
+                            " S{:02}E{:02} ({}/{}) | {} [X] ",
+                            self.state.selected_season,
+                            self.state.selected_episode,
+                            current,
+                            total,
+                            status_text
+                        )
+                    } else {
+                        format!(
+                            " Download: S{:02}E{:02} ({}/{}) | {} [X] Cancel ",
+                            self.state.selected_season,
+                            self.state.selected_episode,
+                            current,
+                            total,
+                            status_text
+                        )
+                    }
+                } else if is_compact_gauge {
+                    format!(" {} [X] ", status_text)
                 } else {
                     format!(" Download: {} [X] Cancel ", status_text)
                 };
@@ -940,31 +957,69 @@ impl App {
 
             text.push(Line::from(""));
 
+            let is_compact_modal = inner_area.width < 56;
             let buttons = match env {
-                crate::updater::apply::InstallationEnvironment::Homebrew => vec![
-                    Span::styled("[b]", self.theme.shortcut),
-                    Span::styled(" Copy 'brew upgrade'    ", self.theme.text),
-                    Span::styled("[o]", self.theme.shortcut),
-                    Span::styled(" Open Release Page    ", self.theme.text),
-                    Span::styled("[Esc]", self.theme.shortcut),
-                    Span::styled(" Dismiss", self.theme.text),
-                ],
+                crate::updater::apply::InstallationEnvironment::Homebrew => {
+                    if is_compact_modal {
+                        vec![
+                            Span::styled("[b]", self.theme.shortcut),
+                            Span::styled(" Copy 'brew upgrade'  ", self.theme.text),
+                            Span::styled("[o]", self.theme.shortcut),
+                            Span::styled(" Web  ", self.theme.text),
+                            Span::styled("[Esc]", self.theme.shortcut),
+                            Span::styled(" Back", self.theme.text),
+                        ]
+                    } else {
+                        vec![
+                            Span::styled("[b]", self.theme.shortcut),
+                            Span::styled(" Copy 'brew upgrade'    ", self.theme.text),
+                            Span::styled("[o]", self.theme.shortcut),
+                            Span::styled(" Open Release Page    ", self.theme.text),
+                            Span::styled("[Esc]", self.theme.shortcut),
+                            Span::styled(" Dismiss", self.theme.text),
+                        ]
+                    }
+                }
                 crate::updater::apply::InstallationEnvironment::Termux
-                | crate::updater::apply::InstallationEnvironment::ReadOnly => vec![
-                    Span::styled("[o]", self.theme.shortcut),
-                    Span::styled(" Open Release Page    ", self.theme.text),
-                    Span::styled("[Esc]", self.theme.shortcut),
-                    Span::styled(" Dismiss", self.theme.text),
-                ],
+                | crate::updater::apply::InstallationEnvironment::ReadOnly => {
+                    if is_compact_modal {
+                        vec![
+                            Span::styled("[o]", self.theme.shortcut),
+                            Span::styled(" Web  ", self.theme.text),
+                            Span::styled("[Esc]", self.theme.shortcut),
+                            Span::styled(" Back", self.theme.text),
+                        ]
+                    } else {
+                        vec![
+                            Span::styled("[o]", self.theme.shortcut),
+                            Span::styled(" Open Release Page    ", self.theme.text),
+                            Span::styled("[Esc]", self.theme.shortcut),
+                            Span::styled(" Dismiss", self.theme.text),
+                        ]
+                    }
+                }
                 crate::updater::apply::InstallationEnvironment::DirectReplace
-                | crate::updater::apply::InstallationEnvironment::WindowsHelper => vec![
-                    Span::styled("[u]", self.theme.shortcut),
-                    Span::styled(" Update Now    ", self.theme.text),
-                    Span::styled("[o]", self.theme.shortcut),
-                    Span::styled(" Open Release Page    ", self.theme.text),
-                    Span::styled("[Esc]", self.theme.shortcut),
-                    Span::styled(" Dismiss", self.theme.text),
-                ],
+                | crate::updater::apply::InstallationEnvironment::WindowsHelper => {
+                    if is_compact_modal {
+                        vec![
+                            Span::styled("[u]", self.theme.shortcut),
+                            Span::styled(" Update  ", self.theme.text),
+                            Span::styled("[o]", self.theme.shortcut),
+                            Span::styled(" Web  ", self.theme.text),
+                            Span::styled("[Esc]", self.theme.shortcut),
+                            Span::styled(" Back", self.theme.text),
+                        ]
+                    } else {
+                        vec![
+                            Span::styled("[u]", self.theme.shortcut),
+                            Span::styled(" Update Now    ", self.theme.text),
+                            Span::styled("[o]", self.theme.shortcut),
+                            Span::styled(" Open Release Page    ", self.theme.text),
+                            Span::styled("[Esc]", self.theme.shortcut),
+                            Span::styled(" Dismiss", self.theme.text),
+                        ]
+                    }
+                }
             };
 
             text.push(Line::from(buttons).alignment(Alignment::Center));
@@ -1012,8 +1067,22 @@ impl App {
             .as_deref()
             .unwrap_or("Applying update...");
 
-        let text = vec![
-            Line::from(vec![
+        let is_compact_header = inner_area.width < 42;
+        let header_spans = if is_compact_header {
+            vec![
+                Span::styled(
+                    format!("{spinner} "),
+                    self.theme
+                        .accent
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("v{} → v{}", env!("CARGO_PKG_VERSION"), target_version),
+                    self.theme.highlight,
+                ),
+            ]
+        } else {
+            vec![
                 Span::styled(
                     format!("{spinner} "),
                     self.theme
@@ -1030,8 +1099,11 @@ impl App {
                     format!("v{} → v{}", env!("CARGO_PKG_VERSION"), target_version),
                     self.theme.highlight,
                 ),
-            ])
-            .alignment(Alignment::Center),
+            ]
+        };
+
+        let text = vec![
+            Line::from(header_spans).alignment(Alignment::Center),
             Line::from(""),
             Line::from(vec![Span::styled(
                 crate::tui::text::truncate_width(
