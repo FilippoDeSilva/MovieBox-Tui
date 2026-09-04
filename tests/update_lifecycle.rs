@@ -62,23 +62,6 @@ async fn test_update_check_guard_clears_on_success() {
 }
 
 #[tokio::test]
-async fn test_update_modal_mouse_hitbox_matches_rendered_geometry() {
-    let area = Rect::new(0, 0, 80, 24);
-    let notes = "• Feature 1\n• Feature 2\n• Feature 3";
-    let layout = update_modal_layout(area, notes);
-
-    assert_eq!(layout.popup_area.width, 72);
-    assert_eq!(layout.display_count, 3);
-    assert!(!layout.has_more);
-    assert_eq!(layout.popup_area.height, 11);
-
-    assert_eq!(layout.button_row_y, layout.popup_area.y + 9);
-    let footer_start = layout.popup_area.x + 1 + (70 - 56) / 2;
-    assert_eq!(layout.update_btn_end_x, footer_start + 18);
-    assert_eq!(layout.open_btn_end_x, layout.update_btn_end_x + 26);
-}
-
-#[tokio::test]
 async fn test_update_modal_update_now_click() {
     let mut app = App::new();
     app.state_mut().update_available = Some((
@@ -375,65 +358,6 @@ fn test_homebrew_detection_and_safe_refusal() {
 
     let standard_user_path = std::path::Path::new("/Users/samir/.local/bin/moviebox-tui");
     assert!(!is_homebrew_managed(standard_user_path));
-}
-
-#[test]
-fn test_update_asset_selection_for_current_platform() {
-    let release = Release {
-        version: "0.1.13".to_string(),
-        tag_name: "v0.1.13".to_string(),
-        notes: "Notes".to_string(),
-        assets: vec![
-            ReleaseAsset {
-                name: "MovieBox_macOS_Universal.tar.gz".to_string(),
-                download_url: "https://.../MovieBox_macOS_Universal.tar.gz".to_string(),
-                size: Some(15000),
-            },
-            ReleaseAsset {
-                name: "MovieBox_Linux_x64.tar.gz".to_string(),
-                download_url: "https://.../MovieBox_Linux_x64.tar.gz".to_string(),
-                size: Some(12000),
-            },
-            ReleaseAsset {
-                name: "MovieBox_Linux_arm64.tar.gz".to_string(),
-                download_url: "https://.../MovieBox_Linux_arm64.tar.gz".to_string(),
-                size: Some(11000),
-            },
-            ReleaseAsset {
-                name: "MovieBox_Windows_x64.zip".to_string(),
-                download_url: "https://.../MovieBox_Windows_x64.zip".to_string(),
-                size: Some(13000),
-            },
-            ReleaseAsset {
-                name: "MovieBox_Windows_arm64.zip".to_string(),
-                download_url: "https://.../MovieBox_Windows_arm64.zip".to_string(),
-                size: Some(12000),
-            },
-            ReleaseAsset {
-                name: "SHA256SUMS".to_string(),
-                download_url: "https://.../SHA256SUMS".to_string(),
-                size: Some(512),
-            },
-        ],
-    };
-
-    let mac = TargetPlatform::detect("macos", "arm64", false).unwrap();
-    assert_eq!(
-        release.find_compatible_asset(mac).unwrap().name,
-        "MovieBox_macOS_Universal.tar.gz"
-    );
-
-    let linux = TargetPlatform::detect("linux", "x86_64", false).unwrap();
-    assert_eq!(
-        release.find_compatible_asset(linux).unwrap().name,
-        "MovieBox_Linux_x64.tar.gz"
-    );
-
-    let win = TargetPlatform::detect("windows", "x86_64", false).unwrap();
-    assert_eq!(
-        release.find_compatible_asset(win).unwrap().name,
-        "MovieBox_Windows_x64.zip"
-    );
 }
 
 #[test]

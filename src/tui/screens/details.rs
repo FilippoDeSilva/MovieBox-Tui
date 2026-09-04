@@ -1911,7 +1911,6 @@ mod tests {
         AudioTrackOption, Episode, MediaDetails, MediaType, ProviderKind, ProviderMediaId, Release,
         Season, SourceMirror,
     };
-    use crate::tui::widgets::{MediaTags, render_media_tag_spans};
 
     #[test]
     fn test_stream_loading_spinner_frames() {
@@ -1920,30 +1919,6 @@ mod tests {
         assert_eq!(stream_loading_spinner(9, false), "⠏");
         assert_eq!(stream_loading_spinner(10, false), "⠋");
         assert_eq!(stream_loading_spinner(0, true), "..");
-    }
-
-    #[test]
-    fn test_resolution_badge_spans() {
-        let theme = Theme::mocha();
-        let spans_4k = resolution_badge_spans(2160, &theme, false);
-        assert_eq!(spans_4k[0].content, "  4K   ");
-
-        let spans_1080 = resolution_badge_spans(1080, &theme, false);
-        assert_eq!(spans_1080[0].content, " 1080p ");
-
-        let spans_720 = resolution_badge_spans(720, &theme, false);
-        assert_eq!(spans_720[0].content, " 720p  ");
-
-        let spans_sd = resolution_badge_spans(480, &theme, false);
-        assert_eq!(spans_sd[0].content, " 480p  ");
-
-        let spans_multi = resolution_badge_spans(-1, &theme, false);
-        assert_eq!(spans_multi[0].content, " Multi ");
-
-        let basic_4k = resolution_badge_spans(2160, &theme, true);
-        assert_eq!(basic_4k[0].content.trim(), "[4K]");
-        let basic_multi = resolution_badge_spans(-1, &theme, true);
-        assert_eq!(basic_multi[0].content.trim(), "[Multi]");
     }
 
     #[test]
@@ -2141,42 +2116,6 @@ mod tests {
             !header_has_selection_bg,
             "Streams table header should not have selection background"
         );
-    }
-
-    #[test]
-    fn test_extract_media_tags() {
-        let tags = extract_media_tags(
-            "Dune.Part.Two.2024.2160p.UHD.BluRay.x265.TrueHD.7.1.Atmos.DV.HDR-FLUX",
-            "HEVC",
-        );
-        assert_eq!(tags.hdr, Some("DV"));
-        assert_eq!(tags.audio, Some("ATMOS"));
-        assert_eq!(tags.codec, Some("HEVC"));
-        assert_eq!(tags.source, Some("BluRay"));
-
-        let tags_web = extract_media_tags(
-            "Movie.Title.2023.1080p.HDR10Plus.WEB-DL.DDP5.1.H.264",
-            "H264",
-        );
-        assert_eq!(tags_web.hdr, Some("HDR10+"));
-        assert_eq!(tags_web.audio, Some("5.1"));
-        assert_eq!(tags_web.codec, Some("H.264"));
-        assert_eq!(tags_web.source, Some("WEB-DL"));
-    }
-
-    #[test]
-    fn test_render_media_tag_spans() {
-        let theme = Theme::mocha();
-        let tags = MediaTags {
-            hdr: Some("HDR"),
-            audio: Some("5.1"),
-            codec: Some("HEVC"),
-            source: Some("REMUX"),
-        };
-        let spans = render_media_tag_spans(&tags, &theme, false);
-        assert!(!spans.is_empty());
-        let basic_spans = render_media_tag_spans(&tags, &theme, true);
-        assert_eq!(basic_spans[0].content, "HDR");
     }
 
     #[test]

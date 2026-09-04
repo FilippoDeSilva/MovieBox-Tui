@@ -1,9 +1,8 @@
 use moviebox_tui::models::NotificationKind;
-use moviebox_tui::providers::addons::client::AddonClient;
 use moviebox_tui::providers::models::RequestContext;
-use moviebox_tui::providers::tv::parser::M3UParser;
 use moviebox_tui::tui::action::Action;
 use moviebox_tui::tui::app::App;
+use moviebox_tui::tui::state::PlayerKind;
 use moviebox_tui::tui::text::is_http_url;
 
 #[tokio::test]
@@ -32,30 +31,6 @@ async fn test_search_failure_clears_loading_and_sets_error_state() {
         Some("Network connection timed out after 10s")
     );
     assert!(app.state().search_results.is_empty());
-}
-
-#[tokio::test]
-async fn test_addon_manifest_invalid_url_triggers_error_notification_and_preserves_state() {
-    let client = AddonClient::new();
-    let err = client
-        .fetch_manifest("https://invalid-nonexistent-domain.test/manifest.json")
-        .await
-        .unwrap_err();
-    assert!(err.contains("Failed to reach manifest") || err.contains("Manifest returned HTTP"));
-
-    let mut app = App::new();
-    let initial_addons = app.state().installed_addons.len();
-
-    app.handle_action(Action::SetStatus(format!(
-        "Error: Addon install failed: {err}"
-    )))
-    .await;
-
-    assert!(!app.state().notifications.is_empty());
-    let notif = app.state().notifications.back().unwrap();
-    assert_eq!(notif.kind, NotificationKind::Error);
-    assert!(notif.message.contains("Addon install failed"));
-    assert_eq!(app.state().installed_addons.len(), initial_addons);
 }
 
 #[tokio::test]
@@ -96,19 +71,6 @@ async fn test_download_resolve_failure_sets_error_status_and_notifies() {
 }
 
 #[tokio::test]
-async fn test_malformed_m3u_playlist_recovers_without_panic() {
-    let parser = M3UParser::new();
-    let malformed_m3u = "#EXTM3U\n#EXTINF:-1 tvg-id=\"\"\n\n#EXTINF:broken attributes without url";
-    let channels = parser.parse_m3u(malformed_m3u);
-    assert!(channels.is_empty());
-
-    let partial_valid_m3u = "#EXTM3U\n#EXTINF:-1 tvg-name=\"Channel 1\",Valid Channel\nhttps://stream.example.com/live.m3u8\n#BROKEN_LINE";
-    let channels2 = parser.parse_m3u(partial_valid_m3u);
-    assert_eq!(channels2.len(), 1);
-    assert_eq!(channels2[0].name, "Valid Channel");
-}
-
-#[tokio::test]
 async fn test_invalid_url_schemes_rejected_by_security_filter() {
     assert!(!is_http_url("file:///etc/passwd"));
     assert!(!is_http_url("ftp://server.local/file"));
@@ -145,4 +107,42 @@ async fn test_active_player_session_blocks_duplicate_playback_and_recovers_on_ex
     app.handle_action(Action::PlayerExited).await;
     assert!(!app.state().is_playing);
     assert!(!app.state().is_resolving_playback);
+}
+#[tokio::test]
+async fn test_authoritative_launch_player_blocks_bypass_attempts() {
+    let mut app = App::new();
+    app.state_mut().update_available = None;
+    app.state_mut().is_playing = false;
+
+    app.handle_action(Action::LaunchPlayer(
+        PlayerKind::Mpv,
+        "magnet:?xt=urn:btih:d08244124e9f0863014f56947ab51404ec102770".to_string(),
+        None,
+    ))
+    .await;
+
+    assert!(!app.state().is_playing);
+    let notif = app
+        .state()
+        .notifications
+        .back()
+        .expect("Notification must be present");
+    assert_eq!(notif.kind, NotificationKind::Error);
+    assert_eq!(notif.title, "Unsupported stream");
+
+    app.handle_action(Action::LaunchPlayer(
+        PlayerKind::Mpv,
+        "file:///etc/shadow".to_string(),
+        None,
+    ))
+    .await;
+
+    assert!(!app.state().is_playing);
+    let notif = app
+        .state()
+        .notifications
+        .back()
+        .expect("Notification must be present");
+    assert_eq!(notif.kind, NotificationKind::Error);
+    assert_eq!(notif.title, "Unsupported stream");
 }

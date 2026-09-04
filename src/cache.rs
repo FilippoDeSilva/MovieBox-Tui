@@ -673,4 +673,13 @@ mod tests {
         assert_eq!(tokio::fs::read_to_string(&target).await.unwrap(), "two");
         let _ = fs::remove_dir_all(&dir);
     }
+    #[test]
+    fn test_md5_hex_determinism() {
+        assert_eq!(
+            md5_hex("https://example.com/stream.m3u8"),
+            "6d61b1f81ddc272d47bef071abd229bd"
+        );
+        assert_eq!(md5_hex(""), "d41d8cd98f00b204e9800998ecf8427e");
+        assert_ne!(md5_hex("query1"), md5_hex("query2"));
+    }
 }

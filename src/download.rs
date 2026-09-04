@@ -782,12 +782,34 @@ mod tests {
     }
 
     #[test]
-    fn test_safe_file_stem_windows_reserved() {
+    fn test_safe_file_stem_empty_fallback() {
+        assert_eq!(safe_file_stem(""), DEFAULT_STREAM_NAME);
+        assert_eq!(safe_file_stem("   "), DEFAULT_STREAM_NAME);
+        assert_eq!(safe_file_stem("..."), DEFAULT_STREAM_NAME);
+        assert_eq!(safe_file_stem("___"), DEFAULT_STREAM_NAME);
+    }
+
+    #[test]
+    fn test_safe_file_stem_sanitization_and_reserved() {
+        assert_eq!(safe_file_stem("../../../etc/passwd"), "etc_passwd");
+        assert_eq!(
+            safe_file_stem("C:\\Windows\\System32\\calc.exe"),
+            "C__Windows_System32_calc.exe"
+        );
         assert_eq!(safe_file_stem("CON"), "CON_");
+        assert_eq!(safe_file_stem("con"), "con_");
+        assert_eq!(safe_file_stem("PRN"), "PRN_");
         assert_eq!(safe_file_stem("AUX"), "AUX_");
+        assert_eq!(safe_file_stem("NUL"), "NUL_");
+        assert_eq!(safe_file_stem("COM1"), "COM1_");
+        assert_eq!(safe_file_stem("LPT9"), "LPT9_");
         assert_eq!(
             safe_file_stem("Normal Title: Special"),
             "Normal Title_ Special"
+        );
+        assert_eq!(
+            safe_file_stem("Movie: The <Ultimate> Edition *?|"),
+            "Movie_ The _Ultimate_ Edition"
         );
     }
 }

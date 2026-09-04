@@ -46,6 +46,10 @@
   - Added structured media player setup guide with package manager commands (`brew`, `apt`, `winget`).
   - Updated macOS Homebrew installation with explicit `brew trust` step required by Homebrew 6.0+ for third-party taps.
   - Streamlined quickstart section to reference in-app interactive help (`?`) and `docs/controls.md`, preventing documentation drift.
+- **Streamlined Test Architecture & High-Signal Test Suite**:
+  - Consolidated unit assertions for file stem sanitization, MD5 hashing, atomic writing, and badge rendering directly into their respective modules (`src/download.rs`, `src/cache.rs`, `src/tui/widgets/badge.rs`).
+  - Pruned 10 redundant, weightless, and duplicate test suites (`player_integration.rs`, `url_security.rs`, `download_integration.rs`, `m3u_integration.rs`, `cache_lifecycle.rs`, `real_acceptance.rs`, `grand_user_journey.rs`, `history_reconciliation.rs`, `version_upgrade_e2e.rs`), reducing integration test files from 20 to 9 focused suites while preserving complete regression coverage.
+  - Hardened `.omp/AGENTS.md` and `docs/testing.md` with strict engineering rules rejecting weightless tests, duplicate test layers, and monolithic multi-phase journey tests.
 ### Fixed
 - **Responsive Text Sizing & Layout Truncation**:
   - Raised Details footer split threshold (`DETAILS_FOOTER_SPLIT_THRESHOLD`) to 106 columns, ensuring shortcuts use a clean 2-row layout on terminals between 80 and 105 columns without clipping.

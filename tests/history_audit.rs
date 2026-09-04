@@ -419,3 +419,66 @@ async fn test_history_slash_command_populates_search_results_accurately() {
     assert!(providers.contains(&ProviderKind::MovieBox));
     assert!(providers.contains(&ProviderKind::Addons));
 }
+#[test]
+fn test_update_progress_precision_preservation() {
+    let mut manager = HistoryManager::default();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut item = dummy_history_item(
+        "moviebox",
+        "mb_m2",
+        "Interstellar",
+        1,
+        "2014",
+        0,
+        0,
+        Some(10140),
+        5000,
+        false,
+    );
+    item.timestamp = now;
+
+    manager.recent.push(item.clone());
+
+    let lower_item = item.clone();
+    manager.update_progress(lower_item, 3000, Some(10140), false);
+
+    assert_eq!(manager.recent.first().unwrap().progress_seconds, 5000);
+}
+
+#[test]
+fn test_duplicate_history_prevention_on_repeated_play() {
+    let mut manager = HistoryManager::default();
+    let item = dummy_history_item(
+        "moviebox",
+        "mb_m3",
+        "The Matrix",
+        1,
+        "1999",
+        0,
+        0,
+        Some(8160),
+        1200,
+        false,
+    );
+
+    manager.update_progress(item.clone(), 1200, Some(8160), false);
+    manager.update_progress(item.clone(), 2400, Some(8160), false);
+    manager.update_progress(item.clone(), 3600, Some(8160), false);
+
+    assert_eq!(manager.recent.len(), 1);
+    assert_eq!(manager.recent.first().unwrap().progress_seconds, 3600);
+}
+
+#[test]
+fn test_corrupted_history_deserialization_recovery() {
+    let malformed_json = "{ \"watched\": [\"corrupt\"], \"recent\": \"invalid_shape\" }";
+    let deserialized = serde_json::from_str::<HistoryManager>(malformed_json);
+    assert!(deserialized.is_err());
+
+    let empty_json = "{}";
+    let empty_manager = serde_json::from_str::<HistoryManager>(empty_json).unwrap();
+    assert!(empty_manager.recent.is_empty());
+}

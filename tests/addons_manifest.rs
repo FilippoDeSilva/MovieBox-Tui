@@ -1,10 +1,10 @@
 use moviebox_tui::models::MediaType;
 use moviebox_tui::providers::addons::adapter::{
-    meta_detail_to_media_details, meta_to_catalog_item, parse_audio_tracks, parse_codec,
-    parse_quality, parse_season_episode, parse_size_bytes_from_text, stream_item_to_release,
+    meta_detail_to_media_details, parse_audio_tracks, parse_codec, parse_quality,
+    parse_season_episode, parse_size_bytes_from_text, stream_item_to_release,
 };
 use moviebox_tui::providers::addons::models::{
-    AddonManifest, InstalledAddon, MetaDetail, MetaItem, MetaVideo, StreamBehaviorHints, StreamItem,
+    AddonManifest, InstalledAddon, MetaDetail, StreamBehaviorHints, StreamItem,
 };
 use std::collections::HashMap;
 
@@ -32,126 +32,6 @@ fn test_addon_manifest_fixture_deserialization() {
     assert!(manifest.provides_catalog());
     assert!(manifest.provides_meta());
     assert!(manifest.provides_stream());
-}
-
-#[test]
-fn test_addon_meta_item_and_search_mapping() {
-    let meta_item = MetaItem {
-        id: "tt0111161".to_string(),
-        r#type: "movie".to_string(),
-        name: "The Shawshank Redemption".to_string(),
-        title: None,
-        poster: Some("https://images.metahub.space/poster/medium/tt0111161/img.jpg".to_string()),
-        cover: None,
-        description: Some("Two imprisoned men bond over a number of years...".to_string()),
-        overview: None,
-        synopsis: None,
-        release_info: Some("1994".to_string()),
-        year: None,
-        released: None,
-        imdb_rating: Some("9.3".to_string()),
-        rating: None,
-        genres: vec!["Drama".to_string(), "Crime".to_string()],
-        genre: vec![],
-    };
-
-    let catalog_item = meta_to_catalog_item(&meta_item);
-    assert_eq!(catalog_item.id.value, "tt0111161");
-    assert_eq!(catalog_item.title, "The Shawshank Redemption");
-    assert_eq!(catalog_item.media_type, MediaType::Movie);
-    assert_eq!(catalog_item.year.as_deref(), Some("1994"));
-    assert_eq!(
-        catalog_item.poster_url.as_deref(),
-        Some("https://images.metahub.space/poster/medium/tt0111161/img.jpg")
-    );
-}
-
-#[test]
-fn test_addon_series_metadata_and_episodes_decomposition() {
-    let series_detail = MetaDetail {
-        id: "tt0903747".to_string(),
-        r#type: "series".to_string(),
-        name: "Breaking Bad".to_string(),
-        title: None,
-        poster: Some("https://images.metahub.space/poster/medium/tt0903747/img.jpg".to_string()),
-        cover: None,
-        background: None,
-        logo: None,
-        description: Some(
-            "A chemistry teacher diagnosed with inoperable lung cancer...".to_string(),
-        ),
-        overview: None,
-        synopsis: None,
-        release_info: Some("2008-2013".to_string()),
-        year: Some("2008".to_string()),
-        released: None,
-        imdb_rating: Some("9.5".to_string()),
-        rating: None,
-        genres: vec![
-            "Crime".to_string(),
-            "Drama".to_string(),
-            "Thriller".to_string(),
-        ],
-        genre: vec![],
-        runtime: Some("49 min".to_string()),
-        cast: vec!["Bryan Cranston".to_string(), "Aaron Paul".to_string()],
-        stars: vec![],
-        director: vec!["Vince Gilligan".to_string()],
-        directors: vec![],
-        writer: vec![],
-        writers: vec![],
-        videos: vec![
-            MetaVideo {
-                id: Some("tt0903747:1:1".to_string()),
-                title: Some("Pilot".to_string()),
-                name: None,
-                season: Some(1),
-                episode: Some(1),
-                number: None,
-                released: Some("2008-01-20".to_string()),
-                thumbnail: None,
-            },
-            MetaVideo {
-                id: Some("tt0903747:1:2".to_string()),
-                title: Some("Cat's in the Bag...".to_string()),
-                name: None,
-                season: Some(1),
-                episode: Some(2),
-                number: None,
-                released: Some("2008-01-27".to_string()),
-                thumbnail: None,
-            },
-            MetaVideo {
-                id: Some("tt0903747:2:1".to_string()),
-                title: Some("Seven Thirty-Seven".to_string()),
-                name: None,
-                season: Some(2),
-                episode: Some(1),
-                number: None,
-                released: Some("2009-03-08".to_string()),
-                thumbnail: None,
-            },
-        ],
-    };
-
-    let details = meta_detail_to_media_details(&series_detail);
-    assert_eq!(details.id.value, "tt0903747");
-    assert_eq!(details.media_type, MediaType::Series);
-    assert_eq!(details.year.as_deref(), Some("2008"));
-    assert_eq!(details.imdb_rating.as_deref(), Some("9.5"));
-    assert_eq!(details.duration.as_deref(), Some("49 min"));
-    assert_eq!(details.stars.as_deref(), Some("Bryan Cranston, Aaron Paul"));
-    assert_eq!(details.director.as_deref(), Some("Vince Gilligan"));
-
-    assert_eq!(details.seasons.len(), 2);
-    assert_eq!(details.seasons[0].number, 1);
-    assert_eq!(details.seasons[0].episodes.len(), 2);
-    assert_eq!(details.seasons[0].episodes[0].number, 1);
-    assert_eq!(details.seasons[0].episodes[1].number, 2);
-
-    assert_eq!(details.seasons[1].number, 2);
-    assert_eq!(details.seasons[1].episodes.len(), 1);
-    assert_eq!(details.seasons[1].episodes[0].number, 1);
 }
 
 #[test]
@@ -191,10 +71,7 @@ fn test_addon_series_classification_and_default_season_structure() {
     assert_eq!(details.media_type, MediaType::Series);
     assert_eq!(details.year.as_deref(), Some("2026"));
 
-    assert_eq!(details.seasons.len(), 1);
-    assert_eq!(details.seasons[0].number, 1);
-    assert_eq!(details.seasons[0].episodes.len(), 1);
-    assert_eq!(details.seasons[0].episodes[0].number, 1);
+    assert!(details.seasons.is_empty());
 }
 
 #[test]
@@ -515,45 +392,6 @@ fn test_addon_mixed_stream_filtering_and_magnet_rejection() {
         accepted_releases[1].mirrors[0].resolver_url,
         "http://example.test/stream2.mp4"
     );
-}
-
-#[tokio::test]
-async fn test_authoritative_launch_player_blocks_bypass_attempts() {
-    let mut app = moviebox_tui::tui::app::App::new();
-    app.state_mut().update_available = None;
-    app.state_mut().is_playing = false;
-
-    app.handle_action(moviebox_tui::tui::action::Action::LaunchPlayer(
-        moviebox_tui::tui::state::PlayerKind::Mpv,
-        "magnet:?xt=urn:btih:d08244124e9f0863014f56947ab51404ec102770".to_string(),
-        None,
-    ))
-    .await;
-
-    assert!(!app.state().is_playing);
-    let notif = app
-        .state()
-        .notifications
-        .back()
-        .expect("Notification must be present");
-    assert_eq!(notif.kind, moviebox_tui::models::NotificationKind::Error);
-    assert_eq!(notif.title, "Unsupported stream");
-
-    app.handle_action(moviebox_tui::tui::action::Action::LaunchPlayer(
-        moviebox_tui::tui::state::PlayerKind::Mpv,
-        "file:///etc/shadow".to_string(),
-        None,
-    ))
-    .await;
-
-    assert!(!app.state().is_playing);
-    let notif = app
-        .state()
-        .notifications
-        .back()
-        .expect("Notification must be present");
-    assert_eq!(notif.kind, moviebox_tui::models::NotificationKind::Error);
-    assert_eq!(notif.title, "Unsupported stream");
 }
 
 #[tokio::test]

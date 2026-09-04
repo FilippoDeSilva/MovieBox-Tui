@@ -4,7 +4,7 @@ This document describes the testing architecture, quality assurance procedures, 
 
 ## 1. Test Architecture
 
-The test suite comprises **346+ automated tests across 21 test suites** (201 unit tests in `src/lib.rs`, 0 binary tests in `src/main.rs`, and 145 integration tests across 20 test suites in `tests/`), running fully offline by default without mocking or live network dependencies.
+The test suite comprises **320+ automated tests across 10 test suites** (213 unit tests in `src/lib.rs` and 110 integration tests across 9 focused suites in `tests/`), running fully offline by default without mocking or live network dependencies.
 The MovieBox-TUI test architecture follows a strict separation of concerns:
 
 ```text
@@ -15,27 +15,16 @@ MovieBox-TUI/
     ├── common/
     │   └── mod.rs           # Shared test utilities & temporary directory helpers
     ├── fixtures/
-    │   ├── m3u/
-    │   │   └── sample_playlist.m3u
     │   └── addons/
     │       └── manifest.json
     ├── settings_hub.rs        # Interactive Settings Hub modal tab navigation, choices, & option rows
-    ├── history_reconciliation.rs  # History identity & background state reconciliation
-    ├── history_audit.rs           # Cross-mode watch progress, series advancement, & boundary audit
-    ├── grand_user_journey.rs      # End-to-end full multi-phase user lifecycle verification
-    ├── cache_lifecycle.rs         # Disk cache hashing & atomic writes
-    ├── player_integration.rs      # Cross-platform player command & path arguments
-    ├── m3u_integration.rs         # Offline M3U playlist parsing
-    ├── download_integration.rs    # File stem sanitization & folder structure
-    ├── url_security.rs            # URL validation & device stem protection
-    ├── error_handling.rs          # Failure state cleanup, error toasts, and recovery
-    ├── content_pipeline.rs        # Content/metadata pipeline, stale request isolation, & cache keys
-    ├── tui_acceptance.rs          # Headless TUI rendering, theme rendering, and resize matrix
-    ├── update_lifecycle.rs        # Update single-flight checks, modal hitboxes, & platform assets
-    ├── real_acceptance.rs         # Opt-in live artifact downloads, SHA256 integrity, & version verify
-    ├── version_upgrade_e2e.rs     # Offline (mock-server) end-to-end upgrade execution
-    ├── addons_manifest.rs         # Addon manifest deserialization & catalog checks
-    ├── favorites_lifecycle.rs     # Favorites persistence, identity, and navigation lifecycle
+    ├── tui_acceptance.rs      # Headless TUI rendering, theme rendering, and resize matrix
+    ├── update_lifecycle.rs    # Update single-flight checks, modal hitboxes, & platform assets
+    ├── content_pipeline.rs    # Content/metadata pipeline, stale request isolation, & cache keys
+    ├── addons_manifest.rs     # Addon manifest deserialization & catalog checks
+    ├── error_handling.rs      # Failure state cleanup, error toasts, and recovery
+    ├── history_audit.rs       # Cross-mode watch progress, series advancement, & boundary audit
+    ├── favorites_lifecycle.rs # Favorites persistence, identity, and navigation lifecycle
     └── live_stream_verification.rs # Live MovieBox CDN signed stream & resolution verification (opt-in)
 ```
 
@@ -49,21 +38,15 @@ Inline unit tests live inside `#[cfg(test)] mod tests` blocks within their respe
 
 ### B. Subsystem Integration Tests (`tests/*.rs`)
 Integration tests live in the `tests/` directory and test externally observable behaviors without mocking internal types:
-- **`version_upgrade_e2e.rs`**: Validates the full update pipeline against a local mock HTTP server (no real network), verifying discovery, asset and checksum download, SHA-256 integrity check, staging, atomic replacement, rollback, and verification that the newly installed binary reports its new version (Unix only).
-- **`update_lifecycle.rs`**: Validates update single-flight concurrency barriers, error recovery on network failure, 1:1 mouse hit-test synchronization with rendered popup geometry, deterministic platform asset filtering, checksum integrity verification (valid, mismatch, missing, multi-format), archive extraction with strict path traversal rejection (`..`), active work protection (playback and download guards), environment detection (Homebrew, ReadOnly, DirectReplace), and safe atomic binary replacement/rollback.
-- **`real_acceptance.rs`**: Validates real-world GitHub release artifact downloads, live streaming SHA-256 verification against upstream `SHA256SUMS`, actual archive extraction to non-empty executable binaries (`chmod 0755`), real `--version` validation of extracted binaries, Windows helper script batch syntax, and data preservation across updates. The live-download test is `#[ignore]`-gated so default runs stay offline; opt in with `MOVIEBOX_LIVE_TESTS=1 cargo test --test real_acceptance -- --ignored`.
-- **`content_pipeline.rs`**: Validates search result identity, ambiguous title isolation, stale metadata response protection (`request_id` validation), cache key dimensional isolation, addon metadata mapping & partial degradation, search failure vs empty result status distinction, and mode-switch stale response isolation.
-- **`error_handling.rs`**: Validates active player session lifecycle, playback debounce guards, search failure cleanup, addon manifest error toasts, stream and download resolution failure notifications, malformed M3U recovery, and URL scheme rejection.
+- **`settings_hub.rs`**: Validates the interactive Settings Hub modal tabs, choices, dynamic player detection refresh, mode toggles, and appearance settings.
 - **`tui_acceptance.rs`**: Validates headless TUI rendering, all theme palettes, end-to-end user journeys (search, details, navigation, mode switching), mouse click and scroll interactions, modal dismissals, and terminal resize matrices across 8 standard and boundary dimensions without panics.
-- **`history_reconciliation.rs`**: Validates `HistoryManager::is_same_show`, media type separation (Movies vs TV Series), remake year distinction, and state file reconciliation (MISS-01).
-- **`history_audit.rs`**: Validates cross-mode watch progress, series advancement and completion tracking, threshold boundaries for in-progress states, history disk persistence roundtrips, Lua tracker reconciliation, and `/history` search list integration.
+- **`update_lifecycle.rs`**: Validates update single-flight concurrency barriers, error recovery on network failure, modal actions, checksum integrity verification (valid, mismatch, missing, multi-format), archive extraction with strict path traversal rejection (`..`), active work protection (playback and download guards), environment detection (Homebrew, ReadOnly, DirectReplace), and safe atomic binary replacement/rollback.
+- **`content_pipeline.rs`**: Validates stale metadata response protection (`request_id` validation), cache key dimensional isolation, search failure vs empty result status distinction, mode-switch stale response isolation, poster image identity mapping, and search preview fallback metadata isolation.
+- **`addons_manifest.rs`**: Validates deserialization of Cinemeta/Stremio addon manifests, multi-season episode decomposition, episode stream isolation (`parse_season_episode`), token and codec parsing, core Cinemeta protection, and addon enabling/disabling lifecycle.
+- **`error_handling.rs`**: Validates active player session lifecycle, playback debounce guards, search failure cleanup, stream and download resolution failure notifications, URL scheme rejection, and authoritative player bypass protections.
+- **`history_audit.rs`**: Validates cross-mode watch progress, series advancement and completion tracking, threshold boundaries for in-progress states, history disk persistence roundtrips, Lua tracker reconciliation, update precision preservation, repeated play deduplication, and `/history` search list integration.
 - **`favorites_lifecycle.rs`**: Validates Favorites persistence boundaries, identity deduplication, `/favorites` loading, landing-row navigation, and independence from watch-history clearing.
-- **`cache_lifecycle.rs`**: Validates atomic file writing (both sync and async) and deterministic MD5 cache key generation.
-- **`player_integration.rs`**: Validates MPV script options path sanitization on Windows (`\` $\rightarrow$ `/`) and Unix.
-- **`m3u_integration.rs`**: Validates parsing of standard, single-quoted, double-quoted, and unquoted M3U playlists using fixtures.
-- **`addons_manifest.rs`**: Validates deserialization of Cinemeta/Stremio addon manifests, series vs movie metadata classification, multi-season episode decomposition, episode stream isolation (`parse_season_episode`), token and codec parsing, and movie stream regressions.
-- **`url_security.rs`**: Validates HTTP/HTTPS URL detection and Windows reserved device stem sanitization (`CON`, `AUX`, `PRN`, `NUL`, `COM1-9`, `LPT1-9`).
-- **`live_stream_verification.rs`**: Validates real-world stream link resolution across MovieBox signed CDN endpoints and 4KHDHub multi-mirror releases (verifying fast <3.5s direct stream resolution on working mirrors and fast <4.5s failure with actionable diagnostics on expired torrents). The tests are `#[ignore]`-gated for offline execution; opt in with `cargo test --test live_stream_verification -- --ignored`.
+- **`live_stream_verification.rs`**: Validates real-world stream link resolution across MovieBox signed CDN endpoints and 4KHDHub multi-mirror releases. The tests are `#[ignore]`-gated for offline execution; opt in with `cargo test --test live_stream_verification -- --ignored`.
 
 ---
 
@@ -84,9 +67,9 @@ cargo test --lib --all-features --locked
 Run a specific integration test:
 
 ```bash
-cargo test --test history_reconciliation --all-features --locked
-cargo test --test player_integration --all-features --locked
-cargo test --test m3u_integration --all-features --locked
+cargo test --test settings_hub --all-features --locked
+cargo test --test tui_acceptance --all-features --locked
+cargo test --test history_audit --all-features --locked
 ```
 
 Run the opt-in live-network acceptance test:

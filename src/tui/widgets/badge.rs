@@ -337,19 +337,39 @@ mod tests {
         assert_eq!(tags.audio, Some("ATMOS"));
         assert_eq!(tags.codec, Some("HEVC"));
         assert_eq!(tags.source, Some("BluRay"));
+
+        let tags_web = extract_media_tags(
+            "Movie.Title.2023.1080p.HDR10Plus.WEB-DL.DDP5.1.H.264",
+            "H264",
+        );
+        assert_eq!(tags_web.hdr, Some("HDR10+"));
+        assert_eq!(tags_web.audio, Some("5.1"));
+        assert_eq!(tags_web.codec, Some("H.264"));
+        assert_eq!(tags_web.source, Some("WEB-DL"));
     }
 
     #[test]
-    fn test_resolution_badge_spans_4k() {
+    fn test_resolution_badge_spans() {
         let theme = Theme::default();
-        let spans_normal = resolution_badge_spans(2160, &theme, false);
-        assert_eq!(spans_normal.len(), 2);
-        assert_eq!(spans_normal[0].content, "  4K   ");
+        let spans_4k = resolution_badge_spans(2160, &theme, false);
+        assert_eq!(spans_4k[0].content, "  4K   ");
 
-        let spans_basic = resolution_badge_spans(2160, &theme, true);
-        assert_eq!(spans_basic.len(), 2);
-        assert!(spans_basic[0].content.contains("[4K]"));
-        assert_eq!(spans_basic[0].content, "[4K]   ");
+        let spans_1080 = resolution_badge_spans(1080, &theme, false);
+        assert_eq!(spans_1080[0].content, " 1080p ");
+
+        let spans_720 = resolution_badge_spans(720, &theme, false);
+        assert_eq!(spans_720[0].content, " 720p  ");
+
+        let spans_sd = resolution_badge_spans(480, &theme, false);
+        assert_eq!(spans_sd[0].content, " 480p  ");
+
+        let spans_multi = resolution_badge_spans(-1, &theme, false);
+        assert_eq!(spans_multi[0].content, " Multi ");
+
+        let basic_4k = resolution_badge_spans(2160, &theme, true);
+        assert_eq!(basic_4k[0].content.trim(), "[4K]");
+        let basic_multi = resolution_badge_spans(-1, &theme, true);
+        assert_eq!(basic_multi[0].content.trim(), "[Multi]");
     }
 
     #[test]
@@ -375,6 +395,8 @@ mod tests {
         };
         let spans = render_media_tag_spans(&tags, &theme, false);
         assert_eq!(spans.len(), 8);
+        let basic_spans = render_media_tag_spans(&tags, &theme, true);
+        assert_eq!(basic_spans[0].content, "HDR");
     }
     #[test]
     fn test_provider_origin_tag() {
