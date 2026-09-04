@@ -256,6 +256,25 @@ impl App {
                 item.episode,
             )
         });
+        if let Some(item) = &history_item {
+            self.state
+                .history
+                .record_start(item, resume_seconds.unwrap_or(0));
+        }
+
+        if let (Some((p, s, se, ep)), Some(item)) = (&tracker_opts, &history_item) {
+            if let Some(state_path) = crate::player::tracker::state_file_path(p, s, *se, *ep) {
+                let initial_state = crate::history::PendingPlaybackState::from_item(
+                    item,
+                    resume_seconds.unwrap_or(0),
+                    item.duration_seconds,
+                    false,
+                );
+                if let Ok(serialized) = serde_json::to_string(&initial_state) {
+                    let _ = std::fs::write(&state_path, serialized);
+                }
+            }
+        }
 
         let sender = self.action_sender.clone();
         let cell_size = self
@@ -342,9 +361,16 @@ impl App {
 
                         match result {
                             Ok(status) if status.success() => {
-                                sender.send(Action::ReconcileHistory).ok();
+                                let has_tracker = tracker_opts.is_some()
+                                    && matches!(
+                                        kind,
+                                        crate::tui::state::PlayerKind::Mpv
+                                            | crate::tui::state::PlayerKind::Iina
+                                    );
 
-                                if let Some(item) = history_item {
+                                if has_tracker {
+                                    sender.send(Action::ReconcileHistory).ok();
+                                } else if let Some(item) = history_item {
                                     let elapsed = start_time.elapsed().as_secs();
                                     if elapsed >= 30 {
                                         let duration = item.duration_seconds;
@@ -737,10 +763,12 @@ impl App {
                 self.state.history.reconcile_pending_playback_states();
             }
             Action::PlayerExited => {
+                self.state.history.reconcile_pending_playback_states();
                 self.state.is_playing = false;
                 self.state.is_resolving_playback = false;
             }
             Action::PlayerCrashed(code, error_msg) => {
+                self.state.history.reconcile_pending_playback_states();
                 self.state.is_playing = false;
                 self.state.is_resolving_playback = false;
                 let code_str = code

@@ -14,6 +14,27 @@ options.read_options(opts, "moviebox")
 
 local last_pos = 0
 local last_dur = 0
+local has_completed = false
+local meta_title = ""
+local meta_cover = ""
+local meta_stype = 0
+local meta_year = ""
+local seed_read = false
+
+local function read_seed_meta()
+    if seed_read or opts.state_file == "" then return end
+    seed_read = true
+    local f = io.open(opts.state_file, "r")
+    if not f then return end
+    local content = f:read("*a")
+    f:close()
+    if not content then return end
+    meta_title = content:match('"title":%s*"([^"]-)"') or ""
+    meta_cover = content:match('"cover_url":%s*"([^"]-)"') or ""
+    local st = content:match('"stype":%s*(%d+)')
+    if st then meta_stype = tonumber(st) or 0 end
+    meta_year = content:match('"release_year":%s*"([^"]-)"') or ""
+end
 
 mp.observe_property("time-pos", "number", function(name, val)
     if val then
@@ -31,25 +52,53 @@ local function write_state(force_completed)
     if opts.state_file == "" then return end
     if last_dur <= 0 and last_pos <= 0 then return end
 
-    local completed = force_completed or (last_dur > 0 and last_pos >= (0.90 * last_dur))
+    read_seed_meta()
+
+    if force_completed then
+        has_completed = true
+    end
+    if last_dur > 0 and last_pos >= (0.90 * last_dur) then
+        has_completed = true
+    end
+
     local now = os.time()
+    local dur_val = "null"
+    if last_dur > 0 then
+        dur_val = string.format("%d", math.floor(last_dur + 0.5))
+    end
+
+    local meta_json = ""
+    if meta_title ~= "" then
+        meta_json = string.format(
+            ',"title":%q,"cover_url":%q,"stype":%d,"release_year":%q',
+            meta_title,
+            meta_cover,
+            meta_stype,
+            meta_year
+        )
+    end
 
     local json = string.format(
-        '{"provider":%q,"subject_id":%q,"season":%d,"episode":%d,"progress_seconds":%d,"duration_seconds":%d,"completed":%s,"timestamp":%d}',
+        '{"provider":%q,"subject_id":%q,"season":%d,"episode":%d,"progress_seconds":%d,"duration_seconds":%s,"completed":%s,"timestamp":%d%s}',
         opts.provider,
         opts.subject_id,
         tonumber(opts.season) or 0,
         tonumber(opts.episode) or 0,
         math.floor(last_pos + 0.5),
-        math.floor(last_dur + 0.5),
-        completed and "true" or "false",
-        now
+        dur_val,
+        has_completed and "true" or "false",
+        now,
+        meta_json
     )
 
-    local f = io.open(opts.state_file, "w")
+    local tmp_file = opts.state_file .. ".tmp"
+    local f = io.open(tmp_file, "w")
     if f then
         f:write(json)
+        f:flush()
         f:close()
+        os.remove(opts.state_file)
+        os.rename(tmp_file, opts.state_file)
     end
 end
 

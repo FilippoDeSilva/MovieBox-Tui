@@ -789,6 +789,11 @@ impl App {
                         KeyCode::Right => {
                             self.action_sender.send(Action::MoveRight).ok();
                         }
+                        KeyCode::Tab | KeyCode::BackTab => {
+                            if self.state.landing_deck_visible() {
+                                self.state.cycle_home_deck_tab();
+                            }
+                        }
                         KeyCode::Home | KeyCode::Char('g') => {
                             if self.state.favorites_focus {
                                 self.state.favorites_landing_state.select(Some(0));
@@ -805,7 +810,7 @@ impl App {
                         }
                         KeyCode::End | KeyCode::Char('G') => {
                             if self.state.favorites_focus {
-                                let total = self.state.favorites_landing_items().len();
+                                let total = self.state.landing_deck_items_count();
                                 if total > 0 {
                                     self.state.favorites_landing_state.select(Some(total - 1));
                                 }
@@ -826,7 +831,7 @@ impl App {
                             if self.state.favorites_focus {
                                 let cur =
                                     self.state.favorites_landing_state.selected().unwrap_or(0);
-                                let total = self.state.favorites_landing_items().len();
+                                let total = self.state.landing_deck_items_count();
                                 if total > 0 {
                                     self.state
                                         .favorites_landing_state
@@ -921,14 +926,25 @@ impl App {
                             self.action_sender.send(Action::ToggleFavorite).ok();
                         }
                         KeyCode::Char(' ') | KeyCode::Char('p') | KeyCode::Char('P')
-                            if self
+                            if (self
                                 .state
                                 .search_query
                                 .trim()
                                 .eq_ignore_ascii_case("/history")
-                                && !self.state.search_results.is_empty() =>
+                                && !self.state.search_results.is_empty())
+                                || (self.state.favorites_focus
+                                    && self.state.effective_home_deck_tab()
+                                        == crate::tui::state::HomeDeckTab::ContinueWatching) =>
                         {
-                            self.resume_history_playback();
+                            if self.state.favorites_focus {
+                                if let Some(idx) = self.state.favorites_landing_state.selected() {
+                                    self.action_sender
+                                        .send(Action::OpenContinueWatching(idx))
+                                        .ok();
+                                }
+                            } else {
+                                self.resume_history_playback();
+                            }
                         }
                         KeyCode::Char(c)
                             if (key.modifiers.is_empty()

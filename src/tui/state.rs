@@ -26,6 +26,13 @@ pub enum AppMode {
     Addon,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HomeDeckTab {
+    #[default]
+    ContinueWatching,
+    Favorites,
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum InputMode {
     #[default]
@@ -361,6 +368,7 @@ pub struct AppState {
     pub history: crate::history::HistoryManager,
     pub favorites: crate::favorites::FavoritesManager,
     pub favorites_focus: bool,
+    pub home_deck_tab: HomeDeckTab,
     pub favorites_landing_state: ListState,
 }
 
@@ -516,6 +524,7 @@ impl Default for AppState {
             history: crate::history::HistoryManager::new(),
             favorites: crate::favorites::FavoritesManager::new(),
             favorites_focus: false,
+            home_deck_tab: HomeDeckTab::default(),
             favorites_landing_state: ListState::default(),
         }
     }
@@ -792,6 +801,87 @@ impl AppState {
         items.sort_by_key(|item| std::cmp::Reverse(item.added_at));
         items.truncate(5);
         items
+    }
+
+    pub fn continue_watching_items(&self) -> Vec<&crate::history::WatchHistoryItem> {
+        let mut items: Vec<&crate::history::WatchHistoryItem> = self
+            .history
+            .recent
+            .iter()
+            .filter(|item| item.is_in_progress())
+            .collect();
+        items.sort_by_key(|item| std::cmp::Reverse(item.timestamp));
+        items.truncate(5);
+        items
+    }
+
+    pub fn continue_watching_available(&self) -> bool {
+        self.streaming_enabled
+            && !self.is_tv_mode
+            && self.history.recent.iter().any(|item| item.is_in_progress())
+    }
+
+    pub fn effective_home_deck_tab(&self) -> HomeDeckTab {
+        let cw_has = self.continue_watching_available();
+        let fav_has = self.favorites_available() && !self.favorites.items.is_empty();
+        match self.home_deck_tab {
+            HomeDeckTab::ContinueWatching => {
+                if cw_has {
+                    HomeDeckTab::ContinueWatching
+                } else if fav_has {
+                    HomeDeckTab::Favorites
+                } else {
+                    HomeDeckTab::ContinueWatching
+                }
+            }
+            HomeDeckTab::Favorites => {
+                if fav_has {
+                    HomeDeckTab::Favorites
+                } else if cw_has {
+                    HomeDeckTab::ContinueWatching
+                } else {
+                    HomeDeckTab::Favorites
+                }
+            }
+        }
+    }
+
+    pub fn landing_deck_visible(&self) -> bool {
+        (self.continue_watching_available() || self.favorites_landing_visible())
+            && !(self.input_mode == InputMode::Editing && !self.search_suggestions.is_empty())
+    }
+
+    pub fn landing_deck_items_count(&self) -> usize {
+        match self.effective_home_deck_tab() {
+            HomeDeckTab::ContinueWatching => self.continue_watching_items().len(),
+            HomeDeckTab::Favorites => self.favorites_landing_items().len(),
+        }
+    }
+
+    pub fn landing_deck_total_items_count(&self) -> usize {
+        match self.effective_home_deck_tab() {
+            HomeDeckTab::ContinueWatching => self
+                .history
+                .recent
+                .iter()
+                .filter(|i| i.is_in_progress())
+                .count(),
+            HomeDeckTab::Favorites => self.favorites.items.len(),
+        }
+    }
+
+    pub fn cycle_home_deck_tab(&mut self) {
+        let cw_has = self.continue_watching_available();
+        let fav_has = self.favorites_available() && !self.favorites.items.is_empty();
+        if cw_has && fav_has {
+            self.home_deck_tab = match self.effective_home_deck_tab() {
+                HomeDeckTab::ContinueWatching => HomeDeckTab::Favorites,
+                HomeDeckTab::Favorites => HomeDeckTab::ContinueWatching,
+            };
+            if self.favorites_focus {
+                self.favorites_landing_state.select(Some(0));
+            }
+        }
     }
 
     pub fn loading_dots(&self) -> &'static str {

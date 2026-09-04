@@ -451,7 +451,7 @@ impl App {
                 area,
                 self.state.is_tv_mode,
                 self.state.basic_terminal,
-                self.state.favorites_landing_visible(),
+                self.state.landing_deck_visible(),
             ))
         } else {
             None
@@ -561,34 +561,33 @@ impl App {
                 return None;
             }
 
-            if self.state.favorites_landing_visible() {
-                let fav_y = rows.rects[rows.favorites].y;
-                let favorites_items = self.state.favorites_landing_items();
-                let fav_count = favorites_items.len() as u16;
-                let overflow = self
-                    .state
-                    .favorites
-                    .items
-                    .len()
-                    .saturating_sub(favorites_items.len());
+            if self.state.landing_deck_visible() {
+                let deck_y = rows.rects[rows.favorites].y;
+                let item_count = self.state.landing_deck_items_count() as u16;
+                let total_count = self.state.landing_deck_total_items_count();
+                let overflow = total_count.saturating_sub(item_count as usize);
                 let overflow_row = u16::from(overflow > 0);
-                let fav_height =
-                    (fav_count + overflow_row + 2).min(rows.rects[rows.favorites].height);
+                let deck_height =
+                    (item_count + overflow_row + 2).min(rows.rects[rows.favorites].height);
 
-                let fav_card_area = Rect {
+                let deck_card_area = Rect {
                     x: card_x,
-                    y: fav_y,
+                    y: deck_y,
                     width: card_width,
-                    height: fav_height,
+                    height: deck_height,
                 };
 
-                if col >= fav_card_area.left()
-                    && col < fav_card_area.right()
-                    && row >= fav_card_area.top()
-                    && row < fav_card_area.bottom()
+                if col >= deck_card_area.left()
+                    && col < deck_card_area.right()
+                    && row >= deck_card_area.top()
+                    && row < deck_card_area.bottom()
                 {
-                    let rel_row = row - fav_card_area.top();
-                    if rel_row >= 1 && rel_row <= fav_count {
+                    let rel_row = row - deck_card_area.top();
+                    if rel_row == 0 {
+                        self.state.cycle_home_deck_tab();
+                        self.state.favorites_focus = true;
+                        self.state.input_mode = InputMode::Normal;
+                    } else if rel_row >= 1 && rel_row <= item_count {
                         let idx = (rel_row - 1) as usize;
                         let prev_selected = if self.state.favorites_focus {
                             self.state.favorites_landing_state.selected()
@@ -599,10 +598,31 @@ impl App {
                         self.state.input_mode = InputMode::Normal;
                         self.state.favorites_landing_state.select(Some(idx));
                         if prev_selected == Some(idx) {
-                            self.action_sender.send(Action::OpenFavorite(idx)).ok();
+                            match self.state.effective_home_deck_tab() {
+                                crate::tui::state::HomeDeckTab::ContinueWatching => {
+                                    self.action_sender
+                                        .send(Action::OpenContinueWatching(idx))
+                                        .ok();
+                                }
+                                crate::tui::state::HomeDeckTab::Favorites => {
+                                    self.action_sender.send(Action::OpenFavorite(idx)).ok();
+                                }
+                            }
                         }
-                    } else if overflow > 0 && rel_row == fav_count + 1 {
-                        self.action_sender.send(Action::ShowFavorites).ok();
+                    } else if overflow > 0 && rel_row == item_count + 1 {
+                        match self.state.effective_home_deck_tab() {
+                            crate::tui::state::HomeDeckTab::ContinueWatching => {
+                                self.action_sender
+                                    .send(Action::Search {
+                                        query: "/history".to_string(),
+                                        force_refresh: false,
+                                    })
+                                    .ok();
+                            }
+                            crate::tui::state::HomeDeckTab::Favorites => {
+                                self.action_sender.send(Action::ShowFavorites).ok();
+                            }
+                        }
                     } else {
                         self.state.favorites_focus = true;
                         self.state.input_mode = InputMode::Normal;

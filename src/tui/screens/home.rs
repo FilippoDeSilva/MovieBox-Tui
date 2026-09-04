@@ -498,28 +498,62 @@ pub(crate) fn no_results_button_hitboxes(
     };
     (btn1, btn2)
 }
+#[allow(dead_code)]
 pub(crate) fn render_favorites_landing(
     frame: &mut Frame,
     area: Rect,
     state: &AppState,
     theme: &Theme,
 ) {
+    render_landing_deck(frame, area, state, theme);
+}
+
+pub(crate) fn render_landing_deck(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     if area.height < 3 || area.width < 20 {
         return;
     }
 
-    let items: Vec<crate::favorites::FavoriteItem> = state
-        .favorites_landing_items()
-        .into_iter()
-        .cloned()
-        .collect();
-    if items.is_empty() {
+    let tab = state.effective_home_deck_tab();
+    let has_cw = state.continue_watching_available();
+    let has_fav = state.favorites_available() && !state.favorites.items.is_empty();
+
+    if !has_cw && !has_fav {
         return;
     }
 
-    let overflow = state.favorites.items.len().saturating_sub(items.len());
+    let is_focused = state.favorites_focus;
+
+    let cw_items = if has_cw {
+        state.continue_watching_items()
+    } else {
+        Vec::new()
+    };
+    let fav_items = if has_fav {
+        state.favorites_landing_items()
+    } else {
+        Vec::new()
+    };
+
+    let (item_count, total_count) = match tab {
+        crate::tui::state::HomeDeckTab::ContinueWatching => {
+            let total = state
+                .history
+                .recent
+                .iter()
+                .filter(|i| i.is_in_progress())
+                .count();
+            (cw_items.len(), total)
+        }
+        crate::tui::state::HomeDeckTab::Favorites => (fav_items.len(), state.favorites.items.len()),
+    };
+
+    if item_count == 0 {
+        return;
+    }
+
+    let overflow = total_count.saturating_sub(item_count);
     let card_width = search_deck_width(area, state, true);
-    let row_count = items.len() as u16;
+    let row_count = item_count as u16;
     let overflow_row = u16::from(overflow > 0);
     let content_height = (row_count + overflow_row + 2).min(area.height);
 
@@ -530,24 +564,57 @@ pub(crate) fn render_favorites_landing(
         height: content_height,
     };
 
-    let (bar, star) = if state.basic_terminal {
-        ("-", "*")
-    } else {
-        ("─", "★")
-    };
-    let border_style = if state.favorites_focus {
+    let border_style = if is_focused {
         theme.border_focus
     } else {
         theme.surface1
     };
-    let title = format!("{bar} {star}  Favorites ");
-    let block = Block::default()
-        .title(title)
-        .title_style(if state.favorites_focus {
+
+    let mut title_spans: Vec<Span> = Vec::new();
+    if has_cw && has_fav {
+        let sep = if state.basic_terminal { " | " } else { " │ " };
+        match tab {
+            crate::tui::state::HomeDeckTab::ContinueWatching => {
+                let active_style = if is_focused {
+                    theme.title.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text.add_modifier(Modifier::BOLD)
+                };
+                title_spans.push(Span::styled(" Continue Watching ", active_style));
+                title_spans.push(Span::styled(sep, theme.surface1));
+                title_spans.push(Span::styled("Favorites", theme.subtext1));
+                title_spans.push(Span::styled(" (Tab) ", theme.text_dim));
+            }
+            crate::tui::state::HomeDeckTab::Favorites => {
+                title_spans.push(Span::styled(" Continue Watching", theme.subtext1));
+                title_spans.push(Span::styled(" (Tab)", theme.text_dim));
+                title_spans.push(Span::styled(sep, theme.surface1));
+                let active_style = if is_focused {
+                    theme.title.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text.add_modifier(Modifier::BOLD)
+                };
+                title_spans.push(Span::styled(" Favorites ", active_style));
+            }
+        }
+    } else if has_cw {
+        let active_style = if is_focused {
             theme.title.add_modifier(Modifier::BOLD)
         } else {
-            theme.subtext1
-        })
+            theme.text.add_modifier(Modifier::BOLD)
+        };
+        title_spans.push(Span::styled(" Continue Watching ", active_style));
+    } else {
+        let active_style = if is_focused {
+            theme.title.add_modifier(Modifier::BOLD)
+        } else {
+            theme.text.add_modifier(Modifier::BOLD)
+        };
+        title_spans.push(Span::styled(" Favorites ", active_style));
+    }
+
+    let block = Block::default()
+        .title(Line::from(title_spans))
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
         .border_style(border_style);
@@ -563,78 +630,172 @@ pub(crate) fn render_favorites_landing(
     }
 
     let mut curr_y = inner_area.y;
-
-    let selected = if state.favorites_focus {
+    let selected = if is_focused {
         state.favorites_landing_state.selected()
     } else {
         None
     };
 
-    for (i, item) in items.iter().enumerate() {
-        if curr_y >= inner_area.bottom() {
-            break;
+    match tab {
+        crate::tui::state::HomeDeckTab::ContinueWatching => {
+            for (i, item) in cw_items.iter().enumerate() {
+                if curr_y >= inner_area.bottom() {
+                    break;
+                }
+                let is_selected = selected == Some(i);
+
+                let episode_tag = if item.season > 0 {
+                    format!("S{:02}E{:02}", item.season, item.episode)
+                } else {
+                    String::new()
+                };
+
+                let progress_str = if let Some(rem) = item.formatted_remaining() {
+                    if let Some(pct) = item.progress_percentage() {
+                        format!("{:.0}% · {rem}", pct)
+                    } else {
+                        rem
+                    }
+                } else if let Some(pct) = item.progress_percentage() {
+                    format!("{:.0}%", pct)
+                } else {
+                    item.formatted_progress()
+                };
+
+                let right_tag = if !episode_tag.is_empty() {
+                    format!("{episode_tag} · {progress_str}")
+                } else if !item.release_year.is_empty() {
+                    format!("{} · {progress_str}", item.release_year)
+                } else {
+                    progress_str
+                };
+
+                let pointer = if is_selected {
+                    if state.basic_terminal { ">  " } else { "▌  " }
+                } else {
+                    "   "
+                };
+
+                let title_style = if is_selected {
+                    theme.title.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text
+                };
+
+                let row_style = if is_selected {
+                    Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+                } else {
+                    Style::default()
+                };
+
+                let left_margin = "  ";
+                let right_margin = " ";
+                let tag_len = crate::tui::text::width(&right_tag);
+                let pointer_len = 3;
+                let margins_len = 3;
+                let fixed_overhead = margins_len + pointer_len + tag_len;
+
+                let max_title_width =
+                    (inner_area.width as usize).saturating_sub(fixed_overhead + 1);
+                let truncated_title =
+                    crate::tui::text::truncate_width(&item.title, max_title_width);
+                let title_width = crate::tui::text::width(&truncated_title);
+                let pad_len = (inner_area.width as usize)
+                    .saturating_sub(margins_len + pointer_len + title_width + tag_len);
+
+                let line = Line::from(vec![
+                    Span::raw(left_margin),
+                    Span::styled(pointer, theme.accent),
+                    Span::styled(truncated_title, title_style),
+                    Span::raw(" ".repeat(pad_len)),
+                    Span::styled(right_tag, theme.text_dim),
+                    Span::raw(right_margin),
+                ]);
+
+                let row_area = Rect {
+                    x: inner_area.x,
+                    y: curr_y,
+                    width: inner_area.width,
+                    height: 1,
+                };
+                frame.render_widget(Paragraph::new(line).style(row_style), row_area);
+                curr_y += 1;
+            }
         }
-        let is_selected = selected == Some(i);
-        let type_tag = if item.stype == 2 { "Series" } else { "Movie" };
-        let right_tag = if item.release_year.is_empty() {
-            type_tag.to_string()
-        } else {
-            format!("{} {type_tag}", item.release_year)
-        };
+        crate::tui::state::HomeDeckTab::Favorites => {
+            for (i, item) in fav_items.iter().enumerate() {
+                if curr_y >= inner_area.bottom() {
+                    break;
+                }
+                let is_selected = selected == Some(i);
+                let type_tag = if item.stype == 2 { "Series" } else { "Movie" };
+                let right_tag = if item.release_year.is_empty() {
+                    type_tag.to_string()
+                } else {
+                    format!("{} {type_tag}", item.release_year)
+                };
 
-        let pointer = if is_selected {
-            if state.basic_terminal { ">  " } else { "▌  " }
-        } else {
-            "   "
-        };
+                let pointer = if is_selected {
+                    if state.basic_terminal { ">  " } else { "▌  " }
+                } else {
+                    "   "
+                };
 
-        let title_style = if is_selected {
-            theme.title.add_modifier(Modifier::BOLD)
-        } else {
-            theme.text
-        };
+                let title_style = if is_selected {
+                    theme.title.add_modifier(Modifier::BOLD)
+                } else {
+                    theme.text
+                };
 
-        let row_style = if is_selected {
-            Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
-        } else {
-            Style::default()
-        };
+                let row_style = if is_selected {
+                    Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+                } else {
+                    Style::default()
+                };
 
-        let left_margin = "  ";
-        let right_margin = " ";
-        let tag_len = crate::tui::text::width(&right_tag);
-        let pointer_len = 3;
-        let margins_len = 3;
-        let fixed_overhead = margins_len + pointer_len + tag_len;
+                let left_margin = "  ";
+                let right_margin = " ";
+                let tag_len = crate::tui::text::width(&right_tag);
+                let pointer_len = 3;
+                let margins_len = 3;
+                let fixed_overhead = margins_len + pointer_len + tag_len;
 
-        let max_title_width = (inner_area.width as usize).saturating_sub(fixed_overhead + 1);
-        let truncated_title = crate::tui::text::truncate_width(&item.title, max_title_width);
-        let title_width = crate::tui::text::width(&truncated_title);
-        let pad_len = (inner_area.width as usize)
-            .saturating_sub(margins_len + pointer_len + title_width + tag_len);
+                let max_title_width =
+                    (inner_area.width as usize).saturating_sub(fixed_overhead + 1);
+                let truncated_title =
+                    crate::tui::text::truncate_width(&item.title, max_title_width);
+                let title_width = crate::tui::text::width(&truncated_title);
+                let pad_len = (inner_area.width as usize)
+                    .saturating_sub(margins_len + pointer_len + title_width + tag_len);
 
-        let line = Line::from(vec![
-            Span::raw(left_margin),
-            Span::styled(pointer, theme.accent),
-            Span::styled(truncated_title, title_style),
-            Span::raw(" ".repeat(pad_len)),
-            Span::styled(right_tag, theme.text_dim),
-            Span::raw(right_margin),
-        ]);
+                let line = Line::from(vec![
+                    Span::raw(left_margin),
+                    Span::styled(pointer, theme.accent),
+                    Span::styled(truncated_title, title_style),
+                    Span::raw(" ".repeat(pad_len)),
+                    Span::styled(right_tag, theme.text_dim),
+                    Span::raw(right_margin),
+                ]);
 
-        let row_area = Rect {
-            x: inner_area.x,
-            y: curr_y,
-            width: inner_area.width,
-            height: 1,
-        };
-        frame.render_widget(Paragraph::new(line).style(row_style), row_area);
-        curr_y += 1;
+                let row_area = Rect {
+                    x: inner_area.x,
+                    y: curr_y,
+                    width: inner_area.width,
+                    height: 1,
+                };
+                frame.render_widget(Paragraph::new(line).style(row_style), row_area);
+                curr_y += 1;
+            }
+        }
     }
 
     if overflow > 0 && curr_y < inner_area.bottom() {
         let sep = if state.basic_terminal { "-" } else { "·" };
-        let pill_text = format!("[ +{overflow} more {sep} /favorites ]");
+        let cmd = match tab {
+            crate::tui::state::HomeDeckTab::ContinueWatching => "/history",
+            crate::tui::state::HomeDeckTab::Favorites => "/favorites",
+        };
+        let pill_text = format!("+{overflow} more {sep} {cmd}");
         let pill_style = if state.basic_terminal {
             theme.sapphire
         } else {
@@ -1356,7 +1517,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             area,
             state.is_tv_mode,
             basic_terminal,
-            state.favorites_landing_visible(),
+            state.landing_deck_visible(),
         );
         let vertical_chunks = rows.rects.clone();
 
@@ -1450,8 +1611,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let suggestions_open =
             state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
 
-        if state.favorites_landing_visible() && !state.tv_config_popup {
-            render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
+        if state.landing_deck_visible() && !state.tv_config_popup {
+            render_landing_deck(frame, vertical_chunks[rows.favorites], state, theme);
         } else if !state.is_tv_mode
             && !state.tv_config_popup
             && !suggestions_open
@@ -2777,6 +2938,7 @@ mod tests {
             active_provider: crate::providers::models::ProviderKind::MovieBox,
             ..Default::default()
         };
+        state.history.recent.clear();
         state.favorites.items.clear();
         let theme = Theme::mocha();
 
@@ -2815,6 +2977,7 @@ mod tests {
             active_provider: crate::providers::models::ProviderKind::Addons,
             ..Default::default()
         };
+        state.history.recent.clear();
         state.favorites.items.clear();
         let theme = Theme::mocha();
 
@@ -3012,6 +3175,7 @@ mod tests {
             basic_terminal: false,
             ..Default::default()
         };
+        state.history.recent.clear();
         state.favorites.items.clear();
         state.favorites_landing_state.select(Some(0));
         for i in 0..10 {
@@ -3042,12 +3206,12 @@ mod tests {
             }
             rendered.push('\n');
         }
-
-        assert!(rendered.contains("─ ★  Favorites"));
+        assert!(rendered.contains("Favorites"));
+        assert!(!rendered.contains("★"));
         assert!(rendered.contains("  ▌  Favorite Movie 0"));
         assert!(rendered.contains("     Favorite Movie 1"));
         assert!(rendered.contains("2024 Movie "));
-        assert!(rendered.contains("[ +5 more · /favorites ]"));
+        assert!(rendered.contains("+5 more · /favorites"));
     }
     #[test]
     fn test_favorites_landing_rendering_basic_terminal() {
@@ -3058,6 +3222,7 @@ mod tests {
             basic_terminal: true,
             ..Default::default()
         };
+        state.history.recent.clear();
         state.favorites.items.clear();
         state.favorites_landing_state.select(Some(0));
         for i in 0..10 {
@@ -3089,11 +3254,70 @@ mod tests {
             rendered.push('\n');
         }
 
-        assert!(rendered.contains("- *  Favorites"));
+        assert!(rendered.contains("Favorites"));
+        assert!(!rendered.contains("*  Favorites"));
         assert!(rendered.contains("  >  Favorite Movie 0"));
         assert!(rendered.contains("     Favorite Movie 1"));
         assert!(rendered.contains("2024 Movie "));
-        assert!(rendered.contains("[ +5 more - /favorites ]"));
+        assert!(rendered.contains("+5 more - /favorites"));
+    }
+    #[test]
+    fn test_landing_deck_continue_watching_rendering() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            favorites_focus: true,
+            streaming_enabled: true,
+            ..Default::default()
+        };
+        state.history.recent.push(crate::history::WatchHistoryItem {
+            provider: "moviebox".to_string(),
+            subject_id: "show-1".to_string(),
+            title: "Severance".to_string(),
+            cover_url: None,
+            stype: 2,
+            release_year: "2022".to_string(),
+            season: 1,
+            episode: 3,
+            progress_seconds: 1200,
+            duration_seconds: Some(3000),
+            completed: false,
+            timestamp: 100,
+        });
+        state.favorites.items.push(crate::favorites::FavoriteItem {
+            provider: "moviebox".to_string(),
+            subject_id: "fav-1".to_string(),
+            title: "Inception".to_string(),
+            cover_url: None,
+            stype: 1,
+            release_year: "2010".to_string(),
+            added_at: 100,
+        });
+        state.favorites_landing_state.select(Some(0));
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                render_landing_deck(frame, area, &state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("Continue Watching"));
+        assert!(rendered.contains("Favorites"));
+        assert!(rendered.contains("(Tab)"));
+        assert!(rendered.contains("Severance"));
+        assert!(rendered.contains("S01E03"));
+        assert!(rendered.contains("40%"));
     }
 
     #[test]
@@ -3197,6 +3421,7 @@ mod tests {
             basic_terminal: false,
             ..Default::default()
         };
+        state.history.recent.clear();
         for i in 1..=6 {
             state.favorites.items.push(crate::favorites::FavoriteItem {
                 provider: "moviebox".to_string(),

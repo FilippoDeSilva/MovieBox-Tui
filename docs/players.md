@@ -44,13 +44,12 @@ The `supports_headers` gate in `app/playback.rs` validates whether a player can 
 
 ## Playback Tracking & Resume
 
-When launching media with in-progress watch history, the player command automatically
-includes the starting position (`--start` / `--mpv-start` / `--start-time`). For `mpv`,
-`src/player/tracker.rs` writes a companion tracker script (`moviebox_tracker.lua`) that
-observes `time-pos` and `duration`, periodically saving playback state every 5 seconds to
-the local data directory. On startup or after player exit, pending playback states are
-reconciled into `history.json`.
+When launching media with in-progress watch history, the player command automatically includes the starting position (`--start` / `--mpv-start` / `--start-time`).
 
+- **Immediate Start Registration**: Media sessions are pre-registered into watch history (`record_start`) upon launch, ensuring that fast-exiting intent dispatchers (Android `termux-open` / `am start`, macOS `open -a IINA`) and unexpected terminal terminations retain history immediately.
+- **Pre-Seeded State Files**: Before launching mpv or IINA, MovieBox-TUI creates a pending state file populated with metadata (`title`, `cover_url`, `stype`, `release_year`). If the application exits abruptly during playback, `reconcile_from_dir` self-heals and inserts new items into watch history without data loss.
+- **Latched Lua Tracker (`moviebox_tracker.lua`)**: Observes `time-pos` and `duration` every 5 seconds. State file writes are atomic (`.tmp` file flushed and renamed with destination removal for Windows compatibility). Video completion at $\ge 90\%$ or EOF is permanently latched, preventing player shutdown events from resetting completion status. Missing or live stream durations write JSON `null` to prevent invalid duration calculations.
+- **Isolated Tracker vs Fallback Reconciliation**: Players with active Lua trackers (`mpv`, `iina-cli`) rely strictly on state file reconciliation, eliminating wall-clock progress overwrite races during pauses or seeks. Process elapsed time is used strictly as a guarded fallback for players without tracker scripts (e.g. VLC).
 ## Spawning
 
 `launch_player` spawns the player with null stdin/stdout, piped stderr, and its own

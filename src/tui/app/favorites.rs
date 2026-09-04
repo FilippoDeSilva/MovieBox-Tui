@@ -25,6 +25,9 @@ impl App {
             Action::OpenFavorite(index) => {
                 self.open_favorite(index);
             }
+            Action::OpenContinueWatching(index) => {
+                self.open_continue_watching(index);
+            }
             _ => return None,
         }
         None
@@ -42,10 +45,26 @@ impl App {
             Screen::Home => {
                 if self.state.favorites_focus {
                     let idx = self.state.favorites_landing_state.selected()?;
-                    self.state
-                        .favorites_landing_items()
-                        .get(idx)
-                        .map(|item| (*item).clone())
+                    match self.state.effective_home_deck_tab() {
+                        crate::tui::state::HomeDeckTab::ContinueWatching => {
+                            let items = self.state.continue_watching_items();
+                            let item = items.get(idx)?;
+                            Some(crate::favorites::FavoriteItem {
+                                provider: item.provider.clone(),
+                                subject_id: item.subject_id.clone(),
+                                title: item.title.clone(),
+                                cover_url: item.cover_url.clone(),
+                                stype: item.stype,
+                                release_year: item.release_year.clone(),
+                                added_at: now_secs(),
+                            })
+                        }
+                        crate::tui::state::HomeDeckTab::Favorites => self
+                            .state
+                            .favorites_landing_items()
+                            .get(idx)
+                            .map(|item| (*item).clone()),
+                    }
                 } else {
                     let idx = self.state.search_list_state.selected()?;
                     let res = self.state.search_results.get(idx)?;
@@ -116,7 +135,7 @@ impl App {
         );
     }
 
-    fn open_favorite(&mut self, index: usize) {
+    pub(super) fn open_favorite(&mut self, index: usize) {
         let Some(item) = self
             .state
             .favorites_landing_items()
@@ -156,6 +175,65 @@ impl App {
         }
         self.state
             .set_status_default(format!("Loading details for {title}..."));
+
+        self.action_sender
+            .send(Action::FetchDetails(subject_id, false))
+            .ok();
+    }
+
+    pub(super) fn open_continue_watching(&mut self, index: usize) {
+        let items = self.state.continue_watching_items();
+        let Some(item) = items.get(index).cloned().cloned() else {
+            return;
+        };
+        let subject_id = item.subject_id.clone();
+        let title = item.title.clone();
+        let search_res = item.to_search_result();
+
+        self.state.active_screen = Screen::Details;
+        self.state.active_subject_id = Some(subject_id.clone());
+        self.state.selected_details = Some(crate::models::MediaDetails::from_search_result(
+            &search_res,
+            self.state.search_preview.as_ref(),
+        ));
+        self.state.selected_resources.clear();
+        self.state.is_loading = true;
+        self.state.is_fetching_streams = false;
+        self.state.stream_error = None;
+        self.state.resource_list_state.select(None);
+        self.state.language_list_state.select(Some(0));
+
+        let se = if item.season > 0 { item.season } else { 1 };
+        let mut ep = if item.episode > 0 { item.episode } else { 1 };
+        if item.completed && item.stype == 2 {
+            ep = ep.saturating_add(1);
+        }
+        self.state.selected_season = se;
+        self.state.selected_episode = ep;
+        self.state
+            .season_list_state
+            .select(Some(se.saturating_sub(1)));
+        self.state
+            .episode_list_state
+            .select(Some(ep.saturating_sub(1)));
+
+        self.state.auto_play_on_ready = true;
+        self.state.language_chosen = false;
+        self.state.available_seasons.clear();
+
+        if let Some(cached) = self
+            .state
+            .image_cache
+            .get(&subject_id)
+            .or_else(|| self.state.search_posters.get(&subject_id))
+        {
+            self.state.poster_image = Some(std::sync::Arc::clone(cached));
+        } else {
+            self.state.poster_image = None;
+        }
+
+        self.state
+            .set_status_default(format!("Resuming playback for {title}..."));
 
         self.action_sender
             .send(Action::FetchDetails(subject_id, false))

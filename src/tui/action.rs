@@ -158,4 +158,5 @@ pub enum Action {
     ToggleFavorite,
     ShowFavorites,
     OpenFavorite(usize),
+    OpenContinueWatching(usize),
 }

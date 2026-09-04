@@ -856,3 +856,185 @@ async fn test_tui_layout_truncation_and_bounds() {
     assert_eq!(tier.footer_height(106), 1);
     assert_eq!(tier.footer_height(120), 1);
 }
+
+#[tokio::test]
+async fn test_home_deck_tab_switching() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().streaming_enabled = true;
+    app.state_mut().history.recent.clear();
+    app.state_mut().favorites.items.clear();
+
+    app.state_mut()
+        .history
+        .recent
+        .push(moviebox_tui::history::WatchHistoryItem {
+            provider: "moviebox".to_string(),
+            subject_id: "show_1".to_string(),
+            title: "Severance".to_string(),
+            cover_url: None,
+            stype: 2,
+            release_year: "2022".to_string(),
+            season: 1,
+            episode: 2,
+            progress_seconds: 1000,
+            duration_seconds: Some(3000),
+            completed: false,
+            timestamp: 100,
+        });
+    app.state_mut()
+        .favorites
+        .items
+        .push(moviebox_tui::favorites::FavoriteItem {
+            provider: "moviebox".to_string(),
+            subject_id: "fav_1".to_string(),
+            title: "Inception".to_string(),
+            cover_url: None,
+            stype: 1,
+            release_year: "2010".to_string(),
+            added_at: 100,
+        });
+
+    assert!(app.state().continue_watching_available());
+    assert!(app.state().favorites_available());
+    assert!(app.state().landing_deck_visible());
+    assert_eq!(
+        app.state().effective_home_deck_tab(),
+        moviebox_tui::tui::state::HomeDeckTab::ContinueWatching
+    );
+
+    let tab_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Tab,
+        crossterm::event::KeyModifiers::NONE,
+    );
+    app.handle_action(Action::Key(tab_key)).await;
+    assert_eq!(
+        app.state().effective_home_deck_tab(),
+        moviebox_tui::tui::state::HomeDeckTab::Favorites
+    );
+
+    let backtab_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::BackTab,
+        crossterm::event::KeyModifiers::SHIFT,
+    );
+    app.handle_action(Action::Key(backtab_key)).await;
+    assert_eq!(
+        app.state().effective_home_deck_tab(),
+        moviebox_tui::tui::state::HomeDeckTab::ContinueWatching
+    );
+
+    app.state_mut().favorites_focus = true;
+    app.state_mut().favorites_landing_state.select(Some(0));
+    app.handle_action(Action::MoveRight).await;
+    assert_eq!(
+        app.state().effective_home_deck_tab(),
+        moviebox_tui::tui::state::HomeDeckTab::Favorites
+    );
+    app.handle_action(Action::MoveLeft).await;
+    assert_eq!(
+        app.state().effective_home_deck_tab(),
+        moviebox_tui::tui::state::HomeDeckTab::ContinueWatching
+    );
+}
+
+#[tokio::test]
+async fn test_home_deck_continue_watching_resume() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().streaming_enabled = true;
+    app.state_mut().history.recent.clear();
+    app.state_mut().favorites.items.clear();
+
+    app.state_mut()
+        .history
+        .recent
+        .push(moviebox_tui::history::WatchHistoryItem {
+            provider: "moviebox".to_string(),
+            subject_id: "cw_target".to_string(),
+            title: "Severance".to_string(),
+            cover_url: None,
+            stype: 2,
+            release_year: "2022".to_string(),
+            season: 1,
+            episode: 3,
+            progress_seconds: 1200,
+            duration_seconds: Some(3000),
+            completed: false,
+            timestamp: 200,
+        });
+
+    app.state_mut().favorites_focus = true;
+    app.state_mut().favorites_landing_state.select(Some(0));
+    assert_eq!(
+        app.state().effective_home_deck_tab(),
+        moviebox_tui::tui::state::HomeDeckTab::ContinueWatching
+    );
+
+    app.handle_action(Action::Submit).await;
+
+    assert_eq!(app.state().active_screen, Screen::Details);
+    assert_eq!(app.state().active_subject_id.as_deref(), Some("cw_target"));
+    assert_eq!(app.state().selected_season, 1);
+    assert_eq!(app.state().selected_episode, 3);
+    assert!(app.state().auto_play_on_ready);
+}
+
+#[tokio::test]
+async fn test_landing_deck_header_renders_without_star_or_bracket() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().streaming_enabled = true;
+    app.state_mut().history.recent.clear();
+    app.state_mut().favorites.items.clear();
+
+    app.state_mut()
+        .history
+        .recent
+        .push(moviebox_tui::history::WatchHistoryItem {
+            provider: "moviebox".to_string(),
+            subject_id: "show_1".to_string(),
+            title: "Severance".to_string(),
+            cover_url: None,
+            stype: 2,
+            release_year: "2022".to_string(),
+            season: 1,
+            episode: 2,
+            progress_seconds: 1000,
+            duration_seconds: Some(3000),
+            completed: false,
+            timestamp: 100,
+        });
+    app.state_mut()
+        .favorites
+        .items
+        .push(moviebox_tui::favorites::FavoriteItem {
+            provider: "moviebox".to_string(),
+            subject_id: "fav_1".to_string(),
+            title: "Inception".to_string(),
+            cover_url: None,
+            stype: 1,
+            release_year: "2010".to_string(),
+            added_at: 100,
+        });
+
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+
+    let res = terminal.draw(|frame| app.draw(frame));
+    assert!(res.is_ok());
+
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|c| c.symbol())
+        .collect();
+
+    assert!(text.contains("Continue Watching"));
+    assert!(text.contains("Favorites"));
+    assert!(!text.contains("★"));
+    assert!(!text.contains("- *  Favorites"));
+}

@@ -469,7 +469,10 @@ impl App {
                 self.handle_playback(action).await;
             }
 
-            Action::ToggleFavorite | Action::ShowFavorites | Action::OpenFavorite(..) => {
+            Action::ToggleFavorite
+            | Action::ShowFavorites
+            | Action::OpenFavorite(..)
+            | Action::OpenContinueWatching(..) => {
                 self.handle_favorites(action).await;
             }
 

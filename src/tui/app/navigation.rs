@@ -590,7 +590,7 @@ impl App {
                 match self.state.active_screen {
                     Screen::Home => {
                         if self.state.favorites_focus {
-                            let total = self.state.favorites_landing_items().len();
+                            let total = self.state.landing_deck_items_count();
                             let current =
                                 self.state.favorites_landing_state.selected().unwrap_or(0);
                             if current + 1 < total {
@@ -600,7 +600,7 @@ impl App {
                         }
                         if self.state.search_results.is_empty()
                             && self.state.search_query.trim().is_empty()
-                            && self.state.favorites_landing_visible()
+                            && self.state.landing_deck_visible()
                         {
                             self.state.favorites_focus = true;
                             self.state.favorites_landing_state.select(Some(0));
@@ -662,6 +662,10 @@ impl App {
 
             Action::MoveLeft => {
                 if self.state.active_screen == Screen::Home {
+                    if self.state.favorites_focus {
+                        self.state.cycle_home_deck_tab();
+                        return None;
+                    }
                     let current = self.state.search_list_state.selected().unwrap_or(0);
                     let jump = 1;
                     if current > jump {
@@ -684,6 +688,10 @@ impl App {
 
             Action::MoveRight => {
                 if self.state.active_screen == Screen::Home {
+                    if self.state.favorites_focus {
+                        self.state.cycle_home_deck_tab();
+                        return None;
+                    }
                     let current = self.state.search_list_state.selected().unwrap_or(0);
                     let jump = 1;
                     let total = self.state.search_results.len();
@@ -757,7 +765,14 @@ impl App {
                 }
                 if self.state.favorites_focus {
                     if let Some(idx) = self.state.favorites_landing_state.selected() {
-                        self.action_sender.send(Action::OpenFavorite(idx)).ok();
+                        match self.state.effective_home_deck_tab() {
+                            crate::tui::state::HomeDeckTab::ContinueWatching => {
+                                self.open_continue_watching(idx);
+                            }
+                            crate::tui::state::HomeDeckTab::Favorites => {
+                                self.open_favorite(idx);
+                            }
+                        }
                     }
                     return None;
                 }
@@ -869,7 +884,17 @@ impl App {
             self.state.language_list_state.select(Some(0));
 
             let se = if item.season > 0 { item.season } else { 1 };
-            let ep = if item.episode > 0 { item.episode } else { 1 };
+            let mut ep = if item.episode > 0 { item.episode } else { 1 };
+            let provider_key = self.state.active_provider.cache_key();
+            if let Some(hist) =
+                self.state
+                    .history
+                    .get_item(provider_key, &item.id, se, ep, Some(&item.title))
+            {
+                if hist.completed && item.stype == 2 {
+                    ep = ep.saturating_add(1);
+                }
+            }
             self.state.selected_season = se;
             self.state.selected_episode = ep;
             self.state

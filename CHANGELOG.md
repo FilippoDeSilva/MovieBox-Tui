@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Home Landing Deck Continue Watching & Multi-Tab Navigation**:
+  - Implemented interactive multi-tab landing deck on the Home screen supporting both `Continue Watching` and `Favorites`.
+  - Added seamless `Tab` and `Shift+Tab` keyboard cycling between Continue Watching and Favorites tabs with instant row focus retention.
+  - Added one-click/key direct resume (`Enter`, `Space`, or `P`) on Continue Watching items, automatically configuring episode advancement, season positioning, and auto-play in Details view.
+  - Formatted Continue Watching rows with title truncation, series episode badge (`S01E03`), progress percentage, and remaining duration (`45% · 24m left`).
+  - Added mouse support for clicking the landing deck header bar to switch tabs, and double-clicking items to play/open.
 - **Windows TrueColor & High-Contrast Terminal Theming**:
   - Enabled 24-bit TrueColor auto-detection by default on Windows 10/11 (`conhost.exe`, Windows Terminal, PowerShell, CMD), ensuring Windows users receive rich Catppuccin themes out of the box.
   - Overhauled 16-color ANSI dark fallback palette (`Theme::fallback`), replacing low-contrast dark blue and magenta with high-contrast cyan accents for borders, titles, headers, and highlights.
@@ -21,6 +27,14 @@
   - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` $\to$ Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
 
 ### Fixed
+- **High-Precision Playback Tracking & Race Elimination**:
+  - Eliminated wall-clock race condition where process elapsed time overwrote exact seek/pause positions from `mpv` and `iina-cli` Lua trackers.
+  - Hardened `moviebox_tracker.lua` with latched completion: reaching $\ge 90\%$ playback or EOF permanently latches completion, preventing shutdown events from reverting completed status.
+  - Implemented atomic state file persistence in Lua using temporary files (`.tmp`) and clean destination replacement for Windows and Unix platforms.
+  - Handled unknown stream durations by writing JSON `null`, preventing zero-duration calculations.
+  - Pre-registered media playback on launch (`record_start`), ensuring immediate watch history persistence for Android intent dispatchers (`termux-open`, `am start`) and app fallbacks.
+  - Added self-healing recovery in `reconcile_from_dir`: pre-seeded pending state files carry metadata (`title`, `cover_url`, `stype`, `release_year`), restoring new items into watch history even after sudden terminal exits or reboots.
+  - Implemented smart series episode advancement: completing an episode automatically cues the next episode (`episode + 1` or next season) on resume (`Space`/`P`) and in the Details view.
 - **Standardized 'No Art' Poster Containers Across Terminals**:
   - Replaced robot eyes and broken infinite loading spinners with clean, static, centered `No Art` bordered blocks across search results and details screens on terminals without graphics support.
   - Preserved full-fidelity native GPU graphics rendering on supported terminals while standardizing card geometry and poster container boundaries across all platforms.
@@ -34,6 +48,9 @@
 - **Pruned Redundant Theme Slash Command**:
   - Removed standalone `/theme` slash command, parser routing, and auto-suggestions; theme selection and visual palette swatches are managed directly within the interactive Settings Hub (`/settings` $\to$ Appearance $\to$ Theme).
 - **Discover Categories Landing Card UX**:
+- **Clean Segmented Landing Deck Header Styling**:
+  - Replaced crowded decorative star (`★`) and bracket (`[ ]`) glyphs with a clean, segmented tab bar header (`Continue Watching │ Favorites (Tab)`).
+  - Streamlined overflow row formatting to centered minimalist pill indicators (`+N more · /history` and `+N more · /favorites`).
   - Streamlined `Discover & Quick Categories` card: elevated `/browse` command to a right-aligned header badge (`[ /browse ]`), eliminated redundant `/browse ·` row prefixes, and adapted category rows dynamically between Streaming and Addon modes.
   - Added direct mouse click navigation to discover categories, routing clicks to preset browse queries or the addon catalog menu.
 - **Command Dispatch & Cache Lookup Optimization**:

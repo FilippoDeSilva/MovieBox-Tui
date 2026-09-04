@@ -1012,7 +1012,23 @@ impl App {
                         && item.episode > 0
                 }) {
                     default_season = history.season;
-                    default_episode = history.episode;
+                    if history.completed {
+                        let current_season_eps = self
+                            .state
+                            .available_seasons
+                            .iter()
+                            .find(|s| s.number == history.season)
+                            .map(|s| s.episodes.len())
+                            .unwrap_or(0);
+                        if current_season_eps > 0 && history.episode >= current_season_eps {
+                            default_season = history.season.saturating_add(1);
+                            default_episode = 1;
+                        } else {
+                            default_episode = history.episode.saturating_add(1);
+                        }
+                    } else {
+                        default_episode = history.episode;
+                    }
                 }
 
                 let target_season = if self.state.selected_season > 0 {

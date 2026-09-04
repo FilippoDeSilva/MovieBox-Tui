@@ -11,9 +11,9 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | **`Home` / `End` / `g` / `G`** | Jump to start / end of list or search results (auto-fetches next page), or move cursor to beginning / end of input line |
 | **`PageUp` / `PageDown`** | Scroll search results, lists, and modal pickers by visible page height (or scroll help overlay) |
 | **`Enter`** | Open, play, or confirm the selected item |
-| **`Space` / `P`** | Direct resume playback for recorded season/episode on `/history` items |
+| **`Space` / `P`** | Direct resume playback for recorded season/episode on `/history` or Home Continue Watching items |
 | **`Esc`** | Focus search input (when results present), dismiss popup dialog, or return to landing |
-| **`Tab` / `Shift+Tab`** | Auto-complete suggestion / command; switch details panes; toggle dialog buttons |
+| **`Tab` / `Shift+Tab`** | Auto-complete suggestion / command; cycle landing deck tabs (Continue Watching / Favorites); switch details panes; toggle dialog buttons |
 | **`Backspace`** | Delete character before cursor, or return focus to search bar from results |
 | **`Delete`** | Delete character at cursor in text inputs, or remove entry in TV/Addon managers |
 | **`Ctrl+U`** | Clear entire input line (Search, TV URL, Addon URL) |
@@ -90,8 +90,10 @@ All popup dialogs (Theme picker, Browse categories, Settings Media Player picker
 | **Click search bar** | Enter search input mode |
 | **Click suggestion item** | Search for that suggestion immediately |
 | **Click search result row** | Select item and load preview; click again to open full details |
-| **Click Favorites row (landing)** | Select a starred title; click again to open it |
-| **Click "+N more • /favorites"** | Open the full favorites list |
+| **Click landing deck tab header** | Switch between Continue Watching and Favorites tabs |
+| **Click Continue Watching row (landing)** | Select an in-progress title; click again to resume playback with auto-play |
+| **Click Favorites row (landing)** | Select a starred title; click again to open details |
+| **Click "+N more • /history" or "+N more • /favorites"** | Open the full watch history or favorites list |
 | **Click audio / season / episode / stream** | Switch audio language, change season, or select episode; click a specific stream row to play; click empty stream pane space to focus without playing |
 | **Click footer buttons** | Switch provider / mode, open help (`[?]`), or quit (`[q]`) |
 | **Click modal buttons** | Choose a theme, subtitles, player, or confirm actions |

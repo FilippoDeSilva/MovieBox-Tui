@@ -163,6 +163,20 @@ impl WatchHistoryItem {
             format!("{}w ago", delta / 604800)
         }
     }
+
+    pub fn to_search_result(&self) -> crate::models::SearchResult {
+        crate::models::SearchResult {
+            id: self.subject_id.clone(),
+            title: self.title.clone(),
+            stype: self.stype,
+            release_year: self.release_year.clone(),
+            cover_url: self.cover_url.clone(),
+            season: self.season,
+            episode: self.episode.max(1),
+            provider: crate::models::ProviderKind::parse(&self.provider)
+                .unwrap_or(crate::models::ProviderKind::MovieBox),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,6 +189,41 @@ pub struct PendingPlaybackState {
     pub duration_seconds: Option<u64>,
     pub completed: bool,
     pub timestamp: u64,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub cover_url: Option<String>,
+    #[serde(default)]
+    pub stype: Option<i64>,
+    #[serde(default)]
+    pub release_year: Option<String>,
+}
+
+impl PendingPlaybackState {
+    pub fn from_item(
+        item: &WatchHistoryItem,
+        progress: u64,
+        duration: Option<u64>,
+        completed: bool,
+    ) -> Self {
+        Self {
+            provider: item.provider.clone(),
+            subject_id: item.subject_id.clone(),
+            season: item.season,
+            episode: item.episode,
+            progress_seconds: progress,
+            duration_seconds: duration,
+            completed,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            title: Some(item.title.clone()),
+            cover_url: item.cover_url.clone(),
+            stype: Some(item.stype),
+            release_year: Some(item.release_year.clone()),
+        }
+    }
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -417,6 +466,36 @@ impl HistoryManager {
         }
         self.save();
     }
+    pub fn record_start(&mut self, item: &WatchHistoryItem, start_pos: u64) {
+        let mut new_item = item.clone();
+        if let Some(existing) = self.recent.iter().find(|i| Self::is_same_show(i, item)) {
+            if new_item.cover_url.is_none() {
+                new_item.cover_url = existing.cover_url.clone();
+            }
+            if existing.season == new_item.season && existing.episode == new_item.episode {
+                new_item.progress_seconds = existing.progress_seconds.max(start_pos);
+                new_item.duration_seconds = existing.duration_seconds.or(new_item.duration_seconds);
+                new_item.completed = existing.completed;
+            } else {
+                new_item.progress_seconds = start_pos;
+            }
+        } else {
+            new_item.progress_seconds = start_pos;
+        }
+        new_item.timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        self.recent.retain(|i| !Self::is_same_show(i, &new_item));
+        self.recent.push(new_item);
+
+        if self.recent.len() > 100 {
+            let excess = self.recent.len() - 100;
+            self.recent.drain(0..excess);
+        }
+        self.save();
+    }
 
     pub fn remove(&mut self, provider: &str, subject_id: &str, season: usize, episode: usize) {
         let key = Self::key(provider, subject_id, season, episode);
@@ -576,6 +655,37 @@ impl HistoryManager {
                     }
                     modified = true;
                 }
+            } else if let Some(title) = state.title.filter(|t| !t.trim().is_empty()) {
+                let new_item = WatchHistoryItem {
+                    provider: state.provider.clone(),
+                    subject_id: state.subject_id.clone(),
+                    title,
+                    cover_url: state.cover_url,
+                    stype: state
+                        .stype
+                        .unwrap_or(if state.season > 0 || state.episode > 0 {
+                            2
+                        } else {
+                            1
+                        }),
+                    release_year: state.release_year.unwrap_or_default(),
+                    season: state.season,
+                    episode: state.episode,
+                    timestamp: state.timestamp,
+                    duration_seconds: state.duration_seconds,
+                    progress_seconds: state.progress_seconds,
+                    completed: state.completed,
+                };
+                if new_item.completed {
+                    self.watched.insert(key);
+                }
+                self.recent.retain(|i| !Self::is_same_show(i, &new_item));
+                self.recent.push(new_item);
+                if self.recent.len() > 100 {
+                    let excess = self.recent.len() - 100;
+                    self.recent.drain(0..excess);
+                }
+                modified = true;
             }
             let _ = fs::remove_file(&path);
         }
@@ -671,6 +781,10 @@ mod tests {
             duration_seconds: Some(3600),
             completed: true,
             timestamp: 2000,
+            title: None,
+            cover_url: None,
+            stype: None,
+            release_year: None,
         };
         std::fs::write(&state_file, serde_json::to_string(&state).unwrap()).unwrap();
 
