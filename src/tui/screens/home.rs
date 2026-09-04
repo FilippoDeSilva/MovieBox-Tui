@@ -800,11 +800,10 @@ pub(crate) fn dynamic_search_placeholder(state: &AppState) -> &'static str {
         const STREAMING_HINTS: &[&str] = &[
             "Search movies, series & anime…",
             "Try 'Interstellar', 'Dune', 'Breaking Bad'…",
-            "Type /settings for preferences & players…",
+            "Type /settings for preferences & themes…",
             "Type /browse for trending & top rated…",
             "Type /history to resume your watch list…",
             "Type /favorites for starred media…",
-            "Type /theme to switch color palettes…",
             "Type /help for interactive keybindings…",
         ];
         let idx = ((state.tick_count / 40) as usize) % STREAMING_HINTS.len();
@@ -2914,7 +2913,7 @@ mod tests {
         state.tick_count = 80;
         assert_eq!(
             dynamic_search_placeholder(&state),
-            "Type /settings for preferences & players…"
+            "Type /settings for preferences & themes…"
         );
         state.tick_count = 120;
         assert_eq!(
@@ -2934,14 +2933,9 @@ mod tests {
         state.tick_count = 240;
         assert_eq!(
             dynamic_search_placeholder(&state),
-            "Type /theme to switch color palettes…"
-        );
-        state.tick_count = 280;
-        assert_eq!(
-            dynamic_search_placeholder(&state),
             "Type /help for interactive keybindings…"
         );
-        state.tick_count = 320;
+        state.tick_count = 280;
         assert_eq!(
             dynamic_search_placeholder(&state),
             "Search movies, series & anime…"

@@ -45,7 +45,7 @@ Text editing across Search, TV Playlist Manager, and Addon Manager uses a unifie
 
 All popup dialogs (Theme picker, Browse categories, Settings Media Player picker, TV Manager, Addon Manager, Download Confirmation) support standard keyboard controls:
 
-- **`↑` / `↓` / `k` / `j`**: Move selection up / down by one item (vim keys `k`/`j` supported in pickers such as `/theme`).
+- **`↑` / `↓` / `k` / `j`**: Move selection up / down by one item (vim keys `k`/`j` supported in pickers such as theme selector in Settings).
 - **`Home` / `End`**: Jump immediately to the first or last item in the list.
 - **`PageUp` / `PageDown`**: Step up or down by 5 items.
 - **`Enter`**: Confirm selection, activate entry, or submit dialog.
@@ -107,7 +107,6 @@ Type these commands directly into the search bar:
 | `/browse` | Streaming / Addon | Browse curated views (Trending, Popular) or Addon catalogs (Top Movies, Top Series) |
 | `/history` | Streaming / Addon | View watch history with latest progress |
 | `/favorites` | Streaming / Addon | View all starred titles |
-| `/theme` | All | Open visual theme palette swatch picker |
 | `/clear` | All | Clear search results and return to landing |
 | `/help` | All | Open interactive keybinding help menu (alias `/?`) |
 | `/list` | TV | View live TV channels |

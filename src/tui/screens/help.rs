@@ -93,7 +93,7 @@ pub fn build_help_columns(
     right.push(Line::from(""));
 
     right.push(help_section_header("Commands & Shortcuts", theme));
-    right.push(help_row("/settings", "Preferences & Modes", theme));
+    right.push(help_row("/settings", "Preferences, Themes & Modes", theme));
     if state.is_tv_mode {
         right.push(help_row("/list", "Show All TV Channels", theme));
     } else if state.is_addon_mode {
@@ -109,7 +109,6 @@ pub fn build_help_columns(
         ));
         right.push(help_row("/favorites", "Starred Titles", theme));
     }
-    right.push(help_row("/theme", "Visual Theme Swatches", theme));
     right.push(help_row("/clear", "Clear Search Results", theme));
     right.push(help_row("/exit", "Exit App ([q] / Ctrl+C)", theme));
     right.push(help_row("[?]", "Toggle This Help Menu", theme));

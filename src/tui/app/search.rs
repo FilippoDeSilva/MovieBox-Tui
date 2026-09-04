@@ -141,10 +141,6 @@ impl App {
                 self.action_sender.send(Action::ToggleHelp).ok();
                 Some(true)
             }
-            crate::tui::commands::SlashCommand::Theme => {
-                self.action_sender.send(Action::ToggleThemePopup).ok();
-                Some(true)
-            }
             crate::tui::commands::SlashCommand::Browse => {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.state.notify(

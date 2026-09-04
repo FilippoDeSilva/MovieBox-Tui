@@ -40,5 +40,5 @@ namespace.
 
 - `/list` — display all loaded TV channels.
 - `[r]` key — reload all active M3U playlist sources.
-- Global commands (`/settings`, `/theme`, `/clear`, `/help`, `/exit`) are active across all modes.
+- Global commands (`/settings`, `/clear`, `/help`, `/exit`) are active across all modes.
 - Streaming/Addon-only commands (e.g. `/browse`, `/history`, `/favorites`) display friendly guidance notifications prompting you to switch modes (`Ctrl+S` or `Ctrl+A`).

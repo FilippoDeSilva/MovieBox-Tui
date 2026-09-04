@@ -32,11 +32,6 @@ impl<'a> ModalFrame<'a> {
 
     pub fn render(&self, frame: &mut Frame, area: Rect, full_area: Rect) -> Rect {
         overlay::clear_modal_area(frame, full_area, area, self.theme);
-        let block_style = if self.basic_terminal {
-            Style::default()
-        } else {
-            Style::default().bg(self.theme.mantle.fg.unwrap_or(self.theme.base))
-        };
         let title_budget = (area.width as usize).saturating_sub(4);
         let display_title = crate::tui::text::truncate_width(self.title.trim(), title_budget);
         let block = Block::default()
@@ -44,14 +39,12 @@ impl<'a> ModalFrame<'a> {
             .title_style(self.theme.title)
             .borders(Borders::ALL)
             .border_type(overlay::border_type(self.basic_terminal))
-            .border_style(self.border_style.unwrap_or(self.theme.lavender))
-            .style(block_style);
+            .border_style(self.border_style.unwrap_or(self.theme.lavender));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         inner
     }
 }
-
 pub fn render_modal_footer(
     frame: &mut Frame,
     area: Rect,

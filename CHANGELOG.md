@@ -12,7 +12,7 @@
   - Enabled 24-bit TrueColor auto-detection by default on Windows 10/11 (`conhost.exe`, Windows Terminal, PowerShell, CMD), ensuring Windows users receive rich Catppuccin themes out of the box.
   - Overhauled 16-color ANSI dark fallback palette (`Theme::fallback`), replacing low-contrast dark blue and magenta with high-contrast cyan accents for borders, titles, headers, and highlights.
   - Added background row selection suppression in Settings Hub when modal popups (media player picker, theme picker, download directory input) are active, directing 100% of user focus to floating dialogs.
-  - Added solid opaque backdrops to `ModalFrame` and clamped popup picker minimum height to 7 rows, eliminating bleed-through and visual crowding on single-item selections.
+  - Clamped popup picker minimum height to 7 rows, eliminating visual crowding on single-item selections.
   - Elevated active selection surface styling to `theme.surface1` with accent-highlighted cursor indicators (`▌ ` / `▸ `) across lists and settings rows.
 - **In-App Self-Update Engine Hardening**:
   - Added deterministic fallback download URL generation for GitHub release assets and `SHA256SUMS` when unauthenticated API requests encounter HTTP 403 rate limits.
@@ -26,6 +26,9 @@
   - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
   - Streamlined `/config` as a direct alias for `/settings`.
 
+
+- **Pruned Redundant Theme Slash Command**:
+  - Removed standalone `/theme` slash command, parser routing, and auto-suggestions; theme selection and visual palette swatches are managed directly within the interactive Settings Hub (`/settings` $\to$ Appearance $\to$ Theme).
 - **Discover Categories Landing Card UX**:
   - Streamlined `Discover & Quick Categories` card: elevated `/browse` command to a right-aligned header badge (`[ /browse ]`), eliminated redundant `/browse ·` row prefixes, and adapted category rows dynamically between Streaming and Addon modes.
   - Added direct mouse click navigation to discover categories, routing clicks to preset browse queries or the addon catalog menu.
@@ -62,6 +65,7 @@
   - Added compact button formatting (`[u] Update  [o] Web  [Esc] Back`) to Update Modal on terminals under 60 columns.
   - Added compact header formatting to Updating progress modal when inner width is under 42 columns.
   - Added title boundary protection to `ModalFrame`, truncating overly long titles to preserve border integrity.
+  - Eliminated dark rectangular halo artifact around modal popups by removing block-level background color overrides from `ModalFrame`, allowing rounded borders to cleanly render against transparent and custom terminal backgrounds without pixel spillage.
 - **Resilient Configuration & Accurate Metadata**:
   - Safeguarded user TV playlists (`tv_config.json`) and HTTP addons (`addons_config.json`): replaced destructive error-swallowing deletion with timestamped `.corrupt.{timestamp}` file rotation and sanitized logging on JSON parse failures.
   - Eliminated fabricated S01E01 fallback in addon metadata adapter, accurately reporting empty series episodes when an upstream catalog entry lacks episode records instead of injecting unplayable dummy data.

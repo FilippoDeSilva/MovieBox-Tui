@@ -32,6 +32,8 @@ fn test_settings_command_parsing_and_aliases() {
         Some(SlashCommand::Settings)
     );
     assert_eq!(SlashCommand::parse("/config"), Some(SlashCommand::Settings));
+    assert_eq!(SlashCommand::parse("/theme"), None);
+    assert_eq!(SlashCommand::parse("/themes"), None);
     assert_eq!(SlashCommand::parse("/help"), Some(SlashCommand::Help));
     assert_eq!(SlashCommand::parse("/?"), Some(SlashCommand::Help));
 
@@ -43,7 +45,6 @@ fn test_settings_command_parsing_and_aliases() {
             "/browse".to_string(),
             "/history".to_string(),
             "/favorites".to_string(),
-            "/theme".to_string(),
             "/clear".to_string(),
             "/help".to_string(),
         ]
@@ -60,6 +61,7 @@ fn test_settings_command_parsing_and_aliases() {
 
     let toggle_suggestions = SlashCommand::suggest(&state, "/toggle");
     assert!(toggle_suggestions.is_empty());
+    assert!(SlashCommand::suggest(&state, "/t").is_empty());
 }
 
 #[test]
@@ -262,6 +264,7 @@ async fn test_settings_appearance_theme_cycle_and_popup() {
     let mut app = App::new();
     app.handle_action(Action::ShowSettingsPopup).await;
     assert!(app.state().show_settings_popup);
+    app.state_mut().poster_mode = "auto".to_string();
 
     app.handle_action(Action::SelectSettingsCategory(SettingsCategory::Appearance))
         .await;

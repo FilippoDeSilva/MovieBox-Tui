@@ -6,7 +6,6 @@ pub enum SlashCommand {
     Browse,
     History,
     Favorites,
-    Theme,
     Clear,
     Help,
     List,
@@ -14,24 +13,22 @@ pub enum SlashCommand {
 }
 
 impl SlashCommand {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 8] = [
         Self::Settings,
         Self::Browse,
         Self::History,
         Self::Favorites,
-        Self::Theme,
         Self::Clear,
         Self::Help,
         Self::List,
         Self::Exit,
     ];
 
-    pub const PRIMARY: [Self; 7] = [
+    pub const PRIMARY: [Self; 6] = [
         Self::Settings,
         Self::Browse,
         Self::History,
         Self::Favorites,
-        Self::Theme,
         Self::Clear,
         Self::Help,
     ];
@@ -42,7 +39,6 @@ impl SlashCommand {
             Self::Browse => "/browse",
             Self::History => "/history",
             Self::Favorites => "/favorites",
-            Self::Theme => "/theme",
             Self::Clear => "/clear",
             Self::Help => "/help",
             Self::List => "/list",
@@ -56,7 +52,6 @@ impl SlashCommand {
             Self::Browse => "Curated, rated & most-watched views",
             Self::History => "Watch history",
             Self::Favorites => "Starred titles",
-            Self::Theme => "Theme picker",
             Self::Clear => "Clear search results and return to landing",
             Self::Help => "Open interactive keybinding help menu",
             Self::List => "Show all TV channels",
@@ -77,7 +72,7 @@ impl SlashCommand {
             }
             Self::Favorites => state.favorites_available(),
             Self::List => state.tv_enabled && state.is_tv_mode,
-            Self::Theme | Self::Clear | Self::Help | Self::Exit => true,
+            Self::Clear | Self::Help | Self::Exit => true,
         }
     }
 
@@ -85,12 +80,11 @@ impl SlashCommand {
         let lower = query.to_ascii_lowercase();
         let mut results = Vec::new();
 
-        let candidates: [(&str, Self); 8] = [
+        let candidates: [(&str, Self); 7] = [
             ("/settings", Self::Settings),
             ("/browse", Self::Browse),
             ("/history", Self::History),
             ("/favorites", Self::Favorites),
-            ("/theme", Self::Theme),
             ("/clear", Self::Clear),
             ("/help", Self::Help),
             ("/list", Self::List),
@@ -131,7 +125,6 @@ impl SlashCommand {
             "/browse" => Some(Self::Browse.description(state)),
             "/history" => Some(Self::History.description(state)),
             "/favorites" => Some(Self::Favorites.description(state)),
-            "/theme" => Some(Self::Theme.description(state)),
             "/clear" => Some(Self::Clear.description(state)),
             "/help" => Some(Self::Help.description(state)),
             "/list" => Some(Self::List.description(state)),
@@ -154,7 +147,6 @@ impl SlashCommand {
             "/browse" => Some(Self::Browse),
             "/history" => Some(Self::History),
             "/favorites" => Some(Self::Favorites),
-            "/theme" => Some(Self::Theme),
             "/clear" => Some(Self::Clear),
             "/help" | "/?" => Some(Self::Help),
             "/list" => Some(Self::List),
@@ -179,7 +171,6 @@ mod tests {
                 "/browse".to_string(),
                 "/history".to_string(),
                 "/favorites".to_string(),
-                "/theme".to_string(),
                 "/clear".to_string(),
                 "/help".to_string(),
             ]
@@ -191,6 +182,8 @@ mod tests {
         let c_sug = SlashCommand::suggest(&state, "/c");
         assert_eq!(c_sug, vec!["/clear".to_string()]);
 
+        let t_sug = SlashCommand::suggest(&state, "/t");
+        assert!(t_sug.is_empty());
         let p_sug = SlashCommand::suggest(&state, "/p");
         assert!(p_sug.is_empty());
 
@@ -229,8 +222,8 @@ mod tests {
     #[test]
     fn test_core_commands_and_aliases_parse() {
         let state = AppState::default();
-        assert_eq!(SlashCommand::ALL.len(), 9);
-        assert_eq!(SlashCommand::PRIMARY.len(), 7);
+        assert_eq!(SlashCommand::ALL.len(), 8);
+        assert_eq!(SlashCommand::PRIMARY.len(), 6);
         assert_eq!(SlashCommand::parse("/exit"), Some(SlashCommand::Exit));
         assert_eq!(SlashCommand::parse("/quit"), Some(SlashCommand::Exit));
         assert_eq!(SlashCommand::parse("/q"), Some(SlashCommand::Exit));
@@ -264,6 +257,8 @@ mod tests {
         assert_eq!(SlashCommand::parse("/list"), Some(SlashCommand::List));
         assert_eq!(SlashCommand::parse("/browse"), Some(SlashCommand::Browse));
         assert_eq!(SlashCommand::parse("/history"), Some(SlashCommand::History));
+        assert_eq!(SlashCommand::parse("/theme"), None);
+        assert_eq!(SlashCommand::parse("/themes"), None);
         assert_eq!(SlashCommand::parse("/toggle-tv"), None);
         assert_eq!(SlashCommand::parse("/enable-tv"), None);
         assert_eq!(SlashCommand::parse("/disable-tv"), None);
@@ -301,5 +296,6 @@ mod tests {
         );
         assert_eq!(SlashCommand::description_for("/download-dir", &state), None);
         assert_eq!(SlashCommand::description_for("/toggle-tv", &state), None);
+        assert_eq!(SlashCommand::description_for("/theme", &state), None);
     }
 }
