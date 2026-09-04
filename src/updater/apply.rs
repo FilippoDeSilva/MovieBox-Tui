@@ -227,9 +227,14 @@ fn spawn_windows_helper(staged_path: &Path, current_exe: &Path) -> Result<(), St
     std::fs::write(&helper_path, script_content)
         .map_err(|e| format!("failed to write Windows update helper: {e}"))?;
 
-    Command::new("cmd.exe")
-        .args(["/C", &helper_path.to_string_lossy()])
-        .spawn()
+    let mut cmd = Command::new("cmd.exe");
+    cmd.args(["/C", &helper_path.to_string_lossy()]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.spawn()
         .map_err(|e| format!("failed to spawn Windows update helper: {e}"))?;
 
     Ok(())

@@ -449,13 +449,26 @@ where
     }
     output.flush().await?;
     output.sync_data().await?;
+    drop(output);
     if file_len(&assembly).await != total {
         return Err(DownloadError::Incomplete {
             downloaded: file_len(&assembly).await,
             expected: total,
         });
     }
-    tokio::fs::rename(&assembly, destination).await?;
+    if destination.exists() {
+        let _ = tokio::fs::remove_file(destination).await;
+    }
+    if let Err(e) = tokio::fs::rename(&assembly, destination).await {
+        let _ = tokio::fs::remove_file(destination).await;
+        tokio::fs::rename(&assembly, destination)
+            .await
+            .map_err(|e2| {
+                DownloadError::File(std::io::Error::other(format!(
+                    "failed to move assembled file to destination: {e} ({e2})"
+                )))
+            })?;
+    }
     for index in 0..segments {
         let _ = tokio::fs::remove_file(segment_path(destination, index)).await;
     }
@@ -715,7 +728,10 @@ async fn finalize(
     metadata: &Path,
     destination: &Path,
 ) -> Result<(), std::io::Error> {
-    tokio::fs::rename(partial, destination).await?;
+    if tokio::fs::rename(partial, destination).await.is_err() {
+        let _ = tokio::fs::remove_file(destination).await;
+        tokio::fs::rename(partial, destination).await?;
+    }
     let _ = tokio::fs::remove_file(metadata).await;
     Ok(())
 }
@@ -811,5 +827,38 @@ mod tests {
             safe_file_stem("Movie: The <Ultimate> Edition *?|"),
             "Movie_ The _Ultimate_ Edition"
         );
+    }
+
+    #[tokio::test]
+    async fn test_finalize_replaces_existing_destination_cleanly() {
+        let dir = std::env::temp_dir().join(format!(
+            "mbx_test_finalize_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        let partial = dir.join("video.mp4.part");
+        let metadata = dir.join("video.mp4.metadata");
+        let destination = dir.join("video.mp4");
+
+        tokio::fs::write(&destination, b"old version")
+            .await
+            .unwrap();
+        tokio::fs::write(&partial, b"new version").await.unwrap();
+        tokio::fs::write(&metadata, b"{}").await.unwrap();
+
+        let res = finalize(&partial, &metadata, &destination).await;
+        assert!(res.is_ok());
+        assert!(!partial.exists());
+        assert!(!metadata.exists());
+        assert!(destination.exists());
+        assert_eq!(
+            tokio::fs::read_to_string(&destination).await.unwrap(),
+            "new version"
+        );
+        let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 }

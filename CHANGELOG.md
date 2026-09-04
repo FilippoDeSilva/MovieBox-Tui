@@ -36,6 +36,13 @@
   - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` $\to$ Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
 
 ### Fixed
+- **Cross-Platform Handle Safety & Silent Failure Elimination**:
+  - Fixed Windows file sharing violation (`ERROR_SHARING_VIOLATION`) in multi-segment download assembly by explicitly flushing, syncing, and dropping the file write handle before executing destination renames.
+  - Added overwrite handling on destination collisions during download finalization on Windows, preventing failed renames on re-downloaded media.
+  - Guarded `FavoritesManager::load_from_path` against premature corrupt file rotation on transient read errors, matching history and configuration persistence invariants.
+  - Hardened Lua tracker script and state file directory initialization to return `None` on directory creation or write failures rather than passing non-existent paths to media players.
+  - Handled web browser launch failures in Settings Hub (`open::that`), logging warnings and displaying the repository URL on headless or restricted environments.
+  - Added `CREATE_NO_WINDOW` flag (`0x08000000`) to the Windows update helper process spawn to eliminate console window flashes during in-app updates.
 - **Resilient Cross-Platform Cache Clearing & In-Flight Task Isolation**:
   - Hardened `clear_all_cache` with recursive directory contents deletion, leaving the root directory node intact to prevent `ERROR_ACCESS_DENIED` and `ERROR_SHARING_VIOLATION` failures when Windows processes or shells hold folder handles.
   - Added Windows read-only attribute clearing before unlinking locked files.

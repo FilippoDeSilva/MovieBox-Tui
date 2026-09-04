@@ -84,22 +84,30 @@ impl FavoritesManager {
 
     pub fn load_from_path(path: &Path) -> Self {
         if path.exists() {
-            if let Ok(content) = fs::read_to_string(path) {
-                if let Ok(manager) = serde_json::from_str::<Self>(&content) {
-                    return manager;
+            match fs::read_to_string(path) {
+                Ok(content) => match serde_json::from_str::<Self>(&content) {
+                    Ok(manager) => return manager,
+                    Err(e) => {
+                        let stamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
+                        log::error!(
+                            "failed to parse favorites from {} ({e}), rotating to {}",
+                            crate::logging::sanitize_path(path),
+                            crate::logging::sanitize_path(&corrupt_path)
+                        );
+                        let _ = fs::rename(path, corrupt_path);
+                    }
+                },
+                Err(e) => {
+                    log::warn!(
+                        "failed to read favorites from {}: {e}",
+                        crate::logging::sanitize_path(path)
+                    );
                 }
             }
-            let stamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
-            log::error!(
-                "failed to parse favorites from {}, rotating to {}",
-                crate::logging::sanitize_path(path),
-                crate::logging::sanitize_path(&corrupt_path)
-            );
-            let _ = fs::rename(path, corrupt_path);
         }
         Self::default()
     }

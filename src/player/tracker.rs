@@ -120,7 +120,10 @@ end)
 pub fn ensure_tracker_script() -> Option<PathBuf> {
     let dir = crate::config::scripts_dir()?;
     if !dir.exists() {
-        let _ = fs::create_dir_all(&dir);
+        if let Err(e) = fs::create_dir_all(&dir) {
+            log::warn!("failed to create scripts dir {}: {e}", dir.display());
+            return None;
+        }
     }
     let path = dir.join("moviebox_tracker.lua");
     if !path.exists()
@@ -128,7 +131,10 @@ pub fn ensure_tracker_script() -> Option<PathBuf> {
             .map(|c| c != TRACKER_LUA_CONTENT)
             .unwrap_or(true)
     {
-        let _ = fs::write(&path, TRACKER_LUA_CONTENT.as_bytes());
+        if let Err(e) = fs::write(&path, TRACKER_LUA_CONTENT.as_bytes()) {
+            log::warn!("failed to write tracker script {}: {e}", path.display());
+            return None;
+        }
     }
     Some(path)
 }
@@ -141,7 +147,10 @@ pub fn state_file_path(
 ) -> Option<PathBuf> {
     let dir = crate::config::playback_state_dir()?;
     if !dir.exists() {
-        let _ = fs::create_dir_all(&dir);
+        if let Err(e) = fs::create_dir_all(&dir) {
+            log::warn!("failed to create playback state dir {}: {e}", dir.display());
+            return None;
+        }
     }
     let sanitized_provider = sanitize_component(provider);
     let sanitized_id = sanitize_component(subject_id);

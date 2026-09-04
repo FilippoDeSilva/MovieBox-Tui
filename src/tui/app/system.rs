@@ -609,12 +609,24 @@ impl App {
                             self.action_sender.send(Action::CheckForUpdates).ok();
                         }
                         2 => {
-                            let _ = open::that("https://github.com/mesamirh/MovieBox-Tui");
-                            self.state.notify(
-                                NotificationKind::Info,
-                                "GitHub",
-                                "Opening repository in default web browser...",
-                            );
+                            const REPO_URL: &str = "https://github.com/mesamirh/MovieBox-Tui";
+                            match open::that(REPO_URL) {
+                                Ok(()) => {
+                                    self.state.notify(
+                                        NotificationKind::Info,
+                                        "GitHub",
+                                        "Opening repository in default web browser...",
+                                    );
+                                }
+                                Err(error) => {
+                                    log::warn!("failed to open web browser: {error}");
+                                    self.state.notify(
+                                        NotificationKind::Warning,
+                                        "Browser Launch Failed",
+                                        format!("Could not open browser: {error}\n{REPO_URL}"),
+                                    );
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -872,7 +884,9 @@ impl App {
                         .ok();
 
                         if let Ok(exe_path) = std::env::current_exe() {
-                            let _ = crate::updater::restart_process(&exe_path);
+                            if let Err(e) = crate::updater::restart_process(&exe_path) {
+                                log::error!("failed to restart process after update: {e}");
+                            }
                         }
                         std::process::exit(0);
                     }

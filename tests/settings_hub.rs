@@ -414,3 +414,19 @@ async fn test_settings_hub_clear_cache_activation_and_notification() {
     assert!(err_notification.is_some());
     assert_eq!(err_notification.unwrap().title, "Cache Clear Failed");
 }
+
+#[tokio::test]
+async fn test_settings_hub_browser_open_row_activation() {
+    let mut app = App::new();
+    app.handle_action(Action::ShowSettingsPopup).await;
+    app.handle_action(Action::SelectSettingsCategory(
+        SettingsCategory::StorageInfo,
+    ))
+    .await;
+    app.state_mut().settings_selected_row = 2;
+    app.handle_action(Action::SettingsActivateRow).await;
+    let notification = app.state().notifications.back();
+    assert!(notification.is_some());
+    let title = &notification.unwrap().title;
+    assert!(title == "GitHub" || title == "Browser Launch Failed");
+}

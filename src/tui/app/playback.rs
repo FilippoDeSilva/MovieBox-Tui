@@ -271,7 +271,12 @@ impl App {
                     false,
                 );
                 if let Ok(serialized) = serde_json::to_string(&initial_state) {
-                    let _ = std::fs::write(&state_path, serialized);
+                    if let Err(e) = std::fs::write(&state_path, serialized) {
+                        log::warn!(
+                            "failed to write initial playback state to {}: {e}",
+                            crate::logging::sanitize_path(&state_path)
+                        );
+                    }
                 }
             }
         }
