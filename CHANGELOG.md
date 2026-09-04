@@ -21,6 +21,9 @@
   - Added environment-aware update modal actions: displays Homebrew upgrade instructions (`brew upgrade moviebox-tui`) with `[b]` shortcut on Homebrew installations, Termux installer guidance on Android, and package manager notifications on read-only installations.
   - Added 5-iteration retry loop with bounded 1-second backoff in the Windows update helper script (`moviebox_update_helper.bat`) to tolerate transient file locks from antivirus or Windows search indexers during binary replacement.
   - Cached full `Release` metadata in `AppState` and action pipeline, eliminating duplicate network queries between release checking and self-update invocation.
+- **Empirical Performance Standards & Benchmark Testing Guidelines**:
+  - Added strict performance verification standards requiring empirical before-and-after measurements (runtime latency, allocations, frame render latency, I/O syscalls, binary footprint) across hot paths.
+  - Documented standardized performance benchmark reporting format in `docs/testing.md` for reproducible optimization audits.
 ### Removed
 - **Poster Graphics Configuration & Halfblocks Engine**:
   - Removed Unicode Halfblocks poster engine (`▀`/`▄`), eliminating low-resolution cell distortion, font scanlines, and terminal redraw lag during list scrolling.

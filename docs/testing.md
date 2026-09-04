@@ -123,3 +123,53 @@ Because TUI and media player interactions depend on terminal capabilities and ex
 2. **Playback Launch & Return**: Launch stream in player, exit player, verify terminal state is cleanly restored without residual escape sequences.
 3. **History & State**: Verify playback progress and watched checkmarks update accurately.
 4. **Downloads**: Test single episode and batch season download queuing.
+
+---
+
+## 5. Performance Verification & Benchmarking Guidelines
+
+All performance optimizations in MovieBox-TUI must be backed by empirical before-and-after measurements. Changes without quantitative verification must be classified as refactors or code cleanups, not performance improvements.
+
+### A. Required Benchmark Measurements
+When submitting or claiming a performance improvement, measure and report exact deltas:
+
+1. **CPU & Algorithmic Hot Paths**:
+   - Measure wall-clock duration using `std::time::Instant` across $\ge 1,000$ iterations.
+   - Run benchmarks on release builds (`cargo test --release` or isolated binary harness) to reflect production compiler optimizations.
+   - Report: Baseline vs. Optimized duration in microseconds ($\mu\text{s}$) or milliseconds ($\text{ms}$), plus relative speedup ($N\times$).
+
+2. **Memory & Allocations**:
+   - Count heap allocations and memory footprint deltas on hot paths (e.g., zero-copy slices vs. cloned `String` or `Vec`).
+   - Report: Total allocations eliminated or reduction percentage.
+
+3. **TUI Render Latency**:
+   - Measure full frame draw cycles using headless `TestBackend`:
+     ```rust
+     let backend = TestBackend::new(120, 30);
+     let mut terminal = Terminal::new(backend).unwrap();
+     let start = std::time::Instant::now();
+     for _ in 0..1_000 {
+         terminal.draw(|f| app.draw(f)).unwrap();
+     }
+     let avg_us = start.elapsed().as_micros() as f64 / 1_000.0;
+     ```
+   - Report: Average draw duration per frame across standard terminal dimensions (80x24, 120x30).
+
+4. **I/O & Syscalls**:
+   - Quantify eliminated filesystem operations (e.g. cache lookups, redundant directory reads) or network roundtrips.
+   - Report: Number of disk reads/writes or HTTP requests saved per action.
+
+5. **Release Binary Footprint**:
+   - Measure stripped release binary size (`target/release/moviebox-tui`).
+   - Report: Baseline size, optimized size, and exact byte/kilobyte delta.
+
+### B. Standard Performance Reporting Format
+Document benchmark results in PR descriptions, commit messages, or changelog entries using this structured format:
+
+```text
+Benchmark: [Subsystem / Hot Path Name]
+- Baseline:   [value] [unit] (e.g. 142.3 µs / op, 84 allocs)
+- Optimized:  [value] [unit] (e.g. 12.1 µs / op, 2 allocs)
+- Delta:      [multiplier]x faster (-[percentage]% allocations)
+- Target:     [Architecture / OS, e.g. Apple M3 / arm64-darwin, release profile]
+```
