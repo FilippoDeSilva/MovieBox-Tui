@@ -125,6 +125,9 @@ impl ColorSupport {
         if std::env::var("NO_COLOR").is_ok() {
             return ColorSupport::NoColor;
         }
+        if std::env::var("WT_SESSION").is_ok() {
+            return ColorSupport::Truecolor;
+        }
         let colorterm = std::env::var("COLORTERM").unwrap_or_default();
         let term = std::env::var("TERM").unwrap_or_default();
         let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
@@ -150,8 +153,6 @@ pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str)
         || term.contains("ghostty")
         || term.starts_with("foot")
         || term.contains("alacritty")
-        || std::env::var("WT_SESSION").is_ok()
-        || cfg!(target_os = "windows")
         || term_program == "iTerm.app"
         || term_program == "Hyper"
         || term_program == "Tabby"
@@ -169,6 +170,8 @@ pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str)
         ColorSupport::Truecolor
     } else if has_256 {
         ColorSupport::Color256
+    } else if cfg!(target_os = "windows") {
+        ColorSupport::Truecolor
     } else {
         ColorSupport::Basic
     }
@@ -990,6 +993,10 @@ mod tests {
             classify_terminal("", "xterm", "Apple_Terminal"),
             ColorSupport::Basic
         );
+        #[cfg(target_os = "windows")]
+        assert_eq!(classify_terminal("", "", ""), ColorSupport::Truecolor);
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(classify_terminal("", "", ""), ColorSupport::Basic);
     }
 
     #[test]
