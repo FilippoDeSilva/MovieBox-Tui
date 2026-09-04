@@ -49,9 +49,7 @@ impl DetailsLayoutTier {
             return minimum.min(maximum);
         };
         let synopsis = details.description.as_deref().unwrap_or_default();
-        let show_poster = !matches!(self, Self::Tiny | Self::Narrow)
-            && area.width >= 75
-            && details.poster_url.is_some();
+        let show_poster = !matches!(self, Self::Tiny | Self::Narrow) && area.width >= 75;
         let text_width = area
             .width
             .saturating_sub(if show_poster { reserved_width } else { 4 })
@@ -358,23 +356,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .as_ref()
             .zip(state.image_picker.as_ref())
             .map(|(image, picker)| {
-                if matches!(
-                    picker.protocol_type(),
-                    ratatui_image::picker::ProtocolType::Halfblocks
-                ) {
-                    ((inner_area.height as f32 * 0.75).round() as u16).clamp(8, 20)
-                } else {
-                    let font_size = picker.font_size();
-                    let font_w = font_size.width.max(1);
-                    let font_h = font_size.height.max(1);
-                    let area_h_px = (inner_area.height as f32) * (font_h as f32);
-                    let aspect = image.width() as f32 / (image.height() as f32).max(1.0);
-                    let area_w_px = area_h_px * aspect;
-                    ((area_w_px / font_w as f32).round() as u16).max(1)
-                }
+                let font_size = picker.font_size();
+                let font_w = font_size.width.max(1);
+                let font_h = font_size.height.max(1);
+                let area_h_px = (inner_area.height as f32) * (font_h as f32);
+                let aspect = image.width() as f32 / (image.height() as f32).max(1.0);
+                let area_w_px = area_h_px * aspect;
+                ((area_w_px / font_w as f32).round() as u16).max(1)
             })
             .unwrap_or_else(|| ((inner_area.height as f32 * (4.0 / 3.0)).round() as u16).max(6));
-        width_for_height.clamp(8, 22)
+        width_for_height.clamp(12, 22)
     } else {
         0
     };
@@ -430,7 +421,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     }
                 }
             }
-        } else {
+        } else if state.image_supported && (state.is_loading || state.preview_loading) {
             let loading_block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(crate::tui::overlay::border_type(state.basic_terminal))
@@ -451,6 +442,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 .alignment(Alignment::Center)
                 .style(theme.overlay0)
                 .block(loading_block);
+            frame.render_widget(placeholder, poster_area);
+        } else {
+            let art_block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+                .border_style(theme.surface0);
+            let label = if state.basic_terminal {
+                "[No Art]"
+            } else {
+                "No Art"
+            };
+            let pad_top = poster_area.height.saturating_sub(3) / 2;
+            let content = format!("{}{label}", "\n".repeat(pad_top as usize));
+            let placeholder = Paragraph::new(content)
+                .alignment(Alignment::Center)
+                .style(theme.overlay0)
+                .block(art_block);
             frame.render_widget(placeholder, poster_area);
         }
 
@@ -2556,6 +2564,7 @@ mod tests {
         assert!(content.contains("Movie"));
         assert!(content.contains("Audio: Original, Hindi"));
         assert!(content.contains("MovieBox"));
+        assert!(content.contains("No Art"));
     }
 
     #[test]
@@ -2637,5 +2646,52 @@ mod tests {
             .collect::<String>();
 
         assert!(content_settled.contains("No stream sources found"));
+    }
+
+    #[test]
+    fn test_details_poster_no_art_basic_terminal() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            basic_terminal: true,
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "sample".to_string(),
+                },
+                title: "Sample Movie".to_string(),
+                media_type: MediaType::Movie,
+                year: Some("2024".to_string()),
+                description: Some("A movie synopsis for testing.".to_string()),
+                tagline: None,
+                imdb_rating: None,
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: None,
+                genres: vec![],
+                seasons: vec![],
+                dubs: vec![],
+            }),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("[No Art]"));
     }
 }

@@ -77,56 +77,37 @@ pub(crate) fn render_poster_placeholder(
         return;
     }
 
-    let anim_frame = (tick / 4) % 3;
-    let eyes = if basic_terminal {
-        if is_in_flight {
-            match anim_frame {
-                0 => ".  .",
-                1 => "o  o",
-                _ => "O  O",
-            }
+    let pad_top = inner.height.saturating_sub(1) / 2;
+    let text_area = Rect {
+        x: inner.x,
+        y: inner.y + pad_top,
+        width: inner.width,
+        height: 1.min(inner.height),
+    };
+
+    if is_in_flight {
+        let dots = match (tick / 4) % 4 {
+            0 => "·",
+            1 => "··",
+            2 => "···",
+            _ => "····",
+        };
+        let p = Paragraph::new(dots)
+            .style(theme.lavender)
+            .alignment(Alignment::Center);
+        frame.render_widget(p, text_area);
+    } else {
+        let label = if inner.width >= 8 {
+            if basic_terminal { "[No Art]" } else { "No Art" }
+        } else if inner.width >= 6 {
+            "No Art"
         } else {
-            "-  -"
-        }
-    } else if is_in_flight {
-        match anim_frame {
-            0 => "·  ·",
-            1 => "◦  ◦",
-            _ => "○  ○",
-        }
-    } else {
-        "·  ·"
-    };
-
-    let text_style = if is_in_flight {
-        theme.lavender
-    } else {
-        theme.text_dim
-    };
-
-    if inner.height == 1 {
-        let p = Paragraph::new(eyes)
-            .style(text_style)
+            "·"
+        };
+        let p = Paragraph::new(label)
+            .style(theme.overlay0)
             .alignment(Alignment::Center);
-        frame.render_widget(p, inner);
-    } else if inner.height == 2 {
-        let mouth = if basic_terminal { "--" } else { "──" };
-        let content = format!("{eyes}\n{mouth}");
-        let p = Paragraph::new(content)
-            .style(text_style)
-            .alignment(Alignment::Center);
-        frame.render_widget(p, inner);
-    } else {
-        let pad_top = inner.height.saturating_sub(2) / 2;
-        let mouth = if basic_terminal { "--" } else { "──" };
-        let mut content = "\n".repeat(pad_top as usize);
-        content.push_str(eyes);
-        content.push('\n');
-        content.push_str(mouth);
-        let p = Paragraph::new(content)
-            .style(text_style)
-            .alignment(Alignment::Center);
-        frame.render_widget(p, inner);
+        frame.render_widget(p, text_area);
     }
 }
 
@@ -1515,30 +1496,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         );
         let list_block = Block::default();
         if !state.search_results.is_empty() {
-            let poster_width = if state.image_supported {
-                state
-                    .image_picker
-                    .as_ref()
-                    .map(|picker| {
-                        if matches!(
-                            picker.protocol_type(),
-                            ratatui_image::picker::ProtocolType::Halfblocks
-                        ) {
-                            11_u16
-                        } else {
-                            let font = picker.font_size();
-                            let pixel_height =
-                                u64::from(state.poster_rows.max(3)) * u64::from(font.height.max(1));
-                            let pixel_width = pixel_height * 2 / 3;
-                            u16::try_from(pixel_width.div_ceil(u64::from(font.width.max(1))))
-                                .unwrap_or(u16::MAX)
-                                .max(6)
-                        }
-                    })
-                    .unwrap_or_else(|| state.poster_rows.saturating_mul(4).div_ceil(3).max(6))
-            } else {
-                12
-            };
             let initial_metrics = state.result_metrics(results_chunk.height, results_chunk.width);
             let has_scrollbar = state.search_results.len() > initial_metrics.visible_items;
             let results_area = if has_scrollbar {
@@ -1553,7 +1510,24 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let selected_idx = state.search_list_state.selected();
 
             let metrics = state.result_metrics(results_area.height, results_area.width);
-            let poster_width = poster_width
+            let target_width = if state.image_supported {
+                state
+                    .image_picker
+                    .as_ref()
+                    .map(|picker| {
+                        let font = picker.font_size();
+                        let pixel_height =
+                            u64::from(state.poster_rows.max(3)) * u64::from(font.height.max(1));
+                        let pixel_width = pixel_height * 2 / 3;
+                        u16::try_from(pixel_width.div_ceil(u64::from(font.width.max(1))))
+                            .unwrap_or(u16::MAX)
+                            .max(6)
+                    })
+                    .unwrap_or_else(|| state.poster_rows.saturating_mul(4).div_ceil(3).max(6))
+            } else {
+                state.poster_rows.saturating_mul(4).div_ceil(3).clamp(8, 12)
+            };
+            let poster_width = target_width
                 .min(metrics.col_width.saturating_sub(18).max(6))
                 .max(6);
             state.last_result_metrics = Some(metrics);
@@ -1637,7 +1611,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     ..poster_area
                 };
 
-                if state.image_supported {
+                if state.image_supported && poster_area.width > 0 {
                     if let Some(img) = state.search_posters.peek(&res.id) {
                         let target_dims = (poster_area.width, state.poster_rows);
                         let needs_protocol =
@@ -1674,7 +1648,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                             state.tick_count,
                         );
                     }
-                } else {
+                } else if poster_area.width > 0 {
                     render_poster_placeholder(
                         frame,
                         p_area,
@@ -2540,6 +2514,30 @@ fn render_search_suggestions(
 #[inline(always)]
 fn item_slot_rects(item_area: Rect, poster_width: u16) -> (Rect, Rect, Rect) {
     let highlight_w = 2.min(item_area.width);
+    if poster_width == 0 {
+        let text_x = item_area.x + highlight_w;
+        let text_w = item_area.width.saturating_sub(highlight_w);
+        return (
+            Rect {
+                x: item_area.x,
+                y: item_area.y,
+                width: highlight_w,
+                height: item_area.height,
+            },
+            Rect {
+                x: item_area.x + highlight_w,
+                y: item_area.y,
+                width: 0,
+                height: item_area.height,
+            },
+            Rect {
+                x: text_x,
+                y: item_area.y,
+                width: text_w,
+                height: item_area.height,
+            },
+        );
+    }
     let poster_w = poster_width.min(item_area.width.saturating_sub(highlight_w));
     let text_x = item_area.x + highlight_w + poster_w + 1;
     let text_w = item_area.width.saturating_sub(highlight_w + poster_w + 1);
@@ -3376,5 +3374,21 @@ mod tests {
         assert!(content.contains("No results for “deewaniyat” on MovieBox"));
         assert!(content.contains("Try on 4KHDHub"));
         assert!(content.contains("Clear Search"));
+    }
+
+    #[test]
+    fn test_item_slot_rects_responsive_zero_width() {
+        let area = Rect::new(10, 5, 80, 4);
+        let (hl_zero, poster_zero, text_zero) = item_slot_rects(area, 0);
+        assert_eq!(hl_zero.width, 2);
+        assert_eq!(poster_zero.width, 0);
+        assert_eq!(text_zero.x, 12);
+        assert_eq!(text_zero.width, 78);
+
+        let (hl, poster, text) = item_slot_rects(area, 12);
+        assert_eq!(hl.width, 2);
+        assert_eq!(poster.width, 12);
+        assert_eq!(text.x, 25);
+        assert_eq!(text.width, 65);
     }
 }

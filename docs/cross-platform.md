@@ -27,16 +27,14 @@ prevent escape sequence probe leakage (`Gi=31...`):
 - **Poster rendering**: Sixel, Kitty, and iTerm2 protocols where the probe
   detects them. Terminals that report kitty/sixel capability but no cell
   size (Windows Terminal sixel, iTerm2 over SSH) are salvaged with default
-  cell metrics. In `Auto` mode, non-graphics terminals (e.g. standard Windows
-  PowerShell / conhost, macOS Apple_Terminal) gracefully display clean text
-  placeholders (`· ·` on Home, `No Art` on Details) to prevent scroll tearing.
-  Users can opt in to 24-bit TrueColor Unicode character-cell posters (`▀`/`▄`)
-  by setting `Poster Graphics: Halfblocks` in `/settings` (Appearance) or
-  `MOVIEBOX_IMAGE_PROTOCOL=halfblocks`. All poster image rendering is
+  cell metrics. On terminals lacking graphics support (e.g. standard Windows
+  PowerShell, legacy console host, macOS Terminal.app), search result cards
+  and details screens display standardized bordered containers with centered `No Art`
+  indicators, ensuring consistent layout geometry without confusing broken blocks.
   automatically gated behind `has_active_modal()` to prevent graphic bleed
   through modal popups and overlays. `MOVIEBOX_NO_IMAGE=1` disables queries;
-  `MOVIEBOX_IMAGE_PROTOCOL` forces a protocol; `MOVIEBOX_CELL_SIZE=WxH`
-  overrides metrics.
+  `MOVIEBOX_IMAGE_PROTOCOL` forces a protocol (`kitty`, `sixel`, `iterm2`);
+  `MOVIEBOX_CELL_SIZE=WxH` overrides metrics.
 - **Colors & Themes**: With no explicit theme, `NO_COLOR` wins, then truecolor RGB
   (auto-detected across Ghostty, Kitty, WezTerm, iTerm2, Alacritty, Foot, Windows Terminal,
   Hyper, Tabby, Warp, and VSCode; enabled by default on Windows 10/11 console host and Windows Terminal),

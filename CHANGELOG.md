@@ -3,11 +3,6 @@
 ## [Unreleased]
 
 ### Added
-- **Optimized Halfblocks Poster Engine & Universal Windows PowerShell Support**:
-  - Implemented 24-bit TrueColor Unicode Halfblocks poster graphics engine (`▀`/`▄`) with dedicated 11x6 cell resolution (132 sub-pixels) and selection highlight isolation.
-  - Added interactive `Poster Graphics` configuration to Settings Hub (`/settings` $\to$ Appearance) with `[ Auto | Halfblocks | Off ]` modes, persisted to `config.json`.
-  - Added `MOVIEBOX_IMAGE_PROTOCOL=halfblocks` environment variable override to force character-cell posters in standard Windows PowerShell, legacy consoles, and basic terminals.
-  - Added explicit buffer clearing (`clear_area`) before rasterizing posters on search results and details screens, preventing ghost character tearing during fast list scrolling.
 - **Windows TrueColor & High-Contrast Terminal Theming**:
   - Enabled 24-bit TrueColor auto-detection by default on Windows 10/11 (`conhost.exe`, Windows Terminal, PowerShell, CMD), ensuring Windows users receive rich Catppuccin themes out of the box.
   - Overhauled 16-color ANSI dark fallback palette (`Theme::fallback`), replacing low-contrast dark blue and magenta with high-contrast cyan accents for borders, titles, headers, and highlights.
@@ -20,12 +15,21 @@
   - Added environment-aware update modal actions: displays Homebrew upgrade instructions (`brew upgrade moviebox-tui`) with `[b]` shortcut on Homebrew installations, Termux installer guidance on Android, and package manager notifications on read-only installations.
   - Added 5-iteration retry loop with bounded 1-second backoff in the Windows update helper script (`moviebox_update_helper.bat`) to tolerate transient file locks from antivirus or Windows search indexers during binary replacement.
   - Cached full `Release` metadata in `AppState` and action pipeline, eliminating duplicate network queries between release checking and self-update invocation.
+### Removed
+- **Poster Graphics Configuration & Halfblocks Engine**:
+  - Removed Unicode Halfblocks poster engine (`▀`/`▄`), eliminating low-resolution cell distortion, font scanlines, and terminal redraw lag during list scrolling.
+  - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` $\to$ Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
+
+### Fixed
+- **Standardized 'No Art' Poster Containers Across Terminals**:
+  - Replaced robot eyes and broken infinite loading spinners with clean, static, centered `No Art` bordered blocks across search results and details screens on terminals without graphics support.
+  - Preserved full-fidelity native GPU graphics rendering on supported terminals while standardizing card geometry and poster container boundaries across all platforms.
+  - Gated background poster network requests and CPU image decoding strictly behind `image_supported`, eliminating redundant network bandwidth and CPU cycles on standard terminals.
 
 ### Changed
 - **Provider Switching Shortcut**:
   - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
   - Streamlined `/config` as a direct alias for `/settings`.
-
 
 - **Pruned Redundant Theme Slash Command**:
   - Removed standalone `/theme` slash command, parser routing, and auto-suggestions; theme selection and visual palette swatches are managed directly within the interactive Settings Hub (`/settings` $\to$ Appearance $\to$ Theme).

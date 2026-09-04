@@ -125,7 +125,6 @@ impl App {
             }
         }
         state.active_theme_kind = config.active_theme;
-        state.poster_mode = config.poster_mode;
         state.default_player = config.default_player;
         state.download_dir = config.download_dir.map(std::path::PathBuf::from);
         state.installed_addons = crate::config::load_addons();
@@ -220,7 +219,6 @@ impl App {
                 .download_dir
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string()),
-            poster_mode: self.state.poster_mode.clone(),
         };
         crate::tui::config::save(&config);
     }

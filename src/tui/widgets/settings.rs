@@ -633,7 +633,7 @@ fn render_content_modes_settings(frame: &mut Frame, area: Rect, state: &AppState
 }
 
 fn render_appearance_settings(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
-    let row_rects = settings_row_rects_in_area(area, 2);
+    let row_rects = settings_row_rects_in_area(area, 1);
     let has_active_popup = has_active_settings_popup(state);
 
     let theme_name = if state.active_theme_kind.is_empty() {
@@ -661,32 +661,6 @@ fn render_appearance_settings(frame: &mut Frame, area: Rect, state: &AppState, t
                 has_active_popup,
                 label: "Theme",
                 subtext: "Active color theme and palette styling",
-                value_spans,
-            },
-            theme,
-            state.basic_terminal,
-        );
-    }
-
-    if let Some(&row_area) = row_rects.get(1) {
-        let is_selected = state.settings_selected_row == 1;
-        let value_spans = vec![Span::styled(
-            state.poster_mode_label(),
-            if state.basic_terminal {
-                theme.text.add_modifier(Modifier::BOLD)
-            } else {
-                theme.accent.add_modifier(Modifier::BOLD)
-            },
-        )];
-
-        render_row(
-            frame,
-            row_area,
-            SettingRow {
-                is_selected,
-                has_active_popup,
-                label: "Poster Graphics",
-                subtext: "Native terminal protocols, Halfblocks or disabled",
                 value_spans,
             },
             theme,
@@ -1221,11 +1195,9 @@ mod tests {
             .join("\n");
 
         assert!(rendered.contains("Theme"));
-        assert!(rendered.contains("Poster Graphics"));
-        assert!(rendered.contains("Auto"));
 
         let popup = Rect::new(4, 4, 76, 17);
         let rows = settings_row_rects(popup, SettingsCategory::Appearance);
-        assert_eq!(rows.len(), 2);
+        assert_eq!(rows.len(), 1);
     }
 }

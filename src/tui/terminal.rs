@@ -92,7 +92,7 @@ mod tests {
             std::env::set_var("TERM", "dumb");
             assert!(!should_query_images());
             std::env::remove_var("TERM");
-            std::env::set_var("MOVIEBOX_IMAGE_PROTOCOL", "halfblocks");
+            std::env::set_var("MOVIEBOX_IMAGE_PROTOCOL", "kitty");
             assert!(should_query_images());
             std::env::remove_var("MOVIEBOX_IMAGE_PROTOCOL");
         }

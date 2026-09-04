@@ -71,7 +71,7 @@ impl SettingsCategory {
         match self {
             Self::General => 3,
             Self::ContentModes => 4,
-            Self::Appearance => 2,
+            Self::Appearance => 1,
             Self::StorageInfo => 3,
         }
     }
@@ -277,7 +277,6 @@ pub struct AppState {
 
     pub poster_protocol: Option<(ratatui::layout::Rect, ratatui_image::protocol::Protocol)>,
     pub image_picker: Option<ratatui_image::picker::Picker>,
-    pub poster_mode: String,
     pub image_supported: bool,
     pub clear_terminal_before_draw: bool,
     pub poster_rows: u16,
@@ -437,7 +436,6 @@ impl Default for AppState {
 
             poster_protocol: None,
             image_picker: None,
-            poster_mode: "auto".to_string(),
             image_supported: crate::tui::terminal::should_query_images(),
             clear_terminal_before_draw: false,
             poster_rows: 3,
@@ -895,30 +893,6 @@ impl AppState {
         self.active_theme_kind = next_theme.clone();
         self.theme_is_auto = false;
         next_theme
-    }
-    pub fn cycle_poster_mode(&mut self, forward: bool) -> String {
-        let modes = ["auto", "halfblocks", "off"];
-        let total = modes.len();
-        let current_idx = modes
-            .iter()
-            .position(|&m| m.eq_ignore_ascii_case(&self.poster_mode))
-            .unwrap_or(0);
-        let next_idx = if forward {
-            (current_idx + 1) % total
-        } else {
-            (current_idx + total - 1) % total
-        };
-        let next_mode = modes[next_idx].to_string();
-        self.poster_mode = next_mode.clone();
-        next_mode
-    }
-
-    pub fn poster_mode_label(&self) -> &'static str {
-        match self.poster_mode.to_ascii_lowercase().as_str() {
-            "halfblocks" => "Halfblocks",
-            "off" => "Off",
-            _ => "Auto",
-        }
     }
 
     pub fn can_disable_streaming_mode(&self) -> bool {

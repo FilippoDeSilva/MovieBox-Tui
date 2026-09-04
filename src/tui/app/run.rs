@@ -21,9 +21,7 @@ impl App {
     where
         std::io::Error: From<<B as ratatui::backend::Backend>::Error>,
     {
-        let should_probe = (self.state.image_supported
-            || self.state.poster_mode.eq_ignore_ascii_case("halfblocks"))
-            && !self.state.poster_mode.eq_ignore_ascii_case("off");
+        let should_probe = self.state.image_supported;
         if self.state.image_picker.is_none() && should_probe {
             self.probe_terminal().await;
         }
@@ -140,52 +138,30 @@ impl App {
     pub(super) async fn probe_terminal(&mut self) {
         use ratatui_image::picker::{Capability, ProtocolType};
 
-        if self.state.poster_mode.eq_ignore_ascii_case("off") {
-            self.state.image_supported = false;
-            self.state.image_picker = None;
-            return;
-        }
-
-        let is_halfblocks_forced = matches!(
-            Self::forced_protocol(),
-            Some(ForcedProtocol::Type(ProtocolType::Halfblocks))
-        ) || self.state.poster_mode.eq_ignore_ascii_case("halfblocks");
-
         match Self::forced_protocol() {
             Some(ForcedProtocol::None) => {
                 self.state.image_supported = false;
                 self.state.image_picker = None;
                 return;
             }
-            forced => {
-                if forced.is_some() {
-                    let font_size = Self::cell_size_override().unwrap_or(ratatui_image::FontSize {
-                        width: 10,
-                        height: 20,
-                    });
-                    #[allow(deprecated)]
-                    let mut picker = ratatui_image::picker::Picker::from_fontsize(font_size);
-                    if let Some(ForcedProtocol::Type(protocol)) = forced {
-                        picker.set_protocol_type(protocol);
-                    }
-                    self.accept_picker(picker);
-                    return;
-                }
+            Some(ForcedProtocol::Type(ProtocolType::Halfblocks)) => {
+                self.state.image_supported = false;
+                self.state.image_picker = None;
+                return;
             }
+            Some(ForcedProtocol::Type(protocol)) => {
+                let font_size = Self::cell_size_override().unwrap_or(ratatui_image::FontSize {
+                    width: 10,
+                    height: 20,
+                });
+                #[allow(deprecated)]
+                let mut picker = ratatui_image::picker::Picker::from_fontsize(font_size);
+                picker.set_protocol_type(protocol);
+                self.accept_picker(picker);
+                return;
+            }
+            None => {}
         }
-
-        if is_halfblocks_forced {
-            let font_size = Self::cell_size_override().unwrap_or(ratatui_image::FontSize {
-                width: 10,
-                height: 20,
-            });
-            #[allow(deprecated)]
-            let mut picker = ratatui_image::picker::Picker::from_fontsize(font_size);
-            picker.set_protocol_type(ProtocolType::Halfblocks);
-            self.accept_picker(picker);
-            return;
-        }
-
         let picker = self.query_picker().await;
 
         if self.state.theme_is_auto
@@ -244,7 +220,7 @@ impl App {
             }
         }
 
-        if matches!(picker.protocol_type(), ProtocolType::Halfblocks) && !is_halfblocks_forced {
+        if matches!(picker.protocol_type(), ProtocolType::Halfblocks) {
             self.state.image_supported = false;
             self.state.image_picker = None;
             return;
@@ -257,12 +233,7 @@ impl App {
         if cell_h > 0 {
             self.state.poster_rows = (96_u16.div_ceil(cell_h)).max(3);
         }
-        if matches!(
-            picker.protocol_type(),
-            ratatui_image::picker::ProtocolType::Halfblocks
-        ) {
-            self.state.poster_rows = self.state.poster_rows.clamp(5, 7);
-        }
+
         self.state.image_picker = Some(picker);
         self.state.image_supported = true;
     }
@@ -290,9 +261,7 @@ impl App {
             .as_str()
         {
             "none" | "off" | "false" => Some(ForcedProtocol::None),
-            "halfblocks" => Some(ForcedProtocol::Type(
-                ratatui_image::picker::ProtocolType::Halfblocks,
-            )),
+
             "sixel" => Some(ForcedProtocol::Type(
                 ratatui_image::picker::ProtocolType::Sixel,
             )),

@@ -432,12 +432,6 @@ impl App {
                         self.theme = crate::tui::theme::Theme::from_kind(kind);
                         self.persist_config();
                         self.state.dirty = true;
-                    } else if self.state.settings_selected_row == 1 {
-                        self.state.cycle_poster_mode(forward);
-                        self.state.image_picker = None;
-                        self.action_sender.send(Action::ProbeTerminal).ok();
-                        self.persist_config();
-                        self.state.dirty = true;
                     }
                 }
                 crate::tui::state::SettingsCategory::StorageInfo => {}
@@ -597,12 +591,6 @@ impl App {
                         } else {
                             self.state.theme_list_state.select(Some(0));
                         }
-                    } else if self.state.settings_selected_row == 1 {
-                        self.state.cycle_poster_mode(true);
-                        self.state.image_picker = None;
-                        self.action_sender.send(Action::ProbeTerminal).ok();
-                        self.persist_config();
-                        self.state.dirty = true;
                     }
                 }
                 crate::tui::state::SettingsCategory::StorageInfo => {

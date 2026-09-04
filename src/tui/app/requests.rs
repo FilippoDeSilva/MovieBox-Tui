@@ -665,7 +665,9 @@ impl App {
                     self.state.poster_protocol = None;
                     if let Some(img) = self.state.image_cache.get(&id) {
                         self.state.poster_image = Some(std::sync::Arc::clone(img));
-                    } else if let Some(url) = cached.cover_url() {
+                    } else if self.state.image_supported
+                        && let Some(url) = cached.cover_url()
+                    {
                         let url = url.to_string();
                         let tx = self.action_sender.clone();
                         let id2 = id.clone();
@@ -777,7 +779,9 @@ impl App {
                 self.state.poster_protocol = None;
                 if let Some(cached_img) = self.state.image_cache.get(&id) {
                     self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
-                } else if let Some(url) = details.cover_url() {
+                } else if self.state.image_supported
+                    && let Some(url) = details.cover_url()
+                {
                     let url_clone = url.to_string();
                     let action_tx = self.action_sender.clone();
                     let id_clone = id.clone();
@@ -927,42 +931,48 @@ impl App {
                         self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
                     } else if let Some(url) = details.cover_url() {
                         self.state.history.update_cover_url(&id, url);
-                        let url_clone = url.to_string();
-                        let action_tx = self.action_sender.clone();
-                        let id_clone = id.clone();
-                        let http_client = self.service.http_client().clone();
-                        tokio::spawn(async move {
-                            if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
-                                let id_clone = id_clone.clone();
-                                move || {
-                                    crate::cache::get_namespaced_image_cache("posters", &id_clone)
-                                }
-                            })
-                            .await
-                            {
-                                if let Some(img) = network::decode_poster(bytes).await {
-                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
-                                    return;
-                                }
-                            }
-                            if let Some(bytes) =
-                                network::fetch_poster_bytes(&http_client, &url_clone).await
-                            {
-                                let bytes_clone = bytes.clone();
-                                let id_clone2 = id_clone.clone();
-                                let _ = tokio::task::spawn_blocking(move || {
-                                    crate::cache::set_namespaced_image_cache(
-                                        "posters",
-                                        &id_clone2,
-                                        &bytes_clone,
-                                    );
+                        if self.state.image_supported {
+                            let url_clone = url.to_string();
+                            let action_tx = self.action_sender.clone();
+                            let id_clone = id.clone();
+                            let http_client = self.service.http_client().clone();
+                            tokio::spawn(async move {
+                                if let Ok(Some(bytes)) = tokio::task::spawn_blocking({
+                                    let id_clone = id_clone.clone();
+                                    move || {
+                                        crate::cache::get_namespaced_image_cache(
+                                            "posters", &id_clone,
+                                        )
+                                    }
                                 })
-                                .await;
-                                if let Some(img) = network::decode_poster(bytes).await {
-                                    let _ = action_tx.send(Action::PosterSuccess(id_clone, img));
+                                .await
+                                {
+                                    if let Some(img) = network::decode_poster(bytes).await {
+                                        let _ =
+                                            action_tx.send(Action::PosterSuccess(id_clone, img));
+                                        return;
+                                    }
                                 }
-                            }
-                        });
+                                if let Some(bytes) =
+                                    network::fetch_poster_bytes(&http_client, &url_clone).await
+                                {
+                                    let bytes_clone = bytes.clone();
+                                    let id_clone2 = id_clone.clone();
+                                    let _ = tokio::task::spawn_blocking(move || {
+                                        crate::cache::set_namespaced_image_cache(
+                                            "posters",
+                                            &id_clone2,
+                                            &bytes_clone,
+                                        );
+                                    })
+                                    .await;
+                                    if let Some(img) = network::decode_poster(bytes).await {
+                                        let _ =
+                                            action_tx.send(Action::PosterSuccess(id_clone, img));
+                                    }
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -1132,7 +1142,9 @@ impl App {
                                 .or_else(|| self.state.search_posters.get(&id))
                             {
                                 self.state.poster_image = Some(std::sync::Arc::clone(cached_img));
-                            } else if let Some(details) = &self.state.selected_details {
+                            } else if self.state.image_supported
+                                && let Some(details) = &self.state.selected_details
+                            {
                                 if let Some(url) = details.cover_url() {
                                     let url_clone = url.to_string();
                                     let action_tx = self.action_sender.clone();
