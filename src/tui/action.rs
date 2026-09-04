@@ -131,7 +131,7 @@ pub enum Action {
     ),
     PosterSuccess(String, std::sync::Arc<image::DynamicImage>),
     SearchPosterLoaded(String, Option<std::sync::Arc<image::DynamicImage>>),
-    UpdateAvailable(Result<Option<(String, String)>, String>),
+    UpdateAvailable(Result<Option<crate::updater::Release>, String>),
     CheckForUpdates,
     StartSelfUpdate,
     SelfUpdateProgress(String),

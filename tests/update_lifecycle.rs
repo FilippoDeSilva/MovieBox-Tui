@@ -46,10 +46,12 @@ async fn test_update_check_guard_clears_on_success() {
     app.handle_action(Action::CheckForUpdates).await;
     assert!(app.state().is_checking_updates);
 
-    app.handle_action(Action::UpdateAvailable(Ok(Some((
-        "0.1.13".to_string(),
-        "Release notes content".to_string(),
-    )))))
+    app.handle_action(Action::UpdateAvailable(Ok(Some(Release {
+        version: "0.1.13".to_string(),
+        tag_name: "v0.1.13".to_string(),
+        notes: "Release notes content".to_string(),
+        assets: Vec::new(),
+    }))))
     .await;
 
     assert!(!app.state().is_checking_updates);
@@ -461,4 +463,48 @@ fn test_update_asset_rejects_wrong_architecture() {
 fn test_update_asset_rejects_wrong_platform() {
     assert!(TargetPlatform::detect("solaris", "x86_64", false).is_none());
     assert!(TargetPlatform::detect("netbsd", "x86_64", false).is_none());
+}
+
+#[tokio::test]
+async fn test_update_editing_mode_input_isolation() {
+    let mut app = App::new();
+    app.state_mut().update_available =
+        Some(("0.1.16".to_string(), "New release notes".to_string()));
+    app.state_mut().input_mode = moviebox_tui::tui::state::InputMode::Editing;
+
+    let u_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('u'),
+        crossterm::event::KeyModifiers::empty(),
+    );
+    app.handle_action(Action::Key(u_key)).await;
+    assert!(app.state().update_available.is_some());
+    assert!(!app.state().is_updating);
+    assert_eq!(app.state().search_query.as_str(), "u");
+}
+
+#[tokio::test]
+async fn test_update_is_updating_blocks_keys_and_mouse() {
+    let mut app = App::new();
+    app.state_mut().is_updating = true;
+    let q_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('q'),
+        crossterm::event::KeyModifiers::empty(),
+    );
+    app.handle_action(Action::Key(q_key)).await;
+    app.handle_action(Action::MouseClick(10, 10)).await;
+    assert!(app.state().is_updating);
+}
+
+#[tokio::test]
+async fn test_update_progress_message_tracking() {
+    let mut app = App::new();
+    app.handle_action(Action::SelfUpdateProgress(
+        "Downloading binary...".to_string(),
+    ))
+    .await;
+
+    assert_eq!(
+        app.state().update_progress_msg.as_deref(),
+        Some("Downloading binary...")
+    );
 }

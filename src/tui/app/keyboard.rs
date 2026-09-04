@@ -9,6 +9,9 @@ impl App {
     pub(super) async fn handle_key(&mut self, key: KeyEvent) -> Option<()> {
         use crossterm::event::{KeyCode, KeyModifiers};
 
+        if self.state.is_updating {
+            return None;
+        }
         if self.state.show_help {
             match key.code {
                 KeyCode::Up | KeyCode::PageUp => {
@@ -85,26 +88,44 @@ impl App {
             return None;
         }
 
-        if let Some((version, _)) = &self.state.update_available {
-            match key.code {
-                KeyCode::Char('u') | KeyCode::Char('U') => {
-                    self.action_sender.send(Action::StartSelfUpdate).ok();
-                    return None;
+        if self.state.input_mode != InputMode::Editing {
+            if let Some((version, _)) = &self.state.update_available {
+                let is_homebrew = std::env::current_exe()
+                    .map(|p| crate::updater::apply::is_homebrew_managed(&p))
+                    .unwrap_or(false);
+
+                match key.code {
+                    KeyCode::Char('u') | KeyCode::Char('U') if !is_homebrew => {
+                        self.action_sender.send(Action::StartSelfUpdate).ok();
+                        return None;
+                    }
+                    KeyCode::Char('b') | KeyCode::Char('B') if is_homebrew => {
+                        self.state
+                            .set_status_short("Run: brew upgrade moviebox-tui");
+                        self.state.notify(
+                            crate::tui::overlay::NotificationKind::Info,
+                            "Homebrew Upgrade",
+                            "Run 'brew upgrade moviebox-tui' in your terminal to update.",
+                        );
+                        self.state.update_available = None;
+                        return None;
+                    }
+                    KeyCode::Char('o') | KeyCode::Char('O') => {
+                        let url = format!(
+                            "https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{}",
+                            version
+                        );
+                        let _ = open::that(&url);
+                        self.state.update_available = None;
+                        return None;
+                    }
+                    KeyCode::Esc => {
+                        self.state.update_available = None;
+                        return None;
+                    }
+                    _ => {}
                 }
-                KeyCode::Char('o') | KeyCode::Char('O') => {
-                    let url = format!(
-                        "https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{}",
-                        version
-                    );
-                    let _ = open::that(&url);
-                    self.state.update_available = None;
-                    return None;
-                }
-                KeyCode::Esc => {
-                    self.state.update_available = None;
-                    return None;
-                }
-                _ => {}
+                return None;
             }
         }
 

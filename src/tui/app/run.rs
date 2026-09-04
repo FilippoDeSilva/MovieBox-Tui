@@ -531,7 +531,7 @@ impl App {
         self.draw_theme_picker(frame, area);
         self.draw_player_picker(frame, area);
         self.draw_update_modal(frame, area);
-
+        self.draw_updating_modal(frame, area);
         crate::tui::overlay::notifications(
             frame,
             area,
@@ -745,10 +745,19 @@ impl App {
     }
 
     fn draw_update_modal(&self, frame: &mut Frame, area: Rect) {
+        if self.state.input_mode == crate::tui::state::InputMode::Editing {
+            return;
+        }
+
         if let Some((version, notes)) = &self.state.update_available {
             use ratatui::layout::Alignment;
             use ratatui::text::{Line, Span};
             use ratatui::widgets::Paragraph;
+
+            let env = std::env::current_exe()
+                .ok()
+                .map(|p| crate::updater::apply::detect_environment(&p))
+                .unwrap_or(crate::updater::apply::InstallationEnvironment::DirectReplace);
 
             let layout = crate::tui::overlay::update_modal_layout(area, notes);
             let popup_area = layout.popup_area;
@@ -789,14 +798,52 @@ impl App {
                     ),
                 ])
                 .alignment(Alignment::Center),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "Release Notes:",
-                    self.theme
-                        .subtext1
-                        .add_modifier(ratatui::style::Modifier::BOLD),
-                )]),
             ];
+
+            match env {
+                crate::updater::apply::InstallationEnvironment::Homebrew => {
+                    text.push(
+                        Line::from(vec![
+                            Span::styled("Homebrew Managed • Run: ", self.theme.text_dim),
+                            Span::styled(
+                                "brew upgrade moviebox-tui",
+                                self.theme
+                                    .accent
+                                    .add_modifier(ratatui::style::Modifier::BOLD),
+                            ),
+                        ])
+                        .alignment(Alignment::Center),
+                    );
+                }
+                crate::updater::apply::InstallationEnvironment::Termux => {
+                    text.push(
+                        Line::from(vec![Span::styled(
+                            "Termux / Android • Re-run installer script to update",
+                            self.theme.accent,
+                        )])
+                        .alignment(Alignment::Center),
+                    );
+                }
+                crate::updater::apply::InstallationEnvironment::ReadOnly => {
+                    text.push(
+                        Line::from(vec![Span::styled(
+                            "Binary is not user-writable • Update via your package manager",
+                            self.theme.accent,
+                        )])
+                        .alignment(Alignment::Center),
+                    );
+                }
+                crate::updater::apply::InstallationEnvironment::DirectReplace
+                | crate::updater::apply::InstallationEnvironment::WindowsHelper => {}
+            }
+
+            text.push(Line::from(""));
+            text.push(Line::from(vec![Span::styled(
+                "Release Notes:",
+                self.theme
+                    .subtext1
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            )]));
 
             let line_width = popup_area.width.saturating_sub(6) as usize;
             for line in note_lines.iter().take(display_count) {
@@ -857,20 +904,117 @@ impl App {
             }
 
             text.push(Line::from(""));
-            text.push(
-                Line::from(vec![
+
+            let buttons = match env {
+                crate::updater::apply::InstallationEnvironment::Homebrew => vec![
+                    Span::styled("[b]", self.theme.shortcut),
+                    Span::styled(" Copy 'brew upgrade'    ", self.theme.text),
+                    Span::styled("[o]", self.theme.shortcut),
+                    Span::styled(" Open Release Page    ", self.theme.text),
+                    Span::styled("[Esc]", self.theme.shortcut),
+                    Span::styled(" Dismiss", self.theme.text),
+                ],
+                crate::updater::apply::InstallationEnvironment::Termux
+                | crate::updater::apply::InstallationEnvironment::ReadOnly => vec![
+                    Span::styled("[o]", self.theme.shortcut),
+                    Span::styled(" Open Release Page    ", self.theme.text),
+                    Span::styled("[Esc]", self.theme.shortcut),
+                    Span::styled(" Dismiss", self.theme.text),
+                ],
+                crate::updater::apply::InstallationEnvironment::DirectReplace
+                | crate::updater::apply::InstallationEnvironment::WindowsHelper => vec![
                     Span::styled("[u]", self.theme.shortcut),
                     Span::styled(" Update Now    ", self.theme.text),
                     Span::styled("[o]", self.theme.shortcut),
                     Span::styled(" Open Release Page    ", self.theme.text),
                     Span::styled("[Esc]", self.theme.shortcut),
                     Span::styled(" Dismiss", self.theme.text),
-                ])
-                .alignment(Alignment::Center),
-            );
+                ],
+            };
+
+            text.push(Line::from(buttons).alignment(Alignment::Center));
 
             let popup = Paragraph::new(text);
             frame.render_widget(popup, inner_area);
         }
+    }
+
+    fn draw_updating_modal(&self, frame: &mut Frame, area: Rect) {
+        if !self.state.is_updating {
+            return;
+        }
+
+        use ratatui::layout::Alignment;
+        use ratatui::text::{Line, Span};
+        use ratatui::widgets::Paragraph;
+
+        let width = 56.min(area.width.saturating_sub(4)).max(36);
+        let height = 8.min(area.height.saturating_sub(2)).max(6);
+        let popup_area = crate::tui::overlay::centered(area, width, height, 36, 56);
+
+        let inner_area = crate::tui::widgets::ModalFrame::new(
+            "Self-Update in Progress",
+            &self.theme,
+            self.state.basic_terminal,
+        )
+        .render(frame, popup_area, area);
+
+        let spinner = crate::tui::screens::details::stream_loading_spinner(
+            self.state.tick_count,
+            self.state.basic_terminal,
+        );
+
+        let target_version = self
+            .state
+            .update_release
+            .as_ref()
+            .map(|r| r.version.as_str())
+            .unwrap_or("latest");
+
+        let progress_msg = self
+            .state
+            .update_progress_msg
+            .as_deref()
+            .unwrap_or("Applying update...");
+
+        let text = vec![
+            Line::from(vec![
+                Span::styled(
+                    format!("{spinner} "),
+                    self.theme
+                        .accent
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Upgrading MovieBox-Tui ",
+                    self.theme
+                        .header
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("v{} → v{}", env!("CARGO_PKG_VERSION"), target_version),
+                    self.theme.highlight,
+                ),
+            ])
+            .alignment(Alignment::Center),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                crate::tui::text::truncate_width(
+                    progress_msg,
+                    inner_area.width.saturating_sub(2) as usize,
+                ),
+                self.theme.text,
+            )])
+            .alignment(Alignment::Center),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Please wait, do not close the terminal...",
+                self.theme.text_dim,
+            )])
+            .alignment(Alignment::Center),
+        ];
+
+        let popup = Paragraph::new(text);
+        frame.render_widget(popup, inner_area);
     }
 }

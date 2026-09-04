@@ -16,6 +16,30 @@ pub async fn perform_self_update(
     release: &Release,
     progress_sender: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
 ) -> Result<SelfUpdateOutcome, String> {
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("failed to get current executable path: {e}"))?;
+
+    let env = detect_environment(&current_exe);
+    match env {
+        InstallationEnvironment::Homebrew => {
+            return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
+                "This installation is managed by Homebrew. Run: brew upgrade moviebox-tui"
+                    .to_string(),
+            ));
+        }
+        InstallationEnvironment::Termux => {
+            return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
+                "Android / Termux update: run 'curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash'".to_string(),
+            ));
+        }
+        InstallationEnvironment::ReadOnly => {
+            return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
+                "MovieBox-Tui binary is not user-writable. Please update via your system package manager.".to_string(),
+            ));
+        }
+        InstallationEnvironment::DirectReplace | InstallationEnvironment::WindowsHelper => {}
+    }
+
     let platform = TargetPlatform::current().ok_or_else(|| {
         "current operating system or architecture is not supported for in-app self-update"
             .to_string()
@@ -31,22 +55,6 @@ pub async fn perform_self_update(
     let checksum_asset = release
         .find_checksum_asset()
         .ok_or_else(|| "no SHA256SUMS checksum file found in GitHub release".to_string())?;
-
-    let current_exe = std::env::current_exe()
-        .map_err(|e| format!("failed to get current executable path: {e}"))?;
-
-    let env = detect_environment(&current_exe);
-    if env == InstallationEnvironment::Homebrew {
-        return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
-            "This installation is managed by Homebrew. Run: brew upgrade moviebox-tui".to_string(),
-        ));
-    }
-    if env == InstallationEnvironment::ReadOnly {
-        return Ok(SelfUpdateOutcome::RequiresManualUpgrade(
-            "MovieBox-Tui binary is not user-writable. Please update via your system package manager.".to_string(),
-        ));
-    }
-
     let temp_dir = tempfile::Builder::new()
         .prefix("moviebox_update_")
         .tempdir()

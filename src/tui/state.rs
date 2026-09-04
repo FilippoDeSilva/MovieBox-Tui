@@ -318,7 +318,7 @@ pub struct AppState {
     pub is_checking_updates: bool,
     pub is_updating: bool,
     pub update_release: Option<crate::updater::Release>,
-
+    pub update_progress_msg: Option<String>,
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
     pub cancel_download: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -478,7 +478,7 @@ impl Default for AppState {
             is_checking_updates: false,
             is_updating: false,
             update_release: None,
-
+            update_progress_msg: None,
             download_progress: None,
             download_status: None,
             cancel_download: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -728,7 +728,8 @@ impl AppState {
             || self.is_download_subtitle_popup
             || self.show_season_download_confirm
             || self.show_episode_download_confirm
-            || self.update_available.is_some()
+            || (self.update_available.is_some() && self.input_mode != InputMode::Editing)
+            || self.is_updating
             || (self.input_mode == InputMode::Editing && !self.search_suggestions.is_empty())
     }
 
@@ -1250,6 +1251,9 @@ mod tests {
 
         state.update_available = Some(("v2.0.0".to_string(), "Notes".to_string()));
         assert!(state.has_active_modal());
+        state.input_mode = InputMode::Editing;
+        assert!(!state.has_active_modal());
+        state.input_mode = InputMode::Normal;
         state.update_available = None;
 
         state.input_mode = InputMode::Editing;

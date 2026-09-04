@@ -14,11 +14,16 @@ pub enum SelfUpdateOutcome {
 pub enum InstallationEnvironment {
     DirectReplace,
     Homebrew,
+    Termux,
     ReadOnly,
     WindowsHelper,
 }
 
 pub fn detect_environment(exe_path: &Path) -> InstallationEnvironment {
+    if super::artifact::is_termux_environment() {
+        return InstallationEnvironment::Termux;
+    }
+
     if is_homebrew_managed(exe_path) {
         return InstallationEnvironment::Homebrew;
     }
@@ -82,6 +87,11 @@ pub fn apply_staged_binary(
         InstallationEnvironment::Homebrew => {
             Ok(SelfUpdateOutcome::RequiresManualUpgrade(
                 "This installation is managed by Homebrew. Run: brew upgrade moviebox-tui".to_string(),
+            ))
+        }
+        InstallationEnvironment::Termux => {
+            Ok(SelfUpdateOutcome::RequiresManualUpgrade(
+                "Android / Termux update: run 'curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash'".to_string(),
             ))
         }
         InstallationEnvironment::ReadOnly => {
@@ -183,11 +193,20 @@ fn render_helper_script(staged_path: &Path, current_exe: &Path, pid: u32) -> Str
         "    timeout /t 1 /nobreak >NUL".to_string(),
         "    goto wait_loop".to_string(),
         ")".to_string(),
+        "set /a attempts=0".to_string(),
+        ":move_loop".to_string(),
         format!(
-            "move /y \"{}\" \"{}\"",
+            "move /y \"{}\" \"{}\" >NUL 2>&1",
             staged_path.to_string_lossy(),
             current_exe.to_string_lossy()
         ),
+        "if %ERRORLEVEL% NEQ 0 (".to_string(),
+        "    set /a attempts+=1".to_string(),
+        "    if %attempts% LSS 5 (".to_string(),
+        "        timeout /t 1 /nobreak >NUL".to_string(),
+        "        goto move_loop".to_string(),
+        "    )".to_string(),
+        ")".to_string(),
         format!(
             "if exist \"{}\" del /f /q \"{}\"",
             staged_path.to_string_lossy(),
@@ -274,8 +293,10 @@ mod tests {
             "tasklist /FI \"PID eq 4242\" 2>NUL | %SystemRoot%\\System32\\find.exe \"4242\" >NUL"
         ));
         assert!(script.contains(
-            "move /y \"C:\\App\\update dir\\.moviebox_update_staged.exe\" \"C:\\App\\moviebox-tui.exe\""
+            "move /y \"C:\\App\\update dir\\.moviebox_update_staged.exe\" \"C:\\App\\moviebox-tui.exe\" >NUL 2>&1"
         ));
+        assert!(script.contains(":move_loop"));
+        assert!(script.contains("if %attempts% LSS 5 ("));
         assert!(script.contains(
             "if exist \"C:\\App\\update dir\\.moviebox_update_staged.exe\" del /f /q \"C:\\App\\update dir\\.moviebox_update_staged.exe\""
         ));

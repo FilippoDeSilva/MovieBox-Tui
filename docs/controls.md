@@ -119,6 +119,16 @@ Type these commands directly into the search bar:
 - `↑`/`↓`, `PageUp`/`PageDown`, and the mouse wheel scroll long content.
 - Other keys are ignored while help is open.
 
+## Update Notification Modal
+
+When a new release is detected:
+
+- `u` / `U`: Download and install update immediately (direct binary replacement platforms).
+- `b` / `B`: View Homebrew upgrade command (`brew upgrade moviebox-tui`) on Homebrew-managed installations.
+- `o` / `O`: Open GitHub release notes in the system browser.
+- `Esc`: Dismiss modal and return to previous screen.
+- Modal presentation is deferred while actively typing in the search bar (`InputMode::Editing`) to prevent input hijacking. During update installation, keyboard and mouse inputs are locked while an in-flight Braille progress modal displays download, verification, and replacement status.
+
 ## Wide-Terminal Grid
 
 On terminals at least 110 columns wide, search results render in two

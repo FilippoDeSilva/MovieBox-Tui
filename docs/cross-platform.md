@@ -62,6 +62,16 @@ prevent escape sequence probe leakage (`Gi=31...`):
   embedded public resolvers (Cloudflare `1.1.1.1`, Google `8.8.8.8`, Quad9 `9.9.9.9`)
   when no system configuration exists — as on Android/Termux or minimal containers.
   No JNI or `ndk-context` required.
+## In-App Self-Update Engine
+
+MovieBox-TUI embeds an in-app binary upgrade engine (`src/updater/`) with cross-platform environment detection and deterministic fallback:
+
+- **Direct Replacement**: Supported on Linux (`x86_64`, `aarch64`), macOS (Universal binary), and Windows (`x64`, `arm64`). Downloaded release archives are validated against SHA-256 checksums, unpacked to temporary staging files, and swapped atomically with rollback on failure.
+- **Windows Helper Script**: On Windows, because running executables are locked by the OS, an external transient batch helper (`moviebox_update_helper.bat`) waits for the parent process PID to terminate, attempts atomic binary replacement with a 5-iteration retry loop (to tolerate antivirus/SmartScreen file locks), restarts the application, and self-deletes.
+- **Homebrew Managed Environments**: Automatically detected via path markers (`/Cellar/`, `/opt/homebrew/`, `/usr/local/Cellar/`, `/home/linuxbrew/`). In-app binary overwrites are disabled to protect package manager integrity; the update modal displays Homebrew instructions (`brew upgrade moviebox-tui`) with a dedicated `[b]` shortcut.
+- **Android / Termux**: Protects Termux environments from overwriting bionic libc binaries with incompatible Linux glibc binaries. Instructs users to re-run the universal installer script (`curl -fsSL ... | bash`).
+- **Deterministic GitHub Asset Fallback**: When GitHub API requests are unauthenticated or rate-limited (status 403), tag resolution falls back to HTTP redirects, and asset download URLs are computed deterministically from release tags rather than failing update operations.
+- **Input Isolation & Event Locking**: Update notifications defer blocking modal presentation while typing in search mode (`InputMode::Editing`) to prevent keystroke hijacking. During in-flight update execution (`is_updating`), all keyboard and mouse events are locked while displaying an active Braille progress spinner.
 
 ## Things to verify per release
 

@@ -24,6 +24,10 @@ impl App {
     }
 
     fn handle_overlay_mouse(&mut self, col: u16, row: u16, area: Rect) -> bool {
+        if self.state.is_updating {
+            return true;
+        }
+
         if !self.state.notifications.is_empty() {
             let rects = crate::tui::overlay::notification_rects(
                 area,
@@ -234,9 +238,23 @@ impl App {
                 .popup_area
                 .contains(ratatui::layout::Position::new(col, row))
             {
+                let is_homebrew = std::env::current_exe()
+                    .map(|p| crate::updater::apply::is_homebrew_managed(&p))
+                    .unwrap_or(false);
+
                 if row == layout.button_row_y {
                     if col < layout.update_btn_end_x {
-                        self.action_sender.send(Action::StartSelfUpdate).ok();
+                        if is_homebrew {
+                            self.state
+                                .set_status_short("Run: brew upgrade moviebox-tui");
+                            self.state.notify(
+                                NotificationKind::Info,
+                                "Homebrew Upgrade",
+                                "Run 'brew upgrade moviebox-tui' in your terminal to update.",
+                            );
+                        } else {
+                            self.action_sender.send(Action::StartSelfUpdate).ok();
+                        }
                     } else if col < layout.open_btn_end_x {
                         let url =
                             format!("https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{ver}");

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+- **In-App Self-Update Engine Hardening**:
+  - Added deterministic fallback download URL generation for GitHub release assets and `SHA256SUMS` when unauthenticated API requests encounter HTTP 403 rate limits.
+  - Added active in-flight self-update progress modal (`draw_updating_modal`) featuring animated Braille spinners, version upgrade indicators (`v{old} → v{new}`), and real-time status steps.
+  - Added environment-aware update modal actions: displays Homebrew upgrade instructions (`brew upgrade moviebox-tui`) with `[b]` shortcut on Homebrew installations, Termux installer guidance on Android, and package manager notifications on read-only installations.
+  - Added 5-iteration retry loop with bounded 1-second backoff in the Windows update helper script (`moviebox_update_helper.bat`) to tolerate transient file locks from antivirus or Windows search indexers during binary replacement.
+  - Cached full `Release` metadata in `AppState` and action pipeline, eliminating duplicate network queries between release checking and self-update invocation.
+
 ### Changed
 - **Provider Switching Shortcut**:
   - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
@@ -18,6 +26,9 @@
   - Updated macOS Homebrew installation with explicit `brew trust` step required by Homebrew 6.0+ for third-party taps.
   - Streamlined quickstart section to reference in-app interactive help (`?`) and `docs/controls.md`, preventing documentation drift.
 ### Fixed
+- **Update Modal Input Isolation & Event Guards**:
+  - Prevented keystroke hijacking: deferred blocking update modal presentation while the user is actively typing in the search bar (`InputMode::Editing`), ensuring keys (`u`, `o`, `Esc`) never trigger unintended update actions.
+  - Added input lock during in-flight updates (`is_updating`), consuming all keyboard and mouse events to prevent mid-upgrade process termination or disk corruption.
 - **Direct Playback & Header Compatibility**:
   - Eliminated vestigial in-stream "Open with" popup that blocked playback when only VLC was installed, routing playback directly to the preferred compatible player.
   - Prevented silent player overrides: when a user explicitly selects a default player (e.g. VLC) that cannot satisfy stream authentication headers (e.g. MovieBox signed DASH manifests), the app now halts playback and warns the user with actionable detected alternatives instead of silently launching an unselected player.
