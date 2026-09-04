@@ -609,6 +609,51 @@ impl App {
                     }
                     return None;
                 }
+            } else if !self.state.is_tv_mode && area.height >= 26 {
+                let suggestions_open = self.state.input_mode == InputMode::Editing
+                    && !self.state.search_suggestions.is_empty();
+                if !suggestions_open {
+                    let discover_y = rows.rects[rows.favorites].y;
+                    let discover_height = 6;
+                    let discover_card_area = Rect {
+                        x: card_x,
+                        y: discover_y,
+                        width: card_width,
+                        height: discover_height,
+                    };
+
+                    if col >= discover_card_area.left()
+                        && col < discover_card_area.right()
+                        && row >= discover_card_area.top()
+                        && row < discover_card_area.bottom()
+                    {
+                        if self.state.is_addon_mode {
+                            self.action_sender.send(Action::ShowBrowseMenu).ok();
+                        } else {
+                            let rel_row = row - discover_card_area.top();
+                            match rel_row {
+                                1 => self
+                                    .action_sender
+                                    .send(Action::SelectBrowse(BrowsePreset::Trending))
+                                    .ok(),
+                                2 => self
+                                    .action_sender
+                                    .send(Action::SelectBrowse(BrowsePreset::TopRatedAllTime))
+                                    .ok(),
+                                3 => self
+                                    .action_sender
+                                    .send(Action::SelectBrowse(BrowsePreset::TopRatedRecent))
+                                    .ok(),
+                                4 => self
+                                    .action_sender
+                                    .send(Action::SelectBrowse(BrowsePreset::MostWatched))
+                                    .ok(),
+                                _ => self.action_sender.send(Action::ShowBrowseMenu).ok(),
+                            };
+                        }
+                        return None;
+                    }
+                }
             }
 
             return None;

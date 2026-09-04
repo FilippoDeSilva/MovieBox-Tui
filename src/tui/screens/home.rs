@@ -655,12 +655,21 @@ pub(crate) fn render_discover_landing(
         return;
     }
 
-    let presets = [
-        ("Trending Movies", "/browse · Popular & In-Theaters"),
-        ("Top Rated Series", "/browse · Award-Winning TV"),
-        ("New Releases", "/browse · Latest 4K & HD Additions"),
-        ("Curated Catalogs", "/browse · Explore Genres"),
-    ];
+    let presets = if state.is_addon_mode {
+        [
+            ("Top Movies", "Cinemeta Curated Catalog"),
+            ("Top Series", "Popular & Episodic TV"),
+            ("Addon Catalogs", "Installed Community Manifests"),
+            ("Community Streams", "Multi-Source Aggregated Feeds"),
+        ]
+    } else {
+        [
+            ("Trending Now", "Popular & In-Theaters"),
+            ("Top Rated Series", "Critically Acclaimed TV"),
+            ("Latest Releases", "Recent 4K & HD Additions"),
+            ("Most Watched", "Community Favorites"),
+        ]
+    };
 
     let card_width = search_deck_width(area, state, true);
     let row_count = presets.len() as u16;
@@ -679,7 +688,14 @@ pub(crate) fn render_discover_landing(
         ("─", "✦")
     };
     let block = Block::default()
-        .title(format!("{bar} {compass}  Discover & Quick Categories "))
+        .title(format!("{bar} {compass}  Discover Categories "))
+        .title(
+            Line::from(vec![Span::styled(
+                "[ /browse ] ",
+                theme.accent.add_modifier(Modifier::BOLD),
+            )])
+            .alignment(Alignment::Right),
+        )
         .title_style(theme.subtext1)
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
@@ -699,7 +715,7 @@ pub(crate) fn render_discover_landing(
         let pointer = if state.basic_terminal { " - " } else { " · " };
         let tag_len = crate::tui::text::width(desc);
         let title_w = crate::tui::text::width(title);
-        let margins_len = 4;
+        let margins_len = 6;
         let pad_len = (inner_area.width as usize).saturating_sub(margins_len + title_w + tag_len);
 
         let line = Line::from(vec![
@@ -1410,10 +1426,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             );
         }
         search_bar_area = search_card_area;
+        let suggestions_open =
+            state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
 
         if state.favorites_landing_visible() && !state.tv_config_popup {
             render_favorites_landing(frame, vertical_chunks[rows.favorites], state, theme);
-        } else if !state.is_tv_mode && !state.tv_config_popup && area.height >= 26 {
+        } else if !state.is_tv_mode
+            && !state.tv_config_popup
+            && !suggestions_open
+            && area.height >= 26
+        {
             render_discover_landing(frame, vertical_chunks[rows.favorites], state, theme);
         }
         let bar_spans = home_bottom_bar_spans(state, theme, area.width, modal_active);
@@ -2645,6 +2667,117 @@ mod tests {
         assert!(rendered.contains("Inception"));
         assert!(!rendered.contains("Favorites"));
         assert!(!rendered.contains("Secret Favorite Movie"));
+    }
+
+    #[test]
+    fn test_landing_draw_hides_discover_when_suggestions_open() {
+        let backend = TestBackend::new(90, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Editing,
+            streaming_enabled: true,
+            search_suggestions: vec!["/help".to_string(), "Inception".to_string()],
+            suggest_index: Some(0),
+            ..Default::default()
+        };
+        state.favorites.items.clear();
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 90, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..30 {
+            for x in 0..90 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("help"));
+        assert!(rendered.contains("Inception"));
+        assert!(!rendered.contains("Discover Categories"));
+        assert!(!rendered.contains("Trending Now"));
+    }
+
+    #[test]
+    fn test_discover_landing_rendering_streaming_mode() {
+        let backend = TestBackend::new(90, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            streaming_enabled: true,
+            active_provider: crate::providers::models::ProviderKind::MovieBox,
+            ..Default::default()
+        };
+        state.favorites.items.clear();
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 90, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..30 {
+            for x in 0..90 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("Discover Categories"));
+        assert!(rendered.contains("[ /browse ]"));
+        assert!(rendered.contains("Trending Now"));
+        assert!(rendered.contains("Popular & In-Theaters"));
+        assert!(!rendered.contains("/browse ·"));
+        assert!(!rendered.contains("Top Movies"));
+    }
+
+    #[test]
+    fn test_discover_landing_rendering_addon_mode() {
+        let backend = TestBackend::new(90, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            is_addon_mode: true,
+            addons_enabled: true,
+            active_provider: crate::providers::models::ProviderKind::Addons,
+            ..Default::default()
+        };
+        state.favorites.items.clear();
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 90, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for y in 0..30 {
+            for x in 0..90 {
+                rendered.push_str(buffer[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("Discover Categories"));
+        assert!(rendered.contains("[ /browse ]"));
+        assert!(rendered.contains("Top Movies"));
+        assert!(rendered.contains("Cinemeta Curated Catalog"));
+        assert!(!rendered.contains("/browse ·"));
+        assert!(!rendered.contains("Trending Now"));
     }
 
     #[test]

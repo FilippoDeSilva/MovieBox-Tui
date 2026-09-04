@@ -15,6 +15,9 @@
   - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
   - Streamlined `/config` as a direct alias for `/settings`.
 
+- **Discover Categories Landing Card UX**:
+  - Streamlined `Discover & Quick Categories` card: elevated `/browse` command to a right-aligned header badge (`[ /browse ]`), eliminated redundant `/browse ·` row prefixes, and adapted category rows dynamically between Streaming and Addon modes.
+  - Added direct mouse click navigation to discover categories, routing clicks to preset browse queries or the addon catalog menu.
 - **Command Dispatch & Cache Lookup Optimization**:
   - Unified `ParsedCommand` and `SlashCommand` into a single canonical enum, eliminating duplicate type definitions across command dispatch and testing.
   - Streamlined image disk cache lookups (`get_namespaced_image_cache`), eliminating 6-iteration fallback namespace scans across unrelated provider directories on cache misses.
@@ -33,6 +36,9 @@
 - **Resilient Configuration & Accurate Metadata**:
   - Safeguarded user TV playlists (`tv_config.json`) and HTTP addons (`addons_config.json`): replaced destructive error-swallowing deletion with timestamped `.corrupt.{timestamp}` file rotation and sanitized logging on JSON parse failures.
   - Eliminated fabricated S01E01 fallback in addon metadata adapter, accurately reporting empty series episodes when an upstream catalog entry lacks episode records instead of injecting unplayable dummy data.
+- **Discover Card Layout & Truncation**:
+  - Fixed horizontal text clipping on discover card category descriptions by adjusting `margins_len` to account for visual pointer and margin cell budgets.
+  - Suppressed discover card rendering while search suggestions dropdown is open, preventing visual overlap.
 - **Update Modal Input Isolation & Event Guards**:
   - Prevented keystroke hijacking: deferred blocking update modal presentation while the user is actively typing in the search bar (`InputMode::Editing`), ensuring keys (`u`, `o`, `Esc`) never trigger unintended update actions.
   - Added input lock during in-flight updates (`is_updating`), consuming all keyboard and mouse events to prevent mid-upgrade process termination or disk corruption.
