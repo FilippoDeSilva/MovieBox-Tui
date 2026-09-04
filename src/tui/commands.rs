@@ -13,19 +13,6 @@ pub enum SlashCommand {
     Exit,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParsedCommand {
-    Settings,
-    Browse,
-    History,
-    Favorites,
-    Theme,
-    Clear,
-    Help,
-    List,
-    Exit,
-}
-
 impl SlashCommand {
     pub const ALL: [Self; 9] = [
         Self::Settings,
@@ -153,7 +140,7 @@ impl SlashCommand {
         }
     }
 
-    pub fn parse(input: &str) -> Option<ParsedCommand> {
+    pub fn parse(input: &str) -> Option<Self> {
         let trimmed = input.trim();
         if !trimmed.starts_with('/') {
             return None;
@@ -163,17 +150,15 @@ impl SlashCommand {
         let command_name = parts.next()?;
 
         match command_name.to_ascii_lowercase().as_str() {
-            "/settings" | "/config" | "/pref" | "/preferences" | "/options" => {
-                Some(ParsedCommand::Settings)
-            }
-            "/browse" => Some(ParsedCommand::Browse),
-            "/history" => Some(ParsedCommand::History),
-            "/favorites" => Some(ParsedCommand::Favorites),
-            "/theme" => Some(ParsedCommand::Theme),
-            "/clear" => Some(ParsedCommand::Clear),
-            "/help" | "/?" => Some(ParsedCommand::Help),
-            "/list" => Some(ParsedCommand::List),
-            "/exit" | "/quit" | "/q" => Some(ParsedCommand::Exit),
+            "/settings" | "/config" | "/pref" | "/preferences" | "/options" => Some(Self::Settings),
+            "/browse" => Some(Self::Browse),
+            "/history" => Some(Self::History),
+            "/favorites" => Some(Self::Favorites),
+            "/theme" => Some(Self::Theme),
+            "/clear" => Some(Self::Clear),
+            "/help" | "/?" => Some(Self::Help),
+            "/list" => Some(Self::List),
+            "/exit" | "/quit" | "/q" => Some(Self::Exit),
             _ => None,
         }
     }
@@ -226,7 +211,7 @@ mod tests {
         let state = AppState::default();
         assert_eq!(
             SlashCommand::parse("/favorites"),
-            Some(ParsedCommand::Favorites)
+            Some(SlashCommand::Favorites)
         );
         assert!(SlashCommand::Favorites.is_available(&state));
         assert_eq!(SlashCommand::Favorites.name(), "/favorites");
@@ -246,46 +231,39 @@ mod tests {
         let state = AppState::default();
         assert_eq!(SlashCommand::ALL.len(), 9);
         assert_eq!(SlashCommand::PRIMARY.len(), 7);
-        assert_eq!(SlashCommand::parse("/exit"), Some(ParsedCommand::Exit));
-        assert_eq!(SlashCommand::parse("/quit"), Some(ParsedCommand::Exit));
-        assert_eq!(SlashCommand::parse("/q"), Some(ParsedCommand::Exit));
+        assert_eq!(SlashCommand::parse("/exit"), Some(SlashCommand::Exit));
+        assert_eq!(SlashCommand::parse("/quit"), Some(SlashCommand::Exit));
+        assert_eq!(SlashCommand::parse("/q"), Some(SlashCommand::Exit));
         assert!(SlashCommand::Exit.is_available(&state));
         assert_eq!(SlashCommand::Exit.name(), "/exit");
 
-        assert_eq!(SlashCommand::parse("/clear"), Some(ParsedCommand::Clear));
+        assert_eq!(SlashCommand::parse("/clear"), Some(SlashCommand::Clear));
         assert!(SlashCommand::Clear.is_available(&state));
         assert_eq!(SlashCommand::Clear.name(), "/clear");
 
-        assert_eq!(SlashCommand::parse("/help"), Some(ParsedCommand::Help));
-        assert_eq!(SlashCommand::parse("/?"), Some(ParsedCommand::Help));
+        assert_eq!(SlashCommand::parse("/help"), Some(SlashCommand::Help));
+        assert_eq!(SlashCommand::parse("/?"), Some(SlashCommand::Help));
         assert!(SlashCommand::Help.is_available(&state));
         assert_eq!(SlashCommand::Help.name(), "/help");
 
         assert_eq!(
             SlashCommand::parse("/settings"),
-            Some(ParsedCommand::Settings)
+            Some(SlashCommand::Settings)
         );
-        assert_eq!(
-            SlashCommand::parse("/config"),
-            Some(ParsedCommand::Settings)
-        );
-        assert_eq!(SlashCommand::parse("/pref"), Some(ParsedCommand::Settings));
+        assert_eq!(SlashCommand::parse("/config"), Some(SlashCommand::Settings));
+        assert_eq!(SlashCommand::parse("/pref"), Some(SlashCommand::Settings));
         assert_eq!(
             SlashCommand::parse("/preferences"),
-            Some(ParsedCommand::Settings)
+            Some(SlashCommand::Settings)
         );
         assert_eq!(
             SlashCommand::parse("/options"),
-            Some(ParsedCommand::Settings)
+            Some(SlashCommand::Settings)
         );
 
-        assert_eq!(SlashCommand::parse("/list"), Some(ParsedCommand::List));
-        assert_eq!(SlashCommand::parse("/browse"), Some(ParsedCommand::Browse));
-        assert_eq!(
-            SlashCommand::parse("/history"),
-            Some(ParsedCommand::History)
-        );
-
+        assert_eq!(SlashCommand::parse("/list"), Some(SlashCommand::List));
+        assert_eq!(SlashCommand::parse("/browse"), Some(SlashCommand::Browse));
+        assert_eq!(SlashCommand::parse("/history"), Some(SlashCommand::History));
         assert_eq!(SlashCommand::parse("/toggle-tv"), None);
         assert_eq!(SlashCommand::parse("/enable-tv"), None);
         assert_eq!(SlashCommand::parse("/disable-tv"), None);

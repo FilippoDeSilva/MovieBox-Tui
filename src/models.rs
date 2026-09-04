@@ -3,10 +3,6 @@ pub use crate::providers::models::{
     ProviderKind, ProviderMediaId, Release, Season, SourceMirror, SubtitleOption,
 };
 
-pub type SeasonInfo = Season;
-pub type EpisodeInfo = Episode;
-pub type StreamResource = Release;
-pub type StreamMirror = SourceMirror;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};

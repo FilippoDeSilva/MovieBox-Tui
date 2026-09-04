@@ -457,27 +457,7 @@ fn check_image_file(path: &PathBuf) -> Option<Vec<u8>> {
 
 pub fn get_namespaced_image_cache(namespace: &str, id: &str) -> Option<Vec<u8>> {
     let path = get_namespaced_image_path(namespace, id);
-    if let Some(bytes) = check_image_file(&path) {
-        return Some(bytes);
-    }
-    let fallback_namespaces = [
-        "posters",
-        "moviebox",
-        "fourkhdhub",
-        "iptv",
-        "circleftp",
-        "dhakaflix",
-        "addons",
-    ];
-    for fb in fallback_namespaces {
-        if fb != namespace {
-            let fb_path = get_namespaced_image_path(fb, id);
-            if let Some(bytes) = check_image_file(&fb_path) {
-                return Some(bytes);
-            }
-        }
-    }
-    None
+    check_image_file(&path)
 }
 
 pub fn set_namespaced_image_cache(namespace: &str, id: &str, bytes: &[u8]) {

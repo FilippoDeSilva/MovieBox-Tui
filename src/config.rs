@@ -184,10 +184,40 @@ pub fn save(config: &Config) {
 }
 
 pub fn load_addons() -> Vec<InstalledAddon> {
-    let mut list = addons_path()
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|content| serde_json::from_str::<Vec<InstalledAddon>>(&content).ok())
-        .unwrap_or_default();
+    let mut list = if let Some(path) = addons_path() {
+        if path.exists() {
+            match std::fs::read_to_string(&path) {
+                Ok(content) => match serde_json::from_str::<Vec<InstalledAddon>>(&content) {
+                    Ok(parsed) => parsed,
+                    Err(e) => {
+                        let stamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
+                        log::error!(
+                            "failed to parse addons config from {} ({e}), rotating to {}",
+                            crate::logging::sanitize_path(&path),
+                            crate::logging::sanitize_path(&corrupt_path)
+                        );
+                        let _ = std::fs::rename(&path, corrupt_path);
+                        Vec::new()
+                    }
+                },
+                Err(e) => {
+                    log::warn!(
+                        "failed to read addons config from {}: {e}",
+                        crate::logging::sanitize_path(&path)
+                    );
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
 
     if !list.iter().any(|a| a.is_core()) {
         list.insert(0, InstalledAddon::cinemeta_default());

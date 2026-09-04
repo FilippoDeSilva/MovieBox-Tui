@@ -4,7 +4,7 @@ use moviebox_tui::{
     tui::{
         action::Action,
         app::App,
-        commands::{ParsedCommand, SlashCommand},
+        commands::SlashCommand,
         state::{AppState, SettingsCategory, settings_player_label},
         widgets::settings::{
             category_tab_rects, settings_category_tab_at, settings_row_at, settings_row_rects,
@@ -20,23 +20,20 @@ fn test_settings_command_parsing_and_aliases() {
     assert_eq!(SlashCommand::Settings.name(), "/settings");
     assert_eq!(
         SlashCommand::parse("/settings"),
-        Some(ParsedCommand::Settings)
+        Some(SlashCommand::Settings)
     );
-    assert_eq!(SlashCommand::parse("/pref"), Some(ParsedCommand::Settings));
+    assert_eq!(SlashCommand::parse("/pref"), Some(SlashCommand::Settings));
     assert_eq!(
         SlashCommand::parse("/preferences"),
-        Some(ParsedCommand::Settings)
+        Some(SlashCommand::Settings)
     );
     assert_eq!(
         SlashCommand::parse("/options"),
-        Some(ParsedCommand::Settings)
+        Some(SlashCommand::Settings)
     );
-    assert_eq!(
-        SlashCommand::parse("/config"),
-        Some(ParsedCommand::Settings)
-    );
-    assert_eq!(SlashCommand::parse("/help"), Some(ParsedCommand::Help));
-    assert_eq!(SlashCommand::parse("/?"), Some(ParsedCommand::Help));
+    assert_eq!(SlashCommand::parse("/config"), Some(SlashCommand::Settings));
+    assert_eq!(SlashCommand::parse("/help"), Some(SlashCommand::Help));
+    assert_eq!(SlashCommand::parse("/?"), Some(SlashCommand::Help));
 
     let suggestions = SlashCommand::suggest(&state, "/");
     assert_eq!(

@@ -253,20 +253,38 @@ impl App {
         let Some(path) = crate::config::tv_path() else {
             return;
         };
-        if let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(list) = serde_json::from_str::<Vec<String>>(&content)
-        {
-            let mut seen = std::collections::HashSet::new();
-            self.state.tv_playlists = list
-                .into_iter()
-                .map(|item| item.trim().to_string())
-                .filter(|item| !item.is_empty() && seen.insert(item.clone()))
-                .collect();
-            if self.state.tv_playlists.is_empty() {
-                let _ = std::fs::remove_file(path);
+        if path.exists() {
+            match std::fs::read_to_string(&path) {
+                Ok(content) => match serde_json::from_str::<Vec<String>>(&content) {
+                    Ok(list) => {
+                        let mut seen = std::collections::HashSet::new();
+                        self.state.tv_playlists = list
+                            .into_iter()
+                            .map(|item| item.trim().to_string())
+                            .filter(|item| !item.is_empty() && seen.insert(item.clone()))
+                            .collect();
+                    }
+                    Err(e) => {
+                        let stamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let corrupt_path = path.with_extension(format!("corrupt.{stamp}"));
+                        log::error!(
+                            "failed to parse tv playlists from {} ({e}), rotating to {}",
+                            crate::logging::sanitize_path(&path),
+                            crate::logging::sanitize_path(&corrupt_path)
+                        );
+                        let _ = std::fs::rename(&path, corrupt_path);
+                    }
+                },
+                Err(e) => {
+                    log::warn!(
+                        "failed to read tv playlists from {}: {e}",
+                        crate::logging::sanitize_path(&path)
+                    );
+                }
             }
-        } else if path.exists() {
-            let _ = std::fs::remove_file(path);
         }
     }
 

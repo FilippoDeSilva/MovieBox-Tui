@@ -95,7 +95,7 @@ pub fn meta_detail_to_media_details(detail: &MetaDetail) -> MediaDetails {
         eps.sort_unstable();
     }
 
-    let mut seasons = season_map
+    let seasons = season_map
         .into_iter()
         .map(|(season_num, eps)| Season {
             number: season_num,
@@ -109,17 +109,6 @@ pub fn meta_detail_to_media_details(detail: &MetaDetail) -> MediaDetails {
                 .collect(),
         })
         .collect::<Vec<_>>();
-
-    if is_series && seasons.is_empty() {
-        seasons.push(Season {
-            number: 1,
-            episodes: vec![Episode {
-                season: 1,
-                number: 1,
-                title: None,
-            }],
-        });
-    }
 
     let year_raw = detail
         .release_info

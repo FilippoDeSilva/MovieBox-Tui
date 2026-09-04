@@ -160,8 +160,6 @@ pub struct LandingRows {
     pub search: usize,
     pub favorites: usize,
     pub mode_row: usize,
-    #[allow(dead_code)]
-    pub util_row: Option<usize>,
     pub logo_width: u16,
 }
 
@@ -207,7 +205,6 @@ pub fn landing_split(
             search: 4,
             favorites: 6,
             mode_row: 7,
-            util_row: None,
             logo_width,
         },
     )

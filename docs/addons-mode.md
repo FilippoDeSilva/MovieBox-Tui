@@ -32,4 +32,4 @@ Addon Mode enables support for community HTTP addon manifests. You can install a
 
 ## Persistence
 
-Installed addons are atomically saved to `addons_config.json` inside the application config directory (`~/Library/Application Support/moviebox-tui/` on macOS, `~/.config/moviebox-tui/` on Linux, `%APPDATA%\moviebox-tui\` on Windows).
+Installed addons are atomically saved to `addons_config.json` inside the application config directory (`~/Library/Application Support/moviebox-tui/` on macOS, `~/.config/moviebox-tui/` on Linux, `%APPDATA%\moviebox-tui\` on Windows). If `addons_config.json` encounters corrupt data on disk, it is preserved and rotated to `addons_config.json.corrupt.{timestamp}` before initializing fallback defaults, preventing silent data loss.

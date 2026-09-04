@@ -100,13 +100,13 @@ impl App {
 
         let will_handle = !matches!(
             &parsed,
-            crate::tui::commands::ParsedCommand::History if current_mode != crate::tui::state::AppMode::Tv
+            crate::tui::commands::SlashCommand::History if current_mode != crate::tui::state::AppMode::Tv
         ) && !matches!(
             &parsed,
-            crate::tui::commands::ParsedCommand::Favorites if current_mode != crate::tui::state::AppMode::Tv
+            crate::tui::commands::SlashCommand::Favorites if current_mode != crate::tui::state::AppMode::Tv
         ) && !matches!(
             &parsed,
-            crate::tui::commands::ParsedCommand::List if current_mode == crate::tui::state::AppMode::Tv
+            crate::tui::commands::SlashCommand::List if current_mode == crate::tui::state::AppMode::Tv
         );
 
         if will_handle {
@@ -115,11 +115,11 @@ impl App {
         }
 
         match parsed {
-            crate::tui::commands::ParsedCommand::Exit => {
+            crate::tui::commands::SlashCommand::Exit => {
                 self.action_sender.send(Action::Quit).ok();
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::Settings => {
+            crate::tui::commands::SlashCommand::Settings => {
                 if trimmed.eq_ignore_ascii_case("/config") {
                     if self.state.is_tv_mode {
                         self.action_sender.send(Action::ShowTvConfig).ok();
@@ -132,20 +132,20 @@ impl App {
                 self.action_sender.send(Action::ToggleSettingsPopup).ok();
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::Clear => {
+            crate::tui::commands::SlashCommand::Clear => {
                 self.state.clear_search_state();
                 self.state.set_status_default("Search cleared.");
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::Help => {
+            crate::tui::commands::SlashCommand::Help => {
                 self.action_sender.send(Action::ToggleHelp).ok();
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::Theme => {
+            crate::tui::commands::SlashCommand::Theme => {
                 self.action_sender.send(Action::ToggleThemePopup).ok();
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::Browse => {
+            crate::tui::commands::SlashCommand::Browse => {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.state.notify(
                         NotificationKind::Info,
@@ -157,7 +157,7 @@ impl App {
                 }
                 Some(true)
             }
-            crate::tui::commands::ParsedCommand::History => {
+            crate::tui::commands::SlashCommand::History => {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.state.notify(
                         NotificationKind::Info,
@@ -169,7 +169,7 @@ impl App {
                     None
                 }
             }
-            crate::tui::commands::ParsedCommand::Favorites => {
+            crate::tui::commands::SlashCommand::Favorites => {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.state.notify(
                         NotificationKind::Info,
@@ -181,7 +181,7 @@ impl App {
                     None
                 }
             }
-            crate::tui::commands::ParsedCommand::List => {
+            crate::tui::commands::SlashCommand::List => {
                 if current_mode == crate::tui::state::AppMode::Tv {
                     self.apply_tv_search_results(query, lower_query);
                 } else {

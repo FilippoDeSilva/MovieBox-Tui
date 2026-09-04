@@ -127,13 +127,6 @@ enum AndroidOpener {
     SystemAm(String),
 }
 
-fn is_termux_env() -> bool {
-    cfg!(target_os = "android")
-        || std::env::var("TERMUX_VERSION").is_ok()
-        || std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
-        || Path::new("/data/data/com.termux/files/usr").exists()
-}
-
 fn android_opener() -> Option<AndroidOpener> {
     static CACHED: std::sync::OnceLock<Option<AndroidOpener>> = std::sync::OnceLock::new();
     CACHED
@@ -148,7 +141,7 @@ fn android_opener() -> Option<AndroidOpener> {
                 }
             }
 
-            let is_termux = is_termux_env();
+            let is_termux = crate::updater::artifact::is_termux_environment();
 
             if let Ok(prefix) = std::env::var("PREFIX") {
                 let termux_open = format!("{prefix}/bin/termux-open");

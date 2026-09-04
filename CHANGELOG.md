@@ -15,6 +15,10 @@
   - Scoped `Ctrl+P` strictly to Streaming Mode for provider cycling, eliminating redundant `Ctrl+P` handling in TV and Addon modes.
   - Streamlined `/config` as a direct alias for `/settings`.
 
+- **Command Dispatch & Cache Lookup Optimization**:
+  - Unified `ParsedCommand` and `SlashCommand` into a single canonical enum, eliminating duplicate type definitions across command dispatch and testing.
+  - Streamlined image disk cache lookups (`get_namespaced_image_cache`), eliminating 6-iteration fallback namespace scans across unrelated provider directories on cache misses.
+  - Replaced duplicate `is_termux_env` in player module with `crate::updater::artifact::is_termux_environment`.
 - **Automation Workflows & Installer Hardening**:
   - Added bounded execution timeouts (`timeout-minutes`) across all CI and release pipeline jobs to prevent runner hangs.
   - Accelerated release preflight by eliminating redundant cross-compilation target toolchain downloads during source packaging.
@@ -26,6 +30,9 @@
   - Updated macOS Homebrew installation with explicit `brew trust` step required by Homebrew 6.0+ for third-party taps.
   - Streamlined quickstart section to reference in-app interactive help (`?`) and `docs/controls.md`, preventing documentation drift.
 ### Fixed
+- **Resilient Configuration & Accurate Metadata**:
+  - Safeguarded user TV playlists (`tv_config.json`) and HTTP addons (`addons_config.json`): replaced destructive error-swallowing deletion with timestamped `.corrupt.{timestamp}` file rotation and sanitized logging on JSON parse failures.
+  - Eliminated fabricated S01E01 fallback in addon metadata adapter, accurately reporting empty series episodes when an upstream catalog entry lacks episode records instead of injecting unplayable dummy data.
 - **Update Modal Input Isolation & Event Guards**:
   - Prevented keystroke hijacking: deferred blocking update modal presentation while the user is actively typing in the search bar (`InputMode::Editing`), ensuring keys (`u`, `o`, `Esc`) never trigger unintended update actions.
   - Added input lock during in-flight updates (`is_updating`), consuming all keyboard and mouse events to prevent mid-upgrade process termination or disk corruption.
@@ -52,6 +59,8 @@
   - Added 64-byte `PT_TLS` alignment anchor in `src/main.rs` to satisfy Android Bionic's ARM64 TLS segment minimum alignment validation.
   - Added automated ELF `e_type` and `PT_TLS` validation checks to `.github/workflows/release.yml` and a post-installation execution smoke test to `install.sh`.
 ### Removed
+- Pruned unused legacy type aliases (`SeasonInfo`, `EpisodeInfo`, `StreamResource`, `StreamMirror`) in `src/models.rs`.
+- Removed dead `util_row` struct field from `LandingRows` in `src/tui/screens/home.rs`.
 - Removed vestigial `ShowPlaybackPicker` and `ShowPlayerPicker` action variants and playback picker state fields in favor of direct compatible player dispatch.
 - Removed unreferenced static screenshot assets (`assets/`), reducing repository clone size by ~1.3MB.
 - **Redundant Slash Commands**:

@@ -19,7 +19,8 @@ file path, and the app parses, groups, dedupes, and lets you search and play the
    - File example: `~/playlists/mine.m3u`
 3. Sources persist in `tv_config.json` (under the config dir). Local file playlists are
    reread directly on every TV-mode entry; remote URL playlists may reuse a recent
-   cached snapshot for up to 24 hours.
+   cached snapshot for up to 24 hours. If `tv_config.json` encounters corrupt data on disk,
+   it is safely rotated to `tv_config.json.corrupt.{timestamp}` rather than deleted.
 4. Highlight a source and press `d` (or `Enter`) to remove it; the list reloads.
 
 ## Parsing and search
