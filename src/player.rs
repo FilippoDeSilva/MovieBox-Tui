@@ -127,82 +127,95 @@ enum AndroidOpener {
     SystemAm(String),
 }
 
+fn probe_android_opener() -> Option<AndroidOpener> {
+    if let Some(custom) = configured_executable("MOVIEBOX_ANDROID_PLAYER_PATH") {
+        if custom.ends_with("termux-open-url") {
+            return Some(AndroidOpener::TermuxOpenUrl(custom));
+        } else if custom.ends_with("termux-am") || custom.ends_with("/am") {
+            return Some(AndroidOpener::TermuxAm(custom));
+        } else {
+            return Some(AndroidOpener::TermuxOpen(custom));
+        }
+    }
+
+    let is_termux = crate::updater::artifact::is_termux_environment();
+
+    if let Ok(prefix) = std::env::var("PREFIX") {
+        let termux_open = format!("{prefix}/bin/termux-open");
+        if Path::new(&termux_open).is_file() {
+            return Some(AndroidOpener::TermuxOpen(termux_open));
+        }
+        let termux_open_url = format!("{prefix}/bin/termux-open-url");
+        if Path::new(&termux_open_url).is_file() {
+            return Some(AndroidOpener::TermuxOpenUrl(termux_open_url));
+        }
+        let termux_am = format!("{prefix}/bin/termux-am");
+        if Path::new(&termux_am).is_file() {
+            return Some(AndroidOpener::TermuxAm(termux_am));
+        }
+        let am_bin = format!("{prefix}/bin/am");
+        if Path::new(&am_bin).is_file() {
+            return Some(AndroidOpener::TermuxAm(am_bin));
+        }
+    }
+
+    let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
+    if Path::new(termux_open_static).is_file() {
+        return Some(AndroidOpener::TermuxOpen(termux_open_static.to_string()));
+    }
+    let termux_open_url_static = "/data/data/com.termux/files/usr/bin/termux-open-url";
+    if Path::new(termux_open_url_static).is_file() {
+        return Some(AndroidOpener::TermuxOpenUrl(
+            termux_open_url_static.to_string(),
+        ));
+    }
+    let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
+    if Path::new(termux_am_static).is_file() {
+        return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
+    }
+    let termux_am_bin_static = "/data/data/com.termux/files/usr/bin/am";
+    if Path::new(termux_am_bin_static).is_file() {
+        return Some(AndroidOpener::TermuxAm(termux_am_bin_static.to_string()));
+    }
+
+    if let Some(path) = find_in_path("termux-open") {
+        return Some(AndroidOpener::TermuxOpen(path));
+    }
+    if let Some(path) = find_in_path("termux-open-url") {
+        return Some(AndroidOpener::TermuxOpenUrl(path));
+    }
+    if let Some(path) = find_in_path("termux-am") {
+        return Some(AndroidOpener::TermuxAm(path));
+    }
+
+    if !is_termux {
+        if Path::new("/system/bin/am").is_file() {
+            return Some(AndroidOpener::SystemAm("/system/bin/am".to_string()));
+        }
+        if let Some(path) = find_in_path("am") {
+            return Some(AndroidOpener::SystemAm(path));
+        }
+    }
+
+    None
+}
+
 fn android_opener() -> Option<AndroidOpener> {
-    static CACHED: std::sync::OnceLock<Option<AndroidOpener>> = std::sync::OnceLock::new();
-    CACHED
-        .get_or_init(|| {
-            if let Some(custom) = configured_executable("MOVIEBOX_ANDROID_PLAYER_PATH") {
-                if custom.ends_with("termux-open-url") {
-                    return Some(AndroidOpener::TermuxOpenUrl(custom));
-                } else if custom.ends_with("termux-am") || custom.ends_with("/am") {
-                    return Some(AndroidOpener::TermuxAm(custom));
-                } else {
-                    return Some(AndroidOpener::TermuxOpen(custom));
-                }
-            }
+    static CACHED: std::sync::RwLock<Option<AndroidOpener>> = std::sync::RwLock::new(None);
 
-            let is_termux = crate::updater::artifact::is_termux_environment();
+    if let Ok(guard) = CACHED.read() {
+        if let Some(opener) = &*guard {
+            return Some(opener.clone());
+        }
+    }
 
-            if let Ok(prefix) = std::env::var("PREFIX") {
-                let termux_open = format!("{prefix}/bin/termux-open");
-                if Path::new(&termux_open).is_file() {
-                    return Some(AndroidOpener::TermuxOpen(termux_open));
-                }
-                let termux_open_url = format!("{prefix}/bin/termux-open-url");
-                if Path::new(&termux_open_url).is_file() {
-                    return Some(AndroidOpener::TermuxOpenUrl(termux_open_url));
-                }
-                let termux_am = format!("{prefix}/bin/termux-am");
-                if Path::new(&termux_am).is_file() {
-                    return Some(AndroidOpener::TermuxAm(termux_am));
-                }
-                let am_bin = format!("{prefix}/bin/am");
-                if Path::new(&am_bin).is_file() {
-                    return Some(AndroidOpener::TermuxAm(am_bin));
-                }
-            }
-
-            let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
-            if Path::new(termux_open_static).is_file() {
-                return Some(AndroidOpener::TermuxOpen(termux_open_static.to_string()));
-            }
-            let termux_open_url_static = "/data/data/com.termux/files/usr/bin/termux-open-url";
-            if Path::new(termux_open_url_static).is_file() {
-                return Some(AndroidOpener::TermuxOpenUrl(
-                    termux_open_url_static.to_string(),
-                ));
-            }
-            let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
-            if Path::new(termux_am_static).is_file() {
-                return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
-            }
-            let termux_am_bin_static = "/data/data/com.termux/files/usr/bin/am";
-            if Path::new(termux_am_bin_static).is_file() {
-                return Some(AndroidOpener::TermuxAm(termux_am_bin_static.to_string()));
-            }
-
-            if let Some(path) = find_in_path("termux-open") {
-                return Some(AndroidOpener::TermuxOpen(path));
-            }
-            if let Some(path) = find_in_path("termux-open-url") {
-                return Some(AndroidOpener::TermuxOpenUrl(path));
-            }
-            if let Some(path) = find_in_path("termux-am") {
-                return Some(AndroidOpener::TermuxAm(path));
-            }
-
-            if !is_termux {
-                if Path::new("/system/bin/am").is_file() {
-                    return Some(AndroidOpener::SystemAm("/system/bin/am".to_string()));
-                }
-                if let Some(path) = find_in_path("am") {
-                    return Some(AndroidOpener::SystemAm(path));
-                }
-            }
-
-            None
-        })
-        .clone()
+    let detected = probe_android_opener();
+    if let Some(opener) = &detected {
+        if let Ok(mut guard) = CACHED.write() {
+            *guard = Some(opener.clone());
+        }
+    }
+    detected
 }
 
 fn android_intent_command(url: &str) -> Command {
@@ -357,41 +370,62 @@ enum IinaResolution {
 }
 
 #[cfg(target_os = "macos")]
+fn probe_iina_resolution() -> Option<IinaResolution> {
+    if let Some(executable) = configured_executable("MOVIEBOX_IINA_PATH") {
+        return Some(IinaResolution::Cli(executable));
+    }
+
+    let cli_global = "/Applications/IINA.app/Contents/MacOS/iina-cli";
+    if Path::new(cli_global).exists() {
+        return Some(IinaResolution::Cli(cli_global.to_string()));
+    }
+    if let Some(home) = dirs::home_dir() {
+        let nix_iina = home.join(".nix-profile/bin/iina-cli");
+        if nix_iina.exists() {
+            return Some(IinaResolution::Cli(nix_iina.to_string_lossy().into_owned()));
+        }
+    }
+
+    for candidate in &[
+        "/opt/homebrew/bin/iina-cli",
+        "/usr/local/bin/iina-cli",
+        "/opt/local/bin/iina-cli",
+        "/run/current-system/sw/bin/iina-cli",
+    ] {
+        if Path::new(candidate).exists() {
+            return Some(IinaResolution::Cli(candidate.to_string()));
+        }
+    }
+
+    if let Some(path) = find_in_path("iina").or_else(|| find_in_path("iina-cli")) {
+        return Some(IinaResolution::Cli(path));
+    }
+    if Path::new("/Applications/IINA.app").exists()
+        || dirs::home_dir().is_some_and(|home| home.join("Applications/IINA.app").exists())
+    {
+        return Some(IinaResolution::AppFallback);
+    }
+
+    None
+}
+
+#[cfg(target_os = "macos")]
 fn iina_resolution() -> Option<IinaResolution> {
-    static CACHED: std::sync::OnceLock<Option<IinaResolution>> = std::sync::OnceLock::new();
-    CACHED
-        .get_or_init(|| {
-            if let Some(executable) = configured_executable("MOVIEBOX_IINA_PATH") {
-                return Some(IinaResolution::Cli(executable));
-            }
+    static CACHED: std::sync::RwLock<Option<IinaResolution>> = std::sync::RwLock::new(None);
 
-            let cli_global = "/Applications/IINA.app/Contents/MacOS/iina-cli";
-            if Path::new(cli_global).exists() {
-                return Some(IinaResolution::Cli(cli_global.to_string()));
-            }
+    if let Ok(guard) = CACHED.read() {
+        if let Some(res) = &*guard {
+            return Some(res.clone());
+        }
+    }
 
-            if let Some(home) = dirs::home_dir() {
-                let cli_local = home.join("Applications/IINA.app/Contents/MacOS/iina-cli");
-                if cli_local.exists() {
-                    return Some(IinaResolution::Cli(
-                        cli_local.to_string_lossy().into_owned(),
-                    ));
-                }
-            }
-
-            if let Some(path) = find_in_path("iina").or_else(|| find_in_path("iina-cli")) {
-                return Some(IinaResolution::Cli(path));
-            }
-
-            if Path::new("/Applications/IINA.app").exists()
-                || dirs::home_dir().is_some_and(|home| home.join("Applications/IINA.app").exists())
-            {
-                return Some(IinaResolution::AppFallback);
-            }
-
-            None
-        })
-        .clone()
+    let detected = probe_iina_resolution();
+    if let Some(res) = &detected {
+        if let Ok(mut guard) = CACHED.write() {
+            *guard = Some(res.clone());
+        }
+    }
+    detected
 }
 
 #[cfg(target_os = "macos")]
@@ -526,171 +560,538 @@ fn probe_player_executable(
     }
 }
 
+#[cfg(target_os = "windows")]
+fn query_windows_registry_value(key: &str, value_name: Option<&str>) -> Option<String> {
+    use std::os::windows::process::CommandExt;
+
+    let mut cmd = Command::new("reg.exe");
+    cmd.arg("query").arg(key);
+    if let Some(val) = value_name {
+        cmd.arg("/v").arg(val);
+    } else {
+        cmd.arg("/ve");
+    }
+    cmd.creation_flags(0x08000000);
+
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("HKEY_") || trimmed.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() >= 3 {
+            if let Some(pos) = parts
+                .iter()
+                .position(|&p| p == "REG_SZ" || p == "REG_EXPAND_SZ")
+            {
+                if pos + 1 < parts.len() {
+                    let val = parts[pos + 1..].join(" ");
+                    let clean = val.trim_matches('"').trim();
+                    if !clean.is_empty() {
+                        return Some(clean.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn windows_mpv_candidate_paths(
+    localappdata: Option<&str>,
+    appdata: Option<&str>,
+    userprofile: Option<&Path>,
+) -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            for name in &[
+                "mpv.exe",
+                "mpv.com",
+                "mpvnet.exe",
+                "mpvnet.com",
+                r"mpv\mpv.exe",
+                r"mpv\mpv.com",
+                r"mpv.net\mpvnet.exe",
+                r"mpv.net\mpv.exe",
+            ] {
+                candidates.push(parent.join(name).to_string_lossy().into_owned());
+            }
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        for name in &[
+            "mpv.exe",
+            "mpv.com",
+            "mpvnet.exe",
+            "mpvnet.com",
+            r"mpv\mpv.exe",
+            r"mpv\mpv.com",
+            r"mpv.net\mpvnet.exe",
+            r"mpv.net\mpv.exe",
+        ] {
+            candidates.push(cwd.join(name).to_string_lossy().into_owned());
+        }
+    }
+
+    if let Some(local) = localappdata {
+        candidates.push(format!(r"{local}\Microsoft\WinGet\Links\mpv.exe"));
+        candidates.push(format!(r"{local}\Microsoft\WinGet\Links\mpv.com"));
+        candidates.push(format!(r"{local}\Microsoft\WinGet\Links\mpvnet.exe"));
+        candidates.push(format!(r"{local}\Programs\mpv\mpv.exe"));
+        candidates.push(format!(r"{local}\Programs\mpv\mpv.com"));
+        candidates.push(format!(r"{local}\Programs\mpv.net\mpvnet.exe"));
+        candidates.push(format!(r"{local}\Programs\mpv.net\mpv.exe"));
+
+        let packages_dir = std::path::PathBuf::from(format!(r"{local}\Microsoft\WinGet\Packages"));
+        if packages_dir.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(&packages_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    if name.contains("mpv") && path.is_dir() {
+                        candidates.push(path.join("mpv.exe").to_string_lossy().into_owned());
+                        candidates.push(path.join("mpv.com").to_string_lossy().into_owned());
+                        candidates.push(path.join("mpvnet.exe").to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(appdata_dir) = appdata {
+        candidates.push(format!(r"{appdata_dir}\mpv\mpv.exe"));
+        candidates.push(format!(r"{appdata_dir}\mpv\mpv.com"));
+    }
+
+    if let Some(home) = userprofile {
+        for sub in &["Downloads", "Desktop"] {
+            let folder = home.join(sub);
+            candidates.push(folder.join("mpv.exe").to_string_lossy().into_owned());
+            candidates.push(folder.join("mpv.com").to_string_lossy().into_owned());
+            candidates.push(folder.join("mpvnet.exe").to_string_lossy().into_owned());
+
+            if folder.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(&folder) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let folder_name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("")
+                            .to_ascii_lowercase();
+                        if folder_name.contains("mpv") && path.is_dir() {
+                            candidates.push(path.join("mpv.exe").to_string_lossy().into_owned());
+                            candidates.push(path.join("mpv.com").to_string_lossy().into_owned());
+                            candidates.push(path.join("mpvnet.exe").to_string_lossy().into_owned());
+                        }
+                    }
+                }
+            }
+        }
+
+        candidates.push(
+            home.join(r"scoop\shims\mpv.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\shims\mpv.com")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\shims\mpvnet.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\apps\mpv\current\mpv.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\apps\mpv\current\mpv.com")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\apps\mpv-git\current\mpv.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\apps\mpv.net\current\mpvnet.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(home.join(r"mpv\mpv.exe").to_string_lossy().into_owned());
+        candidates.push(home.join(r"mpv\mpv.com").to_string_lossy().into_owned());
+        candidates.push(home.join(r"bin\mpv.exe").to_string_lossy().into_owned());
+    }
+
+    candidates.push(r"C:\Program Files\mpv\mpv.exe".to_string());
+    candidates.push(r"C:\Program Files\mpv\mpv.com".to_string());
+    candidates.push(r"C:\Program Files\MPV Player\mpv.exe".to_string());
+    candidates.push(r"C:\Program Files\MPV Player\mpv.com".to_string());
+    candidates.push(r"C:\Program Files\mpv-player\mpv.exe".to_string());
+    candidates.push(r"C:\Program Files\mpv-player\mpv.com".to_string());
+    candidates.push(r"C:\Program Files\mpv.net\mpvnet.exe".to_string());
+    candidates.push(r"C:\Program Files\mpv.net\mpv.exe".to_string());
+    candidates.push(r"C:\Program Files (x86)\mpv\mpv.exe".to_string());
+    candidates.push(r"C:\Program Files (x86)\mpv\mpv.com".to_string());
+    candidates.push(r"C:\Program Files (x86)\mpv.net\mpvnet.exe".to_string());
+    candidates.push(r"C:\mpv\mpv.exe".to_string());
+    candidates.push(r"C:\mpv\mpv.com".to_string());
+    candidates.push(r"D:\mpv\mpv.exe".to_string());
+    candidates.push(r"D:\mpv\mpv.com".to_string());
+    candidates.push(r"C:\tools\mpv\mpv.exe".to_string());
+    candidates.push(r"C:\tools\mpv\mpv.com".to_string());
+    candidates.push(r"C:\ProgramData\chocolatey\bin\mpv.exe".to_string());
+    candidates.push(r"C:\ProgramData\scoop\shims\mpv.exe".to_string());
+    candidates.push(r"C:\ProgramData\scoop\apps\mpv\current\mpv.exe".to_string());
+
+    #[cfg(target_os = "windows")]
+    {
+        for key in &[
+            r"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\mpv.exe",
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\mpv.exe",
+            r"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\mpvnet.exe",
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\mpvnet.exe",
+        ] {
+            if let Some(reg_path) = query_windows_registry_value(key, None) {
+                candidates.push(reg_path);
+            }
+        }
+    }
+
+    candidates
+}
+
+pub fn windows_vlc_candidate_paths(
+    localappdata: Option<&str>,
+    appdata: Option<&str>,
+    userprofile: Option<&Path>,
+) -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            for name in &["vlc.exe", r"vlc\vlc.exe", r"VideoLAN\VLC\vlc.exe"] {
+                candidates.push(parent.join(name).to_string_lossy().into_owned());
+            }
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        for name in &["vlc.exe", r"vlc\vlc.exe", r"VideoLAN\VLC\vlc.exe"] {
+            candidates.push(cwd.join(name).to_string_lossy().into_owned());
+        }
+    }
+
+    if let Some(local) = localappdata {
+        candidates.push(format!(r"{local}\Microsoft\WindowsApps\vlc.exe"));
+        candidates.push(format!(r"{local}\Microsoft\WinGet\Links\vlc.exe"));
+        candidates.push(format!(r"{local}\Programs\VLC\vlc.exe"));
+        candidates.push(format!(r"{local}\Programs\VideoLAN\VLC\vlc.exe"));
+
+        let packages_dir = std::path::PathBuf::from(format!(r"{local}\Microsoft\WinGet\Packages"));
+        if packages_dir.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(&packages_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    if (name.contains("vlc") || name.contains("videolan")) && path.is_dir() {
+                        candidates.push(path.join("vlc.exe").to_string_lossy().into_owned());
+                        candidates.push(path.join(r"vlc\vlc.exe").to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(appdata_dir) = appdata {
+        candidates.push(format!(r"{appdata_dir}\vlc\vlc.exe"));
+        candidates.push(format!(r"{appdata_dir}\VideoLAN\VLC\vlc.exe"));
+    }
+
+    if let Some(home) = userprofile {
+        for sub in &["Downloads", "Desktop"] {
+            let folder = home.join(sub);
+            candidates.push(folder.join("vlc.exe").to_string_lossy().into_owned());
+            if folder.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(&folder) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let folder_name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("")
+                            .to_ascii_lowercase();
+                        if (folder_name.contains("vlc") || folder_name.contains("videolan"))
+                            && path.is_dir()
+                        {
+                            candidates.push(path.join("vlc.exe").to_string_lossy().into_owned());
+                        }
+                    }
+                }
+            }
+        }
+
+        candidates.push(
+            home.join(r"scoop\shims\vlc.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(
+            home.join(r"scoop\apps\vlc\current\vlc.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        candidates.push(home.join(r"vlc\vlc.exe").to_string_lossy().into_owned());
+        candidates.push(home.join(r"bin\vlc.exe").to_string_lossy().into_owned());
+    }
+
+    candidates.push(r"C:\Program Files\VideoLAN\VLC\vlc.exe".to_string());
+    candidates.push(r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe".to_string());
+    candidates.push(r"C:\vlc\vlc.exe".to_string());
+    candidates.push(r"D:\vlc\vlc.exe".to_string());
+    candidates.push(r"C:\tools\vlc\vlc.exe".to_string());
+    candidates.push(r"C:\ProgramData\chocolatey\bin\vlc.exe".to_string());
+    candidates.push(r"C:\ProgramData\scoop\shims\vlc.exe".to_string());
+    candidates.push(r"C:\ProgramData\scoop\apps\vlc\current\vlc.exe".to_string());
+
+    #[cfg(target_os = "windows")]
+    {
+        for key in &[
+            r"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vlc.exe",
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vlc.exe",
+        ] {
+            if let Some(reg_path) = query_windows_registry_value(key, None) {
+                candidates.push(reg_path);
+            }
+        }
+    }
+
+    candidates
+}
+
+fn probe_mpv() -> Option<String> {
+    let mut candidates = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        let localappdata = std::env::var("LOCALAPPDATA").ok();
+        let appdata = std::env::var("APPDATA").ok();
+        let home = dirs::home_dir();
+        candidates.extend(windows_mpv_candidate_paths(
+            localappdata.as_deref(),
+            appdata.as_deref(),
+            home.as_deref(),
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push("/Applications/mpv.app/Contents/MacOS/mpv".to_string());
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(
+                home.join("Applications/mpv.app/Contents/MacOS/mpv")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            candidates.push(
+                home.join(".nix-profile/bin/mpv")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        candidates.push("/opt/homebrew/bin/mpv".to_string());
+        candidates.push("/opt/local/bin/mpv".to_string());
+        candidates.push("/usr/local/bin/mpv".to_string());
+        candidates.push("/run/current-system/sw/bin/mpv".to_string());
+        candidates.push("/bin/mpv".to_string());
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        if let Ok(prefix) = std::env::var("PREFIX") {
+            candidates.push(format!("{prefix}/bin/mpv"));
+        }
+        candidates.push("/data/data/com.termux/files/usr/bin/mpv".to_string());
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(
+                home.join(".local/share/flatpak/exports/bin/io.mpv.Mpv")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            candidates.push(home.join(".local/bin/mpv").to_string_lossy().into_owned());
+            candidates.push(
+                home.join(".nix-profile/bin/mpv")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        candidates.push("/var/lib/flatpak/exports/bin/io.mpv.Mpv".to_string());
+        candidates.push("/snap/bin/mpv".to_string());
+        candidates.push("/var/lib/snapd/snap/bin/mpv".to_string());
+        candidates.push("/run/current-system/sw/bin/mpv".to_string());
+        candidates.push("/usr/bin/mpv".to_string());
+        candidates.push("/usr/local/bin/mpv".to_string());
+        candidates.push("/bin/mpv".to_string());
+        candidates.push("/app/bin/mpv".to_string());
+    }
+    let bin_names = if cfg!(target_os = "windows") {
+        &[
+            "mpv.exe",
+            "mpv.com",
+            "mpv",
+            "mpvnet.exe",
+            "mpvnet.com",
+            "mpvnet",
+        ][..]
+    } else {
+        &["mpv", "io.mpv.Mpv"][..]
+    };
+
+    probe_player_executable(
+        "MOVIEBOX_MPV_PATH",
+        &candidates,
+        bin_names,
+        Some("io.mpv.Mpv"),
+    )
+}
+
+fn probe_vlc() -> Option<String> {
+    let mut candidates = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        let localappdata = std::env::var("LOCALAPPDATA").ok();
+        let appdata = std::env::var("APPDATA").ok();
+        let home = dirs::home_dir();
+        candidates.extend(windows_vlc_candidate_paths(
+            localappdata.as_deref(),
+            appdata.as_deref(),
+            home.as_deref(),
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push("/Applications/VLC.app/Contents/MacOS/VLC".to_string());
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(
+                home.join("Applications/VLC.app/Contents/MacOS/VLC")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            candidates.push(
+                home.join(".nix-profile/bin/vlc")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        candidates.push("/opt/homebrew/bin/vlc".to_string());
+        candidates.push("/opt/local/bin/vlc".to_string());
+        candidates.push("/usr/local/bin/vlc".to_string());
+        candidates.push("/run/current-system/sw/bin/vlc".to_string());
+        candidates.push("/bin/vlc".to_string());
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        if let Ok(prefix) = std::env::var("PREFIX") {
+            candidates.push(format!("{prefix}/bin/vlc"));
+        }
+        candidates.push("/data/data/com.termux/files/usr/bin/vlc".to_string());
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(
+                home.join(".local/share/flatpak/exports/bin/org.videolan.VLC")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            candidates.push(home.join(".local/bin/vlc").to_string_lossy().into_owned());
+            candidates.push(
+                home.join(".nix-profile/bin/vlc")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        candidates.push("/var/lib/flatpak/exports/bin/org.videolan.VLC".to_string());
+        candidates.push("/snap/bin/vlc".to_string());
+        candidates.push("/var/lib/snapd/snap/bin/vlc".to_string());
+        candidates.push("/run/current-system/sw/bin/vlc".to_string());
+        candidates.push("/usr/bin/vlc".to_string());
+        candidates.push("/usr/local/bin/vlc".to_string());
+        candidates.push("/bin/vlc".to_string());
+        candidates.push("/app/bin/vlc".to_string());
+    }
+    let bin_names = if cfg!(target_os = "windows") {
+        &["vlc.exe", "vlc"][..]
+    } else {
+        &["vlc", "org.videolan.VLC"][..]
+    };
+
+    probe_player_executable(
+        "MOVIEBOX_VLC_PATH",
+        &candidates,
+        bin_names,
+        Some("org.videolan.VLC"),
+    )
+}
+
 fn mpv_executable() -> Option<String> {
-    static CACHED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
-    CACHED
-        .get_or_init(|| {
-            let mut candidates = Vec::new();
+    static CACHED: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
 
-            #[cfg(target_os = "windows")]
-            {
-                candidates.push(r"C:\Program Files\mpv\mpv.exe".to_string());
-                candidates.push(r"C:\Program Files\MPV Player\mpv.exe".to_string());
-                candidates.push(r"C:\Program Files\mpv-player\mpv.exe".to_string());
-                candidates.push(r"C:\Program Files (x86)\mpv\mpv.exe".to_string());
-                candidates.push(r"C:\mpv\mpv.exe".to_string());
-                if let Ok(local) = std::env::var("LOCALAPPDATA") {
-                    candidates.push(format!(r"{local}\Programs\mpv\mpv.exe"));
-                    candidates.push(format!(r"{local}\Microsoft\WinGet\Links\mpv.exe"));
-                }
-                if let Ok(appdata) = std::env::var("APPDATA") {
-                    candidates.push(format!(r"{appdata}\mpv\mpv.exe"));
-                }
-                if let Some(home) = dirs::home_dir() {
-                    candidates.push(
-                        home.join(r"scoop\shims\mpv.exe")
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                    candidates.push(home.join(r"mpv\mpv.exe").to_string_lossy().into_owned());
-                    candidates.push(home.join(r"bin\mpv.exe").to_string_lossy().into_owned());
-                }
-                candidates.push(r"C:\ProgramData\chocolatey\bin\mpv.exe".to_string());
+    if let Ok(guard) = CACHED.read() {
+        if let Some(path) = &*guard {
+            if Path::new(path).is_file() {
+                return Some(path.clone());
             }
+        }
+    }
 
-            #[cfg(target_os = "macos")]
-            {
-                candidates.push("/Applications/mpv.app/Contents/MacOS/mpv".to_string());
-                if let Some(home) = dirs::home_dir() {
-                    candidates.push(
-                        home.join("Applications/mpv.app/Contents/MacOS/mpv")
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                }
-                candidates.push("/opt/homebrew/bin/mpv".to_string());
-                candidates.push("/opt/local/bin/mpv".to_string());
-                candidates.push("/usr/local/bin/mpv".to_string());
-                candidates.push("/bin/mpv".to_string());
-            }
-
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            {
-                if let Ok(prefix) = std::env::var("PREFIX") {
-                    candidates.push(format!("{prefix}/bin/mpv"));
-                }
-                candidates.push("/data/data/com.termux/files/usr/bin/mpv".to_string());
-                if let Some(home) = dirs::home_dir() {
-                    candidates.push(
-                        home.join(".local/share/flatpak/exports/bin/io.mpv.Mpv")
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                }
-                candidates.push("/var/lib/flatpak/exports/bin/io.mpv.Mpv".to_string());
-                candidates.push("/snap/bin/mpv".to_string());
-                candidates.push("/var/lib/snapd/snap/bin/mpv".to_string());
-                candidates.push("/usr/bin/mpv".to_string());
-                candidates.push("/usr/local/bin/mpv".to_string());
-                candidates.push("/bin/mpv".to_string());
-                candidates.push("/app/bin/mpv".to_string());
-            }
-
-            let bin_names = if cfg!(target_os = "windows") {
-                &["mpv.exe", "mpv"][..]
-            } else {
-                &["mpv", "io.mpv.Mpv"][..]
-            };
-
-            probe_player_executable(
-                "MOVIEBOX_MPV_PATH",
-                &candidates,
-                bin_names,
-                Some("io.mpv.Mpv"),
-            )
-        })
-        .clone()
+    let detected = probe_mpv();
+    if let Some(path) = &detected {
+        if let Ok(mut guard) = CACHED.write() {
+            *guard = Some(path.clone());
+        }
+    }
+    detected
 }
 
 fn vlc_executable() -> Option<String> {
-    static CACHED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
-    CACHED
-        .get_or_init(|| {
-            let mut candidates = Vec::new();
+    static CACHED: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
 
-            #[cfg(target_os = "windows")]
-            {
-                candidates.push(r"C:\Program Files\VideoLAN\VLC\vlc.exe".to_string());
-                candidates.push(r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe".to_string());
-                if let Ok(local) = std::env::var("LOCALAPPDATA") {
-                    candidates.push(format!(r"{local}\Microsoft\WindowsApps\vlc.exe"));
-                    candidates.push(format!(r"{local}\Programs\VLC\vlc.exe"));
-                }
-                if let Ok(appdata) = std::env::var("APPDATA") {
-                    candidates.push(format!(r"{appdata}\vlc\vlc.exe"));
-                }
-                if let Some(home) = dirs::home_dir() {
-                    candidates.push(
-                        home.join(r"scoop\shims\vlc.exe")
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                }
-                candidates.push(r"C:\ProgramData\chocolatey\bin\vlc.exe".to_string());
+    if let Ok(guard) = CACHED.read() {
+        if let Some(path) = &*guard {
+            if Path::new(path).is_file() {
+                return Some(path.clone());
             }
+        }
+    }
 
-            #[cfg(target_os = "macos")]
-            {
-                candidates.push("/Applications/VLC.app/Contents/MacOS/VLC".to_string());
-                if let Some(home) = dirs::home_dir() {
-                    candidates.push(
-                        home.join("Applications/VLC.app/Contents/MacOS/VLC")
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                }
-                candidates.push("/opt/homebrew/bin/vlc".to_string());
-                candidates.push("/opt/local/bin/vlc".to_string());
-                candidates.push("/usr/local/bin/vlc".to_string());
-                candidates.push("/bin/vlc".to_string());
-            }
-
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            {
-                if let Ok(prefix) = std::env::var("PREFIX") {
-                    candidates.push(format!("{prefix}/bin/vlc"));
-                }
-                candidates.push("/data/data/com.termux/files/usr/bin/vlc".to_string());
-                if let Some(home) = dirs::home_dir() {
-                    candidates.push(
-                        home.join(".local/share/flatpak/exports/bin/org.videolan.VLC")
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                }
-                candidates.push("/var/lib/flatpak/exports/bin/org.videolan.VLC".to_string());
-                candidates.push("/snap/bin/vlc".to_string());
-                candidates.push("/var/lib/snapd/snap/bin/vlc".to_string());
-                candidates.push("/usr/bin/vlc".to_string());
-                candidates.push("/usr/local/bin/vlc".to_string());
-                candidates.push("/bin/vlc".to_string());
-                candidates.push("/app/bin/vlc".to_string());
-            }
-
-            let bin_names = if cfg!(target_os = "windows") {
-                &["vlc.exe", "vlc"][..]
-            } else {
-                &["vlc", "org.videolan.VLC"][..]
-            };
-
-            probe_player_executable(
-                "MOVIEBOX_VLC_PATH",
-                &candidates,
-                bin_names,
-                Some("org.videolan.VLC"),
-            )
-        })
-        .clone()
+    let detected = probe_vlc();
+    if let Some(path) = &detected {
+        if let Ok(mut guard) = CACHED.write() {
+            *guard = Some(path.clone());
+        }
+    }
+    detected
 }
 
 #[cfg(target_os = "macos")]
@@ -755,20 +1156,46 @@ fn find_in_path(name: &str) -> Option<String> {
     if std::path::Path::new(name).is_file() {
         return Some(name.to_string());
     }
-    #[cfg(windows)]
-    if std::path::Path::new(&format!("{name}.exe")).is_file() {
-        return Some(format!("{name}.exe"));
+    #[cfg(target_os = "windows")]
+    {
+        if std::path::Path::new(&format!("{name}.exe")).is_file() {
+            return Some(format!("{name}.exe"));
+        }
+        if std::path::Path::new(&format!("{name}.com")).is_file() {
+            return Some(format!("{name}.com"));
+        }
     }
 
-    let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
+    let mut paths_to_search: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(path) = std::env::var_os("PATH") {
+        paths_to_search.extend(std::env::split_paths(&path));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        for (reg_key, reg_val) in &[
+            (r"HKCU\Environment", "Path"),
+            (
+                r"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+                "Path",
+            ),
+        ] {
+            if let Some(raw_path) = query_windows_registry_value(reg_key, Some(reg_val)) {
+                paths_to_search.extend(std::env::split_paths(&raw_path));
+            }
+        }
+    }
+
+    for dir in paths_to_search {
         let candidate = dir.join(name);
-        #[cfg(windows)]
+        #[cfg(target_os = "windows")]
         {
             let candidates = [
                 candidate.clone(),
                 candidate.with_extension("exe"),
+                candidate.with_extension("com"),
                 candidate.with_extension("cmd"),
+                candidate.with_extension("bat"),
             ];
             for c in candidates {
                 if c.is_file() {
@@ -776,7 +1203,7 @@ fn find_in_path(name: &str) -> Option<String> {
                 }
             }
         }
-        #[cfg(not(windows))]
+        #[cfg(not(target_os = "windows"))]
         {
             if candidate.is_file() {
                 #[cfg(unix)]
@@ -932,5 +1359,107 @@ mod tests {
             .map(|a| a.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
         assert!(args.contains(&"https://example.test/video.mp4".to_string()));
+    }
+
+    #[test]
+    fn test_windows_mpv_candidate_paths_comprehensive() {
+        let home = PathBuf::from(r"C:\Users\TestUser");
+        let candidates = windows_mpv_candidate_paths(
+            Some(r"C:\Users\TestUser\AppData\Local"),
+            Some(r"C:\Users\TestUser\AppData\Roaming"),
+            Some(&home),
+        );
+
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("WinGet") && c.contains("mpv.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("WinGet") && c.contains("mpv.com"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("mpv.net") && c.contains("mpvnet.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Downloads") && c.contains("mpv.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Desktop") && c.contains("mpv.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("scoop") && c.contains("mpv.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Program Files") && c.contains("mpv.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Program Files") && c.contains("mpvnet.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("C:") && c.contains("mpv.exe"))
+        );
+    }
+
+    #[test]
+    fn test_windows_vlc_candidate_paths_comprehensive() {
+        let home = PathBuf::from(r"C:\Users\TestUser");
+        let candidates = windows_vlc_candidate_paths(
+            Some(r"C:\Users\TestUser\AppData\Local"),
+            Some(r"C:\Users\TestUser\AppData\Roaming"),
+            Some(&home),
+        );
+
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Program Files") && c.contains("vlc.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("WindowsApps") && c.contains("vlc.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("WinGet") && c.contains("vlc.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Downloads") && c.contains("vlc.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("Desktop") && c.contains("vlc.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("scoop") && c.contains("vlc.exe"))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c.contains("C:") && c.contains("vlc.exe"))
+        );
     }
 }

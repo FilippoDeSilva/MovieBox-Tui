@@ -42,12 +42,15 @@
 - **Update Modal Input Isolation & Event Guards**:
   - Prevented keystroke hijacking: deferred blocking update modal presentation while the user is actively typing in the search bar (`InputMode::Editing`), ensuring keys (`u`, `o`, `Esc`) never trigger unintended update actions.
   - Added input lock during in-flight updates (`is_updating`), consuming all keyboard and mouse events to prevent mid-upgrade process termination or disk corruption.
+- **Comprehensive Multi-Platform Player Detection & Dynamic Settings Refresh**:
+  - Expanded Windows MPV and VLC candidate discovery across executable-adjacent directories (`.\mpv.exe`, `.\vlc.exe`), WinGet Packages (`%LOCALAPPDATA%\Microsoft\WinGet\Packages`), user `Downloads` and `Desktop` extractions, `mpv.net` (`mpvnet.exe`, `mpv.net`), `mpv.com`, Scoop apps and shims, Chocolatey, portable drive roots (`C:\mpv`, `C:\vlc`, `C:\tools`), and Windows Registry `App Paths` and `Environment\Path`.
+  - Expanded macOS and Linux discovery across Nix profiles (`~/.nix-profile/bin`, `/run/current-system/sw/bin`), Homebrew, MacPorts, user `.local/bin`, and user/system Flatpak exports.
+  - Replaced permanent negative caching (`OnceLock<Option<String>>`) with non-negative path caching across MPV, VLC, IINA, and Android Intent openers, ensuring players installed after cold start are discovered immediately.
+  - Added non-destructive dynamic player detection merging to Settings Hub (`ToggleSettingsPopup`, `ShowSettingsPopup`), player selection activation, and value cycling, refreshing `available_players` in real time without requiring an app restart.
 - **Direct Playback & Header Compatibility**:
   - Eliminated vestigial in-stream "Open with" popup that blocked playback when only VLC was installed, routing playback directly to the preferred compatible player.
   - Prevented silent player overrides: when a user explicitly selects a default player (e.g. VLC) that cannot satisfy stream authentication headers (e.g. MovieBox signed DASH manifests), the app now halts playback and warns the user with actionable detected alternatives instead of silently launching an unselected player.
   - Added structured `PlaybackResolution` engine with dynamic context-aware notifications across playback resolution and download operations.
-  - Expanded Windows `mpv.exe` detection across winget (`MPV Player`, `mpv-player`), portable `C:\mpv`, and user directory paths.
-
 - **Terminal Graphics Probe Leak**:
   - Prevented raw Kitty APC escape sequence leak (`Gi=31...`) on macOS `Terminal.app` and legacy non-graphics consoles by skipping graphics stdio probes.
   - Removed unsafe mid-session stdio graphics re-probing on `FocusChange` events.

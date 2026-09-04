@@ -5,16 +5,14 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 
 ## Detection
 
-`player::detect()` (powered by a centralized `probe_player_executable` engine) returns players in priority order, resolving and caching paths statically:
+`player::detect()` (powered by a centralized `probe_player_executable` engine) returns players in priority order, resolving paths dynamically with non-negative caching:
 
-- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, MacPorts `/opt/local/bin`, and standard `/bin`).
-- Linux: mpv, then VLC (probing Native `$PATH`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, standard `/bin`, and `flatpak run`).
-- Windows: mpv, then VLC (probing `Program Files` including WinGet `MPV Player` and `mpv-player`, `LOCALAPPDATA\Programs`, `WinGet\Links`, portable `C:\mpv`, Scoop `scoop\shims`, and Chocolatey).
+- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, MacPorts `/opt/local/bin`, Nix profiles `~/.nix-profile/bin` and `/run/current-system/sw/bin`, and standard `/bin`).
+- Linux: mpv, then VLC (probing native `$PATH`, user `.local/bin`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, Nix profiles, standard `/bin`, and `flatpak run`).
+- Windows: mpv, then VLC (probing executable-adjacent binaries, WinGet Links & Packages directory `%LOCALAPPDATA%\Microsoft\WinGet\Packages`, `%USERPROFILE%\Downloads` and `%USERPROFILE%\Desktop` extractions, `Program Files` including `mpv`, `mpv-player`, `mpv.net`, and `VideoLAN\VLC`, `LOCALAPPDATA\Programs`, portable drive roots `C:\mpv`, `C:\vlc`, `C:\tools`, Scoop shims & apps, Chocolatey, and Windows Registry `App Paths` and `Environment\Path`).
 - Android/Termux: `mpv` (if installed via `pkg install mpv`), or Android intent chooser (`termux-open`, `termux-open-url`, `termux-am`, or `/system/bin/am`).
 
-Resolution runs once at startup and is cached (`OnceLock`). A preferred player can be
-forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`,
-`vlc`, `android`), which reorders the list. The media player picker in the Settings Hub (`/settings`) lists every detected player on your system and saves your selection to `config.json` unless overridden by `MOVIEBOX_PLAYER`. Playback launches directly using the preferred compatible player without intermediate modal dialogs.
+Resolution caches detected paths across runs while allowing newly installed players to be discovered dynamically when opening or navigating the Settings Hub (`/settings`), without requiring an application restart. A preferred player can be forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`, `vlc`, `android`), which reorders the list. The media player picker in the Settings Hub lists every detected player on your system and saves your selection to `config.json`. Playback launches directly using the preferred compatible player without intermediate modal dialogs.
 
 ## Command construction
 

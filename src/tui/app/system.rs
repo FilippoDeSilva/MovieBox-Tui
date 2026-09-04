@@ -281,6 +281,11 @@ impl App {
                 let open = !self.state.show_settings_popup;
                 if open {
                     self.reset_transient_overlays();
+                    for player in crate::tui::player::detect() {
+                        if !self.state.available_players.contains(&player) {
+                            self.state.available_players.push(player);
+                        }
+                    }
                     self.state.ensure_default_player();
                     self.state.show_settings_popup = true;
                     self.state.settings_category = crate::tui::state::SettingsCategory::General;
@@ -297,7 +302,11 @@ impl App {
             }
 
             Action::ShowSettingsPopup => {
-                self.reset_transient_overlays();
+                for player in crate::tui::player::detect() {
+                    if !self.state.available_players.contains(&player) {
+                        self.state.available_players.push(player);
+                    }
+                }
                 self.state.ensure_default_player();
                 self.state.show_settings_popup = true;
                 self.state.settings_category = crate::tui::state::SettingsCategory::General;
@@ -436,6 +445,13 @@ impl App {
                             self.persist_config();
                         }
                         1 => {
+                            if self.state.available_players.is_empty() {
+                                let detected = crate::tui::player::detect();
+                                if !detected.is_empty() {
+                                    self.state.available_players = detected;
+                                }
+                                self.state.ensure_default_player();
+                            }
                             if !self.state.available_players.is_empty() {
                                 self.state.settings_player_picker = true;
                                 self.state.player_picker_popup = true;
