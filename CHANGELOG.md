@@ -30,6 +30,9 @@
   - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` $\to$ Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
 
 ### Fixed
+- **Unified Search Result Selection Background**:
+  - Unified search result card selection highlight across the entire item slot (`item_area`), eliminating fragmented background rendering between cursor indicators, posters, and text columns.
+  - Removed redundant poster sub-area buffer clearing before image rendering, preventing selection background clipping and black gutter artifacts on the right edge of posters.
 - **High-Precision Playback Tracking & Race Elimination**:
   - Eliminated wall-clock race condition where process elapsed time overwrote exact seek/pause positions from `mpv` and `iina-cli` Lua trackers.
   - Hardened `moviebox_tracker.lua` with latched completion: reaching $\ge 90\%$ playback or EOF permanently latches completion, preventing shutdown events from reverting completed status.

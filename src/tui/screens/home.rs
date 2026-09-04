@@ -1732,11 +1732,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     let selected_bg = theme.surface0.fg.unwrap_or(theme.base);
                     frame.render_widget(
                         Block::default().style(Style::default().bg(selected_bg)),
-                        text_area,
-                    );
-                    frame.render_widget(
-                        Block::default().style(Style::default().bg(selected_bg)),
-                        highlight_area,
+                        item_area,
                     );
                 }
 
@@ -1794,7 +1790,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         }
                         if let Some((_, proto)) = state.search_poster_protocols.peek(&res.id) {
                             if !state.has_active_modal() {
-                                crate::tui::clear_area(frame, p_area, theme);
                                 frame.render_widget(ratatui_image::Image::new(proto), p_area);
                             }
                         }
@@ -3615,5 +3610,45 @@ mod tests {
         assert_eq!(poster.width, 12);
         assert_eq!(text.x, 25);
         assert_eq!(text.width, 65);
+    }
+
+    #[test]
+    fn test_search_result_selection_continuous_background() {
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            input_mode: InputMode::Normal,
+            search_query: "Matrix".into(),
+            search_results: vec![crate::models::SearchResult {
+                id: "test_1".into(),
+                title: "The Matrix".into(),
+                stype: 1,
+                release_year: "1999".into(),
+                cover_url: None,
+                season: 0,
+                episode: 0,
+                provider: crate::providers::models::ProviderKind::MovieBox,
+            }],
+            ..Default::default()
+        };
+        state.search_list_state.select(Some(0));
+        let theme = Theme::mocha();
+        let selected_bg = theme.surface0.fg.unwrap_or(theme.base);
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 100, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        for x in 0..100 {
+            assert_eq!(
+                buffer[(x, 2)].style().bg,
+                Some(selected_bg),
+                "mismatch at x={x}"
+            );
+        }
     }
 }
