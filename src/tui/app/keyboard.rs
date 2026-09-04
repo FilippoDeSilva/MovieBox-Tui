@@ -1193,7 +1193,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_modal_keystroke_fallthrough() {
+    async fn test_update_modal_keystroke_isolation() {
         let mut app = App::new();
         app.state.active_screen = crate::tui::state::Screen::Home;
         app.state.input_mode = InputMode::Normal;
@@ -1224,10 +1224,13 @@ mod tests {
 
         app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()))
             .await;
-        assert_eq!(app.state.search_list_state.selected(), Some(1));
+        assert_eq!(app.state.search_list_state.selected(), Some(0));
         app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
             .await;
         assert!(app.state.update_available.is_none());
+        app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.search_list_state.selected(), Some(1));
     }
     #[tokio::test]
     async fn test_normal_mode_c_clears_search_and_results() {
