@@ -34,15 +34,17 @@ irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | i
 
 ## Android (Termux)
 
-Install Termux tools, run the installer script to fetch the precompiled native Android ARM64 binary, and grant storage permissions:
+Install Termux tools and the intent bridge, run the installer script to fetch the precompiled native Android ARM64 binary, and grant storage permissions:
 
 ```bash
-pkg update && pkg install -y curl tar termux-tools
+pkg update && pkg install -y curl tar termux-tools termux-am
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
 ```
 
 The installer automatically downloads the native Android ARM64 release package (`MovieBox_Android_arm64.tar.gz`) built against the Android NDK and Bionic libc, requiring zero on-device compilation.
+
+> **Media Player Requirements**: Android streams are rendered through external Android video players (such as **VLC for Android**, **MX Player**, **Just Player**, or **MPV Android APK**) triggered via `termux-open` or `termux-am`. Command-line `mpv` installed directly in Termux (`pkg install mpv`) runs without a video output surface unless an X11 desktop environment (like Termux:X11) is configured.
 
 To compile from source on Termux:
 

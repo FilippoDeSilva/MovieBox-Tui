@@ -27,7 +27,7 @@ MovieBox-TUI delegates video decoding to an external media player. Install at le
 | **mpv** *(Recommended)* | Linux, macOS, Windows | `brew install mpv` / `sudo apt install mpv` / `winget install mpv` |
 | **IINA** | macOS (Native GUI) | `brew install --cask iina` |
 | **VLC** | Cross-platform | `brew install --cask vlc` / `sudo apt install vlc` / `winget install VideoLAN.VLC` |
-| **Android Player** | Android (Termux) | `pkg install termux-tools` *(launches VLC or Nova)* |
+| **Android Player** | Android (Termux) | `pkg install -y termux-tools termux-am` *(launches external player)* |
 
 ---
 

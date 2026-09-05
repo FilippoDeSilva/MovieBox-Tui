@@ -134,7 +134,7 @@ fn probe_android_opener() -> Option<AndroidOpener> {
     if let Some(custom) = configured_executable("MOVIEBOX_ANDROID_PLAYER_PATH") {
         if custom.ends_with("termux-open-url") {
             return Some(AndroidOpener::TermuxOpenUrl(custom));
-        } else if custom.ends_with("termux-am") || custom.ends_with("/am") {
+        } else if custom.ends_with("termux-am") {
             return Some(AndroidOpener::TermuxAm(custom));
         } else {
             return Some(AndroidOpener::TermuxOpen(custom));
@@ -156,10 +156,6 @@ fn probe_android_opener() -> Option<AndroidOpener> {
         if Path::new(&termux_am).is_file() {
             return Some(AndroidOpener::TermuxAm(termux_am));
         }
-        let am_bin = format!("{prefix}/bin/am");
-        if Path::new(&am_bin).is_file() {
-            return Some(AndroidOpener::TermuxAm(am_bin));
-        }
     }
 
     let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
@@ -175,10 +171,6 @@ fn probe_android_opener() -> Option<AndroidOpener> {
     let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
     if Path::new(termux_am_static).is_file() {
         return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
-    }
-    let termux_am_bin_static = "/data/data/com.termux/files/usr/bin/am";
-    if Path::new(termux_am_bin_static).is_file() {
-        return Some(AndroidOpener::TermuxAm(termux_am_bin_static.to_string()));
     }
 
     if let Some(path) = find_in_path("termux-open") {
@@ -244,7 +236,7 @@ fn android_intent_command(
     subtitle: Option<&str>,
     headers: &[(String, String)],
 ) -> Command {
-    let mut command = match android_opener() {
+    match android_opener() {
         Some(AndroidOpener::TermuxOpen(path)) => {
             let mut cmd = Command::new(path);
             cmd.arg("--chooser")
@@ -282,6 +274,10 @@ fn android_intent_command(
                 .arg("-t")
                 .arg("video/*");
             append_android_intent_extras(&mut cmd, subtitle, headers);
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            cmd.env("PATH", format!("/system/bin:/system/xbin:{current_path}"));
+            cmd.env_remove("LD_LIBRARY_PATH");
+            cmd.env_remove("LD_PRELOAD");
             cmd
         }
         None => {
@@ -292,12 +288,7 @@ fn android_intent_command(
                 .arg(url);
             cmd
         }
-    };
-
-    command.env_remove("LD_LIBRARY_PATH");
-    command.env_remove("LD_PRELOAD");
-
-    command
+    }
 }
 
 fn mpv_command(

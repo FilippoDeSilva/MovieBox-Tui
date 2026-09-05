@@ -151,11 +151,13 @@ impl App {
             PlaybackResolution::NoPlayersInstalled => {
                 self.state.is_resolving_playback = false;
                 self.state.pending_playback_source = None;
-                self.state.notify(
-                    NotificationKind::Error,
-                    "No Media Player Found",
-                    "Install mpv, IINA, or VLC to enable video playback.",
-                );
+                let message = if crate::updater::artifact::is_termux_environment() {
+                    "Install player intent tools: 'pkg install -y termux-tools termux-am' and ensure an Android player (VLC, MX Player, or Just Player) is installed."
+                } else {
+                    "Install mpv, IINA, or VLC to enable video playback."
+                };
+                self.state
+                    .notify(NotificationKind::Error, "No Media Player Found", message);
             }
         }
     }
@@ -713,11 +715,13 @@ impl App {
                 let player = self.state.available_players.first().cloned();
                 match player {
                     None => {
-                        self.state.notify(
-                            NotificationKind::Error,
-                            "Player Unavailable",
-                            "Install mpv, IINA, or VLC to enable playback.",
-                        );
+                        let message = if crate::updater::artifact::is_termux_environment() {
+                            "Install player intent tools: 'pkg install -y termux-tools termux-am' and ensure an Android player (VLC, MX Player, or Just Player) is installed."
+                        } else {
+                            "Install mpv, IINA, or VLC to enable playback."
+                        };
+                        self.state
+                            .notify(NotificationKind::Error, "Player Unavailable", message);
                     }
                     Some(kind) => {
                         self.state.notify(
@@ -800,22 +804,32 @@ impl App {
                     .unwrap_or_else(|| "unknown".into());
                 log::error!("player crashed (code {code_str}): {error_msg}");
 
-                let display_err = if error_msg.is_empty() {
-                    "No error output provided by player.".to_string()
+                let is_termux_perm_crash = crate::updater::artifact::is_termux_environment()
+                    && (code == Some(126)
+                        || error_msg.contains("Permission denied")
+                        || error_msg.contains("/system/bin/am")
+                        || error_msg.contains("termux-open"));
+
+                let (title, message) = if is_termux_perm_crash {
+                    (
+                        "Termux Player Setup Required",
+                        "Install player intent tools: 'pkg install -y termux-tools termux-am' and ensure an Android player (VLC, MX Player, or Just Player) is installed.".to_string(),
+                    )
                 } else {
-                    error_msg.lines().last().unwrap_or(&error_msg).to_string()
+                    let display_err = if error_msg.is_empty() {
+                        "No error output provided by player.".to_string()
+                    } else {
+                        error_msg.lines().last().unwrap_or(&error_msg).to_string()
+                    };
+                    (
+                        "Player Error",
+                        format!("Crash code: {code_str}\n{display_err}"),
+                    )
                 };
 
-                self.state.set_status(
-                    format!("Player crashed (code {code_str}): {display_err}"),
-                    300,
-                );
+                self.state.set_status(format!("{title}: {message}"), 300);
 
-                self.state.notify(
-                    NotificationKind::Error,
-                    "Player Error",
-                    format!("Crash code: {code_str}\n{display_err}"),
-                );
+                self.state.notify(NotificationKind::Error, title, message);
             }
             _ => return None,
         }
@@ -996,6 +1010,34 @@ mod tests {
                 chosen: crate::tui::state::PlayerKind::AndroidIntent,
                 compatible_alternatives: vec![],
             }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_player_crashed_termux_actionable_notification() {
+        let mut app = crate::tui::app::App::new();
+        unsafe {
+            std::env::set_var("TERMUX_VERSION", "0.118.0");
+        }
+        app.handle_playback(super::Action::PlayerCrashed(
+            Some(126),
+            "/system/bin/am[11]: /data/data/com.termux/files/usr/bin/cmd: Permission denied"
+                .to_string(),
+        ))
+        .await;
+        unsafe {
+            std::env::remove_var("TERMUX_VERSION");
+        }
+        let last_notification = app
+            .state
+            .notifications
+            .back()
+            .expect("expected notification");
+        assert_eq!(last_notification.title, "Termux Player Setup Required");
+        assert!(
+            last_notification
+                .message
+                .contains("pkg install -y termux-tools termux-am")
         );
     }
 }

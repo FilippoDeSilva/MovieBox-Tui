@@ -624,8 +624,8 @@ else
         PLAYER_DETECTED="mpv"
     elif command -v vlc >/dev/null 2>&1 || [ -f "$HOME/.local/share/flatpak/exports/bin/org.videolan.VLC" ] || [ -f "/var/lib/flatpak/exports/bin/org.videolan.VLC" ]; then
         PLAYER_DETECTED="VLC"
-    elif command -v termux-open >/dev/null 2>&1; then
-        PLAYER_DETECTED="Android Player (termux-open)"
+    elif command -v termux-open >/dev/null 2>&1 || command -v termux-am >/dev/null 2>&1; then
+        PLAYER_DETECTED="Android Player (termux intent)"
     fi
 fi
 printf "\n"
@@ -635,7 +635,7 @@ printf "  %b•%b %bBinary:%b  %b%s%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RE
 if [ -n "$PLAYER_DETECTED" ]; then
     printf "  %b•%b %bPlayer:%b  %b%s (ready)%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_GREEN" "$PLAYER_DETECTED" "$C_RESET"
 elif [ "$IS_TERMUX" -eq 1 ]; then
-    printf "  %b•%b %bPlayer:%b  %bNone detected (run 'pkg install termux-tools')%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "$C_RESET"
+    printf "  %b•%b %bPlayer:%b  %bNone detected (run 'pkg install -y termux-tools termux-am')%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "$C_RESET"
 else
     printf "  %b•%b %bPlayer:%b  %bNone detected (mpv, VLC, or IINA recommended)%b\n" "$C_MUTED" "$C_RESET" "$C_MUTED" "$C_RESET" "$C_SAPPHIRE" "$C_RESET"
 fi
@@ -650,10 +650,13 @@ printf "    %b$ moviebox-tui%b\n\n" "$C_GREEN" "$C_RESET"
 
 if [ -z "$PLAYER_DETECTED" ]; then
     if [ "$IS_TERMUX" -eq 1 ]; then
-        printf "  %bℹ%b Note: Run %b'pkg install termux-tools'%b to enable video playback on Termux.\n\n" "$C_SAPPHIRE" "$C_RESET" "$C_BOLD" "$C_RESET"
+        printf "  %bℹ%b Note: Run %b'pkg install -y termux-tools termux-am'%b to enable video playback on Termux.\n" "$C_SAPPHIRE" "$C_RESET" "$C_BOLD" "$C_RESET"
+        printf "    Streams play via external Android players (VLC, MX Player, or Just Player).\n\n"
     else
         printf "  %bℹ%b Note: A media player (mpv, VLC, or IINA) is recommended for video playback.\n\n" "$C_SAPPHIRE" "$C_RESET"
     fi
+elif [ "$IS_TERMUX" -eq 1 ]; then
+    printf "  %bℹ%b Streams will open in your default Android video player (VLC, MX Player, or Just Player).\n\n" "$C_SAPPHIRE" "$C_RESET"
 fi
 
 if [ -n "$SHELL_MODIFIED" ]; then

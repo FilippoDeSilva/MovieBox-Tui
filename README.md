@@ -25,7 +25,7 @@ MovieBox-TUI delegates video decoding to an external media player. Install at le
 | **mpv** *(Recommended)* | Linux, macOS, Windows | `brew install mpv` / `sudo apt install mpv` / `winget install mpv` |
 | **IINA** | macOS (Native GUI) | `brew install --cask iina` |
 | **VLC** | Cross-platform | `brew install --cask vlc` / `sudo apt install vlc` / `winget install VideoLAN.VLC` |
-| **Android Player** | Android (Termux) | `pkg install termux-tools` *(launches VLC or Nova)* |
+| **Android Player** | Android (Termux) | `pkg install -y termux-tools termux-am` *(launches external player)* |
 
 ## Installation
 
@@ -52,12 +52,14 @@ irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | i
 
 ### Android (Termux)
 
-Install Termux tools, download the native precompiled Android ARM64 binary via the installer, and grant storage permissions:
+Install Termux tools and the intent bridge, download the native precompiled Android ARM64 binary via the installer, and grant storage permissions:
 ```bash
-pkg update && pkg install -y curl tar termux-tools
+pkg update && pkg install -y curl tar termux-tools termux-am
 curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
 ```
+
+> **Video Playback on Android**: Playback on Android is handled by external video player apps (**VLC**, **MX Player**, **Just Player**, or **MPV Android APK**) launched via Android Intent. Installing CLI `mpv` inside Termux (`pkg install mpv`) provides terminal/audio-only output because Android does not expose a desktop video surface to terminal sessions.
 
 <details>
 <summary><b>Manual & Developer Builds (Cargo)</b></summary>

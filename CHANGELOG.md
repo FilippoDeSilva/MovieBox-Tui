@@ -18,6 +18,11 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **Termux Android Player Exit Code 126 & Intent Bridge Resolution**:
+  - Eliminated `Player Error: Crash code: 126 (/system/bin/am[11]: /data/data/com.termux/files/usr/bin/cmd: Permission denied)` crash in Termux on Android 10+ by prioritizing native Termux openers (`termux-open`, `termux-open-url`, `termux-am`) and strictly avoiding unprivileged `/system/bin/am` shell script calls.
+  - Preserved `LD_PRELOAD` for Termux applet compatibility while prepending system paths (`/system/bin:/system/xbin`) for system command invocations.
+  - Added actionable diagnostic notifications when player execution fails or when no player is detected in Termux, directing users to install `termux-tools termux-am` and verify an external Android player (VLC, Just Player, MX Player).
+  - Updated universal installer (`install.sh`), README, and documentation guides with `termux-am` prerequisites and architecture details explaining external Android video player integration versus headless CLI `mpv`.
 - **Android Intent Player Stream Compatibility**:
   - Eliminated blanket player incompatibility errors on Android: unauthenticated streams (CircleFTP, DhakaFlix, IPTV, direct streams) and streams carrying standard `Referer`/`User-Agent` headers (4KHDHub) now dispatch directly to Android video players via `termux-open` or `am start`.
   - Added empty-header guard to `supports_headers`, ensuring streams without authentication requirements are never falsely rejected as incompatible.
