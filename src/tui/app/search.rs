@@ -518,7 +518,6 @@ impl App {
             };
             let release_year = item.year.clone().unwrap_or_default();
             let cover_url = item.poster_url.clone();
-            let season = item.season_count.unwrap_or(0);
             let metrics = metrics_map.get(&id).copied().unwrap_or_default();
 
             if let Some(existing) = self.state.search_results.iter_mut().find(|r| r.id == id) {
@@ -528,8 +527,7 @@ impl App {
                 stored_metrics.recent_rating =
                     stored_metrics.recent_rating.or(metrics.recent_rating);
                 stored_metrics.popularity = stored_metrics.popularity.or(metrics.popularity);
-                if season > existing.season {
-                    existing.season = season;
+                if existing.title.is_empty() {
                     existing.title = clean_title;
                     existing.stype = stype;
                     existing.release_year = release_year;
@@ -568,7 +566,7 @@ impl App {
                     stype,
                     release_year,
                     cover_url,
-                    season,
+                    season: 0,
                     episode: 1,
                     provider: item.id.provider,
                 });

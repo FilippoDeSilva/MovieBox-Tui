@@ -776,6 +776,36 @@ async fn test_history_item_enter_pre_seeds_season_and_episode() {
     assert_eq!(app.state().selected_episode, 7);
     assert!(!app.state().auto_play_on_ready);
 }
+#[tokio::test]
+async fn test_search_series_submit_defaults_to_season_one() {
+    let mut app = App::new();
+    app.state_mut().active_screen = Screen::Home;
+    app.state_mut().input_mode = InputMode::Normal;
+    app.state_mut().search_query.set_content("Breaking Bad");
+    app.state_mut().search_results.push(SearchResult {
+        id: "1382465867459478920".to_string(),
+        title: "Breaking Bad".to_string(),
+        stype: 2,
+        release_year: "2008".to_string(),
+        cover_url: None,
+        season: 0,
+        episode: 1,
+        provider: ProviderKind::MovieBox,
+    });
+    app.state_mut().search_list_state.select(Some(0));
+    app.state_mut().last_search_edit =
+        std::time::Instant::now() - std::time::Duration::from_secs(1);
+
+    app.handle_action(Action::Submit).await;
+
+    assert_eq!(app.state().active_screen, Screen::Details);
+    assert_eq!(
+        app.state().active_subject_id.as_deref(),
+        Some("1382465867459478920")
+    );
+    assert_eq!(app.state().selected_season, 1);
+    assert_eq!(app.state().selected_episode, 1);
+}
 
 #[tokio::test]
 async fn test_no_results_and_error_state_rendering_hints() {

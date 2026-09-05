@@ -324,9 +324,15 @@ pub fn moviebox_details_json_to_media_details(
 
     let duration = subject.get("duration").and_then(|d| {
         if let Some(n) = d.as_u64() {
-            Some(format!("{}m", n / 60))
+            if n > 0 {
+                Some(format!("{}m", n / 60))
+            } else {
+                None
+            }
         } else {
-            d.as_str().map(|s| s.to_string())
+            d.as_str()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty() && s != "0m" && s != "0")
         }
     });
 

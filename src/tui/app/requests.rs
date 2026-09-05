@@ -328,13 +328,10 @@ impl App {
                     };
                     let release_year = item.year.clone().unwrap_or_default();
                     let cover_url = item.poster_url.clone();
-                    let season = item.season_count.unwrap_or(0);
-
                     if let Some(existing) =
                         self.state.search_results.iter_mut().find(|r| r.id == id)
                     {
-                        if season > existing.season {
-                            existing.season = season;
+                        if existing.title.is_empty() {
                             existing.title = clean_title;
                             existing.stype = stype;
                             existing.release_year = release_year;
@@ -372,7 +369,7 @@ impl App {
                             stype,
                             release_year,
                             cover_url,
-                            season,
+                            season: 0,
                             episode: 1,
                             provider: context.provider,
                         });
@@ -1021,15 +1018,21 @@ impl App {
                     }
                 }
 
-                let target_season = if self.state.selected_season > 0 {
-                    self.state.selected_season
+                let (target_season, target_episode) = if self.state.language_chosen {
+                    (
+                        if self.state.selected_season > 0 {
+                            self.state.selected_season
+                        } else {
+                            default_season
+                        },
+                        if self.state.selected_episode > 0 {
+                            self.state.selected_episode
+                        } else {
+                            default_episode
+                        },
+                    )
                 } else {
-                    default_season
-                };
-                let target_episode = if self.state.selected_episode > 0 {
-                    self.state.selected_episode
-                } else {
-                    default_episode
+                    (default_season, default_episode)
                 };
 
                 let season_idx = self
@@ -1817,6 +1820,58 @@ impl App {
                     .select(if count > 0 { Some(0) } else { None });
                 self.state
                     .set_status_default(format!("{} streams available.", count));
+
+                if count > 0 {
+                    if let Some(rid) = self
+                        .state
+                        .selected_resources
+                        .first()
+                        .and_then(|r| r.resource_id.clone())
+                    {
+                        let subject_id = self.state.active_subject_id.clone().unwrap_or_default();
+                        let service = self.service.clone();
+                        let sibling_ids: Vec<String> = self
+                            .state
+                            .selected_details
+                            .as_ref()
+                            .map(|d| {
+                                let mut ids = vec![d.id.value.clone()];
+                                ids.extend(d.dubs.iter().map(|dub| dub.subject_id.clone()));
+                                ids.retain(|s| !s.is_empty());
+                                ids.sort();
+                                ids.dedup();
+                                ids
+                            })
+                            .unwrap_or_default();
+                        tokio::spawn(async move {
+                            let already_cached = tokio::task::spawn_blocking({
+                                let subject_id = subject_id.clone();
+                                let rid = rid.clone();
+                                move || {
+                                    crate::cache::get_captions_cache_typed(&subject_id, &rid)
+                                        .is_some()
+                                }
+                            })
+                            .await
+                            .unwrap_or(false);
+
+                            if !already_cached {
+                                if let Ok(res) = service
+                                    .get_ext_captions(&subject_id, &rid, &sibling_ids)
+                                    .await
+                                {
+                                    tokio::task::spawn_blocking(move || {
+                                        crate::cache::set_captions_cache_typed(
+                                            &subject_id,
+                                            &rid,
+                                            &res,
+                                        );
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
 
                 if self.state.is_waiting_for_download_stream {
                     self.state.is_waiting_for_download_stream = false;

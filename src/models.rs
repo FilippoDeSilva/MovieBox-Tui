@@ -78,7 +78,7 @@ impl SearchResult {
             },
             release_year: item.year.unwrap_or_default(),
             cover_url: item.poster_url,
-            season: item.season_count.unwrap_or(0),
+            season: 0,
             episode: 1,
             provider: item.id.provider,
         }

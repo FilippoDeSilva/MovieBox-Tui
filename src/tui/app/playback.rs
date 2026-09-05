@@ -662,7 +662,16 @@ impl App {
                                         .send(Action::ShowSubtitlePopup(source_clone.url, res))
                                         .ok();
                                 }
-                                _ => {
+                                Err(_) => {
+                                    log::warn!(
+                                        "[playback] Subtitle resolution timed out after 15s for rid={rid}"
+                                    );
+                                    sender.send(Action::DispatchPlayback(source_clone)).ok();
+                                }
+                                Ok(Err(err)) => {
+                                    log::warn!(
+                                        "[playback] Subtitle resolution failed for rid={rid}: {err}"
+                                    );
                                     sender.send(Action::DispatchPlayback(source_clone)).ok();
                                 }
                             }

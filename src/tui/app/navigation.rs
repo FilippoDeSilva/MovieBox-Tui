@@ -792,8 +792,7 @@ impl App {
                             .state
                             .search_query
                             .trim()
-                            .eq_ignore_ascii_case("/history")
-                            || (item.season > 0 && item.episode > 0);
+                            .eq_ignore_ascii_case("/history");
                         let se = if is_history && item.season > 0 {
                             item.season
                         } else {

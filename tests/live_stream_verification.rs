@@ -417,3 +417,53 @@ async fn test_live_moviebox_captions_end_to_end() {
             .any(|c| c.name.contains("বাংলা") || c.name.eq_ignore_ascii_case("Bengali"))
     );
 }
+
+#[tokio::test]
+#[ignore = "live network test; run with cargo test --test live_stream_verification -- --ignored"]
+async fn test_live_moviebox_breaking_bad_series_captions_latency() {
+    let service = moviebox_tui::service::MovieBoxService::new();
+    service.client.init().await.expect("client init successful");
+
+    let subject_id = "6207982430134357800";
+    let releases = service
+        .client
+        .episode_streams(subject_id, 1, 1)
+        .await
+        .expect("fetch episode streams");
+    assert!(!releases.is_empty());
+
+    let release = &releases[0];
+    let resource_id = release
+        .resource_id
+        .as_deref()
+        .expect("must have resource_id");
+
+    let sibling_ids = vec![
+        "1382465867459478920".to_string(),
+        "9185019261486531816".to_string(),
+    ];
+
+    let t0 = std::time::Instant::now();
+    let captions = service
+        .get_ext_captions(subject_id, resource_id, &sibling_ids)
+        .await
+        .expect("fetch captions");
+    let elapsed = t0.elapsed();
+
+    assert!(
+        elapsed < std::time::Duration::from_secs(3),
+        "captions resolution should complete within 3 seconds, took {:.2?}",
+        elapsed
+    );
+    assert!(
+        captions.len() >= 10,
+        "should return >= 10 languages for Breaking Bad S1E1, got {}",
+        captions.len()
+    );
+    assert!(
+        captions
+            .iter()
+            .any(|c| c.name.eq_ignore_ascii_case("English")),
+        "must include English"
+    );
+}

@@ -199,57 +199,55 @@ impl MovieBoxService {
         let mut all_captions = Vec::new();
         let mut seen_urls = std::collections::HashSet::new();
 
-        let mut append_captions = |opts: Vec<crate::providers::models::SubtitleOption>| {
-            for opt in opts {
-                if seen_urls.insert(opt.url.clone()) {
-                    all_captions.push(opt);
-                }
-            }
-        };
-
         if let Ok(payload) = self.client.get_ext_captions(subject_id, resource_id).await {
-            append_captions(crate::providers::moviebox::adapt::captions_json_to_options(
-                &payload,
-            ));
+            Self::append_unique_captions(
+                &mut all_captions,
+                &mut seen_urls,
+                crate::providers::moviebox::adapt::captions_json_to_options(&payload),
+            );
         }
 
-        let mut subjects_to_check = vec![subject_id.to_string()];
-        for sib in sibling_ids {
-            if !sib.is_empty() && !subjects_to_check.contains(sib) && subjects_to_check.len() < 5 {
-                subjects_to_check.push(sib.clone());
-            }
-        }
-
-        for sid in &subjects_to_check {
-            if let Ok((items, _)) = self.client.fetch_resource_page(sid, 0, 1).await {
-                for item in items {
-                    let item_rid =
-                        item.get("resourceId")
-                            .or_else(|| item.get("id"))
-                            .and_then(|v| {
-                                if let Some(n) = v.as_i64() {
-                                    Some(n.to_string())
-                                } else if let Some(n) = v.as_u64() {
-                                    Some(n.to_string())
-                                } else {
-                                    v.as_str().map(|s| s.to_string())
+        if all_captions.len() < 5 && !sibling_ids.is_empty() {
+            let mut sibling_futs = Vec::new();
+            for sib in sibling_ids.iter().take(3) {
+                if !sib.is_empty() && sib != subject_id {
+                    let client = &self.client;
+                    sibling_futs.push(async move {
+                        if let Ok((items, _)) = client.fetch_resource_page(sib, 0, 1).await {
+                            if let Some(item) = items.first() {
+                                let item_rid = item
+                                    .get("resourceId")
+                                    .or_else(|| item.get("id"))
+                                    .and_then(|v| {
+                                        if let Some(n) = v.as_i64() {
+                                            Some(n.to_string())
+                                        } else if let Some(n) = v.as_u64() {
+                                            Some(n.to_string())
+                                        } else {
+                                            v.as_str().map(|s| s.to_string())
+                                        }
+                                    });
+                                if let Some(rid) = item_rid {
+                                    if let Ok(res_payload) = client.get_ext_captions(sib, &rid).await {
+                                        return crate::providers::moviebox::adapt::captions_json_to_options(
+                                            &res_payload,
+                                        );
+                                    }
                                 }
-                            });
-                    if let Some(rid) = item_rid {
-                        if sid != subject_id || rid != resource_id {
-                            if let Ok(res_payload) = self.client.get_ext_captions(sid, &rid).await {
-                                append_captions(
-                                    crate::providers::moviebox::adapt::captions_json_to_options(
-                                        &res_payload,
-                                    ),
-                                );
                             }
                         }
-                    }
+                        Vec::new()
+                    });
+                }
+            }
+
+            if !sibling_futs.is_empty() {
+                let sibling_results = futures::future::join_all(sibling_futs).await;
+                for res in sibling_results {
+                    Self::append_unique_captions(&mut all_captions, &mut seen_urls, res);
                 }
             }
         }
-
         let mut deduplicated: Vec<crate::providers::models::SubtitleOption> = Vec::new();
         let mut seen_languages = std::collections::HashSet::new();
         for sub in all_captions {
@@ -272,6 +270,18 @@ impl MovieBoxService {
         });
 
         Ok(deduplicated)
+    }
+
+    fn append_unique_captions(
+        target: &mut Vec<crate::providers::models::SubtitleOption>,
+        seen_urls: &mut std::collections::HashSet<String>,
+        opts: Vec<crate::providers::models::SubtitleOption>,
+    ) {
+        for opt in opts {
+            if seen_urls.insert(opt.url.clone()) {
+                target.push(opt);
+            }
+        }
     }
 
     pub async fn fetch_poster_bytes(&self, url: &str) -> Option<Vec<u8>> {

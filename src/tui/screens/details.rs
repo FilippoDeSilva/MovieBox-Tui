@@ -328,8 +328,16 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     } else {
         "N/A".to_string()
     };
-    let duration = details.duration.as_deref().unwrap_or("N/A");
-    let imdb_rating = details.imdb_rating.as_deref().unwrap_or("N/A");
+    let duration = details
+        .duration
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("N/A");
+    let imdb_rating = details
+        .imdb_rating
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("N/A");
     let tagline = details.tagline.as_deref();
 
     let details_block = Block::default()
@@ -469,12 +477,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         Span::styled(type_str, theme.accent.add_modifier(Modifier::BOLD)),
     ];
 
-    if duration != "N/A" {
+    if !duration.trim().is_empty() && duration != "N/A" {
         badge_spans.push(Span::styled(bullet_sep, theme.overlay0));
         badge_spans.push(Span::styled(duration, theme.subtext1));
     }
 
-    if imdb_rating != "N/A" {
+    if !imdb_rating.trim().is_empty() && imdb_rating != "N/A" {
         badge_spans.push(Span::styled(bullet_sep, theme.overlay0));
         if state.basic_terminal {
             badge_spans.push(Span::styled("IMDb ", theme.rating));
@@ -903,7 +911,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             } else {
                 "▶  "
             };
-            let unwatched_sym = if state.basic_terminal { "[ ] " } else { "·  " };
+            let unwatched_sym = if state.basic_terminal { "    " } else { "   " };
             ep_numbers
                 .iter()
                 .map(|&ep| {
@@ -2296,6 +2304,65 @@ mod tests {
         assert!(content.contains("EP 01"));
         assert!(content.contains("EP 02"));
         assert!(content.contains("EP 10"));
+        assert!(!content.contains("· ·"));
+        assert!(!content.contains("·  EP"));
+    }
+
+    #[test]
+    fn test_details_header_metadata_suppresses_empty_duration_and_double_middot() {
+        let backend = ratatui::backend::TestBackend::new(100, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            active_subject_id: Some("test_series_metadata".to_string()),
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "test_series_metadata".to_string(),
+                },
+                title: "Breaking Bad".to_string(),
+                media_type: MediaType::Series,
+                year: Some("2008".to_string()),
+                description: None,
+                tagline: None,
+                imdb_rating: Some("9.5".to_string()),
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: Some("".to_string()),
+                genres: vec![],
+                seasons: vec![Season {
+                    number: 1,
+                    episodes: vec![],
+                }],
+                dubs: vec![],
+            }),
+            available_seasons: vec![Season {
+                number: 1,
+                episodes: vec![],
+            }],
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(content.contains("2008"));
+        assert!(content.contains("Series"));
+        assert!(content.contains("9.5"));
+        assert!(!content.contains("·  ·"));
+        assert!(!content.contains("· ·"));
     }
 
     #[test]

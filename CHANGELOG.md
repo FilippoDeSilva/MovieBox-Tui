@@ -18,18 +18,27 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **Series Season Default & Episode List Rendering Normalization**:
+  - Initialized unselected series search results with `season: 0`, preventing catalog season counts from masquerading as watch history progress and erroneously defaulting multi-season shows (e.g. *Breaking Bad*) to their final season on initial selection.
+  - Guarded history pre-seeding in search submission strictly to `/history` queries and active continue-watching items, ensuring search results always open at Season 1 Episode 1 for new series while resuming at the user's progress for previously watched shows.
+  - Authoritatively resolved target season and episode in `DetailsSuccess`, preserving in-view season and episode positions across audio dub switches while defaulting fresh series navigation to Season 1 Episode 1.
+  - Replaced `"·  "` unwatched episode status prefix with clean whitespace padding, eliminating double middots (`· ·  EP 01`) and stray dots before unselected episodes in the details pane.
+  - Guarded duration formatting against empty strings in `MediaDetails`, eliminating duplicate bullet dividers (`·  ·`) in the metadata header for series without runtime durations.
 - **Accurate Playback & Download Preparation Notifications**:
   - Replaced misleading "Fetching subtitles" toast notifications during stream and episode download preparation with accurate stream preparation notices (`Preparing <filename>...` and `Resolving episode stream...`), eliminating false subtitle retrieval messages when streams rely on embedded subtitles or contain no external captions.
   - Clarified external subtitle download failure status to `External subtitle unavailable; playing stream directly.` to prevent ambiguity when video containers carry built-in subtitles.
   - Standardized download mirror error notice to `No downloadable mirrors were found for this release.` and normalized notification title casing.
-- **MovieBox Subtitle Resolution & Multi-Language Track Extraction**:
-  - Resolved full multi-language subtitle availability (English, Bengali, Arabic, Filipino, Hindi, Indonesian, Urdu) on MovieBox by linking genuine upload `resourceId` identifiers to releases instead of internal CDN transcoding stream IDs, and aggregating captions across audio dub siblings in `MovieBoxService::get_ext_captions`.
+- **MovieBox Subtitle Resolution & High-Speed Multi-Tier Aggregation**:
+  - Implemented multi-tier subtitle resolution in `MovieBoxService::get_ext_captions` with immediate early-exit (< 250ms) when the active stream provides rich subtitles (≥ 5 tracks), eliminating 15–20 superfluous sibling network round-trips that previously triggered 15-second playback resolution timeouts.
+  - Replaced sequential nested loops for sibling dub crawls with concurrent parallel dispatch via `futures::future::join_all`, bounding multi-dub subtitle aggregation (e.g. *Ek Deewane Ki Deewaniyat*) to < 1.2s.
+  - Added asynchronous background subtitle cache pre-warming in `Action::EpisodeStreamsReady`, fetching and caching subtitle options as soon as streams are received so that pressing Enter on a stream yields an instant < 1ms cache hit.
+  - Resolved full multi-language subtitle availability (English, Bengali, Arabic, Chinese, Filipino, French, Hindi, Indonesian, Malay, Portuguese, Punjabi, Russian, Urdu) on MovieBox by linking genuine upload `resourceId` identifiers to releases instead of internal CDN transcoding stream IDs.
   - Filtered out 34-byte dummy placeholder caption files returned by transcoding endpoints and deduplicated subtitle tracks by language and download URL.
   - Added automatic fallback to subject resources in `MovieBoxService::get_ext_captions` when a stream ID does not directly attach captions.
   - Added `in_id` language code mapping to `sanitize_language_label` for localized Indonesian subtitle display.
   - Registered `draw_subtitle_picker` in `App::draw`, restoring the visual "Subtitles" modal picker overlay during stream playback and download preparation when external captions exist.
   - Tightened modal picker vertical height calculation in `picker_layout`, eliminating blank gap lines between the last list item and the bottom divider for short lists.
-  - Replaced synthetic non-numeric resource ID generation in `get_selected_resource_id` with direct `Release.resource_id` resolution, preventing HTTP 400 parameter parsing errors against the `/wefeed-mobile-bff/subject-api/get-ext-captions` endpoint.
+  - Hardened `Action::PlayStream` error handling with structured diagnostic warnings on subtitle timeout or resolution failure before dispatching direct playback.
 - **Termux Android Player Exit Code 126 & Intent Bridge Resolution**:
   - Eliminated `Player Error: Crash code: 126 (/system/bin/am[11]: /data/data/com.termux/files/usr/bin/cmd: Permission denied)` crash in Termux on Android 10+ by prioritizing native Termux openers (`termux-open`, `termux-open-url`, `termux-am`) and strictly avoiding unprivileged `/system/bin/am` shell script calls.
   - Preserved `LD_PRELOAD` for Termux applet compatibility while prepending system paths (`/system/bin:/system/xbin`) for system command invocations.

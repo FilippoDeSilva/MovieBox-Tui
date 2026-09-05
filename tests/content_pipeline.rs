@@ -1,7 +1,8 @@
 use moviebox_tui::{
     models::SearchResult,
     providers::models::{
-        CatalogItem, MediaDetails, MediaType, ProviderKind, ProviderMediaId, RequestContext,
+        CatalogItem, Episode, MediaDetails, MediaType, ProviderKind, ProviderMediaId,
+        RequestContext, Season,
     },
     tui::{
         action::Action,
@@ -372,4 +373,213 @@ async fn test_search_preview_and_details_metadata_isolation() {
         Some("New Movie Description")
     );
     assert_eq!(matching_fallback.director.as_deref(), Some("New Director"));
+}
+#[tokio::test]
+async fn test_series_details_defaults_to_season_one_when_no_history() {
+    let mut app = App::new();
+    app.state_mut().active_provider = ProviderKind::MovieBox;
+    app.state_mut().active_screen = Screen::Details;
+    app.state_mut().active_subject_id = Some("bb_series".to_string());
+    app.state_mut().selected_season = 1;
+    app.state_mut().selected_episode = 1;
+    app.state_mut().active_details_request = 1;
+
+    let context = RequestContext {
+        provider: ProviderKind::MovieBox,
+        generation: app.state().provider_generation,
+    };
+
+    let seasons = (1..=5)
+        .map(|s| Season {
+            number: s,
+            episodes: (1..=10)
+                .map(|e| Episode {
+                    season: s,
+                    number: e,
+                    title: None,
+                })
+                .collect(),
+        })
+        .collect();
+
+    let details = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "bb_series".to_string(),
+        },
+        title: "Breaking Bad".to_string(),
+        media_type: MediaType::Series,
+        year: Some("2008".to_string()),
+        description: None,
+        tagline: None,
+        imdb_rating: Some("9.5".to_string()),
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons,
+        dubs: vec![],
+    };
+
+    app.handle_action(Action::DetailsSuccess(
+        context,
+        1,
+        "bb_series".to_string(),
+        details,
+    ))
+    .await;
+
+    assert_eq!(app.state().selected_season, 1);
+    assert_eq!(app.state().selected_episode, 1);
+    assert_eq!(app.state().season_list_state.selected(), Some(0));
+    assert_eq!(app.state().episode_list_state.selected(), Some(0));
+}
+
+#[tokio::test]
+async fn test_series_details_resumes_watch_history() {
+    let mut app = App::new();
+    app.state_mut().active_provider = ProviderKind::MovieBox;
+    app.state_mut().active_screen = Screen::Details;
+    app.state_mut().selected_season = 1;
+    app.state_mut().selected_episode = 1;
+    app.state_mut()
+        .history
+        .recent
+        .push(moviebox_tui::history::WatchHistoryItem {
+            provider: "moviebox".to_string(),
+            subject_id: "bb_series".to_string(),
+            title: "Breaking Bad".to_string(),
+            stype: 2,
+            season: 3,
+            episode: 7,
+            duration_seconds: Some(3000),
+            progress_seconds: 500,
+            completed: false,
+            timestamp: 1000,
+            release_year: "2008".to_string(),
+            cover_url: None,
+        });
+    app.state_mut().active_details_request = 1;
+
+    let context = RequestContext {
+        provider: ProviderKind::MovieBox,
+        generation: app.state().provider_generation,
+    };
+
+    let seasons = (1..=5)
+        .map(|s| Season {
+            number: s,
+            episodes: (1..=10)
+                .map(|e| Episode {
+                    season: s,
+                    number: e,
+                    title: None,
+                })
+                .collect(),
+        })
+        .collect();
+
+    let details = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "bb_series".to_string(),
+        },
+        title: "Breaking Bad".to_string(),
+        media_type: MediaType::Series,
+        year: Some("2008".to_string()),
+        description: None,
+        tagline: None,
+        imdb_rating: Some("9.5".to_string()),
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons,
+        dubs: vec![],
+    };
+
+    app.handle_action(Action::DetailsSuccess(
+        context,
+        1,
+        "bb_series".to_string(),
+        details,
+    ))
+    .await;
+
+    assert_eq!(app.state().selected_season, 3);
+    assert_eq!(app.state().selected_episode, 7);
+    assert_eq!(app.state().season_list_state.selected(), Some(2));
+    assert_eq!(app.state().episode_list_state.selected(), Some(6));
+}
+
+#[tokio::test]
+async fn test_series_details_preserves_season_and_episode_on_language_switch() {
+    let mut app = App::new();
+    app.state_mut().active_provider = ProviderKind::MovieBox;
+    app.state_mut().active_screen = Screen::Details;
+    app.state_mut().active_subject_id = Some("bb_series".to_string());
+    app.state_mut().language_chosen = true;
+    app.state_mut().selected_season = 4;
+    app.state_mut().selected_episode = 2;
+
+    app.state_mut().active_details_request = 1;
+
+    let context = RequestContext {
+        provider: ProviderKind::MovieBox,
+        generation: app.state().provider_generation,
+    };
+
+    let seasons = (1..=5)
+        .map(|s| Season {
+            number: s,
+            episodes: (1..=10)
+                .map(|e| Episode {
+                    season: s,
+                    number: e,
+                    title: None,
+                })
+                .collect(),
+        })
+        .collect();
+
+    let details = MediaDetails {
+        id: ProviderMediaId {
+            provider: ProviderKind::MovieBox,
+            value: "bb_series".to_string(),
+        },
+        title: "Breaking Bad".to_string(),
+        media_type: MediaType::Series,
+        year: Some("2008".to_string()),
+        description: None,
+        tagline: None,
+        imdb_rating: Some("9.5".to_string()),
+        director: None,
+        stars: None,
+        prints: None,
+        audios: None,
+        poster_url: None,
+        duration: None,
+        genres: vec![],
+        seasons,
+        dubs: vec![],
+    };
+
+    app.handle_action(Action::DetailsSuccess(
+        context,
+        1,
+        "bb_series".to_string(),
+        details,
+    ))
+    .await;
+
+    assert_eq!(app.state().selected_season, 4);
+    assert_eq!(app.state().selected_episode, 2);
+    assert_eq!(app.state().season_list_state.selected(), Some(3));
+    assert_eq!(app.state().episode_list_state.selected(), Some(1));
 }
