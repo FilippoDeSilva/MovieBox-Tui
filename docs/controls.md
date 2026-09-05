@@ -19,6 +19,7 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | **`Ctrl+U`** | Clear entire input line (Search, TV URL, Addon URL) |
 | **`Ctrl+W`** | Delete backward word in text inputs |
 | **`c`** | Clear active search query and return to landing screen (Normal mode) |
+| **`x` / `X`** | Cancel active download and preserve partial `.part` data |
 | **`Ctrl+S`** | Switch to standard **Streaming Mode** |
 | **`Ctrl+T`** | Toggle / switch to **TV Mode** |
 | **`Ctrl+A`** | Toggle / switch to **Addon Mode** |
@@ -91,6 +92,7 @@ All popup dialogs (Theme picker, Browse categories, Provider menu, Settings Medi
 | **Click search bar** | Enter search input mode |
 | **Click search result row** | Select item and load preview; click again to open full details |
 | **Click landing deck tab header** | Switch between Continue Watching and Favorites tabs |
+| **`Click [x] Cancel on download bar`** | Cancel active download |
 | **Click Continue Watching row (landing)** | Select an in-progress title; click again to resume playback with auto-play |
 | **Click Favorites row (landing)** | Select a starred title; click again to open details |
 | **Click "+N more • /history" or "+N more • /favorites"** | Open the full watch history or favorites list |

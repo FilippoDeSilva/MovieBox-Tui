@@ -7,6 +7,11 @@
   - Replaced immediate mouse cycling on the landing search bar provider badge (`[MovieBox · ^P]`) with a styled popup menu anchored directly beneath the provider badge.
   - Added dedicated keyboard navigation (`↑`/`↓`/`k`/`j`, `Home`/`End`, `Enter`/`Space`, `Esc`) for the provider menu while preserving direct `Ctrl+P` sequential provider cycling across all screens.
   - Implemented shared geometry (`search_bar_provider_pill_rect` and `provider_popup_bounds`) between renderers and mouse hitboxes, ensuring exact alignment and zero geometry divergence.
+- **Redesigned High-Contrast Download Bar & Responsive Layout**:
+  - Replaced the solid rectangular download gauge with a sleek proportional track (`[━━━━━────]` on modern terminals and `[=====>----]` on basic terminals) with filled accent contrast and dimmed surface rail.
+  - Added prominent media title indicators on the top border (`⬇ Downloading: <Title>` or `⬇ S<N>E<N> (<current>/<total>): <Title>`) with bold styling and automatic terminal width truncation.
+  - Replaced ambiguous whole-area click cancellation with an isolated `[x] Cancel` button hitbox on the top-right border, preventing accidental download interruptions while keeping the bar mouse-safe.
+  - Formatted transfer statistics into clean badges (`<Size> | <Speed> | ETA <Time>`) with zero unclosed parenthesis artifacts and zero floating dots.
 - **Native Android ARM64 Release Target & Pipeline**:
   - Added native `aarch64-linux-android` build target to the release workflow (`.github/workflows/release.yml`) using Android NDK r26d and Clang (API 24+).
   - Configured automated packaging of `MovieBox_Android_arm64.tar.gz` with native Bionic dynamic linking (`libc.so`), valid ELF `PT_PHDR` program header table, and `/system/bin/linker64` dynamic loader.
@@ -22,6 +27,11 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **MovieBox DASH Progress Normalization, Throttling & Background Continuity**:
+  - Normalized multi-stream MPEG-DASH download percentages across video (0–90%), audio (90–98%), and merger (99–100%) stages, eliminating progress resets back to 0% when the video stream finishes and the audio stream begins.
+  - Enforced monotonic progress tracking and throttled progress event emissions to 250ms intervals, eliminating terminal text jitter and channel saturation.
+  - Preserved active downloads and queue processing across content provider switching (`Ctrl+P`) and mode toggling (`Ctrl+T`, `Ctrl+A`), eliminating premature download pauses and false cancellation warnings when navigating the TUI.
+  - Added explicit cancellation feedback notifications when dismissing the subtitle selection popup via `Esc` or outside mouse click, preventing silent stream launch cancellations.
 - **Empty Search Clear Guarding on Landing Screen**:
   - Guarded search-cleared status notifications in `Action::GoBack`, `c`/`C`, and `Ctrl+U` to only fire when an active search query or loaded results actually existed, eliminating spurious "Search cleared." status messages when navigating on an already-empty landing page.
   - Allowed pressing Enter on an empty search input in editing mode to cleanly switch back to normal mode without triggering unneeded state resets.

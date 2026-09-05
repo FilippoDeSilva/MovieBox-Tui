@@ -51,6 +51,14 @@ and length is capped.
 
 Selected subtitle sidecars are saved next to the video using ISO 639-1 language codes (e.g. `.en.srt`, `.hi.srt`) and supported subtitle extensions (`.srt`, `.vtt`, `.ass`, `.ssa`, `.sub`).
 
+## Download Bar & Progress Architecture
+
+- **High-Contrast Responsive Bar**: Renders a proportional progress track (`[━━━━━────]` on modern terminals and `[=====>----]` on basic terminals) with prominent media title display (`⬇ Downloading: <Title>`), percentage badge, and separated transfer metrics (`<Size> | <Speed> | ETA <Time>`).
+- **Monotonic DASH Normalization**: Multi-stream MPEG-DASH downloads via `yt-dlp` automatically normalize segmented tracks (video 0–90%, audio 90–98%, and track merger 99–100%) so that progress strictly increases and never resets backwards to 0% mid-download.
+- **Throttled Updates**: Progress events are throttled to 250ms intervals, eliminating terminal flicker and event-channel flooding from high-frequency chunk streams.
+- **Background Download Continuity**: Downloads continue running uninterrupted in the background when switching content providers (`Ctrl+P`) or toggling modes (`Ctrl+T`, `Ctrl+A`), keeping all active transfer workers and queues alive.
+- **Isolated Cancellation Hitbox**: Cancellation is bound strictly to the `x` / `X` keyboard shortcut and the `[x] Cancel` button in the top-right corner of the download bar. Clicking anywhere else on the bar safely consumes the mouse event without interrupting active downloads.
+
 ## Outcomes
 
 `DownloadCompleted` / `DownloadPaused` / `DownloadFailed` drive the UI status and

@@ -50,7 +50,15 @@ impl App {
                 .split(area);
             let dl_area = chunks[1];
             if dl_area.contains(ratatui::layout::Position::new(col, row)) {
-                self.action_sender.send(Action::CancelDownload).ok();
+                let cancel_rect = Rect {
+                    x: dl_area.right().saturating_sub(14),
+                    y: dl_area.y,
+                    width: 14.min(dl_area.width),
+                    height: 1,
+                };
+                if cancel_rect.contains(ratatui::layout::Position::new(col, row)) {
+                    self.action_sender.send(Action::CancelDownload).ok();
+                }
                 return true;
             }
         }
@@ -300,8 +308,24 @@ impl App {
                 }
                 Some(None) => {}
                 None => {
+                    let is_dl = self.state.is_download_subtitle_popup;
+                    self.state.is_resolving_playback = false;
                     self.state.subtitle_popup = false;
                     self.state.is_download_subtitle_popup = false;
+                    self.state.pending_play_link = None;
+                    self.state.pending_playback_source = None;
+                    self.state.subtitle_list.clear();
+                    self.state.subtitle_list_state.select(None);
+                    if is_dl {
+                        self.state
+                            .set_status_default("Download subtitle selection cancelled.");
+                    } else {
+                        self.state.notify(
+                            crate::tui::overlay::NotificationKind::Info,
+                            "Playback Cancelled",
+                            "Stream launch cancelled.",
+                        );
+                    }
                 }
             }
             return true;
@@ -1457,5 +1481,39 @@ mod tests {
         app.handle_home_mouse(area.x, area.y, area);
         assert!(!app.state.show_provider_popup);
         assert_eq!(app.state.active_provider, ProviderKind::FourKHdHub);
+    }
+
+    #[tokio::test]
+    async fn test_download_cancel_mouse_hitbox() {
+        let mut app = App::new();
+        let area = Rect::new(0, 0, 80, 24);
+        app.state.download_progress = Some(50.0);
+        app.state
+            .cancel_download
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let handled = app.handle_overlay_mouse(20, 22, area);
+        assert!(handled);
+        assert!(app.action_receiver.try_recv().is_err());
+
+        let handled_cancel = app.handle_overlay_mouse(72, 21, area);
+        assert!(handled_cancel);
+        assert!(matches!(
+            app.action_receiver.try_recv().ok(),
+            Some(Action::CancelDownload)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_subtitle_popup_outside_click_emits_cancellation() {
+        let mut app = App::new();
+        let area = Rect::new(0, 0, 80, 24);
+        app.state.subtitle_popup = true;
+        app.state.subtitle_list = vec![("English".to_string(), "https://sub.url".to_string())];
+
+        let handled = app.handle_overlay_mouse(0, 0, area);
+        assert!(handled);
+        assert!(!app.state.subtitle_popup);
+        let notif = app.state.notifications.back().expect("notification posted");
+        assert_eq!(notif.title, "Playback Cancelled");
     }
 }

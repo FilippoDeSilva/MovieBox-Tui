@@ -629,70 +629,190 @@ impl App {
     }
 
     fn draw_download_gauge(&self, frame: &mut Frame, download_area: Option<Rect>) {
-        if let Some(prog) = self.state.download_progress {
-            if let Some(dl_area) = download_area {
-                use ratatui::widgets::{Block, Borders, Gauge};
+        let Some(prog) = self.state.download_progress else {
+            return;
+        };
+        let Some(dl_area) = download_area else {
+            return;
+        };
+        if dl_area.width < 16 || dl_area.height < 3 {
+            return;
+        }
 
-                let status = self
-                    .state
-                    .download_status
-                    .as_deref()
-                    .unwrap_or("Downloading...");
+        use ratatui::layout::Alignment;
+        use ratatui::style::Modifier;
+        use ratatui::text::{Line, Span};
+        use ratatui::widgets::{Block, Borders, Paragraph};
 
-                let budget = (dl_area.width as usize).saturating_sub(10);
-                let is_compact_gauge = dl_area.width < 60;
-                let status_sub = if is_compact_gauge { 16 } else { 30 };
-                let status_text = crate::tui::text::truncate_width(
-                    status,
-                    budget.saturating_sub(status_sub).max(8),
-                );
-                let title_text = if self.state.download_queue_total > 0 {
-                    let total = self.state.download_queue_total;
-                    let remaining = self.state.download_queue.len();
-                    let current = total - remaining;
-                    if is_compact_gauge {
-                        format!(
-                            " S{:02}E{:02} ({}/{}) | {} [X] ",
-                            self.state.selected_season,
-                            self.state.selected_episode,
-                            current,
-                            total,
-                            status_text
-                        )
-                    } else {
-                        format!(
-                            " Download: S{:02}E{:02} ({}/{}) | {} [X] Cancel ",
-                            self.state.selected_season,
-                            self.state.selected_episode,
-                            current,
-                            total,
-                            status_text
-                        )
+        let is_compact = dl_area.width < 60;
+        let basic = self.state.basic_terminal;
+
+        let raw_title = self
+            .state
+            .download_title
+            .as_deref()
+            .or_else(|| {
+                self.state
+                    .selected_details
+                    .as_ref()
+                    .map(|d| d.title.as_str())
+            })
+            .unwrap_or("Media");
+
+        let cancel_label = if is_compact { "[x]" } else { "[x] Cancel" };
+        let cancel_budget = (crate::tui::text::width(cancel_label) as u16).saturating_add(4);
+
+        let mut left_title_spans = Vec::new();
+        if basic {
+            left_title_spans.push(Span::styled(
+                " [DL] ",
+                self.theme.teal.add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            left_title_spans.push(Span::styled(
+                " ⬇ Downloading: ",
+                self.theme.teal.add_modifier(Modifier::BOLD),
+            ));
+        }
+
+        if self.state.download_queue_total > 0 {
+            let total = self.state.download_queue_total;
+            let remaining = self.state.download_queue.len();
+            let current = total.saturating_sub(remaining);
+            let queue_str = format!(
+                "S{:02}E{:02} ({}/{}): ",
+                self.state.selected_season, self.state.selected_episode, current, total
+            );
+            left_title_spans.push(Span::styled(queue_str, self.theme.sapphire));
+        }
+
+        let prefix_width = left_title_spans.iter().map(Span::width).sum::<usize>() as u16;
+        let title_max_width = dl_area
+            .width
+            .saturating_sub(prefix_width.saturating_add(cancel_budget).saturating_add(4))
+            as usize;
+        let truncated_title = crate::tui::text::truncate_width(raw_title, title_max_width.max(6));
+        left_title_spans.push(Span::styled(
+            truncated_title,
+            self.theme.title.add_modifier(Modifier::BOLD),
+        ));
+        left_title_spans.push(Span::raw(" "));
+
+        let left_title = Line::from(left_title_spans);
+        let right_title = Line::from(vec![Span::styled(
+            format!(" {cancel_label} "),
+            self.theme.error.add_modifier(Modifier::BOLD),
+        )])
+        .alignment(Alignment::Right);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(left_title)
+            .title(right_title)
+            .border_style(self.theme.lavender)
+            .border_type(crate::tui::overlay::border_type(basic));
+
+        let inner_area = block.inner(dl_area);
+        crate::tui::clear_area(frame, dl_area, &self.theme);
+        frame.render_widget(block, dl_area);
+
+        if inner_area.height == 0 || inner_area.width < 10 {
+            return;
+        }
+
+        let status_str = self
+            .state
+            .download_status
+            .as_deref()
+            .unwrap_or("Downloading...");
+
+        let pct_val = prog.clamp(0.0, 100.0);
+        let pct_badge = format!(" {:>5.1}% ", pct_val);
+        let pct_width = 8usize;
+
+        let available_for_rest = (inner_area.width as usize).saturating_sub(pct_width + 1);
+
+        let bar_width = if available_for_rest < 20 {
+            10usize.min(available_for_rest)
+        } else {
+            (available_for_rest / 2).clamp(12, 38)
+        };
+
+        let track_cells = bar_width.saturating_sub(2);
+        let ratio = (pct_val / 100.0).clamp(0.0, 1.0);
+        let filled_cells = ((track_cells as f64) * ratio).round() as usize;
+        let unfilled_cells = track_cells.saturating_sub(filled_cells);
+
+        let mut row_spans = Vec::new();
+        row_spans.push(Span::styled(
+            pct_badge,
+            self.theme.sapphire.add_modifier(Modifier::BOLD),
+        ));
+
+        row_spans.push(Span::styled("[", self.theme.surface1));
+        if basic {
+            if filled_cells > 0 && unfilled_cells > 0 {
+                row_spans.push(Span::styled(
+                    "=".repeat(filled_cells.saturating_sub(1)),
+                    self.theme.accent.add_modifier(Modifier::BOLD),
+                ));
+                row_spans.push(Span::styled(
+                    ">",
+                    self.theme.accent.add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                row_spans.push(Span::styled(
+                    "=".repeat(filled_cells),
+                    self.theme.accent.add_modifier(Modifier::BOLD),
+                ));
+            }
+            row_spans.push(Span::styled(
+                "-".repeat(unfilled_cells),
+                self.theme.surface1,
+            ));
+        } else {
+            row_spans.push(Span::styled(
+                "━".repeat(filled_cells),
+                self.theme.teal.add_modifier(Modifier::BOLD),
+            ));
+            row_spans.push(Span::styled(
+                "─".repeat(unfilled_cells),
+                self.theme.surface1,
+            ));
+        }
+        row_spans.push(Span::styled("]  ", self.theme.surface1));
+
+        let status_budget = available_for_rest.saturating_sub(bar_width + 2);
+        if status_budget >= 6 {
+            let truncated_status = crate::tui::text::truncate_width(status_str, status_budget);
+            if truncated_status.contains(" | ") {
+                let parts: Vec<&str> = truncated_status.split(" | ").collect();
+                for (idx, part) in parts.iter().enumerate() {
+                    if idx > 0 {
+                        row_spans.push(Span::styled(" | ", self.theme.surface1));
                     }
-                } else if is_compact_gauge {
-                    format!(" {} [X] ", status_text)
-                } else {
-                    format!(" Download: {} [X] Cancel ", status_text)
-                };
-
-                let gauge = Gauge::default()
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title(title_text)
-                            .border_style(self.theme.lavender)
-                            .title_style(self.theme.title)
-                            .border_type(crate::tui::overlay::border_type(
-                                self.state.basic_terminal,
-                            )),
-                    )
-                    .gauge_style(self.theme.accent)
-                    .ratio((prog / 100.0).clamp(0.0, 1.0));
-
-                crate::tui::clear_area(frame, dl_area, &self.theme);
-                frame.render_widget(gauge, dl_area);
+                    if part.starts_with("ETA") {
+                        row_spans.push(Span::styled(part.to_string(), self.theme.rating));
+                    } else if part.contains("/s") {
+                        row_spans.push(Span::styled(
+                            part.to_string(),
+                            self.theme.teal.add_modifier(Modifier::BOLD),
+                        ));
+                    } else if part.starts_with("Audio") {
+                        row_spans.push(Span::styled(
+                            part.to_string(),
+                            self.theme.lavender.add_modifier(Modifier::BOLD),
+                        ));
+                    } else {
+                        row_spans.push(Span::styled(part.to_string(), self.theme.subtext1));
+                    }
+                }
+            } else {
+                row_spans.push(Span::styled(truncated_status, self.theme.subtext1));
             }
         }
+
+        frame.render_widget(Paragraph::new(Line::from(row_spans)), inner_area);
     }
 
     fn draw_theme_picker(&mut self, frame: &mut Frame, area: Rect) {
@@ -1127,5 +1247,72 @@ impl App {
 
         let popup = Paragraph::new(text);
         frame.render_widget(popup, inner_area);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    #[test]
+    fn test_download_bar_rendering_modern_and_basic() {
+        let backend = TestBackend::new(100, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut app = App::new();
+        app.state.download_progress = Some(93.2);
+        app.state.download_title = Some("Ek Deewane Ki Deewaniyat".to_string());
+        app.state.download_status = Some("778.6 MB | 4.6 MB/s | ETA 00:12".to_string());
+        app.state.basic_terminal = false;
+        terminal
+            .draw(|f| {
+                app.draw(f);
+            })
+            .unwrap();
+
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..100 {
+                let cell = terminal.backend().buffer().cell((x, y)).unwrap();
+                rendered.push_str(cell.symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("Downloading:"));
+        assert!(rendered.contains("Ek Deewane Ki Deewaniyat"));
+        assert!(rendered.contains("[x] Cancel"));
+        assert!(rendered.contains("93.2%"));
+        assert!(rendered.contains("778.6 MB"));
+        assert!(rendered.contains("4.6 MB/s"));
+        assert!(rendered.contains("ETA 00:12"));
+
+        app.state.basic_terminal = true;
+        terminal
+            .draw(|f| {
+                app.draw(f);
+            })
+            .unwrap();
+
+        let mut basic_rendered = String::new();
+        for y in 0..24 {
+            for x in 0..100 {
+                let cell = terminal.backend().buffer().cell((x, y)).unwrap();
+                basic_rendered.push_str(cell.symbol());
+            }
+            basic_rendered.push('\n');
+        }
+
+        assert!(basic_rendered.contains("[DL]"));
+        assert!(basic_rendered.contains("===="));
+        assert!(basic_rendered.contains("[x] Cancel"));
+
+        let narrow_backend = TestBackend::new(45, 24);
+        let mut narrow_terminal = Terminal::new(narrow_backend).unwrap();
+        let res = narrow_terminal.draw(|f| {
+            app.draw(f);
+        });
+        assert!(res.is_ok());
     }
 }

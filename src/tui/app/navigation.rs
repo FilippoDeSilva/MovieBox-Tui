@@ -43,13 +43,6 @@ impl App {
         self.state.stream_pool.clear();
         self.state.has_streams_settled = false;
         self.state.has_search_settled = false;
-        self.state
-            .cancel_download
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-        self.state.download_progress = None;
-        self.state.download_status = None;
-        self.state.download_queue.clear();
-        self.state.download_queue_total = 0;
         self.state.is_waiting_for_download_stream = false;
         self.state.clear_poster_cache();
         self.state.image_cache.clear();
@@ -345,6 +338,7 @@ impl App {
                     return None;
                 }
                 if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
+                    let is_dl = self.state.is_download_subtitle_popup;
                     self.state.is_resolving_playback = false;
                     self.state.subtitle_popup = false;
                     self.state.is_download_subtitle_popup = false;
@@ -352,6 +346,16 @@ impl App {
                     self.state.pending_playback_source = None;
                     self.state.subtitle_list.clear();
                     self.state.subtitle_list_state.select(None);
+                    if is_dl {
+                        self.state
+                            .set_status_default("Download subtitle selection cancelled.");
+                    } else {
+                        self.state.notify(
+                            crate::tui::overlay::NotificationKind::Info,
+                            "Playback Cancelled",
+                            "Stream launch cancelled.",
+                        );
+                    }
                     return None;
                 }
                 if self.state.show_help {
@@ -914,5 +918,55 @@ impl App {
                 .send(Action::FetchDetails(item.id.clone(), false))
                 .ok();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::providers::models::ProviderKind;
+    use crate::tui::action::Action;
+    use crate::tui::app::App;
+    use crate::tui::overlay::NotificationKind;
+
+    #[tokio::test]
+    async fn test_switch_provider_preserves_active_download() {
+        let mut app = App::new();
+        app.state.download_progress = Some(45.0);
+        app.state.download_status = Some("45MB".to_string());
+        app.state.download_title = Some("Test Movie".to_string());
+        app.state
+            .cancel_download
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+
+        app.switch_provider(ProviderKind::FourKHdHub);
+
+        assert_eq!(app.state.active_provider, ProviderKind::FourKHdHub);
+        assert_eq!(app.state.download_progress, Some(45.0));
+        assert_eq!(app.state.download_status.as_deref(), Some("45MB"));
+        assert_eq!(app.state.download_title.as_deref(), Some("Test Movie"));
+        assert!(
+            !app.state
+                .cancel_download
+                .load(std::sync::atomic::Ordering::SeqCst)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_subtitle_popup_cancellation_feedback() {
+        let mut app = App::new();
+        app.state.subtitle_popup = true;
+        app.state.pending_play_link = Some("https://example.com/video.mp4".to_string());
+
+        app.handle_action(Action::GoBack).await;
+
+        assert!(!app.state.subtitle_popup);
+        assert!(app.state.pending_play_link.is_none());
+        let notif = app
+            .state
+            .notifications
+            .back()
+            .expect("notification emitted");
+        assert_eq!(notif.kind, NotificationKind::Info);
+        assert_eq!(notif.title, "Playback Cancelled");
     }
 }

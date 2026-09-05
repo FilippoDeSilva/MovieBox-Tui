@@ -95,6 +95,7 @@ impl App {
             .or_else(|| self.state.season_subtitle_preference.clone().flatten());
 
         self.state.is_waiting_for_download_stream = false;
+        self.state.download_title = Some(base_name.clone());
         self.state.download_status = Some("Preparing download...".into());
         self.state.download_progress = Some(0.0);
         self.state
@@ -281,6 +282,11 @@ impl App {
                 if let Some(stdout) = child.stdout.take() {
                     use tokio::io::AsyncBufReadExt;
                     let mut reader = tokio::io::BufReader::new(stdout).lines();
+                    let mut stream_index: usize = 0;
+                    let mut max_progress: f64 = 0.0;
+                    let mut last_send =
+                        std::time::Instant::now() - std::time::Duration::from_secs(1);
+
                     loop {
                         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
                             let _ = child.kill().await;
@@ -306,17 +312,31 @@ impl App {
                             line_res = reader.next_line() => {
                                 match line_res {
                                     Ok(Some(line)) => {
-                                        if let Some((pct, status)) = parse_ytdlp_progress(&line) {
-                                            sender
-                                                .send(Action::UpdateDownload(Some(pct), Some(status)))
-                                                .ok();
-                                        } else if line.contains("[Merger]") {
+                                        if line.contains("[download] Destination:") {
+                                            stream_index = stream_index.saturating_add(1);
+                                        } else if let Some((raw_pct, status)) = parse_ytdlp_progress(&line) {
+                                            let current_stream = stream_index.max(1);
+                                            let (normalized_pct, display_status) = if current_stream <= 1 {
+                                                (raw_pct * 0.90, status)
+                                            } else {
+                                                (90.0 + (raw_pct * 0.08), format!("Audio | {status}"))
+                                            };
+                                            max_progress = max_progress.max(normalized_pct);
+                                            if last_send.elapsed() >= std::time::Duration::from_millis(250) || raw_pct >= 99.9 {
+                                                sender
+                                                    .send(Action::UpdateDownload(Some(max_progress), Some(display_status)))
+                                                    .ok();
+                                                last_send = std::time::Instant::now();
+                                            }
+                                        } else if line.contains("[Merger]") || line.contains("[ffmpeg]") {
+                                            max_progress = max_progress.max(99.0);
                                             sender
                                                 .send(Action::UpdateDownload(
-                                                    Some(99.0),
-                                                    Some("Merging audio and video...".to_string()),
+                                                    Some(max_progress),
+                                                    Some("Merging audio & video...".to_string()),
                                                 ))
                                                 .ok();
+                                            last_send = std::time::Instant::now();
                                         }
                                     }
                                     Ok(None) => break,
@@ -717,6 +737,7 @@ impl App {
             Action::DownloadFailed(error) => {
                 self.state.download_progress = None;
                 self.state.download_status = None;
+                self.state.download_title = None;
                 if self.state.download_queue_total > 0 {
                     let total = self.state.download_queue_total;
                     let remaining = self.state.download_queue.len();
@@ -739,6 +760,7 @@ impl App {
             Action::DownloadPaused(path) => {
                 self.state.download_progress = None;
                 self.state.download_status = None;
+                self.state.download_title = None;
                 if self.state.download_queue_total > 0 {
                     let total = self.state.download_queue_total;
                     let remaining = self.state.download_queue.len();
@@ -761,6 +783,7 @@ impl App {
             Action::ClearDownload => {
                 self.state.download_progress = None;
                 self.state.download_status = None;
+                self.state.download_title = None;
                 if !self.state.download_queue.is_empty() {
                     self.action_sender.send(Action::ProcessDownloadQueue).ok();
                 } else if self.state.download_queue_total > 0 {
@@ -908,21 +931,84 @@ pub(crate) fn yt_dlp_missing_guidance() -> String {
 }
 
 pub(crate) fn parse_ytdlp_progress(line: &str) -> Option<(f64, String)> {
-    if !line.contains("[download]") {
+    if !line.contains("[download]") || line.contains("Destination:") {
         return None;
     }
     let trimmed = line.split("[download]").nth(1)?.trim();
-    let mut percentage = None;
-    for part in trimmed.split_whitespace() {
-        if let Some(num_str) = part.strip_suffix('%') {
-            if let Ok(pct) = num_str.parse::<f64>() {
-                percentage = Some(pct);
-                break;
+    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    if words.is_empty() {
+        return None;
+    }
+
+    let pct_str = words.iter().find(|w| w.ends_with('%'))?;
+    let pct: f64 = pct_str.trim_end_matches('%').parse().ok()?;
+
+    if trimmed.contains(" in ") {
+        let size = words
+            .iter()
+            .position(|&w| w == "of")
+            .and_then(|idx| words.get(idx + 1))
+            .copied()
+            .unwrap_or("");
+        let duration = words
+            .iter()
+            .position(|&w| w == "in")
+            .and_then(|idx| words.get(idx + 1))
+            .copied()
+            .unwrap_or("");
+        if !size.is_empty() && !duration.is_empty() {
+            return Some((pct, format!("{size} in {duration}")));
+        }
+    }
+
+    let mut size_parts = Vec::new();
+    let mut speed = "";
+    let mut eta = "";
+
+    if let Some(of_idx) = words.iter().position(|&w| w == "of") {
+        let at_idx = words.iter().position(|&w| w == "at").unwrap_or(words.len());
+        for &w in &words[of_idx + 1..at_idx] {
+            let clean = w.trim_matches('~').trim();
+            if !clean.is_empty() {
+                size_parts.push(clean);
             }
         }
     }
-    let pct = percentage?;
-    Some((pct, trimmed.to_string()))
+
+    if let Some(at_idx) = words.iter().position(|&w| w == "at") {
+        if let Some(&s) = words.get(at_idx + 1) {
+            speed = s;
+        }
+    }
+
+    if let Some(eta_idx) = words.iter().position(|&w| w == "ETA") {
+        if let Some(&e) = words.get(eta_idx + 1) {
+            let clean_eta = e.trim_end_matches(['(', ')', ',']);
+            if !clean_eta.eq_ignore_ascii_case("unknown") {
+                eta = clean_eta;
+            }
+        }
+    }
+
+    let size = size_parts.join(" ");
+    let mut parts = Vec::new();
+    if !size.is_empty() {
+        parts.push(size);
+    }
+    if !speed.is_empty() {
+        parts.push(speed.to_string());
+    }
+    if !eta.is_empty() {
+        parts.push(format!("ETA {eta}"));
+    }
+
+    let status = if parts.is_empty() {
+        trimmed.to_string()
+    } else {
+        parts.join(" | ")
+    };
+
+    Some((pct, status))
 }
 
 #[cfg(test)]
@@ -1000,20 +1086,24 @@ mod tests {
         assert!(res1.is_some());
         let (pct1, status1) = res1.unwrap();
         assert!((pct1 - 0.0).abs() < f64::EPSILON);
-        assert!(status1.contains("5.19MiB"));
+        assert_eq!(status1, "5.19MiB | 0.00B/s");
+        assert!(!status1.contains('~'));
+        assert!(!status1.contains("Unknown"));
+        assert!(!status1.contains("(frag"));
 
         let line2 = "[download]  45.2% of ~ 1.45GiB at 12.3MiB/s ETA 00:45 (frag 500/1676)";
         let res2 = super::parse_ytdlp_progress(line2);
         assert!(res2.is_some());
         let (pct2, status2) = res2.unwrap();
         assert!((pct2 - 45.2).abs() < f64::EPSILON);
-        assert!(status2.contains("12.3MiB/s"));
+        assert_eq!(status2, "1.45GiB | 12.3MiB/s | ETA 00:45");
 
         let line3 = "[download] 100% of 1.45GiB in 02:15";
         let res3 = super::parse_ytdlp_progress(line3);
         assert!(res3.is_some());
-        let (pct3, _) = res3.unwrap();
+        let (pct3, status3) = res3.unwrap();
         assert!((pct3 - 100.0).abs() < f64::EPSILON);
+        assert_eq!(status3, "1.45GiB in 02:15");
 
         let line_non = "[generic] Extracting URL: https://example.com/index.mpd";
         assert!(super::parse_ytdlp_progress(line_non).is_none());

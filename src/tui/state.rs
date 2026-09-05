@@ -199,6 +199,7 @@ pub struct PlaybackState {
 pub struct DownloadState {
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
+    pub download_title: Option<String>,
     pub download_dir: Option<std::path::PathBuf>,
     pub download_queue_total: usize,
     pub show_season_download_confirm: bool,
@@ -330,6 +331,7 @@ pub struct AppState {
     pub update_progress_msg: Option<String>,
     pub download_progress: Option<f64>,
     pub download_status: Option<String>,
+    pub download_title: Option<String>,
     pub cancel_download: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub download_dir: Option<std::path::PathBuf>,
 
@@ -493,6 +495,7 @@ impl Default for AppState {
             update_progress_msg: None,
             download_progress: None,
             download_status: None,
+            download_title: None,
             cancel_download: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             download_dir: None,
             download_queue: std::collections::VecDeque::new(),
