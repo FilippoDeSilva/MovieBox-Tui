@@ -27,7 +27,7 @@ Downloading from **MovieBox** requires `yt-dlp` and `ffmpeg` on the host system 
 
 - **macOS**: Install via Homebrew: `brew install yt-dlp ffmpeg`
 - **Linux**: Install via your system package manager (e.g. `sudo apt install yt-dlp ffmpeg`, `sudo pacman -S yt-dlp ffmpeg`)
-- **Windows**: Install via WinGet or Scoop: `winget install yt-dlp Gyan.FFmpeg`
+- **Windows**: Install via WinGet or Scoop: `winget install yt-dlp.yt-dlp Gyan.FFmpeg`
 - **Android / Termux**: Install via Termux package manager: `pkg install yt-dlp ffmpeg`
 
 If a MovieBox download is initiated without `yt-dlp` installed, MovieBox-TUI prevents execution and displays an OS-tailored notification with installation guidance. Progressive streams from other providers (CircleFTP, DhakaFlix, 4KHDHub, Addons) do not require `yt-dlp` or `ffmpeg`.
