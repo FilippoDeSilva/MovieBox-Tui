@@ -259,16 +259,22 @@ jobs:
           prefix-key: "release-build-android-aarch64"
 
       - name: Setup Android NDK
+        id: setup-ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
-          add-to-path: true
+          add-to-path: false
 
       - name: Build Android binary
-        env:
-          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: aarch64-linux-android24-clang
-          CC_aarch64_linux_android: aarch64-linux-android24-clang
-        run: cargo build --release --all-features --locked --target aarch64-linux-android
+        run: |
+          TOOLCHAIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "$TOOLCHAIN" >> $GITHUB_PATH
+          export PATH="$TOOLCHAIN:$PATH"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/aarch64-linux-android24-clang"
+          export CC_aarch64_linux_android="$TOOLCHAIN/aarch64-linux-android24-clang"
+          export AR_aarch64_linux_android="$TOOLCHAIN/llvm-ar"
+
+          cargo build --release --all-features --locked --target aarch64-linux-android
 
       - name: Validate Android ELF headers
         run: |
