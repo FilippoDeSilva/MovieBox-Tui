@@ -6,7 +6,7 @@ Written atomically under the config directory (`dirs::config_dir()/moviebox-tui/
 macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tui`).
 
 | Field               | Type           | Meaning                                                                                                     |
-| ------------------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| :--- | :--- | :--- |
 | `auto_update`       | bool           | Check for updates on startup (max once/hour).                                                               |
 | `last_update_check` | u64            | Epoch seconds of the last update check.                                                                     |
 | `active_mode`       | string         | Last active mode (`streaming`, `tv`, `addon`) restored on startup.                                         |
@@ -40,7 +40,7 @@ All settings in `config.json` can be configured interactively inside the applica
 ## Environment variables
 
 | Variable                  | Purpose                                                                           |
-| ------------------------- | --------------------------------------------------------------------------------- |
+| :--- | :--- |
 | `MOVIEBOX_LOG`            | Log level: `off`, `error`, `warn`, `info`, `debug`, `trace`. See [logging.md](logging.md). |
 | `MOVIEBOX_PLAYER`         | Preferred player (overrides `default_player`).                                    |
 | `MOVIEBOX_MPV_PATH`       | Custom mpv executable.                                                            |

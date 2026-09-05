@@ -11,7 +11,7 @@ the release checks in [`release-checklist.md`](release-checklist.md).
 ## OS notes
 
 | Platform         | Notes                                                                                                                                                                                                                                                                                                |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| :--- | :--- |
 | macOS            | IINA preferred player (via the installed IINA `iina-cli`); VLC/mpv `.app` paths detected. `process_group(0)` on spawn.                                                                                                                                                                                |
 | Windows          | mpv/VLC detected via Program Files + `%LOCALAPPDATA%`; path-safe file stems; static MSVC CRT linking (`+crt-static`) for zero-dependency standalone binaries; handle-safe atomic download replacement (dropping file handles before renames); background update helper spawned with `CREATE_NO_WINDOW` (`0x08000000`). |
 | Linux            | Flatpak mpv/VLC supported (`flatpak run …`); xdg data/cache dirs.                                                                                                                                                                                                                                    |

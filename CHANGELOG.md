@@ -32,6 +32,13 @@
   - Replaced unparsed LaTeX syntax (`$\to$`, `$\ge$`, `$\mu\text{s}$`, `$N\times$`) across all documentation guides with standard Unicode characters (`→`, `≥`, `µs`, `N×`), eliminating raw unrendered markup in mdBook output.
   - Added responsive documentation stylesheet (`docs/custom.css`) integrated via `book.toml`, enabling smooth touch horizontal scrolling, compact cell padding, visible scrollbars, and dynamic code text wrapping across mobile and small screen viewports.
   - Formatted provider matrix table in `docs/providers.md` with explicit column alignments and bold provider labels to optimize scannability on narrow screens.
+
+### Changed
+- **Documentation Readability & Typography Polish**:
+  - Expanded reading container width (`--content-max-width: 860px`) and relaxed line-height (`1.62em`) with vertical list spacing (`0.45em`) in `docs/custom.css`.
+  - Added theme-adaptive inline code badge containers (`:not(pre) > code`) with bordered backgrounds, and framed `<pre>` code blocks with rounded corners and drop shadows.
+  - Added table row hover transitions and container borders across configuration, platform, and player documentation tables.
+  - Implemented responsive mobile header title scaling (`.menu-title`) and smooth anchor navigation scrolling (`scroll-behavior: smooth`).
 ## [0.1.16] - 2026-09-05
 
 ### Added
