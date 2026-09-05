@@ -153,7 +153,7 @@
   - Eliminated ASCII art banner wrapping and visual corruption on narrow mobile viewports (e.g. Android Termux portrait mode at 40–55 columns) by rendering an adaptive 31-column compact half-block banner (`█▀▄▀█...`) and dynamic horizontal centering.
 - **Android Termux Static-PIE & TLS Alignment**:
   - Linked `aarch64-unknown-linux-musl` target as static-PIE (`-C relocation-model=pic -C link-arg=-pie`) to produce `ET_DYN` (ELF `e_type: 0x0003`) binaries accepted by Android Bionic's `/system/bin/linker64`, resolving runtime failure (`unexpected e_type: 2`).
-  - Added 64-byte `PT_TLS` alignment anchor in `src/main.rs` to satisfy Android Bionic's ARM64 TLS segment minimum alignment validation.
+  - Added 64-byte `PT_TLS` alignment anchor in `src/main.rs` and post-build ELF program header alignment in `.github/workflows/release.yml` to satisfy Android Bionic's ARM64 TLS segment minimum alignment validation.
   - Added automated ELF `e_type` and `PT_TLS` validation checks to `.github/workflows/release.yml` and a post-installation execution smoke test to `install.sh`.
 ### Removed
 - Pruned unused legacy type aliases (`SeasonInfo`, `EpisodeInfo`, `StreamResource`, `StreamMirror`) in `src/models.rs`.

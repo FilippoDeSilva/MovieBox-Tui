@@ -108,6 +108,29 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl' || matrix.target == 'x86_64-apple-darwin' || matrix.target == 'aarch64-apple-darwin'
         run: target/${{ matrix.target }}/release/moviebox-tui --version
 
+      - name: Align aarch64 ELF PT_TLS for Android Termux
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: |
+          python3 - << 'EOF'
+          import struct
+
+          path = "target/aarch64-unknown-linux-musl/release/moviebox-tui"
+          with open(path, "r+b") as f:
+              data = f.read()
+              fmt = "<HHIQQQIHHH"
+              e_type, e_machine, e_version, e_entry, e_phoff, e_shoff, e_flags, e_ehsize, e_phentsize, e_phnum = struct.unpack(
+                  fmt, data[16 : 16 + struct.calcsize(fmt)]
+              )
+              for i in range(e_phnum):
+                  off = e_phoff + i * e_phentsize
+                  ptype, pflags, poff, pvaddr, ppaddr, pfilesz, pmemsz, palign = struct.unpack(
+                      "<IIQQQQQQ", data[off : off + 56]
+                  )
+                  if ptype == 7 and palign < 64:
+                      f.seek(off + 48)
+                      f.write(struct.pack("<Q", 64))
+                      print(f"Patched PT_TLS p_align from {hex(palign)} to 0x40 (64 bytes)")
+          EOF
 
       - name: Validate aarch64 ELF header for Android Termux (ET_DYN & TLS alignment)
         if: matrix.target == 'aarch64-unknown-linux-musl'
