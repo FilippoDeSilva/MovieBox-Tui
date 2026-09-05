@@ -21,7 +21,7 @@ Addon Mode enables support for community HTTP addon manifests. You can install a
 - `Ctrl+S`: Return to standard **Streaming Mode**.
 - `Ctrl+T`: Toggle **TV Mode**.
 - `/browse`: Browse curated addon catalogs (`Top Movies`, `Top Series`, `Top Rated Movies`, `Top Rated Series`).
-- `/settings` $\to$ Content Modes: Enable or disable Addon Mode navigation.
+- `/settings` → Content Modes: Enable or disable Addon Mode navigation.
 
 ## Addon Manager
 

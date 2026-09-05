@@ -13,9 +13,9 @@ macOS `~/Library/Application Support/moviebox-tui`, Linux `~/.config/moviebox-tu
 | `active_provider`   | string         | Last provider (`moviebox`, `fourkhdhub`, …).                                                                |
 | `active_theme`      | string         | Theme name.                                                                                                 |
 | `bdix_enabled`      | bool           | Show BDIX providers (Bangladesh-only).                                                                      |
-| `streaming_enabled` | bool           | Enable Streaming Mode navigation in bottom dock (`/settings` $\to$ Content Modes).           |
-| `tv_enabled`        | bool           | Enable TV Mode navigation in bottom dock (`/settings` $\to$ Content Modes).                 |
-| `addons_enabled`    | bool           | Enable Addon Mode navigation in bottom dock (`/settings` $\to$ Content Modes).              |
+| `streaming_enabled` | bool           | Enable Streaming Mode navigation in bottom dock (`/settings` → Content Modes).              |
+| `tv_enabled`        | bool           | Enable TV Mode navigation in bottom dock (`/settings` → Content Modes).                     |
+| `addons_enabled`    | bool           | Enable Addon Mode navigation in bottom dock (`/settings` → Content Modes).                  |
 | `default_player`    | string or null | Preferred player: `mpv`, `iina`, `vlc`, `android`; absent/null until you choose one from the in-app picker. |
 | `download_dir`      | string or null | Custom directory for video and subtitle downloads (null uses OS default).                                   |
 

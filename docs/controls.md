@@ -58,7 +58,7 @@ All popup dialogs (Theme picker, Browse categories, Settings Media Player picker
 ## Mode-Specific Controls
 
 ### Streaming Mode
-- **`Ctrl+P`**: Cycle content providers (`MovieBox` $\to$ `4KHDHub` $\to$ `BDIX`). On the Details screen, re-searches and fetches alternate streams for the current movie in-place.
+- **`Ctrl+P`**: Cycle content providers (`MovieBox` → `4KHDHub` → `BDIX`). On the Details screen, re-searches and fetches alternate streams for the current movie in-place.
 - **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Audio Languages, Seasons, Episodes, Streams).
 - **`Enter`**: Play selected stream or open selected title.
 - **`d`**: Download current episode or full season batch.

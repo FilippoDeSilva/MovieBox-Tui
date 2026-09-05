@@ -6,16 +6,16 @@ shared typed models in `providers/models.rs` and the moviebox JSON schema used b
 
 ## Provider kinds
 
-| Kind            | Module                     | Notes                                       |
-| --------------- | -------------------------- | ------------------------------------------- |
-| `MovieBox`      | `providers/moviebox`       | Primary. Requires request signing (crypto). |
-| `FourKHdHub`    | `providers/fourkhdhub`     | 4K releases; hubcloud mirror resolver.      |
-| `BdixCircleFtp` | `providers/bdix/circleftp` | BDIX FTP directory scrapes.                 |
-| `BdixDhakaFlix` | `providers/bdix/dhakaflix` | BDIX indexer.                               |
-| `Addons`        | `providers/addons`         | Community HTTP addons (Cinemeta, streams).  |
+| Provider | Module | Description |
+| :--- | :--- | :--- |
+| **MovieBox** | `providers/moviebox` | Primary provider. Requires request signing (crypto). |
+| **FourKHdHub** | `providers/fourkhdhub` | 4K releases; hubcloud mirror resolver. |
+| **BdixCircleFtp** | `providers/bdix/circleftp` | BDIX FTP directory scrapes. |
+| **BdixDhakaFlix** | `providers/bdix/dhakaflix` | BDIX indexer. |
+| **Addons** | `providers/addons` | Community HTTP addons (Cinemeta, streams). |
 
 BDIX sources are only reachable from supported Bangladeshi ISPs and are hidden by
-default (`bdix_enabled` in config; `/settings` $\to$ Content Modes $\to$ BDIX Sources).
+default (`bdix_enabled` in config; `/settings` → Content Modes → BDIX Sources).
 
 ## Shared Provider Contract
 
@@ -73,7 +73,7 @@ Adding a new streaming or BDIX provider to MovieBox TUI takes 3 simple steps:
 - `client.rs::resolve_release` resolves release mirrors concurrently using bounded-concurrency probing (`select_ok` in batches of 3) with a 3.5s per-probe timeout.
 - Direct links undergo automatic path percent-encoding normalization (`validate_playback_url`) to handle filenames containing unencoded spaces, brackets, and special characters.
 - Preflight probes issue a bounded range probe (`Range: bytes=0-8191`) and inspect response bodies for expired mirror errors (`"Failed to extract link"`, `"Token Expired"`, `"404"`) to fail fast on expired torrents.
-- `hubcloud.rs` scores and prioritizes candidate streams (Cloudflare R2 / S3 / Seekable Streams $\to$ Storage $\to$ PixelDrain API $\to$ Google UserContent / Direct Attachments), automatically decoding base64 `Watch Online` mirrors (`vdplay.pages.dev/?u=...`).
+- `hubcloud.rs` scores and prioritizes candidate streams (Cloudflare R2 / S3 / Seekable Streams → Storage → PixelDrain API → Google UserContent / Direct Attachments), automatically decoding base64 `Watch Online` mirrors (`vdplay.pages.dev/?u=...`).
 - **Multilingual audio detection**: `parser.rs::detect_language` parses release titles and
   metadata for 30+ regional and international languages (Hindi, Tamil, Telugu, Kannada,
   Malayalam, Bengali, Marathi, Punjabi, Gujarati, Urdu, Japanese, Korean, Chinese, Spanish,

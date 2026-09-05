@@ -134,9 +134,9 @@ All performance optimizations in MovieBox-TUI must be backed by empirical before
 When submitting or claiming a performance improvement, measure and report exact deltas:
 
 1. **CPU & Algorithmic Hot Paths**:
-   - Measure wall-clock duration using `std::time::Instant` across $\ge 1,000$ iterations.
+   - Measure wall-clock duration using `std::time::Instant` across ≥ 1,000 iterations.
    - Run benchmarks on release builds (`cargo test --release` or isolated binary harness) to reflect production compiler optimizations.
-   - Report: Baseline vs. Optimized duration in microseconds ($\mu\text{s}$) or milliseconds ($\text{ms}$), plus relative speedup ($N\times$).
+   - Report: Baseline vs. Optimized duration in microseconds (µs) or milliseconds (ms), plus relative speedup (N×).
 
 2. **Memory & Allocations**:
    - Count heap allocations and memory footprint deltas on hot paths (e.g., zero-copy slices vs. cloned `String` or `Vec`).
