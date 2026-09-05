@@ -12,6 +12,12 @@
   - Added prominent media title indicators on the top border (`⬇ Downloading: <Title>` or `⬇ S<N>E<N> (<current>/<total>): <Title>`) with bold styling and automatic terminal width truncation.
   - Replaced ambiguous whole-area click cancellation with an isolated `[x] Cancel` button hitbox on the top-right border, preventing accidental download interruptions while keeping the bar mouse-safe.
   - Formatted transfer statistics into clean badges (`<Size> | <Speed> | ETA <Time>`) with zero unclosed parenthesis artifacts and zero floating dots.
+- **Details Screen UX & UI Deduplication**:
+  - Replaced repetitive audio language strings in the metadata header with a concise summary badge (`N Audio Tracks`), reserving line space for genre tags and IMDb ratings.
+  - Eliminated the redundant workflow breadcrumb bar on wide/desktop layouts where selector columns are already visible side-by-side, reclaiming a vertical display row to show more episodes without scrolling.
+  - Standardized selector list typography and cursor alignment, eliminating irregular bullet padding and double-space indentation across Audio, Season, and Episode items.
+  - Deduplicated stream table columns by showing clean CDN/provider origins under `SOURCE` and stripping redundant resolution/codec suffixes from the `RELEASE` column.
+  - Added count context to pane titles (`Audio (N)`, `Seasons (N)`, `Episodes (N)`), providing immediate visibility into available content quantities.
 - **Native Android ARM64 Release Target & Pipeline**:
   - Added native `aarch64-linux-android` build target to the release workflow (`.github/workflows/release.yml`) using Android NDK r26d and Clang (API 24+).
   - Configured automated packaging of `MovieBox_Android_arm64.tar.gz` with native Bionic dynamic linking (`libc.so`), valid ELF `PT_PHDR` program header table, and `/system/bin/linker64` dynamic loader.

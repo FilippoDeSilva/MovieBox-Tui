@@ -1001,7 +1001,7 @@ impl App {
             return None;
         }
 
-        if row == workflow_area.y {
+        if workflow_area.height > 0 && row == workflow_area.y {
             let count = available_panes.len() + 1;
             let section_w = area.width / count as u16;
             let pane_idx = (col / section_w.max(1)) as usize;

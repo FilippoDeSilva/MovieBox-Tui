@@ -180,9 +180,10 @@ pub fn details_screen_layout(
     let tier = DetailsLayoutTier::for_area(area);
     let header_height = tier.header_height(area, selected_details);
     let footer_height = tier.footer_height(area.width);
+    let workflow_height = if area.width < 85 { 1 } else { 0 };
     let chunks = Layout::vertical([
         Constraint::Length(header_height),
-        Constraint::Length(1),
+        Constraint::Length(workflow_height),
         Constraint::Min(5),
         Constraint::Length(footer_height),
     ])
@@ -495,29 +496,23 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         ));
     }
 
-    let audio_str = details
-        .audios
-        .as_deref()
-        .filter(|s| !s.trim().is_empty() && *s != "N/A")
-        .map(|s| s.to_string())
-        .or_else(|| {
-            if !details.dubs.is_empty() {
-                let mut unique_langs = Vec::new();
-                for dub in &details.dubs {
-                    let lang = clean_language_name(&dub.language);
-                    if !unique_langs.contains(&lang) {
-                        unique_langs.push(lang);
-                    }
-                }
-                if !unique_langs.is_empty() {
-                    Some(unique_langs.join(", "))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        });
+    let audio_str = if details.has_languages() {
+        let count = details.dubs.len();
+        if count > 1 {
+            Some(format!("{count} Tracks"))
+        } else {
+            details
+                .dubs
+                .first()
+                .map(|d| clean_language_name(&d.language))
+        }
+    } else {
+        details
+            .audios
+            .as_deref()
+            .filter(|s| !s.trim().is_empty() && *s != "N/A")
+            .map(|s| s.to_string())
+    };
 
     let bullet_w = crate::tui::text::width(bullet_sep);
     let provider_name = details.id.provider.label();
@@ -901,27 +896,38 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let subject_id = state.active_subject_id.as_deref().unwrap_or("");
             let provider = state.provider_for_subject(subject_id).cache_key();
 
-            let check_sym = if state.basic_terminal {
-                "[x] "
-            } else {
-                "✓  "
-            };
-            let play_sym = if state.basic_terminal {
-                "[>] "
-            } else {
-                "▶  "
-            };
-            let unwatched_sym = if state.basic_terminal { "    " } else { "   " };
+            let check_sym = if state.basic_terminal { "[x] " } else { "✓ " };
+            let play_sym = if state.basic_terminal { "[>] " } else { "▶ " };
+            let unwatched_sym = if state.basic_terminal { "    " } else { "  " };
+            let ep_max_w = eps_area.map_or(40, |a| a.width.saturating_sub(6)) as usize;
             ep_numbers
                 .iter()
                 .map(|&ep| {
+                    let ep_title_opt = details
+                        .seasons
+                        .iter()
+                        .find(|s| s.number == se_num)
+                        .and_then(|s| s.episodes.iter().find(|e| e.number == ep))
+                        .and_then(|e| e.title.as_deref())
+                        .filter(|t| {
+                            let trim = t.trim();
+                            !trim.is_empty()
+                                && !trim.eq_ignore_ascii_case(&format!("Episode {ep}"))
+                                && !trim.eq_ignore_ascii_case(&format!("EP {ep}"))
+                        });
+                    let ep_base = if let Some(t) = ep_title_opt {
+                        let candidate = format!("EP {ep:02} · {t}");
+                        crate::tui::text::truncate_width(&candidate, ep_max_w)
+                    } else {
+                        format!("EP {ep:02}")
+                    };
                     if let Some(hist) =
                         state
                             .history
                             .get_item(provider, subject_id, se_num, ep, Some(&title))
                     {
                         if hist.completed {
-                            ListItem::new(format!("{check_sym}EP {ep:02}")).style(theme.text_dim)
+                            ListItem::new(format!("{check_sym}{ep_base}")).style(theme.text_dim)
                         } else if hist.is_in_progress() {
                             let progress_info =
                                 match (hist.progress_percentage(), hist.formatted_remaining()) {
@@ -930,15 +936,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                     (None, Some(r)) => format!(" ({r})"),
                                     (None, None) => String::new(),
                                 };
-                            ListItem::new(format!("{play_sym}EP {ep:02}{progress_info}"))
+                            ListItem::new(format!("{play_sym}{ep_base}{progress_info}"))
                                 .style(theme.accent)
                         } else {
-                            ListItem::new(format!("{unwatched_sym}EP {ep:02}")).style(theme.text)
+                            ListItem::new(format!("{unwatched_sym}{ep_base}")).style(theme.text)
                         }
                     } else if state.history.is_watched(provider, subject_id, se_num, ep) {
-                        ListItem::new(format!("{check_sym}EP {ep:02}")).style(theme.text_dim)
+                        ListItem::new(format!("{check_sym}{ep_base}")).style(theme.text_dim)
                     } else {
-                        ListItem::new(format!("{unwatched_sym}EP {ep:02}")).style(theme.text)
+                        ListItem::new(format!("{unwatched_sym}{ep_base}")).style(theme.text)
                     }
                 })
                 .collect()
@@ -1020,11 +1026,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             ""
         };
         let avail = streams_area.width.saturating_sub(4) as usize;
-        let title_full = format!(
-            " {marker}Streams ({visible_count}) · {}/{} ",
-            selected + 1,
-            visible_count
-        );
+        let title_full = if visible_count > 1 {
+            format!(
+                " {marker}Streams ({visible_count}) · {}/{} ",
+                selected + 1,
+                visible_count
+            )
+        } else {
+            format!(" {marker}Streams (1) ")
+        };
         if avail > 0 && crate::tui::text::width(&title_full) > avail {
             let title_medium = format!(" {marker}Streams ({visible_count}) ");
             if crate::tui::text::width(&title_medium) <= avail {
@@ -1086,8 +1096,25 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     metadata_style(theme)
                 };
 
-                let release_title = crate::tui::text::clean_stream_text(&file.filename);
-                let upload_by = crate::tui::text::clean_stream_text(file.source_label());
+                let release_title = clean_stream_release_title(&file.filename);
+                let upload_by = match file.provider {
+                    crate::providers::models::ProviderKind::MovieBox => "MovieBox CDN".to_string(),
+                    crate::providers::models::ProviderKind::FourKHdHub => "4KHDHub".to_string(),
+                    crate::providers::models::ProviderKind::BdixCircleFtp => {
+                        "CircleFTP".to_string()
+                    }
+                    crate::providers::models::ProviderKind::BdixDhakaFlix => {
+                        "DhakaFlix".to_string()
+                    }
+                    crate::providers::models::ProviderKind::Addons => {
+                        let clean = crate::tui::text::clean_stream_text(file.source_label());
+                        if !clean.is_empty() {
+                            clean
+                        } else {
+                            "Addon".to_string()
+                        }
+                    }
+                };
                 let is_ultra_compact = streams_area.width < 58;
                 let is_compact = streams_area.width < 85;
                 let is_wide = streams_area.width >= 115;
@@ -1450,9 +1477,51 @@ fn clean_language_name(value: &str) -> String {
     name
 }
 
+pub fn clean_stream_release_title(filename: &str) -> String {
+    let clean = crate::tui::text::clean_stream_text(filename);
+    let mut title = clean.as_str();
+    let redundant_suffixes = [
+        "Multi-Res hevc",
+        "Multi-Res h264",
+        "Multi-Res",
+        "multi-res hevc",
+        "multi-res h264",
+        "multi-res",
+        "HEVC",
+        "hevc",
+        "H264",
+        "h264",
+        "x265",
+        "x264",
+        "X265",
+        "X264",
+        "1080p",
+        "720p",
+        "480p",
+        "2160p",
+        "4K",
+    ];
+    for _ in 0..3 {
+        let before = title;
+        for suffix in &redundant_suffixes {
+            if let Some(stripped) = title.strip_suffix(suffix) {
+                title = stripped.trim_end_matches([' ', '-', '.', '_']);
+            }
+        }
+        if title == before {
+            break;
+        }
+    }
+    if title.is_empty() {
+        clean
+    } else {
+        title.to_string()
+    }
+}
+
 fn pane_title(
     label: &str,
-    _count: usize,
+    count: usize,
     pane: crate::tui::state::DetailsPane,
     focused: bool,
     state: &AppState,
@@ -1487,10 +1556,21 @@ fn pane_title(
         String::new()
     };
 
-    let title_full = format!(" {marker}{label}{position_str} ");
+    let count_suffix = if count > 0 {
+        format!(" ({count})")
+    } else {
+        String::new()
+    };
+
+    let title_full = format!(" {marker}{label}{count_suffix}{position_str} ");
     let avail = max_width.saturating_sub(2) as usize;
     let title = if avail > 0 && crate::tui::text::width(&title_full) > avail {
-        format!(" {marker}{label} ")
+        let title_medium = format!(" {marker}{label}{count_suffix} ");
+        if crate::tui::text::width(&title_medium) <= avail {
+            title_medium
+        } else {
+            format!(" {marker}{label} ")
+        }
     } else {
         title_full
     };
@@ -1569,6 +1649,9 @@ fn render_workflow(
     streams_count: usize,
     theme: &Theme,
 ) {
+    if area.height == 0 || area.width == 0 {
+        return;
+    }
     let compact = area.width < 100;
     let mut steps = Vec::new();
 
@@ -2424,10 +2507,10 @@ mod tests {
         };
 
         let title_wide = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 40);
-        assert_eq!(title_wide.to_string(), " ● Audio  1/2 ");
+        assert_eq!(title_wide.to_string(), " ● Audio (2)  1/2 ");
 
         let title_unfocused = pane_title("Audio", 2, DetailsPane::Languages, false, &state, 40);
-        assert_eq!(title_unfocused.to_string(), " Audio ");
+        assert_eq!(title_unfocused.to_string(), " Audio (2) ");
 
         let title_narrow = pane_title("Audio", 2, DetailsPane::Languages, true, &state, 10);
         assert_eq!(title_narrow.to_string(), " ● Audio ");
@@ -2593,7 +2676,7 @@ mod tests {
         assert!(content.contains("Ek Deewane Ki Deewaniyat"));
         assert!(content.contains("2025"));
         assert!(content.contains("Movie"));
-        assert!(content.contains("Audio: Original, Hindi"));
+        assert!(content.contains("Audio: 2 Tracks"));
         assert!(content.contains("MovieBox"));
         assert!(content.contains("No Art"));
     }
@@ -2724,5 +2807,112 @@ mod tests {
             .collect::<String>();
 
         assert!(content.contains("[No Art]"));
+    }
+
+    #[test]
+    fn test_details_metadata_audio_summary() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "bb_test".to_string(),
+                },
+                title: "Breaking Bad".to_string(),
+                media_type: MediaType::Series,
+                year: Some("2008".to_string()),
+                description: Some("Chemistry teacher".to_string()),
+                tagline: None,
+                imdb_rating: Some("9.5".to_string()),
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: None,
+                genres: vec!["Crime".to_string(), "Drama".to_string()],
+                seasons: vec![],
+                dubs: vec![
+                    AudioTrackOption {
+                        subject_id: "1".to_string(),
+                        language: "Original".to_string(),
+                        label: "Original".to_string(),
+                    },
+                    AudioTrackOption {
+                        subject_id: "2".to_string(),
+                        language: "Hindi".to_string(),
+                        label: "Hindi".to_string(),
+                    },
+                    AudioTrackOption {
+                        subject_id: "3".to_string(),
+                        language: "Spanish (LA)".to_string(),
+                        label: "Spanish (LA)".to_string(),
+                    },
+                    AudioTrackOption {
+                        subject_id: "4".to_string(),
+                        language: "Portuguese (BR)".to_string(),
+                        label: "Portuguese (BR)".to_string(),
+                    },
+                ],
+            }),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("Audio: 4 Tracks"));
+        assert!(!content.contains("Audio: Original, Hindi, Spanish (LA), Portuguese (BR)"));
+    }
+
+    #[test]
+    fn test_details_screen_layout_wide_and_compact() {
+        let wide_area = Rect::new(0, 0, 120, 35);
+        let wide_layout = details_screen_layout(wide_area, None);
+        assert_eq!(wide_layout.workflow_area.height, 0);
+
+        let compact_area = Rect::new(0, 0, 75, 35);
+        let compact_layout = details_screen_layout(compact_area, None);
+        assert_eq!(compact_layout.workflow_area.height, 1);
+    }
+
+    #[test]
+    fn test_stream_table_deduplication() {
+        assert_eq!(
+            clean_stream_release_title("Pilot S01E01 Multi-Res hevc"),
+            "Pilot S01E01"
+        );
+        assert_eq!(
+            clean_stream_release_title("Breaking Bad S01E01 1080p HEVC"),
+            "Breaking Bad S01E01"
+        );
+        assert_eq!(
+            clean_stream_release_title("Inception 2010 1080p x264"),
+            "Inception 2010"
+        );
+        assert_eq!(clean_stream_release_title("Short Film"), "Short Film");
+    }
+
+    #[test]
+    fn test_episode_item_spacing() {
+        let check_sym = "✓ ";
+        let play_sym = "▶ ";
+        let unwatched_sym = "  ";
+
+        assert_eq!(crate::tui::text::width(check_sym), 2);
+        assert_eq!(crate::tui::text::width(play_sym), 2);
+        assert_eq!(crate::tui::text::width(unwatched_sym), 2);
     }
 }
