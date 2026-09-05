@@ -367,7 +367,7 @@ pub fn sanitize_language_label(name: &str) -> String {
         "বাংলা" | "Bengali" | "ben" | "bn" => "Bengali".to_string(),
         "हिन्दी" | "हिंदी" | "Hindi" | "hin" | "hi" => "Hindi".to_string(),
         "Filipino" | "Tagalog" | "fil" | "tl" => "Filipino".to_string(),
-        "Indonesian" | "ind" | "id" => "Indonesian".to_string(),
+        "Indonesian" | "ind" | "id" | "in_id" => "Indonesian".to_string(),
         "English" | "eng" | "en" => "English".to_string(),
         "Español" | "Spanish" | "spa" | "es" => "Spanish".to_string(),
         "Français" | "French" | "fra" | "fre" | "fr" => "French".to_string(),

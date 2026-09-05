@@ -224,6 +224,8 @@ pub struct Release {
     pub season: Option<usize>,
     pub episode: Option<usize>,
     pub mirrors: Vec<SourceMirror>,
+    #[serde(default)]
+    pub resource_id: Option<String>,
 }
 impl Release {
     pub fn is_multi_resolution(&self) -> bool {

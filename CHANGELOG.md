@@ -18,6 +18,18 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **Accurate Playback & Download Preparation Notifications**:
+  - Replaced misleading "Fetching subtitles" toast notifications during stream and episode download preparation with accurate stream preparation notices (`Preparing <filename>...` and `Resolving episode stream...`), eliminating false subtitle retrieval messages when streams rely on embedded subtitles or contain no external captions.
+  - Clarified external subtitle download failure status to `External subtitle unavailable; playing stream directly.` to prevent ambiguity when video containers carry built-in subtitles.
+  - Standardized download mirror error notice to `No downloadable mirrors were found for this release.` and normalized notification title casing.
+- **MovieBox Subtitle Resolution & Multi-Language Track Extraction**:
+  - Resolved full multi-language subtitle availability (English, Bengali, Arabic, Filipino, Hindi, Indonesian, Urdu) on MovieBox by linking genuine upload `resourceId` identifiers to releases instead of internal CDN transcoding stream IDs, and aggregating captions across audio dub siblings in `MovieBoxService::get_ext_captions`.
+  - Filtered out 34-byte dummy placeholder caption files returned by transcoding endpoints and deduplicated subtitle tracks by language and download URL.
+  - Added automatic fallback to subject resources in `MovieBoxService::get_ext_captions` when a stream ID does not directly attach captions.
+  - Added `in_id` language code mapping to `sanitize_language_label` for localized Indonesian subtitle display.
+  - Registered `draw_subtitle_picker` in `App::draw`, restoring the visual "Subtitles" modal picker overlay during stream playback and download preparation when external captions exist.
+  - Tightened modal picker vertical height calculation in `picker_layout`, eliminating blank gap lines between the last list item and the bottom divider for short lists.
+  - Replaced synthetic non-numeric resource ID generation in `get_selected_resource_id` with direct `Release.resource_id` resolution, preventing HTTP 400 parameter parsing errors against the `/wefeed-mobile-bff/subject-api/get-ext-captions` endpoint.
 - **Termux Android Player Exit Code 126 & Intent Bridge Resolution**:
   - Eliminated `Player Error: Crash code: 126 (/system/bin/am[11]: /data/data/com.termux/files/usr/bin/cmd: Permission denied)` crash in Termux on Android 10+ by prioritizing native Termux openers (`termux-open`, `termux-open-url`, `termux-am`) and strictly avoiding unprivileged `/system/bin/am` shell script calls.
   - Preserved `LD_PRELOAD` for Termux applet compatibility while prepending system paths (`/system/bin:/system/xbin`) for system command invocations.

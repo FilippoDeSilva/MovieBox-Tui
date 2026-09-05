@@ -286,6 +286,7 @@ impl CircleFtpClient {
                                             headers: Vec::new(),
                                             direct_file: true,
                                         }],
+                                        resource_id: None,
                                     });
                                 }
                             }
@@ -321,6 +322,7 @@ impl CircleFtpClient {
                         headers: Vec::new(),
                         direct_file: true,
                     }],
+                    resource_id: None,
                 });
             }
         }

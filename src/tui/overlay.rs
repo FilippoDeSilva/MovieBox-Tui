@@ -41,7 +41,7 @@ pub fn picker_layout(
     centered(
         area,
         content_width as u16,
-        (visible_rows as u16 + 4).max(7),
+        (visible_rows as u16 + 4).max(5),
         minimum_width,
         64,
     )
@@ -828,10 +828,14 @@ mod tests {
         assert!(content.contains("Popular Movies"));
     }
     #[test]
-    fn test_picker_layout_minimum_height_clamped_to_seven() {
+    fn test_picker_layout_height_tight_fit() {
         let area = Rect::new(0, 0, 80, 24);
-        let items = vec!["Single Item".to_string()];
-        let layout = picker_layout(area, &items, "Open", 20);
-        assert!(layout.height >= 7);
+        let items_single = vec!["Single Item".to_string()];
+        let layout_single = picker_layout(area, &items_single, "Open", 20);
+        assert_eq!(layout_single.height, 5);
+
+        let items_two = vec!["Item 1".to_string(), "Item 2".to_string()];
+        let layout_two = picker_layout(area, &items_two, "Use", 20);
+        assert_eq!(layout_two.height, 6);
     }
 }

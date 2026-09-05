@@ -61,13 +61,41 @@ impl crate::providers::ReleaseProvider for client::MovieBoxClient {
         season: usize,
         episode: usize,
     ) -> Result<Vec<crate::providers::models::Release>, ProviderError> {
-        let json = self
-            .get_play_info(id, season, episode)
-            .await
-            .map_err(ProviderError::from)?;
-        let releases =
+        let (play_info_res, resources_res) = tokio::join!(
+            self.get_play_info(id, season, episode),
+            self.get_resources(id, season, episode, 1, None, 5)
+        );
+
+        let upload_resource_id = resources_res.ok().and_then(|val| {
+            val.get("list")
+                .or_else(|| val.get("data").and_then(|d| d.get("list")))
+                .and_then(|l| l.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|item| {
+                    item.get("resourceId")
+                        .or_else(|| item.get("id"))
+                        .and_then(|v| {
+                            if let Some(n) = v.as_i64() {
+                                Some(n.to_string())
+                            } else if let Some(n) = v.as_u64() {
+                                Some(n.to_string())
+                            } else {
+                                v.as_str().map(|s| s.to_string())
+                            }
+                        })
+                })
+        });
+
+        let json = play_info_res.map_err(ProviderError::from)?;
+        let mut releases =
             adapt::moviebox_play_info_json_to_releases(&json, season, episode, self.user_agent());
+
         if !releases.is_empty() {
+            if let Some(upload_id) = upload_resource_id {
+                for rel in &mut releases {
+                    rel.resource_id = Some(upload_id.clone());
+                }
+            }
             return Ok(releases);
         }
 

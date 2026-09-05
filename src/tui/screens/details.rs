@@ -1930,6 +1930,7 @@ mod tests {
                         headers: vec![],
                         direct_file: false,
                     }],
+                    resource_id: None,
                 },
                 Release {
                     provider: ProviderKind::MovieBox,
@@ -1946,6 +1947,7 @@ mod tests {
                         headers: vec![],
                         direct_file: false,
                     }],
+                    resource_id: None,
                 },
                 Release {
                     provider: ProviderKind::MovieBox,
@@ -1962,6 +1964,7 @@ mod tests {
                         headers: vec![],
                         direct_file: false,
                     }],
+                    resource_id: None,
                 },
             ],
             details_pane: crate::tui::state::DetailsPane::Streams,
@@ -2032,6 +2035,7 @@ mod tests {
                     season: None,
                     episode: None,
                     mirrors: vec![],
+                    resource_id: None,
                 },
                 Release {
                     provider: ProviderKind::MovieBox,
@@ -2043,6 +2047,7 @@ mod tests {
                     season: None,
                     episode: None,
                     mirrors: vec![],
+                    resource_id: None,
                 },
             ],
             details_pane: crate::tui::state::DetailsPane::Streams,

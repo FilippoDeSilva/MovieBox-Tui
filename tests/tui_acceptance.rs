@@ -40,6 +40,38 @@ async fn test_season_download_remembers_explicit_no_subtitle_choice() {
 }
 
 #[tokio::test]
+async fn test_download_subtitle_popup_renders_in_app_draw() {
+    let backend = TestBackend::new(100, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut app = App::new();
+
+    app.state_mut().is_download_subtitle_popup = true;
+    app.state_mut().subtitle_list = vec![
+        ("None".to_string(), String::new()),
+        (
+            "English".to_string(),
+            "https://example.com/en.srt".to_string(),
+        ),
+    ];
+    app.state_mut().subtitle_list_state.select(Some(0));
+
+    terminal.draw(|frame| app.draw(frame)).unwrap();
+
+    let content = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|c| c.symbol())
+        .collect::<String>();
+
+    assert!(content.contains("Subtitles"));
+    assert!(content.contains("No subtitles"));
+    assert!(content.contains("English"));
+    assert!(content.contains("Download"));
+}
+
+#[tokio::test]
 async fn test_tui_startup_and_home_screen_rendering() {
     let backend = TestBackend::new(100, 30);
     let mut terminal = Terminal::new(backend).unwrap();

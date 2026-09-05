@@ -370,3 +370,50 @@ async fn test_live_fourkhdhub_game_of_thrones_resolution() {
         }
     }
 }
+
+#[tokio::test]
+#[ignore = "live network test; run with cargo test --test live_stream_verification -- --ignored"]
+async fn test_live_moviebox_captions_end_to_end() {
+    let service = moviebox_tui::service::MovieBoxService::new();
+    service.client.init().await.expect("client init successful");
+
+    let releases = service
+        .client
+        .episode_streams("4179386086617137184", 0, 0)
+        .await
+        .expect("fetch movie streams");
+    assert!(!releases.is_empty(), "releases should not be empty");
+
+    let release = &releases[0];
+    let resource_id = release
+        .resource_id
+        .as_deref()
+        .expect("moviebox release must include resource_id");
+    assert!(!resource_id.is_empty());
+
+    let sibling_ids = vec!["3264772588333157424".to_string()];
+    let captions = service
+        .get_ext_captions("4179386086617137184", resource_id, &sibling_ids)
+        .await
+        .expect("fetch captions");
+    assert!(
+        captions.len() >= 5,
+        "should return aggregated subtitles across dub siblings, got {}",
+        captions.len()
+    );
+    assert!(
+        captions
+            .iter()
+            .all(|c| !c.url.is_empty() && !c.url.contains("aa348f2541d13ffe"))
+    );
+    assert!(
+        captions
+            .iter()
+            .any(|c| c.name.eq_ignore_ascii_case("English"))
+    );
+    assert!(
+        captions
+            .iter()
+            .any(|c| c.name.contains("বাংলা") || c.name.eq_ignore_ascii_case("Bengali"))
+    );
+}

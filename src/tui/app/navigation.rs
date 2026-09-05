@@ -327,17 +327,7 @@ impl App {
     }
 
     pub(super) fn get_selected_resource_id(&self) -> Option<String> {
-        let release = self.get_selected_release()?;
-        let idx = self.state.resource_list_state.selected().unwrap_or(0);
-        Some(format!(
-            "{}-{idx}",
-            release
-                .provider
-                .label()
-                .to_lowercase()
-                .replace(' ', "-")
-                .replace(['(', ')'], "")
-        ))
+        self.get_selected_release().and_then(|r| r.resource_id)
     }
 
     pub(super) fn get_selected_release(&self) -> Option<Release> {

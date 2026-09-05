@@ -342,7 +342,7 @@ impl App {
                             crate::logging::sanitize_url(&url)
                         );
                         let _ = sender.send(Action::SetStatus(
-                            "Subtitles unavailable; playing without subtitles.".to_string(),
+                            "External subtitle unavailable; playing stream directly.".to_string(),
                         ));
                     }
                 }
@@ -607,12 +607,25 @@ impl App {
                         self.state.notify(
                             NotificationKind::Info,
                             "Preparing playback",
-                            format!("Fetching subtitles for {}...", release.filename),
+                            format!("Preparing {}...", release.filename),
                         );
                         self.state.pending_playback_source = Some(direct_source.clone());
                         let service = self.service.clone();
                         let sender = self.action_sender.clone();
                         let source_clone = direct_source.clone();
+                        let sibling_ids: Vec<String> = self
+                            .state
+                            .selected_details
+                            .as_ref()
+                            .map(|d| {
+                                let mut ids = vec![d.id.value.clone()];
+                                ids.extend(d.dubs.iter().map(|dub| dub.subject_id.clone()));
+                                ids.retain(|s| !s.is_empty());
+                                ids.sort();
+                                ids.dedup();
+                                ids
+                            })
+                            .unwrap_or_default();
                         tokio::spawn(async move {
                             let cached = tokio::task::spawn_blocking({
                                 let subject_id = subject_id.clone();
@@ -630,7 +643,7 @@ impl App {
                             }
                             let result = tokio::time::timeout(
                                 std::time::Duration::from_secs(15),
-                                service.get_ext_captions(&subject_id, &rid),
+                                service.get_ext_captions(&subject_id, &rid, &sibling_ids),
                             )
                             .await;
                             match result {
@@ -884,6 +897,120 @@ mod tests {
 
         assert!(app.state.subtitle_popup);
         assert_eq!(app.state.subtitle_list.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_get_selected_resource_id_resolution() {
+        let mut app = crate::tui::app::App::new();
+        assert_eq!(app.get_selected_resource_id(), None);
+
+        app.state.selected_resources = vec![
+            crate::providers::models::Release {
+                provider: crate::providers::models::ProviderKind::MovieBox,
+                filename: "Movie.1080p.mkv".to_string(),
+                quality: Some("1080p".to_string()),
+                codec: Some("hevc".to_string()),
+                language: None,
+                size_bytes: Some(1024),
+                season: None,
+                episode: None,
+                mirrors: vec![],
+                resource_id: Some("167282974499786072".to_string()),
+            },
+            crate::providers::models::Release {
+                provider: crate::providers::models::ProviderKind::MovieBox,
+                filename: "Movie.720p.mkv".to_string(),
+                quality: Some("720p".to_string()),
+                codec: Some("h264".to_string()),
+                language: None,
+                size_bytes: Some(512),
+                season: None,
+                episode: None,
+                mirrors: vec![],
+                resource_id: None,
+            },
+        ];
+
+        app.state.resource_list_state.select(Some(0));
+        assert_eq!(
+            app.get_selected_resource_id().as_deref(),
+            Some("167282974499786072")
+        );
+
+        app.state.resource_list_state.select(Some(1));
+        assert_eq!(app.get_selected_resource_id(), None);
+    }
+
+    #[tokio::test]
+    async fn test_play_stream_notifies_preparing_playback_accurately() {
+        let mut app = crate::tui::app::App::new();
+        app.state.active_provider = crate::providers::models::ProviderKind::MovieBox;
+        app.state.active_screen = crate::tui::state::Screen::Details;
+        app.state.selected_resources = vec![crate::providers::models::Release {
+            provider: crate::providers::models::ProviderKind::MovieBox,
+            filename: "Movie.1080p.mkv".to_string(),
+            quality: Some("1080p".to_string()),
+            codec: Some("hevc".to_string()),
+            language: None,
+            size_bytes: Some(1024),
+            season: None,
+            episode: None,
+            mirrors: vec![crate::providers::models::SourceMirror {
+                label: "Direct".to_string(),
+                resolver_url: "https://example.com/video.mp4".to_string(),
+                headers: vec![],
+                direct_file: true,
+            }],
+            resource_id: Some("12345".to_string()),
+        }];
+        app.state.resource_list_state.select(Some(0));
+
+        app.handle_playback(crate::tui::action::Action::PlayStream)
+            .await;
+
+        let notif = app.state.notifications.back().expect("notification posted");
+        assert_eq!(notif.title, "Preparing playback");
+        assert_eq!(notif.message, "Preparing Movie.1080p.mkv...");
+    }
+
+    #[test]
+    fn test_subtitle_popup_renders_in_app_draw() {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut app = crate::tui::app::App::new();
+
+        app.state.subtitle_popup = true;
+        app.state.subtitle_list = vec![
+            ("None".to_string(), String::new()),
+            (
+                "English".to_string(),
+                "https://example.com/en.srt".to_string(),
+            ),
+        ];
+        app.state.subtitle_list_state.select(Some(0));
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("Subtitles"));
+        assert!(content.contains("No subtitles"));
+        assert!(content.contains("English"));
+        assert!(content.contains("Use"));
+
+        let items = vec!["No subtitles".to_string(), "English".to_string()];
+        let popup_layout = crate::tui::overlay::picker_layout(
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+            &items,
+            "Use",
+            32,
+        );
+        assert_eq!(popup_layout.height, 6);
     }
 
     #[tokio::test]

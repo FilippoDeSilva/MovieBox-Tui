@@ -1300,6 +1300,7 @@ mod tests {
             season: None,
             episode: None,
             mirrors: vec![],
+            resource_id: None,
         }];
         app.state.resource_list_state.select(Some(0));
 

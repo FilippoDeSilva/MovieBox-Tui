@@ -298,13 +298,13 @@ impl App {
                             self.state.notify(
                                 NotificationKind::Error,
                                 "Download unavailable",
-                                "No playable mirrors were found for this release.",
+                                "No downloadable mirrors were found for this release.",
                             );
                             return None;
                         };
                         self.state.notify(
                             NotificationKind::Info,
-                            "Preparing Download",
+                            "Preparing download",
                             format!(
                                 "Resolving {} from {}...",
                                 first_mirror.label,
@@ -401,12 +401,28 @@ impl App {
                     self.state.notify(
                         NotificationKind::Info,
                         "Preparing download",
-                        "Fetching subtitles.",
+                        "Resolving episode stream...",
                     );
                     let service = self.service.clone();
                     let sender = self.action_sender.clone();
+                    let sibling_ids: Vec<String> = self
+                        .state
+                        .selected_details
+                        .as_ref()
+                        .map(|d| {
+                            let mut ids = vec![d.id.value.clone()];
+                            ids.extend(d.dubs.iter().map(|dub| dub.subject_id.clone()));
+                            ids.retain(|s| !s.is_empty());
+                            ids.sort();
+                            ids.dedup();
+                            ids
+                        })
+                        .unwrap_or_default();
                     tokio::spawn(async move {
-                        if let Ok(res) = service.get_ext_captions(&subject_id, &rid).await {
+                        if let Ok(res) = service
+                            .get_ext_captions(&subject_id, &rid, &sibling_ids)
+                            .await
+                        {
                             sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                         } else {
                             sender.send(Action::DownloadStream(None)).ok();
@@ -732,4 +748,74 @@ fn is_media_already_downloaded(target_dir: &std::path::Path, base_name: &str) ->
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::providers::models::{ProviderKind, Release, SourceMirror};
+    use crate::tui::action::Action;
+    use crate::tui::app::App;
+    use crate::tui::overlay::NotificationKind;
+    use crate::tui::state::Screen;
+
+    #[tokio::test]
+    async fn test_confirm_download_episode_emits_resolving_stream_notification() {
+        let mut app = App::new();
+        app.state.active_screen = Screen::Details;
+        app.state.selected_resources = vec![Release {
+            provider: ProviderKind::MovieBox,
+            filename: "Episode.mkv".to_string(),
+            quality: Some("1080p".to_string()),
+            codec: Some("hevc".to_string()),
+            language: None,
+            size_bytes: Some(1024),
+            season: Some(1),
+            episode: Some(1),
+            mirrors: vec![SourceMirror {
+                label: "Direct".to_string(),
+                resolver_url: "https://example.com/stream.mp4".to_string(),
+                headers: vec![],
+                direct_file: true,
+            }],
+            resource_id: Some("98765".to_string()),
+        }];
+        app.state.resource_list_state.select(Some(0));
+
+        app.handle_download(Action::ConfirmDownloadEpisode).await;
+
+        let notif = app.state.notifications.back().expect("notification posted");
+        assert_eq!(notif.kind, NotificationKind::Info);
+        assert_eq!(notif.title, "Preparing download");
+        assert_eq!(notif.message, "Resolving episode stream...");
+    }
+
+    #[tokio::test]
+    async fn test_download_stream_missing_mirror_reports_downloadable_error() {
+        let mut app = App::new();
+        app.state.active_provider = ProviderKind::FourKHdHub;
+        app.state.active_screen = Screen::Details;
+        app.state.selected_resources = vec![Release {
+            provider: ProviderKind::FourKHdHub,
+            filename: "Unavailable.mkv".to_string(),
+            quality: Some("1080p".to_string()),
+            codec: Some("hevc".to_string()),
+            language: None,
+            size_bytes: Some(1024),
+            season: None,
+            episode: None,
+            mirrors: vec![],
+            resource_id: None,
+        }];
+        app.state.resource_list_state.select(Some(0));
+
+        app.handle_download(Action::DownloadStream(None)).await;
+
+        let notif = app.state.notifications.back().expect("notification posted");
+        assert_eq!(notif.kind, NotificationKind::Error);
+        assert_eq!(notif.title, "Download unavailable");
+        assert_eq!(
+            notif.message,
+            "No downloadable mirrors were found for this release."
+        );
+    }
 }

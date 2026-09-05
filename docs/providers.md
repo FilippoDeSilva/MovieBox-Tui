@@ -34,7 +34,7 @@ in `providers/mod.rs` give every client a shared, strictly-typed async trait sha
 All internal state (`AppState`), UI screens (`details.rs`, `home.rs`), and the action event bus transport native Rust structs directly:
 - `CatalogItem` / `SearchResult` for search results and discover catalogs.
 - `MediaDetails` (with `Vec<Season>` and `Vec<AudioTrackOption>`) for media metadata.
-- `Release` (with `Vec<SourceMirror>`) for streams.
+- `Release` (with `Vec<SourceMirror>` and optional `resource_id`) for streams.
 - `SubtitleOption` for external subtitles.
 
 Disk caching in `src/cache.rs` uses high-performance portable binary serialization via `rmp-serde` (MessagePack) with a 4-byte magic signature (`MBC1`) and versioned TTL envelope (`CacheEnvelope<T>`), eliminating all runtime JSON parsing and string allocation bottlenecks.

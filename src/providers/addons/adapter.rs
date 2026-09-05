@@ -591,6 +591,7 @@ pub fn stream_item_to_release(
             headers,
             direct_file: true,
         }],
+        resource_id: None,
     })
 }
 

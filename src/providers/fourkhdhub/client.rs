@@ -328,6 +328,7 @@ mod tests {
             season: None,
             episode: None,
             mirrors: Vec::new(),
+            resource_id: None,
         };
         assert!(client.resolve_release(&release).await.is_err());
     }

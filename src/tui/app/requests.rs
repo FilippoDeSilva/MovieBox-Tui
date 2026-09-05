@@ -1828,9 +1828,25 @@ impl App {
                             let service = self.service.clone();
                             let sender = self.action_sender.clone();
                             let pref = self.state.season_subtitle_preference.clone();
+                            let sibling_ids: Vec<String> = self
+                                .state
+                                .selected_details
+                                .as_ref()
+                                .map(|d| {
+                                    let mut ids = vec![d.id.value.clone()];
+                                    ids.extend(d.dubs.iter().map(|dub| dub.subject_id.clone()));
+                                    ids.retain(|s| !s.is_empty());
+                                    ids.sort();
+                                    ids.dedup();
+                                    ids
+                                })
+                                .unwrap_or_default();
 
                             tokio::spawn(async move {
-                                if let Ok(res) = service.get_ext_captions(&subject_id, &rid).await {
+                                if let Ok(res) = service
+                                    .get_ext_captions(&subject_id, &rid, &sibling_ids)
+                                    .await
+                                {
                                     if pref.is_none() {
                                         sender.send(Action::ShowDownloadSubtitlePopup(res)).ok();
                                     } else if let Some(pref_lang) = pref.flatten() {

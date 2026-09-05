@@ -434,6 +434,7 @@ impl DhakaFlixClient {
                                         headers: vec![],
                                         direct_file: true,
                                     }],
+                                    resource_id: None,
                                 });
                             }
                         }

@@ -209,6 +209,7 @@ pub fn parse_releases(
             episode: parsed_episode.map(|value| value.1),
             filename: filename.clone(),
             mirrors: Vec::new(),
+            resource_id: None,
         });
         for mirror in mirrors {
             if !release

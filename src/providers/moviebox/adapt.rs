@@ -4,23 +4,50 @@ use crate::providers::models::{
 };
 use base64::Engine;
 pub fn captions_json_to_options(payload: &serde_json::Value) -> Vec<SubtitleOption> {
-    let Some(captions) = payload.get("extCaptions").and_then(|c| c.as_array()) else {
+    let Some(captions) = payload
+        .get("extCaptions")
+        .or_else(|| payload.get("data").and_then(|d| d.get("extCaptions")))
+        .and_then(|c| c.as_array())
+    else {
         return Vec::new();
     };
+    let mut seen_urls = std::collections::HashSet::new();
     captions
         .iter()
         .filter_map(|cap| {
             let url = cap.get("url").and_then(|u| u.as_str())?;
-            if url.is_empty() {
+            if url.is_empty() || url.contains("aa348f2541d13ffe") {
                 return None;
             }
-            let name = cap
+            let size = cap
+                .get("size")
+                .and_then(|s| {
+                    if let Some(n) = s.as_u64() {
+                        Some(n)
+                    } else if let Some(n) = s.as_i64() {
+                        Some(n as u64)
+                    } else {
+                        s.as_str().and_then(|str_val| str_val.parse::<u64>().ok())
+                    }
+                })
+                .unwrap_or(0);
+            if size > 0 && size <= 50 {
+                return None;
+            }
+            let raw_name = cap
                 .get("lanName")
                 .and_then(|n| n.as_str())
-                .unwrap_or("Unknown")
-                .to_string();
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| cap.get("lan").and_then(|l| l.as_str()))
+                .unwrap_or("Unknown");
+            if raw_name.eq_ignore_ascii_case("in") && (size == 0 || size <= 100) {
+                return None;
+            }
+            if !seen_urls.insert(url.to_string()) {
+                return None;
+            }
             Some(SubtitleOption {
-                name,
+                name: raw_name.to_string(),
                 url: url.to_string(),
             })
         })
@@ -477,6 +504,18 @@ pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
             v.as_str().and_then(|s| s.parse().ok())
         }
     });
+    let resource_id = item
+        .get("resourceId")
+        .or_else(|| item.get("id"))
+        .and_then(|v| {
+            if let Some(num) = v.as_i64() {
+                Some(num.to_string())
+            } else if let Some(num) = v.as_u64() {
+                Some(num.to_string())
+            } else {
+                v.as_str().map(|s| s.to_string())
+            }
+        });
 
     let mut mirrors = Vec::new();
     let resource_link = item
@@ -511,6 +550,7 @@ pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
         season,
         episode,
         mirrors,
+        resource_id,
     }
 }
 
@@ -593,6 +633,15 @@ pub fn moviebox_play_info_json_to_releases(
     let mut releases = Vec::new();
 
     for stream in streams {
+        let stream_id = stream.get("id").and_then(|v| {
+            if let Some(n) = v.as_i64() {
+                Some(n.to_string())
+            } else if let Some(n) = v.as_u64() {
+                Some(n.to_string())
+            } else {
+                v.as_str().map(|s| s.to_string())
+            }
+        });
         let format_type = stream
             .get("format")
             .and_then(|f| f.as_str())
@@ -702,6 +751,7 @@ pub fn moviebox_play_info_json_to_releases(
             season: if season > 0 { Some(season) } else { None },
             episode: if episode > 0 { Some(episode) } else { None },
             mirrors: vec![mirror],
+            resource_id: stream_id,
         });
     }
 
@@ -1096,5 +1146,133 @@ mod tests {
             releases[0].direct_url(),
             Some("https://cdn.example.com/legitimate_movie.mp4")
         );
+    }
+
+    #[test]
+    fn test_captions_json_to_options_wrapper_and_language_fallback() {
+        let wrapped_payload = json!({
+            "code": 0,
+            "data": {
+                "extCaptions": [
+                    {
+                        "id": "1",
+                        "lan": "en",
+                        "lanName": "English",
+                        "size": "1000",
+                        "url": "https://example.com/en.srt"
+                    },
+                    {
+                        "id": "2",
+                        "lan": "es",
+                        "lanName": "",
+                        "size": "1200",
+                        "url": "https://example.com/es.srt"
+                    },
+                    {
+                        "id": "3",
+                        "lan": "",
+                        "lanName": "",
+                        "url": ""
+                    },
+                    {
+                        "id": "4",
+                        "lan": "en",
+                        "lanName": "IN",
+                        "size": "34",
+                        "url": "https://pacdn.aoneroom.com/other/2024/09/18/aa348f2541d13ffe1a8ea6f9e14f3ed5.srt"
+                    }
+                ]
+            }
+        });
+
+        let options = captions_json_to_options(&wrapped_payload);
+        assert_eq!(options.len(), 2);
+        assert_eq!(options[0].name, "English");
+        assert_eq!(options[0].url, "https://example.com/en.srt");
+        assert_eq!(options[1].name, "es");
+        assert_eq!(options[1].url, "https://example.com/es.srt");
+
+        let unwrapped_payload = json!({
+            "extCaptions": [
+                {
+                    "id": "10",
+                    "lan": "fr",
+                    "lanName": "French",
+                    "size": "500",
+                    "url": "https://example.com/fr.srt"
+                },
+                {
+                    "id": "11",
+                    "lan": "fr",
+                    "lanName": "French Duplicate",
+                    "size": "500",
+                    "url": "https://example.com/fr.srt"
+                }
+            ]
+        });
+        let unwrapped_options = captions_json_to_options(&unwrapped_payload);
+        assert_eq!(unwrapped_options.len(), 1);
+        assert_eq!(unwrapped_options[0].name, "French");
+    }
+
+    #[test]
+    fn test_moviebox_play_info_preserves_numeric_and_string_resource_id() {
+        let payload = json!({
+            "code": 0,
+            "data": {
+                "title": "Movie Title",
+                "streams": [
+                    {
+                        "id": 167282974499786072_i64,
+                        "format": "MP4",
+                        "codecName": "hevc",
+                        "resolutions": "1080",
+                        "url": "https://cdn.example.com/stream1.mp4",
+                        "signCookie": ""
+                    },
+                    {
+                        "id": "9026715103487476952",
+                        "format": "MP4",
+                        "codecName": "h264",
+                        "resolutions": "720",
+                        "url": "https://cdn.example.com/stream2.mp4",
+                        "signCookie": ""
+                    }
+                ]
+            }
+        });
+
+        let releases = moviebox_play_info_json_to_releases(&payload, 0, 0, "TestAgent/1.0");
+        assert_eq!(releases.len(), 2);
+        assert_eq!(
+            releases[0].resource_id.as_deref(),
+            Some("167282974499786072")
+        );
+        assert_eq!(
+            releases[1].resource_id.as_deref(),
+            Some("9026715103487476952")
+        );
+    }
+
+    #[test]
+    fn test_moviebox_resource_item_preserves_resource_id() {
+        let item_numeric = json!({
+            "resourceId": 6065869889208832296_i64,
+            "title": "Test Release",
+            "url": "https://example.com/file.mkv"
+        });
+        let release_numeric = moviebox_resource_item_to_release(&item_numeric);
+        assert_eq!(
+            release_numeric.resource_id.as_deref(),
+            Some("6065869889208832296")
+        );
+
+        let item_str = json!({
+            "id": "1234567890",
+            "title": "Test Release 2",
+            "url": "https://example.com/file2.mkv"
+        });
+        let release_str = moviebox_resource_item_to_release(&item_str);
+        assert_eq!(release_str.resource_id.as_deref(), Some("1234567890"));
     }
 }

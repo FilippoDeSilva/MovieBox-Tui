@@ -536,6 +536,7 @@ impl App {
         self.draw_settings_modal(frame, area);
         self.draw_theme_picker(frame, area);
         self.draw_player_picker(frame, area);
+        self.draw_subtitle_picker(frame, area);
         self.draw_update_modal(frame, area);
         self.draw_updating_modal(frame, area);
         crate::tui::overlay::notifications(
@@ -760,6 +761,40 @@ impl App {
                     title: "Default Media Player",
                     confirm_label: "Select",
                     minimum_width: 24,
+                },
+                &self.theme,
+                self.state.basic_terminal,
+            );
+        }
+    }
+    fn draw_subtitle_picker(&mut self, frame: &mut Frame, area: Rect) {
+        if self.state.subtitle_popup || self.state.is_download_subtitle_popup {
+            let items = self
+                .state
+                .subtitle_list
+                .iter()
+                .map(|(name, _)| {
+                    if name == "None" {
+                        "No subtitles".to_string()
+                    } else {
+                        crate::tui::text::sanitize_language_label(name)
+                    }
+                })
+                .collect::<Vec<_>>();
+            let confirm_label = if self.state.is_download_subtitle_popup {
+                "Download"
+            } else {
+                "Use"
+            };
+            crate::tui::overlay::picker(
+                frame,
+                area,
+                &items,
+                &mut self.state.subtitle_list_state,
+                crate::tui::overlay::PickerSpec {
+                    title: "Subtitles",
+                    confirm_label,
+                    minimum_width: 32,
                 },
                 &self.theme,
                 self.state.basic_terminal,
