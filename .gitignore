@@ -19,3 +19,6 @@ Thumbs.db
 debug_*.json
 *.log
 dist/
+book/
+docs/changelog.md
+docs/contributing.md

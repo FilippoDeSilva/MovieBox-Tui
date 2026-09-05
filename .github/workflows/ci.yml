@@ -48,6 +48,14 @@ jobs:
       - run: cargo audit
       - name: Verify package
         run: cargo package --locked
+      - name: Verify documentation build
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook
+      - name: Test mdBook build
+        run: |
+          cp CHANGELOG.md docs/changelog.md && cp CONTRIBUTING.md docs/contributing.md
+          mdbook build
 
   build-and-test:
     name: Build and test (${{ matrix.os }})

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Native mdBook & GitHub Pages Documentation Architecture**:
+  - Integrated `mdBook` documentation engine reading directly from canonical `docs/*.md` guides with zero duplicated markdown files and zero third-party web frameworks.
+  - Added `docs/SUMMARY.md` defining table-of-contents chapter navigation across all guides, architecture diagrams, and operational workflows.
+  - Added `docs/installation.md` detailing complete installation instructions for macOS (curl script and Homebrew tap), Linux, Windows (PowerShell), Android (Termux), Cargo, and source builds.
+  - Formatted `docs/README.md` as the book's introductory landing page featuring core capabilities, prerequisites player matrix, and the live terminal demonstration video streamed from the GitHub CDN.
+  - Added minimal root `book.toml` with `navy` dark theme, collapsible sidebar navigation, and client-side full-text search.
+  - Added automated GitHub Actions deployment workflow (`.github/workflows/pages.yml`) publishing the documentation site to GitHub Pages on every push to `main`.
+  - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
+
 ## [0.1.16] - 2026-09-05
 
 ### Added

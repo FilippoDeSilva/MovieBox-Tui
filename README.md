@@ -99,7 +99,7 @@ moviebox-tui
 
 ## Documentation
 
-Comprehensive guides are available in the [`docs/`](docs/) directory:
+Comprehensive guides are available online at [**mesamirh.github.io/MovieBox-Tui**](https://mesamirh.github.io/MovieBox-Tui/) or locally in the [`docs/`](docs/) directory:
 
 - [Controls & Shortcuts](docs/controls.md) — Complete keybindings, navigation, and slash commands
 - [Media Players](docs/players.md) — Player options, custom paths, and launch flags

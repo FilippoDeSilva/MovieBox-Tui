@@ -10,6 +10,8 @@ exclude = [
     "install.ps1",
     "CONTRIBUTING.md",
     ".gitignore",
+    "book.toml",
+    "book/",
 ]
 version = "0.1.16"
 edition = "2024"
