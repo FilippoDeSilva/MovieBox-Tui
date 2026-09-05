@@ -67,7 +67,7 @@ Adding a new streaming or BDIX provider to MovieBox TUI takes 3 simple steps:
 - Multi-resolution DASH manifests (`index.mpd`) and adaptive streams are labeled with a distinct
   `[Multi]` badge, stripping confusing raw CDN resolution tags from release titles.
 - Title normalization lives in `moviebox/title.rs` (`clean_moviebox_title`).
-
+- **DASH Manifest Playback & Downloads**: Media streams are hosted on CloudFront as segmented MPEG-DASH manifests (`index.mpd`) protected by signed policy cookies. Stream playback forwards `Cookie`, `Referer`, and `User-Agent` headers to external players (`mpv`, `IINA`). Local downloads utilize `yt-dlp` with forwarded authentication headers to demux and assemble audio/video streams into `.mp4`.
 ## 4KHDHub
 
 - `client.rs::resolve_release` resolves release mirrors concurrently using bounded-concurrency probing (`select_ok` in batches of 3) with a 3.5s per-probe timeout.

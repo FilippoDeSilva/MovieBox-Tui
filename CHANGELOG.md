@@ -18,6 +18,13 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **MovieBox DASH Stream Download Engine & Header Authentication**:
+  - Forwarded mirror authentication headers (`Cookie` containing CloudFront signed policy and `Referer`) through `Action::StartDownload` and `start_resilient_download`, eliminating `HTTP 403 Forbidden` errors on MovieBox CDN downloads.
+  - Added dedicated MPEG-DASH stream engine utilizing `yt-dlp` to assemble multi-track audio/video manifests (`index.mpd`) into `.mp4`, maintaining full feature parity with progressive single-file downloads.
+  - Integrated real-time child process progress parsing (`parse_ytdlp_progress`), reporting live percentage, speed, and ETA metrics to the TUI status bar.
+  - Implemented dynamic, OS-tailored installation guidance for `yt-dlp` and `ffmpeg` when missing from the host system (Homebrew on macOS, package managers on Linux, WinGet on Windows, and Termux `pkg install yt-dlp ffmpeg` on Android).
+  - Hardened Windows background process spawning with `CREATE_NO_WINDOW` and added cross-platform path resolution fallbacks for macOS Homebrew, Nix, and Termux environments.
+  - Preserved external subtitle sidecar retrieval alongside DASH video downloads, maintaining clean `<base_dir>/Movies/<Title>/` and `<base_dir>/Series/<Title>/Season <N>/` directory hierarchy.
 - **Series Season Default & Episode List Rendering Normalization**:
   - Initialized unselected series search results with `season: 0`, preventing catalog season counts from masquerading as watch history progress and erroneously defaulting multi-season shows (e.g. *Breaking Bad*) to their final season on initial selection.
   - Guarded history pre-seeding in search submission strictly to `/history` queries and active continue-watching items, ensuring search results always open at Season 1 Episode 1 for new series while resuming at the user's progress for previously watched shows.

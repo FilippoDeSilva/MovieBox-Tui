@@ -11,6 +11,7 @@ impl App {
         &mut self,
         subtitle_url: Option<String>,
         link: Option<String>,
+        headers: Vec<(String, String)>,
     ) {
         if self.state.download_progress.is_some() || self.state.active_screen != Screen::Details {
             return;
@@ -48,22 +49,7 @@ impl App {
             || !self.state.available_seasons.is_empty();
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
-        let safe_title = clean_title
-            .chars()
-            .map(|c| {
-                if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
-                    c
-                } else {
-                    ' '
-                }
-            })
-            .collect::<String>();
-        let safe_title = safe_title.split_whitespace().collect::<Vec<_>>().join(" ");
-        let safe_title = if safe_title.is_empty() {
-            crate::download::DEFAULT_STREAM_NAME.to_string()
-        } else {
-            safe_title
-        };
+        let safe_title = crate::download::safe_file_stem(&clean_title);
 
         let extension = link
             .split('?')
@@ -123,10 +109,29 @@ impl App {
         let cancel = self.state.cancel_download.clone();
         let sender = self.action_sender.clone();
         let user_agent = self.service.client.user_agent().to_string();
-        let client = crate::net::http_client_builder()
+
+        let mut client_builder = crate::net::http_client_builder()
             .connect_timeout(std::time::Duration::from_secs(15))
-            .tcp_keepalive(std::time::Duration::from_secs(30))
-            .user_agent(user_agent)
+            .tcp_keepalive(std::time::Duration::from_secs(30));
+
+        let mut has_custom_ua = false;
+        let mut header_map = reqwest::header::HeaderMap::new();
+        for (k, v) in &headers {
+            if k.eq_ignore_ascii_case("user-agent") {
+                has_custom_ua = true;
+                client_builder = client_builder.user_agent(v);
+            } else if let (Ok(name), Ok(val)) = (
+                reqwest::header::HeaderName::from_bytes(k.as_bytes()),
+                reqwest::header::HeaderValue::from_str(v),
+            ) {
+                header_map.insert(name, val);
+            }
+        }
+        if !has_custom_ua {
+            client_builder = client_builder.user_agent(user_agent);
+        }
+        let client = client_builder
+            .default_headers(header_map)
             .build()
             .unwrap_or_else(|err| {
                 log::warn!(
@@ -134,6 +139,8 @@ impl App {
                 );
                 self.service.http_client().clone()
             });
+
+        let is_dash = link.ends_with(".mpd") || link.contains("/dash/");
 
         tokio::spawn(async move {
             if let Err(error) = tokio::fs::create_dir_all(&target_dir).await {
@@ -217,63 +224,206 @@ impl App {
                 }
             }
 
-            let progress_sender = sender.clone();
-            let result =
-                crate::download::download(&client, &link, &destination, cancel, move |progress| {
-                    let total = progress.total.unwrap_or_default();
-                    let percentage = if total > 0 {
-                        progress.downloaded as f64 / total as f64 * 100.0
-                    } else {
-                        0.0
-                    };
-                    let speed = progress.bytes_per_second / 1024.0 / 1024.0;
-                    let eta = if total > progress.downloaded && progress.bytes_per_second > 0.0 {
-                        (total - progress.downloaded) as f64 / progress.bytes_per_second
-                    } else {
-                        0.0
-                    };
-                    let status = if total > 0 {
-                        format!(
-                            "{:.1}/{:.1} MB | {:.1} MB/s | ETA {:.0}s | {}x | attempt {}",
-                            progress.downloaded as f64 / 1024.0 / 1024.0,
-                            total as f64 / 1024.0 / 1024.0,
-                            speed,
-                            eta,
-                            progress.workers,
-                            progress.attempt
-                        )
-                    } else {
-                        format!(
-                            "{:.1} MB | {:.1} MB/s | {}x | attempt {}",
-                            progress.downloaded as f64 / 1024.0 / 1024.0,
-                            speed,
-                            progress.workers,
-                            progress.attempt
-                        )
-                    };
-                    progress_sender
-                        .send(Action::UpdateDownload(Some(percentage), Some(status)))
+            if is_dash {
+                let Some(ytdlp_bin) = crate::player::find_in_path("yt-dlp") else {
+                    sender
+                        .send(Action::DownloadFailed(yt_dlp_missing_guidance()))
                         .ok();
-                })
+                    return;
+                };
+
+                let mut cmd = tokio::process::Command::new(ytdlp_bin);
+                for (k, v) in &headers {
+                    if k.eq_ignore_ascii_case("user-agent") {
+                        cmd.arg("--user-agent").arg(v);
+                    } else {
+                        cmd.arg("--add-header").arg(format!("{k}: {v}"));
+                    }
+                }
+                cmd.arg("-f")
+                    .arg("bestvideo+bestaudio/best")
+                    .arg("--newline")
+                    .arg("--part")
+                    .arg("-o")
+                    .arg(&destination)
+                    .arg("--force-overwrites")
+                    .arg(&link);
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.creation_flags(0x08000000);
+                }
+
+                cmd.stdout(std::process::Stdio::piped());
+                cmd.stderr(std::process::Stdio::piped());
+
+                let mut child = match cmd.spawn() {
+                    Ok(child) => child,
+                    Err(err) => {
+                        sender
+                            .send(Action::DownloadFailed(format!(
+                                "Failed to start yt-dlp: {err}"
+                            )))
+                            .ok();
+                        return;
+                    }
+                };
+
+                if let Some(stderr) = child.stderr.take() {
+                    tokio::spawn(async move {
+                        use tokio::io::AsyncBufReadExt;
+                        let mut reader = tokio::io::BufReader::new(stderr).lines();
+                        while let Ok(Some(line)) = reader.next_line().await {
+                            log::debug!("yt-dlp stderr: {line}");
+                        }
+                    });
+                }
+
+                if let Some(stdout) = child.stdout.take() {
+                    use tokio::io::AsyncBufReadExt;
+                    let mut reader = tokio::io::BufReader::new(stdout).lines();
+                    loop {
+                        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                            let _ = child.kill().await;
+                            sender
+                                .send(Action::DownloadPaused(
+                                    destination.to_string_lossy().into_owned(),
+                                ))
+                                .ok();
+                            return;
+                        }
+                        tokio::select! {
+                            _ = tokio::time::sleep(std::time::Duration::from_millis(250)) => {
+                                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                                    let _ = child.kill().await;
+                                    sender
+                                        .send(Action::DownloadPaused(
+                                            destination.to_string_lossy().into_owned(),
+                                        ))
+                                        .ok();
+                                    return;
+                                }
+                            }
+                            line_res = reader.next_line() => {
+                                match line_res {
+                                    Ok(Some(line)) => {
+                                        if let Some((pct, status)) = parse_ytdlp_progress(&line) {
+                                            sender
+                                                .send(Action::UpdateDownload(Some(pct), Some(status)))
+                                                .ok();
+                                        } else if line.contains("[Merger]") {
+                                            sender
+                                                .send(Action::UpdateDownload(
+                                                    Some(99.0),
+                                                    Some("Merging audio and video...".to_string()),
+                                                ))
+                                                .ok();
+                                        }
+                                    }
+                                    Ok(None) => break,
+                                    Err(_) => break,
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let status = child.wait().await;
+                match status {
+                    Ok(s) if s.success() => {
+                        sender
+                            .send(Action::DownloadCompleted(
+                                destination.to_string_lossy().into_owned(),
+                            ))
+                            .ok();
+                    }
+                    Ok(s) => {
+                        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                            sender
+                                .send(Action::DownloadPaused(
+                                    destination.to_string_lossy().into_owned(),
+                                ))
+                                .ok();
+                        } else {
+                            sender
+                                .send(Action::DownloadFailed(format!(
+                                    "yt-dlp exited with status {s}"
+                                )))
+                                .ok();
+                        }
+                    }
+                    Err(err) => {
+                        sender
+                            .send(Action::DownloadFailed(format!(
+                                "Failed to wait for yt-dlp: {err}"
+                            )))
+                            .ok();
+                    }
+                }
+            } else {
+                let progress_sender = sender.clone();
+                let result = crate::download::download(
+                    &client,
+                    &link,
+                    &destination,
+                    cancel,
+                    move |progress| {
+                        let total = progress.total.unwrap_or_default();
+                        let percentage = if total > 0 {
+                            progress.downloaded as f64 / total as f64 * 100.0
+                        } else {
+                            0.0
+                        };
+                        let speed = progress.bytes_per_second / 1024.0 / 1024.0;
+                        let eta = if total > progress.downloaded && progress.bytes_per_second > 0.0
+                        {
+                            (total - progress.downloaded) as f64 / progress.bytes_per_second
+                        } else {
+                            0.0
+                        };
+                        let status = if total > 0 {
+                            format!(
+                                "{:.1}/{:.1} MB | {:.1} MB/s | ETA {:.0}s | {}x | attempt {}",
+                                progress.downloaded as f64 / 1024.0 / 1024.0,
+                                total as f64 / 1024.0 / 1024.0,
+                                speed,
+                                eta,
+                                progress.workers,
+                                progress.attempt
+                            )
+                        } else {
+                            format!(
+                                "{:.1} MB | {:.1} MB/s | {}x | attempt {}",
+                                progress.downloaded as f64 / 1024.0 / 1024.0,
+                                speed,
+                                progress.workers,
+                                progress.attempt
+                            )
+                        };
+                        progress_sender
+                            .send(Action::UpdateDownload(Some(percentage), Some(status)))
+                            .ok();
+                    },
+                )
                 .await;
 
-            match result {
-                Ok(crate::download::DownloadOutcome::Completed { .. }) => {
-                    sender
-                        .send(Action::DownloadCompleted(
-                            destination.to_string_lossy().into_owned(),
-                        ))
-                        .ok();
-                }
-                Ok(crate::download::DownloadOutcome::Paused { .. }) => {
-                    sender
-                        .send(Action::DownloadPaused(
-                            destination.to_string_lossy().into_owned(),
-                        ))
-                        .ok();
-                }
-                Err(error) => {
-                    sender.send(Action::DownloadFailed(error.to_string())).ok();
+                match result {
+                    Ok(crate::download::DownloadOutcome::Completed { .. }) => {
+                        sender
+                            .send(Action::DownloadCompleted(
+                                destination.to_string_lossy().into_owned(),
+                            ))
+                            .ok();
+                    }
+                    Ok(crate::download::DownloadOutcome::Paused { .. }) => {
+                        sender
+                            .send(Action::DownloadPaused(
+                                destination.to_string_lossy().into_owned(),
+                            ))
+                            .ok();
+                    }
+                    Err(error) => {
+                        sender.send(Action::DownloadFailed(error.to_string())).ok();
+                    }
                 }
             }
         });
@@ -320,6 +470,7 @@ impl App {
                                 .send(Action::StartDownload(
                                     subtitle_url,
                                     Some(first_mirror.resolver_url.clone()),
+                                    first_mirror.headers.clone(),
                                 ))
                                 .ok();
                             return None;
@@ -347,7 +498,11 @@ impl App {
                             match result {
                                 Ok(Ok(source)) => {
                                     sender
-                                        .send(Action::StartDownload(subtitle_url, Some(source.url)))
+                                        .send(Action::StartDownload(
+                                            subtitle_url,
+                                            Some(source.url),
+                                            source.headers,
+                                        ))
                                         .ok();
                                 }
                                 Ok(Err(error)) => {
@@ -368,22 +523,26 @@ impl App {
                         });
                     } else {
                         self.action_sender
-                            .send(Action::StartDownload(subtitle_url, None))
+                            .send(Action::StartDownload(subtitle_url, None, Vec::new()))
                             .ok();
                     }
                 } else {
+                    let release = self.get_selected_release();
+                    let link = self.get_selected_link();
+                    let headers = release
+                        .as_ref()
+                        .and_then(|r| r.mirrors.first())
+                        .map(|m| m.headers.clone())
+                        .unwrap_or_default();
                     self.action_sender
-                        .send(Action::StartDownload(
-                            subtitle_url,
-                            self.get_selected_link(),
-                        ))
+                        .send(Action::StartDownload(subtitle_url, link, headers))
                         .ok();
                 }
                 return None;
             }
-            Action::StartDownload(subtitle_url, link) => {
+            Action::StartDownload(subtitle_url, link, headers) => {
                 self.state.is_resolving_playback = false;
-                self.start_resilient_download(subtitle_url, link);
+                self.start_resilient_download(subtitle_url, link, headers);
                 return None;
             }
             Action::PromptDownloadEpisode => {
@@ -482,22 +641,7 @@ impl App {
                         .map(|details| details.title.as_str())
                         .unwrap_or(crate::download::DEFAULT_STREAM_NAME);
                     let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
-                    let safe_title = clean_title
-                        .chars()
-                        .map(|c| {
-                            if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
-                                c
-                            } else {
-                                ' '
-                            }
-                        })
-                        .collect::<String>();
-                    let safe_title = safe_title.split_whitespace().collect::<Vec<_>>().join(" ");
-                    let safe_title = if safe_title.is_empty() {
-                        crate::download::DEFAULT_STREAM_NAME.to_string()
-                    } else {
-                        safe_title
-                    };
+                    let safe_title = crate::download::safe_file_stem(&clean_title);
 
                     let base_dir = self.resolve_download_base_dir();
                     let target_dir = base_dir
@@ -749,6 +893,37 @@ fn is_media_already_downloaded(target_dir: &std::path::Path, base_name: &str) ->
     }
     false
 }
+pub(crate) fn yt_dlp_missing_guidance() -> String {
+    if crate::updater::artifact::is_termux_environment() {
+        "MovieBox DASH streams require yt-dlp. Please install yt-dlp and ffmpeg on your device (e.g. 'pkg install yt-dlp ffmpeg') to download these streams.".to_string()
+    } else if cfg!(target_os = "macos") {
+        "MovieBox DASH streams require yt-dlp. Please install yt-dlp and ffmpeg on your Mac (e.g. 'brew install yt-dlp ffmpeg') to download these streams.".to_string()
+    } else if cfg!(target_os = "windows") {
+        "MovieBox DASH streams require yt-dlp. Please install yt-dlp and ffmpeg on your system (e.g. 'winget install yt-dlp Gyan.FFmpeg') to download these streams.".to_string()
+    } else if cfg!(target_os = "linux") {
+        "MovieBox DASH streams require yt-dlp. Please install yt-dlp and ffmpeg via your system package manager to download these streams.".to_string()
+    } else {
+        "MovieBox DASH streams require yt-dlp. Please install yt-dlp and ffmpeg on your system to download these streams.".to_string()
+    }
+}
+
+pub(crate) fn parse_ytdlp_progress(line: &str) -> Option<(f64, String)> {
+    if !line.contains("[download]") {
+        return None;
+    }
+    let trimmed = line.split("[download]").nth(1)?.trim();
+    let mut percentage = None;
+    for part in trimmed.split_whitespace() {
+        if let Some(num_str) = part.strip_suffix('%') {
+            if let Ok(pct) = num_str.parse::<f64>() {
+                percentage = Some(pct);
+                break;
+            }
+        }
+    }
+    let pct = percentage?;
+    Some((pct, trimmed.to_string()))
+}
 
 #[cfg(test)]
 mod tests {
@@ -817,5 +992,130 @@ mod tests {
             notif.message,
             "No downloadable mirrors were found for this release."
         );
+    }
+    #[test]
+    fn test_parse_ytdlp_progress_variants() {
+        let line1 = "[download]   0.0% of ~   5.19MiB at      0.00B/s ETA Unknown (frag 0/1676)";
+        let res1 = super::parse_ytdlp_progress(line1);
+        assert!(res1.is_some());
+        let (pct1, status1) = res1.unwrap();
+        assert!((pct1 - 0.0).abs() < f64::EPSILON);
+        assert!(status1.contains("5.19MiB"));
+
+        let line2 = "[download]  45.2% of ~ 1.45GiB at 12.3MiB/s ETA 00:45 (frag 500/1676)";
+        let res2 = super::parse_ytdlp_progress(line2);
+        assert!(res2.is_some());
+        let (pct2, status2) = res2.unwrap();
+        assert!((pct2 - 45.2).abs() < f64::EPSILON);
+        assert!(status2.contains("12.3MiB/s"));
+
+        let line3 = "[download] 100% of 1.45GiB in 02:15";
+        let res3 = super::parse_ytdlp_progress(line3);
+        assert!(res3.is_some());
+        let (pct3, _) = res3.unwrap();
+        assert!((pct3 - 100.0).abs() < f64::EPSILON);
+
+        let line_non = "[generic] Extracting URL: https://example.com/index.mpd";
+        assert!(super::parse_ytdlp_progress(line_non).is_none());
+
+        let line_dest = "[download] Destination: /tmp/test.mp4";
+        assert!(super::parse_ytdlp_progress(line_dest).is_none());
+    }
+
+    #[test]
+    fn test_yt_dlp_missing_guidance_contains_platform_hint() {
+        let guidance = super::yt_dlp_missing_guidance();
+        assert!(guidance.contains("MovieBox DASH streams require yt-dlp"));
+        assert!(guidance.contains("install yt-dlp and ffmpeg"));
+    }
+
+    #[tokio::test]
+    async fn test_download_stream_forwards_mirror_headers() {
+        let mut app = App::new();
+        app.state.active_provider = ProviderKind::MovieBox;
+        app.state.active_screen = Screen::Details;
+        app.state.selected_resources = vec![Release {
+            provider: ProviderKind::MovieBox,
+            filename: "Movie.mp4".to_string(),
+            quality: Some("1080p".to_string()),
+            codec: Some("hevc".to_string()),
+            language: None,
+            size_bytes: Some(1024),
+            season: None,
+            episode: None,
+            mirrors: vec![SourceMirror {
+                label: "H.265".to_string(),
+                resolver_url: "https://example.com/dash/123/index.mpd".to_string(),
+                headers: vec![
+                    ("Cookie".to_string(), "CloudFront-Policy=xyz".to_string()),
+                    ("Referer".to_string(), "https://sportslive.wine".to_string()),
+                ],
+                direct_file: true,
+            }],
+            resource_id: Some("12345".to_string()),
+        }];
+        app.state.resource_list_state.select(Some(0));
+
+        app.handle_download(Action::DownloadStream(None)).await;
+
+        let dispatched = app.action_receiver.try_recv().expect("action dispatched");
+        match dispatched {
+            Action::StartDownload(_, link, headers) => {
+                assert_eq!(
+                    link.as_deref(),
+                    Some("https://example.com/dash/123/index.mpd")
+                );
+                assert_eq!(headers.len(), 2);
+                assert_eq!(headers[0].0, "Cookie");
+                assert_eq!(headers[0].1, "CloudFront-Policy=xyz");
+                assert_eq!(headers[1].0, "Referer");
+                assert_eq!(headers[1].1, "https://sportslive.wine");
+            }
+            other => panic!("expected StartDownload, got {:?}", other),
+        }
+    }
+    #[test]
+    fn test_download_directory_and_filename_conventions() {
+        let base_dir = std::path::PathBuf::from("/tmp/MovieBox-TUI");
+
+        let movie_title = "Ek Deewane Ki Deewaniyat";
+        let movie_target = base_dir.join("Movies").join(movie_title);
+        let movie_file = movie_target.join(format!("{movie_title}.mp4"));
+        let movie_sub = movie_target.join(format!("{movie_title}.en.srt"));
+
+        let expected_movie_file = base_dir
+            .join("Movies")
+            .join(movie_title)
+            .join(format!("{movie_title}.mp4"));
+        let expected_movie_sub = base_dir
+            .join("Movies")
+            .join(movie_title)
+            .join(format!("{movie_title}.en.srt"));
+        assert_eq!(movie_file, expected_movie_file);
+        assert_eq!(movie_sub, expected_movie_sub);
+
+        let series_title = "Breaking Bad";
+        let season: usize = 1;
+        let episode: usize = 1;
+        let series_target = base_dir
+            .join("Series")
+            .join(series_title)
+            .join(format!("Season {season}"));
+        let base_name = format!("{series_title} - S{season:02}E{episode:02}");
+        let series_file = series_target.join(format!("{base_name}.mp4"));
+        let series_sub = series_target.join(format!("{base_name}.en.srt"));
+
+        let expected_series_file = base_dir
+            .join("Series")
+            .join(series_title)
+            .join(format!("Season {season}"))
+            .join(format!("{base_name}.mp4"));
+        let expected_series_sub = base_dir
+            .join("Series")
+            .join(series_title)
+            .join(format!("Season {season}"))
+            .join(format!("{base_name}.en.srt"));
+        assert_eq!(series_file, expected_series_file);
+        assert_eq!(series_sub, expected_series_sub);
     }
 }

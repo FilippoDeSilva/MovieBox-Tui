@@ -1170,7 +1170,7 @@ fn configured_executable(variable: &str) -> Option<String> {
     }
 }
 
-fn find_in_path(name: &str) -> Option<String> {
+pub(crate) fn find_in_path(name: &str) -> Option<String> {
     if std::path::Path::new(name).is_file() {
         return Some(name.to_string());
     }
@@ -1200,6 +1200,39 @@ fn find_in_path(name: &str) -> Option<String> {
         ] {
             if let Some(raw_path) = query_windows_registry_value(reg_key, Some(reg_val)) {
                 paths_to_search.extend(std::env::split_paths(&raw_path));
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let standard_unix_dirs = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/run/current-system/sw/bin",
+            "/data/data/com.termux/files/usr/bin",
+        ];
+        for d in standard_unix_dirs {
+            let p = std::path::PathBuf::from(d);
+            if !paths_to_search.contains(&p) {
+                paths_to_search.push(p);
+            }
+        }
+        if let Ok(prefix) = std::env::var("PREFIX") {
+            let p = std::path::PathBuf::from(format!("{prefix}/bin"));
+            if !paths_to_search.contains(&p) {
+                paths_to_search.push(p);
+            }
+        }
+        if let Some(home) = dirs::home_dir() {
+            let local_bin = home.join(".local/bin");
+            if !paths_to_search.contains(&local_bin) {
+                paths_to_search.push(local_bin);
+            }
+            let nix_bin = home.join(".nix-profile/bin");
+            if !paths_to_search.contains(&nix_bin) {
+                paths_to_search.push(nix_bin);
             }
         }
     }

@@ -17,7 +17,20 @@ and optional segmentation. Orchestration lives in `app/download.rs`.
   partial file for a later resume.
 - **User-Agent**: the download HTTP client inherits the active provider's mobile `User-Agent`
   to prevent CDN stream rejections when downloading media segments.
+- **Stream Engines**:
+  - **Progressive Streams** (CircleFTP, DhakaFlix, 4KHDHub, Addons): Handled directly by the native Rust multi-segment range downloader, splitting files into parallel chunks with `.part` state tracking.
+  - **MPEG-DASH Streams** (MovieBox): Multi-track segmented audio/video streams (`index.mpd`) requiring CloudFront cookie authentication. Downloaded via `yt-dlp` with automatic authentication header forwarding (`Cookie`, `Referer`, `User-Agent`), real-time progress parsing, and track multiplexing into `.mp4`.
 
+## External Tool Prerequisites
+
+Downloading from **MovieBox** requires `yt-dlp` and `ffmpeg` on the host system to demux and merge MPEG-DASH audio and video streams:
+
+- **macOS**: Install via Homebrew: `brew install yt-dlp ffmpeg`
+- **Linux**: Install via your system package manager (e.g. `sudo apt install yt-dlp ffmpeg`, `sudo pacman -S yt-dlp ffmpeg`)
+- **Windows**: Install via WinGet or Scoop: `winget install yt-dlp Gyan.FFmpeg`
+- **Android / Termux**: Install via Termux package manager: `pkg install yt-dlp ffmpeg`
+
+If a MovieBox download is initiated without `yt-dlp` installed, MovieBox-TUI prevents execution and displays an OS-tailored notification with installation guidance. Progressive streams from other providers (CircleFTP, DhakaFlix, 4KHDHub, Addons) do not require `yt-dlp` or `ffmpeg`.
 ## File names and directories
 
 `safe_file_stem` sanitizes titles for all platforms: control/whitespace/illegal

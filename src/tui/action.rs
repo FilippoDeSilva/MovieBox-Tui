@@ -85,7 +85,7 @@ pub enum Action {
     SelectAddonCatalog(crate::providers::addons::models::AddonCatalogTarget),
     LaunchMpv(String, Option<String>),
     DownloadStream(Option<String>),
-    StartDownload(Option<String>, Option<String>),
+    StartDownload(Option<String>, Option<String>, Vec<(String, String)>),
     UpdateDownload(Option<f64>, Option<String>),
     DownloadCompleted(String),
     DownloadFailed(String),

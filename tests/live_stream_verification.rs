@@ -256,6 +256,80 @@ async fn test_live_moviebox_dynamic_movie_mpv_playback() {
 
 #[tokio::test]
 #[ignore = "live network test; run with cargo test --test live_stream_verification -- --ignored"]
+async fn test_live_moviebox_dash_download_stream_with_headers() {
+    let client = MovieBoxClient::new();
+    client.init().await.expect("client init successful");
+
+    let releases = client
+        .episode_streams("4179386086617137184", 0, 0)
+        .await
+        .expect("fetch movie streams");
+    assert!(!releases.is_empty(), "releases should not be empty");
+
+    let mirror = &releases[0].mirrors[0];
+    assert!(
+        !mirror.headers.is_empty(),
+        "mirror should contain auth headers"
+    );
+
+    let dest = std::env::temp_dir().join("test_live_moviebox_download.mp4");
+    let dest_str = dest.to_string_lossy().into_owned();
+    let part_dest = std::env::temp_dir().join("test_live_moviebox_download.mp4.part");
+    let _ = std::fs::remove_file(&dest);
+    let _ = std::fs::remove_file(&part_dest);
+
+    let mut cmd = std::process::Command::new("yt-dlp");
+    for (k, v) in &mirror.headers {
+        if k.eq_ignore_ascii_case("user-agent") {
+            cmd.arg("--user-agent").arg(v);
+        } else {
+            cmd.arg("--add-header").arg(format!("{k}: {v}"));
+        }
+    }
+    cmd.arg("-f")
+        .arg("bestvideo+bestaudio/best")
+        .arg("--newline")
+        .arg("--part")
+        .arg("-o")
+        .arg(&dest_str)
+        .arg("--force-overwrites")
+        .arg(&mirror.resolver_url);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+
+    let mut child = cmd.spawn().expect("spawn yt-dlp");
+    let stdout = child.stdout.take().expect("capture stdout");
+
+    use std::io::{BufRead, BufReader};
+    let reader = BufReader::new(stdout);
+    let mut saw_progress = false;
+
+    for l in reader.lines().map_while(Result::ok) {
+        println!("yt-dlp output: {l}");
+        if l.contains("[download]") && l.contains('%') {
+            saw_progress = true;
+            break;
+        }
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_file(&dest);
+    let _ = std::fs::remove_file(&part_dest);
+    assert!(
+        saw_progress,
+        "yt-dlp must start downloading MovieBox DASH fragments without 403 Forbidden"
+    );
+}
+
+#[tokio::test]
+#[ignore = "live network test; run with cargo test --test live_stream_verification -- --ignored"]
 async fn test_live_moviebox_session_persistence_and_reuse() {
     let client1 = MovieBoxClient::new();
     let token1 = client1.ensure_session().await.expect("ensure session 1");
