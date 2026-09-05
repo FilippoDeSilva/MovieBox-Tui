@@ -382,7 +382,7 @@ fi
 
 if [ "$IS_TERMUX" -eq 1 ]; then
     if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-        FILE="MovieBox_Linux_arm64.tar.gz"
+        FILE="MovieBox_Android_arm64.tar.gz"
         PLATFORM_NAME="Android Termux (arm64)"
     else
         log_error "Unsupported Termux architecture ($ARCH). Only arm64/aarch64 is hosted. Use 'cargo install moviebox-tui'."
@@ -499,7 +499,16 @@ URL="https://github.com/$REPO/releases/download/$TARGET_VERSION/$FILE"
 CHECKSUM_URL="https://github.com/$REPO/releases/download/$TARGET_VERSION/SHA256SUMS"
 
 download_files() {
-    curl -fsSL "$URL" -o "$TMP_DIR/$FILE" && \
+    if ! curl -fsSL "$URL" -o "$TMP_DIR/$FILE"; then
+        if [ "$IS_TERMUX" -eq 1 ]; then
+            printf "\n" >&2
+            log_error "Failed to download $FILE."
+            printf "  %bℹ%b Precompiled native Android binaries are hosted starting from v0.1.17+.\n" "$C_SAPPHIRE" "$C_RESET" >&2
+            printf "  To install from source on Termux:\n" >&2
+            printf "    %bpkg install -y rust clang && cargo install moviebox-tui --locked%b\n\n" "$C_BOLD" "$C_RESET" >&2
+        fi
+        return 1
+    fi
     curl -fsSL "$CHECKSUM_URL" -o "$TMP_DIR/SHA256SUMS"
 }
 
@@ -555,6 +564,10 @@ if [ "$DRY_RUN" -eq 0 ]; then
     if ! smoke_output=$("$APP_PATH" --version 2>&1); then
         log_error "Installed binary failed execution smoke test ($APP_PATH):"
         printf "  %s\n" "$smoke_output" >&2
+        if [ "$IS_TERMUX" -eq 1 ]; then
+            printf "\n  %bℹ%b If Termux rejects the binary, install via cargo:\n" "$C_SAPPHIRE" "$C_RESET" >&2
+            printf "    %bpkg install -y rust clang && cargo install moviebox-tui --locked%b\n\n" "$C_BOLD" "$C_RESET" >&2
+        fi
         exit 1
     fi
 fi

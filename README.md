@@ -52,10 +52,10 @@ irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | i
 
 ### Android (Termux)
 
-Install Termux tools, run the installer, and grant storage permissions:
+Install Termux tools, download the native precompiled Android ARM64 binary via the installer, and grant storage permissions:
 ```bash
-pkg update && pkg install termux-tools
-curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
+pkg update && pkg install -y curl tar termux-tools
+curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
 ```
 

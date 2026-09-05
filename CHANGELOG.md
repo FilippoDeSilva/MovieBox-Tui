@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Native Android ARM64 Release Target & Pipeline**:
+  - Added native `aarch64-linux-android` build target to the release workflow (`.github/workflows/release.yml`) using Android NDK r26d and Clang (API 24+).
+  - Configured automated packaging of `MovieBox_Android_arm64.tar.gz` with native Bionic dynamic linking (`libc.so`), valid ELF `PT_PHDR` program header table, and `/system/bin/linker64` dynamic loader.
+  - Added Android ELF header validation in CI to verify `PT_PHDR` and `/system/bin/linker64` presence, preventing `Could not find a PHDR: broken executable?` aborts on Android devices.
+  - Updated universal installer script (`install.sh`) to detect Android Termux on 64-bit ARM and automatically fetch `MovieBox_Android_arm64.tar.gz` with verified SHA256 checksums, enabling 1-second native installation without on-device compilation.
 - **Native mdBook & GitHub Pages Documentation Architecture**:
   - Integrated `mdBook` documentation engine reading directly from canonical `docs/*.md` guides with zero duplicated markdown files and zero third-party web frameworks.
   - Added `docs/SUMMARY.md` defining table-of-contents chapter navigation across all guides, architecture diagrams, and operational workflows.

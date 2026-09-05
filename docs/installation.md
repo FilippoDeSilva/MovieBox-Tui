@@ -34,12 +34,21 @@ irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | i
 
 ## Android (Termux)
 
-Install Termux tools, run the installer script, and grant storage permissions:
+Install Termux tools, run the installer script to fetch the precompiled native Android ARM64 binary, and grant storage permissions:
 
 ```bash
-pkg update && pkg install termux-tools
-curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
+pkg update && pkg install -y curl tar termux-tools
+curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh -o install.sh && bash install.sh
 termux-setup-storage
+```
+
+The installer automatically downloads the native Android ARM64 release package (`MovieBox_Android_arm64.tar.gz`) built against the Android NDK and Bionic libc, requiring zero on-device compilation.
+
+To compile from source on Termux:
+
+```bash
+pkg install -y rust clang
+cargo install moviebox-tui --locked
 ```
 
 ---

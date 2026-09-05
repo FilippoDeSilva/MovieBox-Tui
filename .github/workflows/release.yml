@@ -239,9 +239,60 @@ jobs:
           name: binary-universal-apple-darwin
           path: MovieBox_macOS_Universal.tar.gz
 
+  build-android:
+    name: Build Android (aarch64-linux-android)
+    needs: [check-version, preflight]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "release-build-android-aarch64"
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Build Android binary
+        env:
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: aarch64-linux-android24-clang
+          CC_aarch64_linux_android: aarch64-linux-android24-clang
+        run: cargo build --release --all-features --locked --target aarch64-linux-android
+
+      - name: Validate Android ELF headers
+        run: |
+          BIN="target/aarch64-linux-android/release/moviebox-tui"
+          readelf -lW "$BIN" | grep -F "PHDR" || { echo "::error::Missing PT_PHDR"; exit 1; }
+          readelf -lW "$BIN" | grep -F "/system/bin/linker64" || { echo "::error::Missing Android PT_INTERP"; exit 1; }
+
+      - name: Archive Android
+        run: |
+          mkdir dist
+          cp target/aarch64-linux-android/release/moviebox-tui dist/
+          cp README.md dist/
+          cp LICENSE-* dist/ || true
+          tar -czvf MovieBox_Android_arm64.tar.gz -C dist .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: binary-aarch64-linux-android
+          path: MovieBox_Android_arm64.tar.gz
+
   release:
     name: Create Release
-    needs: [check-version, build, build-macos-universal]
+    needs: [check-version, build, build-macos-universal, build-android]
     if: needs.check-version.outputs.is_new == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -289,6 +340,7 @@ jobs:
           EXPECTED=(
             "MovieBox_Linux_x64.tar.gz"
             "MovieBox_Linux_arm64.tar.gz"
+            "MovieBox_Android_arm64.tar.gz"
             "MovieBox_macOS_Universal.tar.gz"
             "MovieBox_Windows_x64.zip"
             "MovieBox_Windows_arm64.zip"
