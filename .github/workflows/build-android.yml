@@ -7,6 +7,10 @@ on:
         description: "Release tag to attach the Android binary to"
         required: true
         default: "v0.1.16"
+      git_ref:
+        description: "Git ref (branch, tag, or commit SHA) to build from"
+        required: false
+        default: "main"
 
 permissions:
   contents: write
@@ -19,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.inputs.release_tag }}
+          ref: ${{ github.event.inputs.git_ref || github.event.inputs.release_tag }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

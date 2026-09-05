@@ -17,6 +17,12 @@
   - Added automated GitHub Actions deployment workflow (`.github/workflows/pages.yml`) publishing the documentation site to GitHub Pages on every push to `main`.
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
+### Fixed
+- **Android Intent Player Stream Compatibility**:
+  - Eliminated blanket player incompatibility errors on Android: unauthenticated streams (CircleFTP, DhakaFlix, IPTV, direct streams) and streams carrying standard `Referer`/`User-Agent` headers (4KHDHub) now dispatch directly to Android video players via `termux-open` or `am start`.
+  - Added empty-header guard to `supports_headers`, ensuring streams without authentication requirements are never falsely rejected as incompatible.
+  - Forwarded `User-Agent`, `Referer`, and subtitles (`subtitles_location` and `subs`) as intent extras when dispatching playback via `am` or `termux-am`.
+  - Prevented circular provider switch prompts when playing 4KHDHub streams by tailoring notification hints based on the active provider.
 ## [0.1.16] - 2026-09-05
 
 ### Added

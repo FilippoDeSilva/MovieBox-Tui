@@ -96,15 +96,29 @@ impl App {
                         .map(|k| k.label())
                         .collect::<Vec<_>>()
                         .join(" or ");
-                    format!(
-                        "{} cannot play this {} stream due to required authentication headers. Set {} as default in /settings, or press Ctrl+P for 4KHDHub.",
-                        chosen_name, provider_name, alternatives_str
-                    )
+                    if source.provider == ProviderKind::FourKHdHub {
+                        format!(
+                            "{} cannot play this {} stream due to required authentication headers. Set {} as default in /settings.",
+                            chosen_name, provider_name, alternatives_str
+                        )
+                    } else {
+                        format!(
+                            "{} cannot play this {} stream due to required authentication headers. Set {} as default in /settings, or press Ctrl+P for 4KHDHub.",
+                            chosen_name, provider_name, alternatives_str
+                        )
+                    }
                 } else {
-                    format!(
-                        "{} cannot play this {} stream due to required authentication headers. Install a compatible player (mpv) or press Ctrl+P for 4KHDHub.",
-                        chosen_name, provider_name
-                    )
+                    if source.provider == ProviderKind::FourKHdHub {
+                        format!(
+                            "{} cannot play this {} stream due to required authentication headers. Install a compatible player (mpv).",
+                            chosen_name, provider_name
+                        )
+                    } else {
+                        format!(
+                            "{} cannot play this {} stream due to required authentication headers. Install a compatible player (mpv) or press Ctrl+P for 4KHDHub.",
+                            chosen_name, provider_name
+                        )
+                    }
                 };
                 self.state.notify(
                     NotificationKind::Warning,
@@ -121,11 +135,16 @@ impl App {
                     .collect::<Vec<_>>()
                     .join(", ");
                 let provider_name = source.provider.label();
+                let action_hint = if source.provider == ProviderKind::FourKHdHub {
+                    "Install mpv."
+                } else {
+                    "Install mpv or press Ctrl+P for 4KHDHub."
+                };
                 self.state.notify(
                     NotificationKind::Error,
                     "Incompatible Media Player",
                     format!(
-                        "None of your detected players ({players_str}) support authentication headers required by {provider_name} streams. Install mpv or press Ctrl+P for 4KHDHub."
+                        "None of your detected players ({players_str}) support authentication headers required by {provider_name} streams. {action_hint}"
                     ),
                 );
             }
@@ -930,5 +949,53 @@ mod tests {
 
         assert!(!app.state.is_resolving_playback);
         assert!(!app.state.is_playing);
+    }
+    #[tokio::test]
+    async fn test_android_player_allows_unauthenticated_and_referer_streams() {
+        let mut app = crate::tui::app::App::new();
+        app.state.available_players = vec![crate::tui::state::PlayerKind::AndroidIntent];
+        app.state.default_player = Some("android".to_string());
+
+        let bdix_source = crate::providers::models::PlaybackSource {
+            provider: crate::providers::models::ProviderKind::BdixCircleFtp,
+            url: "http://10.16.100.244/movies/film.mkv".to_string(),
+            headers: vec![],
+            subtitle: None,
+            source_label: "CircleFTP".to_string(),
+        };
+        assert_eq!(
+            app.resolve_playback_player(&bdix_source),
+            super::PlaybackResolution::Available(crate::tui::state::PlayerKind::AndroidIntent)
+        );
+
+        let fourk_source = crate::providers::models::PlaybackSource {
+            provider: crate::providers::models::ProviderKind::FourKHdHub,
+            url: "https://r2.example.com/stream.mkv".to_string(),
+            headers: vec![
+                ("Referer".to_string(), "https://hubcloud.one/".to_string()),
+                ("User-Agent".to_string(), "Mozilla/5.0".to_string()),
+            ],
+            subtitle: None,
+            source_label: "1080p".to_string(),
+        };
+        assert_eq!(
+            app.resolve_playback_player(&fourk_source),
+            super::PlaybackResolution::Available(crate::tui::state::PlayerKind::AndroidIntent)
+        );
+
+        let auth_source = crate::providers::models::PlaybackSource {
+            provider: crate::providers::models::ProviderKind::MovieBox,
+            url: "https://example.com/index.mpd".to_string(),
+            headers: vec![("Cookie".to_string(), "CloudFront-Policy=test".to_string())],
+            subtitle: None,
+            source_label: "Multi-Res".to_string(),
+        };
+        assert_eq!(
+            app.resolve_playback_player(&auth_source),
+            super::PlaybackResolution::ExplicitPlayerIncompatible {
+                chosen: crate::tui::state::PlayerKind::AndroidIntent,
+                compatible_alternatives: vec![],
+            }
+        );
     }
 }

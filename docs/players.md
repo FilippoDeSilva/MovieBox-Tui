@@ -21,7 +21,7 @@ Resolution caches detected paths across runs while allowing newly installed play
 | mpv             | `mpv --autofit=WxH --geometry=50%:50% --idle=no --keep-open=no [--start=..] [--script=..] [--script-opts=..] [--http-header-fields=..] [--sub-file=..] <url>` | Window sized to the terminal. Injects `moviebox_tracker.lua` for position tracking and resume. Flatpak mpv is launched via `flatpak run`. |
 | VLC             | `vlc --width=W --height=H --play-and-exit [--start-time=..] [--http-referrer=..] [--http-user-agent=..] [--sub-file=..] <url>`            | Supports start time resume via `--start-time`.                                                         |
 | IINA            | `iina-cli --keep-running --no-stdin --mpv-autofit=.. [--mpv-start=..] --mpv-http-header-fields=.. --mpv-sub-files=.. <url>`               | Uses the installed IINA `iina-cli`; falls back to `open -a IINA <url>` only if the CLI is absent.      |
-| Android / Termux | `termux-open --chooser --content-type video/* <url>` (or `termux-open-url` / `termux-am`) | Opens an app chooser on the device. Requires `termux-tools` (or `termux-am`). |
+| Android / Termux | `termux-open --chooser --content-type video/* <url>` (or `termux-open-url` / `termux-am`) | Opens an app chooser on the device. When launched via `termux-am` or `am`, forwards `User-Agent`, `Referer`, and subtitles (`subtitles_location`/`subs`). |
 
 Window size is derived from the live terminal size times the font cell size reported
 by the image picker, then clamped to a fixed range.
@@ -31,8 +31,8 @@ by the image picker, then clamped to a fixed range.
 Playback sources (for example 4KHD and MovieBox) may carry `Referer`/`User-Agent` headers.
 MovieBox DASH streams additionally carry signed `Cookie` headers for CloudFront authentication.
 mpv/IINA send them via `http-header-fields` (`--http-header-fields=...` or `--mpv-http-header-fields=...`),
-while VLC maps them to `--http-referrer` / `--http-user-agent`.
-The `supports_headers` gate in `app/playback.rs` validates whether a player can satisfy required stream headers. MovieBox-TUI strictly respects the user's configured default player: if the chosen player cannot satisfy a stream's headers (such as VLC attempting to play signed MovieBox DASH manifests with cookie requirements), playback will not silently fall back to an alternative player. Instead, an explicit warning notification informs the user of the exact incompatibility and lists available compatible alternatives (e.g. mpv) or the option to switch providers with `Ctrl+P`.
+while VLC maps them to `--http-referrer` / `--http-user-agent`. Android intent playback forwards `Referer`/`User-Agent` extras when using `am`/`termux-am`, and supports unauthenticated streams (CircleFTP, DhakaFlix, IPTV) and CDN streams natively.
+The `supports_headers` gate in `app/playback.rs` validates whether a player can satisfy required stream headers. MovieBox-TUI strictly respects the user's configured default player: if the chosen player cannot satisfy a stream's headers (such as VLC or Android Player attempting to play signed MovieBox DASH manifests with CloudFront cookie requirements), playback will not silently fall back to an alternative player. Instead, an explicit warning notification informs the user of the exact incompatibility and lists available compatible alternatives (e.g. mpv) or the option to switch providers with `Ctrl+P`.
 ## Subtitles
 
 - mpv receives the remote subtitle URL directly (`--sub-file=<url>`); mpv fetches it
@@ -40,6 +40,7 @@ The `supports_headers` gate in `app/playback.rs` validates whether a player can 
 - VLC and IINA download the subtitle to a temp file first, preserving the URL's
   extension (srt/vtt/ass/…), and pass the local path. The download applies the source
   headers. On failure a status is shown and playback continues without subtitles.
+- Android intent playback passes subtitle paths to `am`/`termux-am` via `subtitles_location` and `subs` intent extras.
 - Temp files are cleaned up after the player exits and purged at startup if stale.
 
 ## Playback Tracking & Resume

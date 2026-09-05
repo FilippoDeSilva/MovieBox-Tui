@@ -64,17 +64,20 @@ pub fn detect() -> Vec<PlayerKind> {
 }
 
 pub fn supports_headers(kind: PlayerKind, headers: &[(String, String)]) -> bool {
-    if kind == PlayerKind::AndroidIntent {
-        return false;
+    if headers.is_empty() {
+        return true;
     }
     #[cfg(target_os = "macos")]
     if kind == PlayerKind::Iina && !iina_cli_exists() {
         return false;
     }
-    kind != PlayerKind::Vlc
-        || headers.iter().all(|(name, _)| {
+    match kind {
+        PlayerKind::Mpv => true,
+        PlayerKind::Iina => true,
+        PlayerKind::Vlc | PlayerKind::AndroidIntent => headers.iter().all(|(name, _)| {
             name.eq_ignore_ascii_case("referer") || name.eq_ignore_ascii_case("user-agent")
-        })
+        }),
+    }
 }
 
 pub fn command(
@@ -98,7 +101,7 @@ pub fn command(
         ),
         PlayerKind::Iina => iina_command(url, subtitle, headers, window, resume_seconds, tracker),
         PlayerKind::Vlc => vlc_command(url, subtitle, headers, window, resume_seconds),
-        PlayerKind::AndroidIntent => android_intent_command(url),
+        PlayerKind::AndroidIntent => android_intent_command(url, subtitle, headers),
     }
 }
 
@@ -218,7 +221,29 @@ fn android_opener() -> Option<AndroidOpener> {
     detected
 }
 
-fn android_intent_command(url: &str) -> Command {
+fn append_android_intent_extras(
+    cmd: &mut Command,
+    subtitle: Option<&str>,
+    headers: &[(String, String)],
+) {
+    if let Some(sub) = subtitle {
+        cmd.arg("-e").arg("subtitles_location").arg(sub);
+        cmd.arg("-e").arg("subs").arg(sub);
+    }
+    for (name, value) in headers {
+        if name.eq_ignore_ascii_case("user-agent") {
+            cmd.arg("-e").arg("User-Agent").arg(value);
+        } else if name.eq_ignore_ascii_case("referer") {
+            cmd.arg("-e").arg("Referer").arg(value);
+        }
+    }
+}
+
+fn android_intent_command(
+    url: &str,
+    subtitle: Option<&str>,
+    headers: &[(String, String)],
+) -> Command {
     let mut command = match android_opener() {
         Some(AndroidOpener::TermuxOpen(path)) => {
             let mut cmd = Command::new(path);
@@ -242,6 +267,7 @@ fn android_intent_command(url: &str) -> Command {
                 .arg(url)
                 .arg("-t")
                 .arg("video/*");
+            append_android_intent_extras(&mut cmd, subtitle, headers);
             cmd
         }
         Some(AndroidOpener::SystemAm(path)) => {
@@ -255,6 +281,7 @@ fn android_intent_command(url: &str) -> Command {
                 .arg(url)
                 .arg("-t")
                 .arg("video/*");
+            append_android_intent_extras(&mut cmd, subtitle, headers);
             cmd
         }
         None => {
@@ -1349,11 +1376,21 @@ mod tests {
             PlayerKind::Vlc,
             &[("referer".into(), "https://example.test/".into())]
         ));
+        assert!(supports_headers(PlayerKind::AndroidIntent, &[]));
+        assert!(supports_headers(
+            PlayerKind::AndroidIntent,
+            &[
+                ("referer".into(), "https://example.test/".into()),
+                ("user-agent".into(), "TestAgent/1.0".into())
+            ]
+        ));
+        assert!(supports_headers(PlayerKind::Vlc, &[]));
+        assert!(supports_headers(PlayerKind::Mpv, &headers));
     }
 
     #[test]
     fn test_android_intent_command_structure() {
-        let cmd = android_intent_command("https://example.test/video.mp4");
+        let cmd = android_intent_command("https://example.test/video.mp4", None, &[]);
         let args = cmd
             .get_args()
             .map(|a| a.to_string_lossy().into_owned())
