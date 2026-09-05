@@ -458,7 +458,8 @@ pub(crate) fn render_landing_deck(frame: &mut Frame, area: Rect, state: &AppStat
         return;
     }
 
-    let is_focused = state.favorites_focus;
+    let modal_active = state.has_active_modal();
+    let is_focused = state.favorites_focus && !modal_active;
 
     let cw_items = if has_cw {
         state.continue_watching_items()
@@ -501,52 +502,48 @@ pub(crate) fn render_landing_deck(frame: &mut Frame, area: Rect, state: &AppStat
         height: content_height,
     };
 
-    let border_style = if is_focused {
+    let border_style = if modal_active {
+        theme.muted
+    } else if is_focused {
         theme.border_focus
     } else {
         theme.surface1
     };
 
     let mut title_spans: Vec<Span> = Vec::new();
+    let (active_style, inactive_style, hint_style, sep_style) = if modal_active {
+        (theme.muted, theme.muted, theme.muted, theme.muted)
+    } else {
+        (
+            if is_focused {
+                theme.title.add_modifier(Modifier::BOLD)
+            } else {
+                theme.text.add_modifier(Modifier::BOLD)
+            },
+            theme.subtext1,
+            theme.text_dim,
+            theme.surface1,
+        )
+    };
     if has_cw && has_fav {
         let sep = if state.basic_terminal { " | " } else { " │ " };
         match tab {
             crate::tui::state::HomeDeckTab::ContinueWatching => {
-                let active_style = if is_focused {
-                    theme.title.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text.add_modifier(Modifier::BOLD)
-                };
                 title_spans.push(Span::styled(" Continue Watching ", active_style));
-                title_spans.push(Span::styled(sep, theme.surface1));
-                title_spans.push(Span::styled("Favorites", theme.subtext1));
-                title_spans.push(Span::styled(" (Tab) ", theme.text_dim));
+                title_spans.push(Span::styled(sep, sep_style));
+                title_spans.push(Span::styled("Favorites", inactive_style));
+                title_spans.push(Span::styled(" (Tab) ", hint_style));
             }
             crate::tui::state::HomeDeckTab::Favorites => {
-                title_spans.push(Span::styled(" Continue Watching", theme.subtext1));
-                title_spans.push(Span::styled(" (Tab)", theme.text_dim));
-                title_spans.push(Span::styled(sep, theme.surface1));
-                let active_style = if is_focused {
-                    theme.title.add_modifier(Modifier::BOLD)
-                } else {
-                    theme.text.add_modifier(Modifier::BOLD)
-                };
+                title_spans.push(Span::styled(" Continue Watching", inactive_style));
+                title_spans.push(Span::styled(" (Tab)", hint_style));
+                title_spans.push(Span::styled(sep, sep_style));
                 title_spans.push(Span::styled(" Favorites ", active_style));
             }
         }
     } else if has_cw {
-        let active_style = if is_focused {
-            theme.title.add_modifier(Modifier::BOLD)
-        } else {
-            theme.text.add_modifier(Modifier::BOLD)
-        };
         title_spans.push(Span::styled(" Continue Watching ", active_style));
     } else {
-        let active_style = if is_focused {
-            theme.title.add_modifier(Modifier::BOLD)
-        } else {
-            theme.text.add_modifier(Modifier::BOLD)
-        };
         title_spans.push(Span::styled(" Favorites ", active_style));
     }
 
@@ -790,7 +787,7 @@ pub(crate) fn render_discover_landing(
         width: card_width,
         height: content_height,
     };
-
+    let modal_active = state.has_active_modal();
     let (bar, compass) = if state.basic_terminal {
         ("-", "*")
     } else {
@@ -801,14 +798,26 @@ pub(crate) fn render_discover_landing(
         .title(
             Line::from(vec![Span::styled(
                 "[ /browse ] ",
-                theme.accent.add_modifier(Modifier::BOLD),
+                if modal_active {
+                    theme.muted
+                } else {
+                    theme.accent.add_modifier(Modifier::BOLD)
+                },
             )])
             .alignment(Alignment::Right),
         )
-        .title_style(theme.subtext1)
+        .title_style(if modal_active {
+            theme.muted
+        } else {
+            theme.subtext1
+        })
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
-        .border_style(theme.surface1);
+        .border_style(if modal_active {
+            theme.muted
+        } else {
+            theme.surface1
+        });
 
     frame.render_widget(block, card_area);
 
@@ -1631,6 +1640,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
             let inner_area = results_area;
             let is_editing = state.input_mode == InputMode::Editing;
+            let modal_active = state.has_active_modal();
 
             for slot in 0..metrics.visible_items {
                 let i = state.result_scroll + slot;
@@ -1662,7 +1672,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     item_slot_rects(item_area, poster_width);
 
                 let is_selected = Some(i) == selected_idx;
-                if is_selected && !is_editing {
+                if is_selected && !is_editing && !modal_active {
                     let selected_bg = theme.surface0.fg.unwrap_or(theme.base);
                     frame.render_widget(
                         Block::default().style(Style::default().bg(selected_bg)),
@@ -1671,7 +1681,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
 
                 if is_selected {
-                    let (indicator_sym, indicator_style) = if is_editing {
+                    let (indicator_sym, indicator_style) = if is_editing || modal_active {
                         (
                             if state.basic_terminal { "- " } else { "· " },
                             theme.text_dim,
@@ -3843,5 +3853,33 @@ mod tests {
                 "mismatch at x={x}"
             );
         }
+    }
+
+    #[test]
+    fn test_home_deck_unfocused_when_modal_active() {
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            favorites_focus: true,
+            show_settings_popup: true,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 100, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(!content.contains("●"));
     }
 }

@@ -33,6 +33,10 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **Global Modal Background Unfocus & Dimming**:
+  - Automatically unfocused and dimmed all background components across Details, Home, and Runner views whenever any modal or popup dialog is active, replacing bright active borders, focus bullets, and selection highlight rectangles with dimmed styling (`theme.muted`).
+  - Dimmed background footer shortcuts and download bar elements during open dialogs, ensuring visual focus remains strictly on the active foreground popup.
+  - Suppressed terminal graphics protocol rendering for background posters when a modal dialog is open, preventing image pixels from bleeding over foreground confirmation dialogs.
 - **MovieBox DASH Progress Normalization, Throttling & Background Continuity**:
   - Normalized multi-stream MPEG-DASH download percentages across video (0–90%), audio (90–98%), and merger (99–100%) stages, eliminating progress resets back to 0% when the video stream finishes and the audio stream begins.
   - Enforced monotonic progress tracking and throttled progress event emissions to 250ms intervals, eliminating terminal text jitter and channel saturation.

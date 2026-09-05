@@ -646,7 +646,7 @@ impl App {
 
         let is_compact = dl_area.width < 60;
         let basic = self.state.basic_terminal;
-
+        let modal_active = self.state.has_active_modal();
         let raw_title = self
             .state
             .download_title
@@ -663,16 +663,15 @@ impl App {
         let cancel_budget = (crate::tui::text::width(cancel_label) as u16).saturating_add(4);
 
         let mut left_title_spans = Vec::new();
-        if basic {
-            left_title_spans.push(Span::styled(
-                " [DL] ",
-                self.theme.teal.add_modifier(Modifier::BOLD),
-            ));
+        let prefix_style = if modal_active {
+            self.theme.muted
         } else {
-            left_title_spans.push(Span::styled(
-                " ⬇ Downloading: ",
-                self.theme.teal.add_modifier(Modifier::BOLD),
-            ));
+            self.theme.teal.add_modifier(Modifier::BOLD)
+        };
+        if basic {
+            left_title_spans.push(Span::styled(" [DL] ", prefix_style));
+        } else {
+            left_title_spans.push(Span::styled(" ⬇ Downloading: ", prefix_style));
         }
 
         if self.state.download_queue_total > 0 {
@@ -683,7 +682,14 @@ impl App {
                 "S{:02}E{:02} ({}/{}): ",
                 self.state.selected_season, self.state.selected_episode, current, total
             );
-            left_title_spans.push(Span::styled(queue_str, self.theme.sapphire));
+            left_title_spans.push(Span::styled(
+                queue_str,
+                if modal_active {
+                    self.theme.muted
+                } else {
+                    self.theme.sapphire
+                },
+            ));
         }
 
         let prefix_width = left_title_spans.iter().map(Span::width).sum::<usize>() as u16;
@@ -694,14 +700,22 @@ impl App {
         let truncated_title = crate::tui::text::truncate_width(raw_title, title_max_width.max(6));
         left_title_spans.push(Span::styled(
             truncated_title,
-            self.theme.title.add_modifier(Modifier::BOLD),
+            if modal_active {
+                self.theme.muted
+            } else {
+                self.theme.title.add_modifier(Modifier::BOLD)
+            },
         ));
         left_title_spans.push(Span::raw(" "));
 
         let left_title = Line::from(left_title_spans);
         let right_title = Line::from(vec![Span::styled(
             format!(" {cancel_label} "),
-            self.theme.error.add_modifier(Modifier::BOLD),
+            if modal_active {
+                self.theme.muted
+            } else {
+                self.theme.error.add_modifier(Modifier::BOLD)
+            },
         )])
         .alignment(Alignment::Right);
 
@@ -709,7 +723,11 @@ impl App {
             .borders(Borders::ALL)
             .title(left_title)
             .title(right_title)
-            .border_style(self.theme.lavender)
+            .border_style(if modal_active {
+                self.theme.muted
+            } else {
+                self.theme.lavender
+            })
             .border_type(crate::tui::overlay::border_type(basic));
 
         let inner_area = block.inner(dl_area);
@@ -746,41 +764,83 @@ impl App {
         let mut row_spans = Vec::new();
         row_spans.push(Span::styled(
             pct_badge,
-            self.theme.sapphire.add_modifier(Modifier::BOLD),
+            if modal_active {
+                self.theme.muted
+            } else {
+                self.theme.sapphire.add_modifier(Modifier::BOLD)
+            },
         ));
 
-        row_spans.push(Span::styled("[", self.theme.surface1));
+        row_spans.push(Span::styled(
+            "[",
+            if modal_active {
+                self.theme.muted
+            } else {
+                self.theme.surface1
+            },
+        ));
         if basic {
             if filled_cells > 0 && unfilled_cells > 0 {
                 row_spans.push(Span::styled(
                     "=".repeat(filled_cells.saturating_sub(1)),
-                    self.theme.accent.add_modifier(Modifier::BOLD),
+                    if modal_active {
+                        self.theme.muted
+                    } else {
+                        self.theme.accent.add_modifier(Modifier::BOLD)
+                    },
                 ));
                 row_spans.push(Span::styled(
                     ">",
-                    self.theme.accent.add_modifier(Modifier::BOLD),
+                    if modal_active {
+                        self.theme.muted
+                    } else {
+                        self.theme.accent.add_modifier(Modifier::BOLD)
+                    },
                 ));
             } else {
                 row_spans.push(Span::styled(
                     "=".repeat(filled_cells),
-                    self.theme.accent.add_modifier(Modifier::BOLD),
+                    if modal_active {
+                        self.theme.muted
+                    } else {
+                        self.theme.accent.add_modifier(Modifier::BOLD)
+                    },
                 ));
             }
             row_spans.push(Span::styled(
                 "-".repeat(unfilled_cells),
-                self.theme.surface1,
+                if modal_active {
+                    self.theme.muted
+                } else {
+                    self.theme.surface1
+                },
             ));
         } else {
             row_spans.push(Span::styled(
                 "━".repeat(filled_cells),
-                self.theme.teal.add_modifier(Modifier::BOLD),
+                if modal_active {
+                    self.theme.muted
+                } else {
+                    self.theme.teal.add_modifier(Modifier::BOLD)
+                },
             ));
             row_spans.push(Span::styled(
                 "─".repeat(unfilled_cells),
-                self.theme.surface1,
+                if modal_active {
+                    self.theme.muted
+                } else {
+                    self.theme.surface1
+                },
             ));
         }
-        row_spans.push(Span::styled("]  ", self.theme.surface1));
+        row_spans.push(Span::styled(
+            "]  ",
+            if modal_active {
+                self.theme.muted
+            } else {
+                self.theme.surface1
+            },
+        ));
 
         let status_budget = available_for_rest.saturating_sub(bar_width + 2);
         if status_budget >= 6 {
@@ -789,9 +849,18 @@ impl App {
                 let parts: Vec<&str> = truncated_status.split(" | ").collect();
                 for (idx, part) in parts.iter().enumerate() {
                     if idx > 0 {
-                        row_spans.push(Span::styled(" | ", self.theme.surface1));
+                        row_spans.push(Span::styled(
+                            " | ",
+                            if modal_active {
+                                self.theme.muted
+                            } else {
+                                self.theme.surface1
+                            },
+                        ));
                     }
-                    if part.starts_with("ETA") {
+                    if modal_active {
+                        row_spans.push(Span::styled(part.to_string(), self.theme.muted));
+                    } else if part.starts_with("ETA") {
                         row_spans.push(Span::styled(part.to_string(), self.theme.rating));
                     } else if part.contains("/s") {
                         row_spans.push(Span::styled(
@@ -808,7 +877,14 @@ impl App {
                     }
                 }
             } else {
-                row_spans.push(Span::styled(truncated_status, self.theme.subtext1));
+                row_spans.push(Span::styled(
+                    truncated_status,
+                    if modal_active {
+                        self.theme.muted
+                    } else {
+                        self.theme.subtext1
+                    },
+                ));
             }
         }
 
@@ -1311,6 +1387,21 @@ mod tests {
         let narrow_backend = TestBackend::new(45, 24);
         let mut narrow_terminal = Terminal::new(narrow_backend).unwrap();
         let res = narrow_terminal.draw(|f| {
+            app.draw(f);
+        });
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_download_bar_dimmed_when_modal_active() {
+        let backend = TestBackend::new(100, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut app = App::new();
+        app.state.download_progress = Some(50.0);
+        app.state.download_title = Some("Test Movie".to_string());
+        app.state.show_settings_popup = true;
+
+        let res = terminal.draw(|f| {
             app.draw(f);
         });
         assert!(res.is_ok());
