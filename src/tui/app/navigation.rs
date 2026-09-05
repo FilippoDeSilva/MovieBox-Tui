@@ -76,10 +76,7 @@ impl App {
     }
 
     pub(super) fn cycle_provider(&mut self) {
-        let available_providers: Vec<ProviderKind> = ProviderKind::ENABLED
-            .into_iter()
-            .filter(|p| !p.is_bdix() || self.state.bdix_enabled)
-            .collect();
+        let available_providers = self.state.available_providers();
 
         if available_providers.is_empty() {
             return;
@@ -366,6 +363,11 @@ impl App {
                     self.state.browse_list_state.select(None);
                     return None;
                 }
+                if self.state.show_provider_popup {
+                    self.state.show_provider_popup = false;
+                    self.state.provider_list_state.select(None);
+                    return None;
+                }
                 if self.state.favorites_focus {
                     self.state.favorites_focus = false;
                     self.state.favorites_landing_state.select(None);
@@ -391,6 +393,8 @@ impl App {
                             self.state.last_search_edit = std::time::Instant::now();
                             return None;
                         }
+                        let had_search = !self.state.search_query.trim().is_empty()
+                            || !self.state.search_results.is_empty();
                         self.state.is_loading = false;
                         self.state.active_search_request =
                             self.state.active_search_request.wrapping_add(1);
@@ -399,7 +403,9 @@ impl App {
                         self.state.active_preview_request =
                             self.state.active_preview_request.wrapping_add(1);
                         self.state.clear_search_state();
-                        self.state.set_status_default("Search cleared.");
+                        if had_search {
+                            self.state.set_status_default("Search cleared.");
+                        }
                     }
                     Screen::Details => {
                         self.state

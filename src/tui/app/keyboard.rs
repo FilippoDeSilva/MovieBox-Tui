@@ -128,6 +128,56 @@ impl App {
                 return None;
             }
         }
+        if self.state.show_provider_popup {
+            let available = self.state.available_providers();
+            let total_count = available.len();
+
+            match key.code {
+                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.state.show_provider_popup = false;
+                    self.state.provider_list_state.select(None);
+                    self.cycle_provider();
+                }
+                KeyCode::Esc => {
+                    self.state.show_provider_popup = false;
+                    self.state.provider_list_state.select(None);
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    crate::tui::state::cycle_list_selection(
+                        &mut self.state.provider_list_state,
+                        total_count,
+                        false,
+                    );
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    crate::tui::state::cycle_list_selection(
+                        &mut self.state.provider_list_state,
+                        total_count,
+                        true,
+                    );
+                }
+                KeyCode::Home => {
+                    if total_count > 0 {
+                        self.state.provider_list_state.select(Some(0));
+                    }
+                }
+                KeyCode::End => {
+                    if total_count > 0 {
+                        self.state.provider_list_state.select(Some(total_count - 1));
+                    }
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    let index = self.state.provider_list_state.selected().unwrap_or(0);
+                    if let Some(&provider) = available.get(index) {
+                        self.switch_provider(provider);
+                    }
+                    self.state.show_provider_popup = false;
+                    self.state.provider_list_state.select(None);
+                }
+                _ => {}
+            }
+            return None;
+        }
 
         if self.state.show_browse_popup {
             let is_addon = self.state.mode() == crate::tui::state::AppMode::Addon;
@@ -429,9 +479,13 @@ impl App {
             InputMode::Editing => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     if let KeyCode::Char('u') = key.code {
+                        let had_search = !self.state.search_query.trim().is_empty()
+                            || !self.state.search_results.is_empty();
                         self.state.clear_search_state();
                         self.state.input_mode = InputMode::Normal;
-                        self.state.set_status_default("Search cleared.");
+                        if had_search {
+                            self.state.set_status_default("Search cleared.");
+                        }
                         return None;
                     }
                     if let KeyCode::Char('w') = key.code {
@@ -495,6 +549,10 @@ impl App {
                                     force_refresh: false,
                                 })
                                 .ok();
+                        } else {
+                            self.state.input_mode = InputMode::Normal;
+                            self.state.search_suggestions.clear();
+                            self.state.suggest_index = None;
                         }
                     }
                     KeyCode::Tab => {
@@ -915,9 +973,13 @@ impl App {
                         KeyCode::Char('c') | KeyCode::Char('C')
                             if self.state.download_progress.is_none() =>
                         {
+                            let had_search = !self.state.search_query.trim().is_empty()
+                                || !self.state.search_results.is_empty();
                             self.state.clear_search_state();
                             self.state.input_mode = InputMode::Normal;
-                            self.state.set_status_default("Search cleared.");
+                            if had_search {
+                                self.state.set_status_default("Search cleared.");
+                            }
                         }
                         KeyCode::Char('f') | KeyCode::Char('F')
                             if self.state.favorites_available()
@@ -1341,5 +1403,70 @@ mod tests {
         assert!(app.state.search_results.is_empty());
         assert_eq!(app.state.search_list_state.selected(), None);
         assert_eq!(app.state.input_mode, InputMode::Normal);
+    }
+    #[tokio::test]
+    async fn test_provider_popup_keyboard_navigation() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.active_provider = crate::models::ProviderKind::MovieBox;
+        app.state.show_provider_popup = true;
+        app.state.provider_list_state.select(Some(0));
+
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.provider_list_state.selected(), Some(1));
+
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()))
+            .await;
+        assert!(!app.state.show_provider_popup);
+        let expected = app.state.available_providers()[1];
+        assert_eq!(app.state.active_provider, expected);
+
+        app.state.show_provider_popup = true;
+        app.state.provider_list_state.select(Some(0));
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        assert!(!app.state.show_provider_popup);
+        assert_eq!(app.state.provider_list_state.selected(), None);
+
+        app.state.show_provider_popup = true;
+        app.state.provider_list_state.select(Some(0));
+        let before_provider = app.state.active_provider;
+        app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL))
+            .await;
+        assert!(!app.state.show_provider_popup);
+        assert_ne!(app.state.active_provider, before_provider);
+    }
+
+    #[tokio::test]
+    async fn test_empty_search_clear_does_not_set_status() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = InputMode::Normal;
+        app.state.search_query.clear();
+        app.state.search_results.clear();
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.status_message, "");
+
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        while let Ok(action) = app.action_receiver.try_recv() {
+            app.handle_action(action).await;
+        }
+        assert_eq!(app.state.status_message, "");
+
+        app.state.input_mode = InputMode::Editing;
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.input_mode, InputMode::Normal);
+        assert_eq!(app.state.status_message, "");
+
+        app.state.search_query.set_content("inception");
+        app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.status_message, "Search cleared.");
     }
 }

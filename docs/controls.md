@@ -43,7 +43,7 @@ Text editing across Search, TV Playlist Manager, and Addon Manager uses a unifie
 
 ## Modal Dialogs & Pickers
 
-All popup dialogs (Theme picker, Browse categories, Settings Media Player picker, TV Manager, Addon Manager, Download Confirmation) support standard keyboard controls:
+All popup dialogs (Theme picker, Browse categories, Provider menu, Settings Media Player picker, TV Manager, Addon Manager, Download Confirmation) support standard keyboard controls:
 
 - **`↑` / `↓` / `k` / `j`**: Move selection up / down by one item (vim keys `k`/`j` supported in pickers such as theme selector in Settings).
 - **`Home` / `End`**: Jump immediately to the first or last item in the list.
@@ -87,8 +87,8 @@ All popup dialogs (Theme picker, Browse categories, Settings Media Player picker
 
 | Action | Result |
 | :--- | :--- |
+| **Click provider badge** | Open anchored provider selection menu; click provider to switch directly |
 | **Click search bar** | Enter search input mode |
-| **Click suggestion item** | Search for that suggestion immediately |
 | **Click search result row** | Select item and load preview; click again to open full details |
 | **Click landing deck tab header** | Switch between Continue Watching and Favorites tabs |
 | **Click Continue Watching row (landing)** | Select an in-progress title; click again to resume playback with auto-play |

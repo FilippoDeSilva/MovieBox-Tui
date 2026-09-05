@@ -276,6 +276,8 @@ pub struct AppState {
     pub browse_list_state: ListState,
     pub active_browse_preset: Option<BrowsePreset>,
     pub active_addon_catalog: Option<crate::providers::addons::models::AddonCatalogTarget>,
+    pub show_provider_popup: bool,
+    pub provider_list_state: ListState,
     pub browse_metrics: std::collections::HashMap<String, BrowseMetrics>,
     pub show_settings_popup: bool,
     pub settings_category: SettingsCategory,
@@ -436,6 +438,8 @@ impl Default for AppState {
             browse_list_state: ListState::default(),
             active_browse_preset: None,
             active_addon_catalog: None,
+            show_provider_popup: false,
+            provider_list_state: ListState::default(),
             browse_metrics: std::collections::HashMap::new(),
             show_settings_popup: false,
             settings_category: SettingsCategory::General,
@@ -586,11 +590,15 @@ impl AppState {
             .unwrap_or(self.active_provider)
     }
 
-    pub fn next_provider(&self) -> ProviderKind {
-        let available_providers: Vec<ProviderKind> = crate::models::ProviderKind::ENABLED
+    pub fn available_providers(&self) -> Vec<ProviderKind> {
+        crate::models::ProviderKind::ENABLED
             .into_iter()
             .filter(|p| !p.is_bdix() || self.bdix_enabled)
-            .collect();
+            .collect()
+    }
+
+    pub fn next_provider(&self) -> ProviderKind {
+        let available_providers = self.available_providers();
         if available_providers.is_empty() {
             return self.active_provider;
         }
@@ -729,6 +737,7 @@ impl AppState {
         self.show_help
             || self.show_theme_popup
             || self.show_browse_popup
+            || self.show_provider_popup
             || self.show_settings_popup
             || self.addon_manager_popup
             || self.tv_config_popup
@@ -1335,6 +1344,9 @@ mod tests {
         state.show_browse_popup = true;
         assert!(state.has_active_modal());
         state.show_browse_popup = false;
+        state.show_provider_popup = true;
+        assert!(state.has_active_modal());
+        state.show_provider_popup = false;
 
         state.addon_manager_popup = true;
         assert!(state.has_active_modal());

@@ -17,6 +17,7 @@ shared typed models in `providers/models.rs` and the moviebox JSON schema used b
 BDIX sources are only reachable from supported Bangladeshi ISPs and are hidden by
 default (`bdix_enabled` in config; `/settings` → Content Modes → BDIX Sources).
 
+Active streaming providers can be cycled via `Ctrl+P` or visually selected by clicking the provider badge (`[MovieBox · ^P]`) on the landing search bar to open the anchored provider popup menu.
 ## Shared Provider Contract
 
 Search, details, and episode-streams are dispatched per provider. Pluggable provider seams

@@ -986,7 +986,23 @@ fn render_search_bar(
         };
 
         let is_query_empty = state.search_query.is_empty();
-        let (pill_text, pill_style) = if modal_active {
+        let (pill_text, pill_style) = if state.show_provider_popup {
+            let label = state.active_provider.label();
+            let text = if is_ultra_compact {
+                format!("[{label}]")
+            } else {
+                let sep = if state.basic_terminal { "-" } else { "·" };
+                format!("[{label} {sep} {ctrl_p}]")
+            };
+            let style = if state.basic_terminal {
+                theme.sapphire.add_modifier(Modifier::BOLD)
+            } else {
+                let bg = theme.surface1.fg.unwrap_or(Color::Rgb(69, 71, 90));
+                let fg = theme.sapphire.fg.unwrap_or(Color::Rgb(116, 199, 236));
+                Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD)
+            };
+            (text, style)
+        } else if modal_active {
             let text = if !is_query_empty {
                 if is_ultra_compact {
                     "[Enter]".to_string()
@@ -1071,14 +1087,26 @@ fn render_search_bar(
             (text, style)
         };
 
-        let pill_width = crate::tui::text::width(&pill_text) as u16;
-        let search_split = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min(1),
-                Constraint::Length(pill_width.saturating_add(1)),
-            ])
-            .split(inner_row_area);
+        let pill_rect = search_bar_provider_pill_rect(area, state);
+        let search_split = if is_query_empty {
+            let left = Rect {
+                x: inner_row_area.x,
+                y: inner_row_area.y,
+                width: inner_row_area.width.saturating_sub(pill_rect.width),
+                height: inner_row_area.height,
+            };
+            vec![left, pill_rect]
+        } else {
+            let pill_width = crate::tui::text::width(&pill_text) as u16;
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Min(1),
+                    Constraint::Length(pill_width.saturating_add(1)),
+                ])
+                .split(inner_row_area)
+                .to_vec()
+        };
 
         let prefix = if state.basic_terminal { "> " } else { "❯ " };
         let prefix_width = crate::tui::text::width(prefix) as u16;
@@ -2019,6 +2047,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     if !state.tv_config_popup {
         render_search_suggestions(frame, area, search_bar_area, state, theme, view);
     }
+    render_provider_popup(frame, area, search_bar_area, state, theme);
     if state.tv_config_popup {
         let rows = state.tv_manager_rows();
         let total_rows = rows.len();
@@ -2573,6 +2602,186 @@ fn render_search_suggestions(
         frame.render_widget(Paragraph::new(Line::from(spans)).style(row_style), row_area);
     }
 }
+pub fn search_bar_provider_pill_rect(search_card_area: Rect, state: &AppState) -> Rect {
+    let inner_width = search_card_area.width.saturating_sub(4);
+    let inner_row_area = Rect {
+        x: search_card_area.x + 2,
+        y: search_card_area.y + 1,
+        width: inner_width,
+        height: 1,
+    };
+    let is_ultra_compact = search_card_area.width < 58;
+    let ctrl_p = if is_ultra_compact {
+        "P"
+    } else {
+        crate::tui::text::CTRL_P_STR
+    };
+    let ctrl_t = if is_ultra_compact {
+        "T"
+    } else {
+        crate::tui::text::CTRL_T_STR
+    };
+    let sep = if state.basic_terminal { "-" } else { "·" };
+    let pill_text = if state.is_tv_mode {
+        if is_ultra_compact {
+            "[TV]".to_string()
+        } else {
+            format!("[Live TV {sep} {ctrl_t}]")
+        }
+    } else if state.is_addon_mode {
+        if is_ultra_compact {
+            "[Addons]".to_string()
+        } else {
+            "[Addon Mode]".to_string()
+        }
+    } else {
+        let label = state.active_provider.label();
+        if is_ultra_compact {
+            format!("[{label}]")
+        } else {
+            format!("[{label} {sep} {ctrl_p}]")
+        }
+    };
+    let pill_width = crate::tui::text::width(&pill_text) as u16;
+    let search_split = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(1),
+            Constraint::Length(pill_width.saturating_add(1)),
+        ])
+        .split(inner_row_area);
+    search_split[1]
+}
+
+pub fn provider_popup_bounds(
+    area: Rect,
+    search_card_area: Rect,
+    provider_count: usize,
+) -> (Rect, Rect) {
+    if provider_count == 0 || search_card_area.width == 0 || area.width == 0 || area.height == 0 {
+        return (Rect::default(), Rect::default());
+    }
+
+    let min_width = 20u16.min(area.width.saturating_sub(2));
+    let popup_width = 24u16.min(area.width.saturating_sub(2)).max(min_width);
+    let popup_height =
+        ((provider_count as u16).saturating_add(2)).min(area.height.saturating_sub(2));
+
+    let x = search_card_area
+        .right()
+        .saturating_sub(popup_width)
+        .max(area.x)
+        .min(area.right().saturating_sub(popup_width));
+
+    let start_y = search_card_area.bottom();
+    let y = if start_y.saturating_add(popup_height) <= area.bottom() {
+        start_y
+    } else {
+        search_card_area.y.saturating_sub(popup_height)
+    };
+
+    let container_area = Rect {
+        x,
+        y,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    let inner_area = Rect {
+        x: container_area.x.saturating_add(1),
+        y: container_area.y.saturating_add(1),
+        width: container_area.width.saturating_sub(2),
+        height: container_area.height.saturating_sub(2),
+    };
+
+    (container_area, inner_area)
+}
+
+fn render_provider_popup(
+    frame: &mut Frame,
+    area: Rect,
+    search_bar_area: Rect,
+    state: &AppState,
+    theme: &Theme,
+) {
+    if !state.show_provider_popup || search_bar_area.width == 0 {
+        return;
+    }
+
+    let providers = state.available_providers();
+    if providers.is_empty() {
+        return;
+    }
+
+    let (container_area, inner_area) =
+        provider_popup_bounds(area, search_bar_area, providers.len());
+
+    if container_area.width == 0 || container_area.height <= 2 || inner_area.height == 0 {
+        return;
+    }
+
+    crate::tui::clear_area(frame, container_area, theme);
+
+    let container_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(crate::tui::overlay::border_type(state.basic_terminal))
+        .border_style(theme.border_focus)
+        .title(" Providers ");
+
+    frame.render_widget(container_block, container_area);
+
+    let selected_idx = state.provider_list_state.selected();
+
+    for (idx, provider) in providers.iter().enumerate() {
+        let current_y = inner_area.y + idx as u16;
+        if current_y >= inner_area.bottom() {
+            break;
+        }
+
+        let is_selected = selected_idx == Some(idx);
+        let is_active = *provider == state.active_provider;
+
+        let cursor_symbol = if is_selected {
+            if state.basic_terminal { "> " } else { "▌ " }
+        } else {
+            "  "
+        };
+        let cursor_style = if is_selected {
+            theme.accent.add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        };
+
+        let label_style = if is_selected {
+            theme.highlight.add_modifier(Modifier::BOLD)
+        } else if is_active {
+            theme.sapphire.add_modifier(Modifier::BOLD)
+        } else {
+            theme.text_dim
+        };
+
+        let row_style = if is_selected {
+            Style::default().bg(theme.surface0.fg.unwrap_or(theme.base))
+        } else {
+            Style::default()
+        };
+
+        let row_area = Rect {
+            x: inner_area.x,
+            y: current_y,
+            width: inner_area.width,
+            height: 1,
+        };
+
+        let line = Line::from(vec![
+            Span::styled(cursor_symbol, cursor_style),
+            Span::styled(provider.label(), label_style),
+        ]);
+
+        frame.render_widget(Paragraph::new(line).style(row_style), row_area);
+    }
+}
+
 #[inline(always)]
 fn item_slot_rects(item_area: Rect, poster_width: u16) -> (Rect, Rect, Rect) {
     let highlight_w = 2.min(item_area.width);
@@ -2919,6 +3128,84 @@ mod tests {
         assert_eq!(inner.y, 6);
         assert_eq!(inner.width, 58);
         assert_eq!(inner.height, 3);
+    }
+    #[test]
+    fn test_search_bar_provider_pill_rect() {
+        let state = AppState::default();
+        let normal_card = Rect::new(10, 2, 64, 3);
+        let pill_rect = search_bar_provider_pill_rect(normal_card, &state);
+        assert_eq!(pill_rect.y, 3);
+        assert_eq!(pill_rect.height, 1);
+        assert!(pill_rect.right() <= normal_card.right().saturating_sub(2));
+        assert!(pill_rect.width >= 12);
+
+        let compact_card = Rect::new(5, 2, 40, 3);
+        let compact_pill = search_bar_provider_pill_rect(compact_card, &state);
+        assert_eq!(compact_pill.y, 3);
+        assert_eq!(compact_pill.height, 1);
+        assert!(compact_pill.right() <= compact_card.right().saturating_sub(2));
+        assert!(compact_pill.width < pill_rect.width);
+    }
+
+    #[test]
+    fn test_provider_popup_bounds() {
+        let area = Rect::new(0, 0, 80, 24);
+        let search_bar = Rect::new(10, 2, 60, 3);
+        let (container, inner) = provider_popup_bounds(area, search_bar, 4);
+        assert_eq!(container.y, 5);
+        assert_eq!(container.height, 6);
+        assert_eq!(container.width, 24);
+        assert_eq!(container.right(), 70);
+        assert_eq!(inner.x, container.x + 1);
+        assert_eq!(inner.y, 6);
+        assert_eq!(inner.width, 22);
+        assert_eq!(inner.height, 4);
+
+        let bottom_bar = Rect::new(10, 20, 60, 3);
+        let (flipped, _) = provider_popup_bounds(area, bottom_bar, 4);
+        assert_eq!(flipped.y, 14);
+        assert_eq!(flipped.height, 6);
+
+        let narrow_area = Rect::new(0, 0, 16, 24);
+        let narrow_bar = Rect::new(1, 2, 14, 3);
+        let (narrow_container, _) = provider_popup_bounds(narrow_area, narrow_bar, 4);
+        assert!(narrow_container.width <= 14);
+        assert!(narrow_container.right() <= 16);
+    }
+
+    #[test]
+    fn test_render_provider_popup() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            show_provider_popup: true,
+            ..Default::default()
+        };
+        state.provider_list_state.select(Some(0));
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 80, 24);
+                let search_bar = Rect::new(10, 2, 60, 3);
+                render_provider_popup(frame, area, search_bar, &state, &theme);
+            })
+            .unwrap();
+
+        let mut rendered = String::new();
+        for y in 0..24 {
+            for x in 0..80 {
+                let cell = terminal.backend().buffer().cell((x, y)).unwrap();
+                rendered.push_str(cell.symbol());
+            }
+            rendered.push('\n');
+        }
+
+        assert!(rendered.contains("Providers"));
+        assert!(rendered.contains("MovieBox"));
+        assert!(rendered.contains("4KHDHub"));
+        assert!(!rendered.contains('●'));
+        assert!(!rendered.contains('○'));
     }
 
     #[test]

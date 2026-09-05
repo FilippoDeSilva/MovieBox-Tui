@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **Anchored Provider Selection Menu**:
+  - Replaced immediate mouse cycling on the landing search bar provider badge (`[MovieBox · ^P]`) with a styled popup menu anchored directly beneath the provider badge.
+  - Added dedicated keyboard navigation (`↑`/`↓`/`k`/`j`, `Home`/`End`, `Enter`/`Space`, `Esc`) for the provider menu while preserving direct `Ctrl+P` sequential provider cycling across all screens.
+  - Implemented shared geometry (`search_bar_provider_pill_rect` and `provider_popup_bounds`) between renderers and mouse hitboxes, ensuring exact alignment and zero geometry divergence.
 - **Native Android ARM64 Release Target & Pipeline**:
   - Added native `aarch64-linux-android` build target to the release workflow (`.github/workflows/release.yml`) using Android NDK r26d and Clang (API 24+).
   - Configured automated packaging of `MovieBox_Android_arm64.tar.gz` with native Bionic dynamic linking (`libc.so`), valid ELF `PT_PHDR` program header table, and `/system/bin/linker64` dynamic loader.
@@ -18,6 +22,9 @@
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
 ### Fixed
+- **Empty Search Clear Guarding on Landing Screen**:
+  - Guarded search-cleared status notifications in `Action::GoBack`, `c`/`C`, and `Ctrl+U` to only fire when an active search query or loaded results actually existed, eliminating spurious "Search cleared." status messages when navigating on an already-empty landing page.
+  - Allowed pressing Enter on an empty search input in editing mode to cleanly switch back to normal mode without triggering unneeded state resets.
 - **MovieBox DASH Stream Download Engine & Header Authentication**:
   - Forwarded mirror authentication headers (`Cookie` containing CloudFront signed policy and `Referer`) through `Action::StartDownload` and `start_resilient_download`, eliminating `HTTP 403 Forbidden` errors on MovieBox CDN downloads.
   - Added dedicated MPEG-DASH stream engine utilizing `yt-dlp` to assemble multi-track audio/video manifests (`index.mpd`) into `.mp4`, maintaining full feature parity with progressive single-file downloads.

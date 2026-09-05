@@ -467,6 +467,30 @@ impl App {
                 width: card_width,
                 height: rows.rects[rows.search].height,
             };
+            if self.state.show_provider_popup {
+                let available = self.state.available_providers();
+                let (_container_area, inner_area) =
+                    crate::tui::screens::home::provider_popup_bounds(
+                        area,
+                        search_card_area,
+                        available.len(),
+                    );
+
+                if col >= inner_area.left()
+                    && col < inner_area.right()
+                    && row >= inner_area.top()
+                    && row < inner_area.bottom()
+                {
+                    let clicked_idx = (row - inner_area.top()) as usize;
+                    if let Some(&provider) = available.get(clicked_idx) {
+                        self.switch_provider(provider);
+                    }
+                }
+
+                self.state.show_provider_popup = false;
+                self.state.provider_list_state.select(None);
+                return None;
+            }
 
             if row == rows.rects[rows.mode_row].y {
                 self.handle_home_bottom_bar_click(col, area.width);
@@ -529,24 +553,26 @@ impl App {
                 && row >= search_card_area.top()
                 && row < search_card_area.bottom()
             {
-                let is_ultra_compact = area.width < 58;
                 let is_query_empty = self.state.search_query.is_empty();
                 if is_query_empty {
-                    let pill_len = if self.state.is_tv_mode {
-                        if is_ultra_compact { 4 } else { 16 }
-                    } else if self.state.is_addon_mode {
-                        if is_ultra_compact { 8 } else { 16 }
-                    } else {
-                        let label_len = self.state.active_provider.label().chars().count() as u16;
-                        if is_ultra_compact {
-                            label_len + 2
-                        } else {
-                            label_len + 12
-                        }
-                    };
-                    if col >= search_card_area.right().saturating_sub(pill_len + 2) {
+                    let pill_rect = crate::tui::screens::home::search_bar_provider_pill_rect(
+                        search_card_area,
+                        &self.state,
+                    );
+                    if col >= pill_rect.left()
+                        && col < pill_rect.right()
+                        && row >= pill_rect.top()
+                        && row < pill_rect.bottom()
+                    {
                         if self.state.mode() == crate::tui::state::AppMode::Streaming {
-                            self.cycle_provider();
+                            let available = self.state.available_providers();
+                            let current_idx = available
+                                .iter()
+                                .position(|p| *p == self.state.active_provider)
+                                .unwrap_or(0);
+                            self.state.show_provider_popup = true;
+                            self.state.provider_list_state.select(Some(current_idx));
+                            self.state.input_mode = InputMode::Normal;
                         } else if self.state.mode() == crate::tui::state::AppMode::Tv {
                             self.action_sender.send(Action::ToggleTvMode).ok();
                         } else if self.state.mode() == crate::tui::state::AppMode::Addon {
@@ -1378,5 +1404,58 @@ mod tests {
         app.state.search_query.set_content("deewaniyat");
         app.handle_home_mouse(btn1.x + 1, btn1.y, area);
         assert_ne!(app.state.active_provider, ProviderKind::FourKHdHub);
+    }
+    #[tokio::test]
+    async fn test_home_provider_pill_mouse_click_opens_popup() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Home;
+        app.state.input_mode = crate::tui::state::InputMode::Normal;
+        app.state.active_provider = ProviderKind::MovieBox;
+        app.state.search_query.clear();
+
+        let area = Rect::new(0, 0, 100, 30);
+        let card_width = crate::tui::screens::home::search_deck_width(area, &app.state, true);
+        let card_x = area.x + area.width.saturating_sub(card_width) / 2;
+        let (_tier, rows) = crate::tui::screens::home::landing_split(
+            area,
+            app.state.is_tv_mode,
+            app.state.basic_terminal,
+            app.state.landing_deck_visible(),
+        );
+        let search_card_area = Rect {
+            x: card_x,
+            y: rows.rects[rows.search].y,
+            width: card_width,
+            height: rows.rects[rows.search].height,
+        };
+
+        let pill_rect =
+            crate::tui::screens::home::search_bar_provider_pill_rect(search_card_area, &app.state);
+
+        app.handle_home_mouse(pill_rect.x + 1, pill_rect.y, area);
+        assert!(app.state.show_provider_popup);
+        assert_eq!(app.state.provider_list_state.selected(), Some(0));
+
+        let available = app.state.available_providers();
+        let (_container, inner) = crate::tui::screens::home::provider_popup_bounds(
+            area,
+            search_card_area,
+            available.len(),
+        );
+
+        let fourk_idx = available
+            .iter()
+            .position(|p| *p == ProviderKind::FourKHdHub)
+            .unwrap();
+        let target_y = inner.y + fourk_idx as u16;
+        app.handle_home_mouse(inner.x + 1, target_y, area);
+        assert!(!app.state.show_provider_popup);
+        assert_eq!(app.state.active_provider, ProviderKind::FourKHdHub);
+
+        app.handle_home_mouse(pill_rect.x + 1, pill_rect.y, area);
+        assert!(app.state.show_provider_popup);
+        app.handle_home_mouse(area.x, area.y, area);
+        assert!(!app.state.show_provider_popup);
+        assert_eq!(app.state.active_provider, ProviderKind::FourKHdHub);
     }
 }
