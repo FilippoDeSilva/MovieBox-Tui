@@ -3,7 +3,9 @@
 A fast, lightweight terminal client for streaming and downloading movies, TV shows, anime, and live TV — powered by your local media player.
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/5d4da0f6-05fb-4b82-9e9c-9d4eaf98cdaa" alt="MovieBox-TUI Demo" width="100%">
+
+https://github.com/user-attachments/assets/3801e234-9979-4846-a8da-ccfebaabb763
+
 </div>
 
 MovieBox-TUI replaces ad-heavy streaming websites and clunky browser players with a clean, keyboard-driven terminal interface. It scrapes stream links directly from multiple sources and launches playback in your native media player with hardware acceleration, audio track switching, and automatic subtitle synchronization.
