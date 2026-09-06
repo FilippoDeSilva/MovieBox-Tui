@@ -1120,22 +1120,22 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 };
 
                 let release_title = clean_stream_release_title(&file.filename);
-                let upload_by = match file.provider {
-                    crate::providers::models::ProviderKind::MovieBox => "MovieBox CDN".to_string(),
-                    crate::providers::models::ProviderKind::FourKHdHub => "4KHDHub".to_string(),
-                    crate::providers::models::ProviderKind::BdixCircleFtp => {
-                        "CircleFTP".to_string()
-                    }
-                    crate::providers::models::ProviderKind::BdixDhakaFlix => {
-                        "DhakaFlix".to_string()
-                    }
-                    crate::providers::models::ProviderKind::Addons => {
-                        let clean = crate::tui::text::clean_stream_text(file.source_label());
-                        if !clean.is_empty() {
-                            clean
-                        } else {
-                            "Addon".to_string()
+                let clean_source = crate::tui::text::clean_stream_text(file.source_label());
+                let upload_by = if !clean_source.is_empty() && clean_source != "Direct" {
+                    clean_source
+                } else {
+                    match file.provider {
+                        crate::providers::models::ProviderKind::MovieBox => {
+                            "MovieBox CDN".to_string()
                         }
+                        crate::providers::models::ProviderKind::FourKHdHub => "4KHDHub".to_string(),
+                        crate::providers::models::ProviderKind::BdixCircleFtp => {
+                            "CircleFTP".to_string()
+                        }
+                        crate::providers::models::ProviderKind::BdixDhakaFlix => {
+                            "DhakaFlix".to_string()
+                        }
+                        crate::providers::models::ProviderKind::Addons => "Addon".to_string(),
                     }
                 };
                 let is_ultra_compact = streams_area.width < 58;

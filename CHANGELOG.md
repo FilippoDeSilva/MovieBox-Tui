@@ -51,6 +51,8 @@
   - Dimmed unselected list items across Audio dubs, Seasons, Episodes, and Search Results to `theme.muted`, eliminating bright white text bleeds in the background.
   - Dimmed background footer shortcuts and download bar elements during open dialogs, ensuring visual focus remains strictly on the active foreground popup.
   - Suppressed terminal graphics protocol rendering for background posters when a modal dialog is open, preventing image pixels from bleeding over foreground confirmation dialogs.
+- **Stream Table Source Column Resolution**:
+  - Prioritized specific mirror and uploader labels (`file.source_label()`) in the stream table `SOURCE` column before falling back to generic provider names, displaying actual source tags (`Pahe.in`, `PSA`, `NF`, `GalaxyRG`, etc.) when present while retaining provider fallbacks for direct CDN streams.
 - **MovieBox DASH Progress Normalization, Throttling & Background Continuity**:
   - Normalized multi-stream MPEG-DASH download percentages across video (0–90%), audio (90–98%), and merger (99–100%) stages, eliminating progress resets back to 0% when the video stream finishes and the audio stream begins.
   - Enforced monotonic progress tracking and throttled progress event emissions to 250ms intervals, eliminating terminal text jitter and channel saturation.
