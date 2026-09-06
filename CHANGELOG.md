@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Minimal Update Available Modal & Indented Release Notes**:
+  - Formatted release notes into a clean, scannable indented hierarchy under `Release Notes:` with category badges (`[Added]`, `[Fixed]`) and bullet points, displaying concise feature titles without decorative tree glyphs, block prefixes (`▌`), or multi-line duplicate text walls.
+  - Stripped decorative star icons and redundant prompt sentences, keeping the header focused on a clean, high-contrast version diff (`Installed: vX.Y.Z → Latest: vX.Y.Z`).
+  - Separated dialog sections with subtle horizontal card divider lines (`─`) and dedicated action button pills (`[u] Update Now`, `[o] Open Release Page`, `[Esc] Dismiss`).
+- **Calm, Minimal Self-Updating Progress Dialog**:
+  - Redesigned `draw_updating_modal` into a calm, focused card with top and bottom border clearances, eliminating visual crowding against the title and frame.
+  - Streamlined the in-flight display into a unified active status line with spinner (`⠋ Downloading MovieBox-Tui v...` / `⠋ Installing MovieBox-Tui v...`) and a cross-platform safety warning (`⚠ Please wait • do not close terminal` / `[!] Please wait - do not close terminal`).
+### Fixed
+- **Landing Screen ASCII Banner Bleed-Through**:
+- **Modal Frame Backdrop Isolation**:
+  - Applied opaque theme background styling (`theme.base`) to `ModalFrame`, preventing terminal background transparency or buffer bleed through dialog borders.
+- **Update Modal Geometry & Border Clearances**:
+  - Widened the modal from 72 to 76 columns to align with standard dialog geometry and provide a generous 3-column safety margin, preventing text lines and bullet points from crowding the outer borders.
+
 ## [0.1.17] - 2026-09-06
 
 ### Added

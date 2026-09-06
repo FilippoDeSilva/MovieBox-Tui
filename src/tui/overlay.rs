@@ -589,30 +589,28 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
         .filter(|l| !l.is_empty())
         .count();
 
-    let min_w: u16 = 58;
-    let max_w: u16 = 72;
-    let desired_w = max_w
-        .min(area.width.saturating_sub(4))
-        .max(min_w.min(area.width));
+    let min_w: u16 = 46;
+    let max_w: u16 = 76;
+    let available_w = area.width.saturating_sub(4);
+    let desired_w = max_w.min(available_w).max(min_w.min(available_w));
 
-    let header_rows: u16 = 5;
-    let footer_rows: u16 = 3;
+    let header_rows: u16 = 6;
+    let footer_rows: u16 = 4;
     let available_height = area.height.saturating_sub(4);
     let available_note_rows =
-        (available_height.saturating_sub(header_rows + footer_rows) as usize).clamp(2, 10);
+        (available_height.saturating_sub(header_rows + footer_rows) as usize).clamp(3, 12);
 
     let display_count = note_lines_count.min(available_note_rows);
     let has_more = note_lines_count > display_count;
-    let total_rows =
-        header_rows + (display_count as u16) + (if has_more { 1 } else { 0 }) + footer_rows;
-    let desired_h = total_rows.clamp(10, available_height.max(10));
+    let total_rows = header_rows + (display_count as u16) + footer_rows;
+    let desired_h = total_rows.clamp(12, available_height.max(12));
 
     const UPDATE_SEGMENT: u16 = 18;
     const OPEN_SEGMENT: u16 = 26;
-    const DISMISS_SEGMENT: u16 = 12;
+    const DISMISS_SEGMENT: u16 = 14;
 
-    let popup_area = centered(area, desired_w, desired_h, min_w.min(area.width), max_w);
-    let (update_seg, open_seg, dismiss_seg) = if popup_area.width < 58 {
+    let popup_area = centered(area, desired_w, desired_h, min_w.min(available_w), max_w);
+    let (update_seg, open_seg, dismiss_seg) = if popup_area.width < 60 {
         (12, 10, 10)
     } else {
         (UPDATE_SEGMENT, OPEN_SEGMENT, DISMISS_SEGMENT)
@@ -646,14 +644,14 @@ mod tests {
         let notes = "Line 1\nLine 2\nLine 3\nLine 4";
         let layout = update_modal_layout(area, notes);
 
-        assert_eq!(layout.popup_area.width, 72);
+        assert_eq!(layout.popup_area.width, 76);
         assert_eq!(layout.display_count, 4);
         assert!(!layout.has_more);
-        assert_eq!(layout.popup_area.height, 12);
-        assert_eq!(layout.popup_area.x, (80 - 72) / 2);
-        assert_eq!(layout.popup_area.y, (24 - 12) / 2);
-        assert_eq!(layout.button_row_y, layout.popup_area.y + 10);
-        let footer_start = layout.popup_area.x + 1 + (70 - 56) / 2;
+        assert_eq!(layout.popup_area.height, 14);
+        assert_eq!(layout.popup_area.x, (80 - 76) / 2);
+        assert_eq!(layout.popup_area.y, (24 - 14) / 2);
+        assert_eq!(layout.button_row_y, layout.popup_area.y + 12);
+        let footer_start = layout.popup_area.x + 1 + (74 - 58) / 2;
         assert_eq!(layout.update_btn_end_x, footer_start + 18);
         assert_eq!(layout.open_btn_end_x, layout.update_btn_end_x + 26);
         assert_eq!(layout.open_button_midpoint_x, layout.update_btn_end_x + 13);
@@ -734,9 +732,9 @@ mod tests {
         assert!(compact.has_more);
 
         let large = update_modal_layout(Rect::new(0, 0, 160, 50), notes);
-        assert_eq!(large.popup_area.width, 72);
-        assert_eq!(large.display_count, 10);
-        assert!(large.has_more);
+        assert_eq!(large.popup_area.width, 76);
+        assert_eq!(large.display_count, 11);
+        assert!(!large.has_more);
     }
 
     #[test]

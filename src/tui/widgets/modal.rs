@@ -39,7 +39,8 @@ impl<'a> ModalFrame<'a> {
             .title_style(self.theme.title)
             .borders(Borders::ALL)
             .border_type(overlay::border_type(self.basic_terminal))
-            .border_style(self.border_style.unwrap_or(self.theme.lavender));
+            .border_style(self.border_style.unwrap_or(self.theme.lavender))
+            .style(Style::default().bg(self.theme.base));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         inner

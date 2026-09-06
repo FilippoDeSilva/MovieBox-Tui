@@ -1501,25 +1501,30 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             .split(vertical_chunks[rows.version]);
 
         let modal_active = state.has_active_modal() || state.show_settings_popup;
-        let logo_style = if modal_active {
-            theme.overlay0
-        } else {
-            theme.title
-        };
-        let title_art = Paragraph::new(logo_text)
-            .alignment(Alignment::Left)
-            .style(logo_style);
-        frame.render_widget(title_art, horizontal_chunks[1]);
+        let update_active = (state.update_available.is_some()
+            && state.input_mode != InputMode::Editing)
+            || state.is_updating;
+        if !update_active {
+            let logo_style = if modal_active {
+                theme.overlay0
+            } else {
+                theme.title
+            };
+            let title_art = Paragraph::new(logo_text)
+                .alignment(Alignment::Left)
+                .style(logo_style);
+            frame.render_widget(title_art, horizontal_chunks[1]);
 
-        let version_style = if modal_active {
-            theme.muted
-        } else {
-            theme.text_dim
-        };
-        let version = Paragraph::new(format!("v{}", env!("CARGO_PKG_VERSION")))
-            .alignment(Alignment::Right)
-            .style(version_style);
-        frame.render_widget(version, version_chunks[1]);
+            let version_style = if modal_active {
+                theme.muted
+            } else {
+                theme.text_dim
+            };
+            let version = Paragraph::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                .alignment(Alignment::Right)
+                .style(version_style);
+            frame.render_widget(version, version_chunks[1]);
+        }
 
         let card_width = search_deck_width(area, state, true);
         let card_x = area.x + area.width.saturating_sub(card_width) / 2;
@@ -1530,7 +1535,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             height: vertical_chunks[rows.search].height,
         };
 
-        if !state.tv_config_popup {
+        if !state.tv_config_popup && !update_active {
             render_search_bar(
                 frame,
                 search_card_area,
@@ -1545,11 +1550,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let suggestions_open =
             state.input_mode == InputMode::Editing && !state.search_suggestions.is_empty();
 
-        if state.landing_deck_visible() && !state.tv_config_popup {
+        if state.landing_deck_visible() && !state.tv_config_popup && !update_active {
             render_landing_deck(frame, vertical_chunks[rows.favorites], state, theme);
         } else if !state.is_tv_mode
             && !state.tv_config_popup
             && !suggestions_open
+            && !update_active
             && area.height >= 26
         {
             render_discover_landing(frame, vertical_chunks[rows.favorites], state, theme);
@@ -3907,7 +3913,57 @@ mod tests {
             .iter()
             .map(|cell| cell.symbol())
             .collect::<String>();
-
         assert!(!content.contains("●"));
+    }
+
+    #[test]
+    fn test_home_banner_suppressed_when_update_modal_active() {
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            update_available: Some(("0.1.18".to_string(), "Release Notes".to_string())),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 100, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(!content.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
+    }
+
+    #[test]
+    fn test_home_banner_rendered_when_no_update_modal() {
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState::default();
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                let area = Rect::new(0, 0, 100, 30);
+                draw(frame, area, &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
     }
 }
