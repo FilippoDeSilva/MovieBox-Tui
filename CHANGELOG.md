@@ -18,6 +18,10 @@
   - Widened the modal from 72 to 76 columns to align with standard dialog geometry and provide a generous 3-column safety margin, preventing text lines and bullet points from crowding the outer borders.
 - **Search Bar Synthetic Cursor Artifacts**:
   - Removed artificial block glyphs (`▎` / `█`) drawn directly into search input paragraphs, relying on native terminal cursor positioning without visual cursor duplication or blinking redraw churn.
+- **README Demo GIF Inline Embed**:
+  - Embedded the application demo animation directly as a centered responsive image in `README.md` and `docs/README.md`, replacing text link and video tag placeholders for immediate inline display across GitHub and mdBook.
+- **CI Performance Benchmark Runner Tolerance**:
+  - Bound wall-clock timing assertion tolerances during unoptimized debug test execution in `tests/performance_audit.rs`, eliminating flaky runner noise failures across virtualized CI runners while maintaining release regression bounds.
 ### Performance
 - **Zero-Allocation Text Truncation Pipeline (`src/tui/text.rs`)**:
   - Implemented SIMD `is_ascii()` fast path in `width` and migrated `truncate_width` to `Cow<'a, str>`, eliminating 100% of heap allocations on fitting titles and text spans.
