@@ -1031,7 +1031,7 @@ fn render_search_bar(
                     format!("[{label} {sep} {ctrl_p}]")
                 }
             };
-            (text, theme.text_dim)
+            (text, theme.muted)
         } else if !is_query_empty {
             if is_ultra_compact {
                 ("[Enter]".to_string(), theme.accent)
@@ -1782,7 +1782,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         .split(text_area)
                 };
 
-                let title_style = if is_selected {
+                let title_style = if modal_active {
+                    theme.muted
+                } else if is_selected {
                     if is_editing {
                         theme.text
                     } else {
@@ -1827,6 +1829,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         r,
                         theme,
                         state.basic_terminal,
+                        modal_active,
                     )
                 });
                 let badge_width = badge_spans.as_ref().map_or(0, |spans| {
@@ -1848,7 +1851,11 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 if is_favorited {
                     row1_spans.push(ratatui::text::Span::styled(
                         if state.basic_terminal { "* " } else { "★ " },
-                        theme.rating,
+                        if modal_active {
+                            theme.muted
+                        } else {
+                            theme.rating
+                        },
                     ));
                 }
                 row1_spans.push(ratatui::text::Span::styled(
@@ -1958,6 +1965,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         res.provider,
                         theme,
                         state.basic_terminal,
+                        modal_active,
                     ));
                 } else {
                     let matching_meta = state
@@ -1997,18 +2005,47 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     }
                     let has_year = res.release_year != "Unknown" && !res.release_year.is_empty();
                     if has_year {
-                        row2_spans.push(ratatui::text::Span::styled(&res.release_year, theme.text));
-                        row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        row2_spans.push(ratatui::text::Span::styled(
+                            &res.release_year,
+                            if modal_active {
+                                theme.muted
+                            } else {
+                                theme.text
+                            },
+                        ));
+                        row2_spans.push(ratatui::text::Span::styled(
+                            " • ",
+                            if modal_active {
+                                theme.muted
+                            } else {
+                                theme.text_dim
+                            },
+                        ));
                     }
 
                     if text_area.width >= 36 || !has_year {
-                        row2_spans.push(ratatui::text::Span::styled(&type_tag, theme.text));
-                        row2_spans.push(ratatui::text::Span::styled(" • ", theme.text_dim));
+                        row2_spans.push(ratatui::text::Span::styled(
+                            &type_tag,
+                            if modal_active {
+                                theme.muted
+                            } else {
+                                theme.text
+                            },
+                        ));
+                        row2_spans.push(ratatui::text::Span::styled(
+                            " • ",
+                            if modal_active {
+                                theme.muted
+                            } else {
+                                theme.text_dim
+                            },
+                        ));
                     }
                     row2_spans.push(crate::tui::widgets::badge::provider_badge_span(
                         res.provider,
                         theme,
                         state.basic_terminal,
+                        modal_active,
                     ));
                 }
 

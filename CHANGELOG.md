@@ -47,6 +47,8 @@
 ### Fixed
 - **Global Modal Background Unfocus & Dimming**:
   - Automatically unfocused and dimmed all background components across Details, Home, and Runner views whenever any modal or popup dialog is active, replacing bright active borders, focus bullets, and selection highlight rectangles with dimmed styling (`theme.muted`).
+  - Dimmed background resolution badges (`Multi`, `4K`, `1080p`, etc.) and provider origin tags to muted styling (`theme.muted` on surface backgrounds) during active modal popups, preventing neon badge colors from competing with foreground dialogs.
+  - Dimmed unselected list items across Audio dubs, Seasons, Episodes, and Search Results to `theme.muted`, eliminating bright white text bleeds in the background.
   - Dimmed background footer shortcuts and download bar elements during open dialogs, ensuring visual focus remains strictly on the active foreground popup.
   - Suppressed terminal graphics protocol rendering for background posters when a modal dialog is open, preventing image pixels from bleeding over foreground confirmation dialogs.
 - **MovieBox DASH Progress Normalization, Throttling & Background Continuity**:

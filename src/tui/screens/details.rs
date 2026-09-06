@@ -810,7 +810,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let mut lang_items = Vec::new();
         for dub in &details.dubs {
             let name = clean_language_name(&dub.language);
-            lang_items.push(ListItem::new(name).style(theme.text));
+            let item_style = if modal_active {
+                theme.muted
+            } else {
+                theme.text
+            };
+            lang_items.push(ListItem::new(name).style(item_style));
         }
         let language_count = lang_items.len();
 
@@ -857,7 +862,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         let seasons_items: Vec<ListItem> = state
             .available_seasons
             .iter()
-            .map(|s| ListItem::new(format!("Season {}", s.number)).style(theme.text))
+            .map(|s| {
+                let item_style = if modal_active {
+                    theme.muted
+                } else {
+                    theme.text
+                };
+                ListItem::new(format!("Season {}", s.number)).style(item_style)
+            })
             .collect();
 
         let seasons_focused =
@@ -939,7 +951,9 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     } else {
                         format!("EP {ep:02}")
                     };
-                    if let Some(hist) =
+                    if modal_active {
+                        ListItem::new(format!("{unwatched_sym}{ep_base}")).style(theme.muted)
+                    } else if let Some(hist) =
                         state
                             .history
                             .get_item(provider, subject_id, se_num, ep, Some(&title))
@@ -1135,6 +1149,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     resolution,
                     theme,
                     state.basic_terminal,
+                    modal_active,
                 ));
 
                 stream_spans.push(Span::styled(
@@ -1760,7 +1775,11 @@ fn render_workflow(
                 } else {
                     "  ›  "
                 },
-                theme.overlay0,
+                if modal_active {
+                    theme.muted
+                } else {
+                    theme.overlay0
+                },
             ));
         }
         if *pane == state.details_pane && !modal_active {
@@ -2921,12 +2940,36 @@ mod tests {
                 duration: None,
                 genres: vec![],
                 seasons: vec![],
-                dubs: vec![],
+                dubs: vec![
+                    AudioTrackOption {
+                        subject_id: "sample".to_string(),
+                        language: "Original".to_string(),
+                        label: "Original".to_string(),
+                    },
+                    AudioTrackOption {
+                        subject_id: "sample-hi".to_string(),
+                        language: "Hindi".to_string(),
+                        label: "Hindi".to_string(),
+                    },
+                ],
             }),
+            selected_resources: vec![Release {
+                provider: ProviderKind::MovieBox,
+                filename: "Sample Stream Multi-Res hevc".to_string(),
+                quality: Some("Multi".to_string()),
+                codec: Some("HEVC".to_string()),
+                language: None,
+                size_bytes: Some(1_600_000_000),
+                season: None,
+                episode: None,
+                mirrors: vec![],
+                resource_id: Some("res-1".to_string()),
+            }],
             details_pane: crate::tui::state::DetailsPane::Streams,
             show_episode_download_confirm: true,
             ..Default::default()
         };
+        state.language_list_state.select(Some(0));
         let theme = Theme::mocha();
 
         terminal
@@ -2944,5 +2987,31 @@ mod tests {
 
         assert!(content.contains("Confirm Episode Download"));
         assert!(!content.contains("● Streams"));
+        assert!(content.contains("Multi"));
+        assert!(content.contains("Hindi"));
+
+        for y in 0..30 {
+            for x in 0..120 {
+                let cell = &buffer[(x, y)];
+                if x < 20
+                    && cell.symbol() == "M"
+                    && x + 4 < 120
+                    && buffer[(x + 1, y)].symbol() == "u"
+                {
+                    assert_eq!(
+                        cell.style().fg,
+                        theme.muted.fg,
+                        "Multi badge foreground should be muted"
+                    );
+                }
+                if cell.symbol() == "H" && x + 4 < 120 && buffer[(x + 1, y)].symbol() == "i" {
+                    assert_eq!(
+                        cell.style().fg,
+                        theme.muted.fg,
+                        "Hindi text foreground should be muted"
+                    );
+                }
+            }
+        }
     }
 }

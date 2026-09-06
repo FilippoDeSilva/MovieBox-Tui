@@ -23,7 +23,44 @@ pub fn resolution_badge_spans<'a>(
     resolution: i64,
     theme: &'a Theme,
     basic_terminal: bool,
+    modal_active: bool,
 ) -> Vec<Span<'a>> {
+    if modal_active {
+        if basic_terminal {
+            let label = match resolution {
+                -1 => "[Multi]",
+                2160 | 4320 => "[4K]",
+                1080 => "[1080p]",
+                720 => "[720p]",
+                480 | 540 | 576 => "[480p]",
+                360 => "[360p]",
+                _ if resolution > 0 => "[HD]",
+                _ => "[SD]",
+            };
+            return vec![
+                Span::styled(format!("{:<7}", label), theme.muted),
+                Span::raw(" "),
+            ];
+        }
+
+        let label = match resolution {
+            -1 => " Multi ",
+            2160 | 4320 => "  4K   ",
+            1080 => " 1080p ",
+            720 => " 720p  ",
+            480 | 540 | 576 => " 480p  ",
+            360 => " 360p  ",
+            _ if resolution > 0 => "  HD   ",
+            _ => "  SD   ",
+        };
+        let badge_bg = theme_color(theme.surface0, theme.base);
+        let contrast_fg = theme_color(theme.muted, Color::DarkGray);
+        return vec![
+            Span::styled(label, Style::default().bg(badge_bg).fg(contrast_fg)),
+            Span::raw(" "),
+        ];
+    }
+
     if basic_terminal {
         let (label, style) = match resolution {
             -1 => ("[Multi]", theme.lavender.add_modifier(Modifier::BOLD)),
@@ -123,9 +160,12 @@ pub fn provider_badge_span<'a>(
     provider: ProviderKind,
     theme: &'a Theme,
     basic_terminal: bool,
+    modal_active: bool,
 ) -> Span<'a> {
     let tag = provider_origin_tag(provider);
-    if basic_terminal {
+    if modal_active {
+        Span::styled(tag, theme.muted)
+    } else if basic_terminal {
         Span::styled(tag, theme.text_dim)
     } else {
         let style = match provider {
@@ -347,25 +387,30 @@ mod tests {
     #[test]
     fn test_resolution_badge_spans() {
         let theme = Theme::default();
-        let spans_4k = resolution_badge_spans(2160, &theme, false);
+        let spans_4k = resolution_badge_spans(2160, &theme, false, false);
         assert_eq!(spans_4k[0].content, "  4K   ");
 
-        let spans_1080 = resolution_badge_spans(1080, &theme, false);
+        let spans_1080 = resolution_badge_spans(1080, &theme, false, false);
         assert_eq!(spans_1080[0].content, " 1080p ");
 
-        let spans_720 = resolution_badge_spans(720, &theme, false);
+        let spans_720 = resolution_badge_spans(720, &theme, false, false);
         assert_eq!(spans_720[0].content, " 720p  ");
 
-        let spans_sd = resolution_badge_spans(480, &theme, false);
+        let spans_sd = resolution_badge_spans(480, &theme, false, false);
         assert_eq!(spans_sd[0].content, " 480p  ");
 
-        let spans_multi = resolution_badge_spans(-1, &theme, false);
+        let spans_multi = resolution_badge_spans(-1, &theme, false, false);
         assert_eq!(spans_multi[0].content, " Multi ");
 
-        let basic_4k = resolution_badge_spans(2160, &theme, true);
+        let basic_4k = resolution_badge_spans(2160, &theme, true, false);
         assert_eq!(basic_4k[0].content.trim(), "[4K]");
-        let basic_multi = resolution_badge_spans(-1, &theme, true);
+        let basic_multi = resolution_badge_spans(-1, &theme, true, false);
         assert_eq!(basic_multi[0].content.trim(), "[Multi]");
+
+        let muted_multi = resolution_badge_spans(-1, &theme, false, true);
+        assert_eq!(muted_multi[0].style.fg, theme.muted.fg);
+        let muted_basic = resolution_badge_spans(-1, &theme, true, true);
+        assert_eq!(muted_basic[0].style.fg, theme.muted.fg);
     }
 
     #[test]
