@@ -42,7 +42,7 @@ prevent escape sequence probe leakage (`Gi=31...`):
   fallback palette (`Theme::fallback`) using crisp cyan accents; an OSC 11 background query
   picks light/dark variants. Light mode themes (including Catppuccin Latte) are tuned for
   WCAG AA compliance, ensuring high-contrast readability across light terminal backgrounds.
-  Modal pickers feature solid opaque backdrops, minimum 7-row breathing room, and background
+  Modal pickers feature clean transparent border backdrops, minimum 7-row breathing room, and background
   selection suppression to isolate dialog focus. An explicit `MOVIEBOX_THEME` or saved theme
   always wins over autodetection.
 - **Keyboard & Cursor**: The kitty keyboard protocol (disambiguated escapes, event

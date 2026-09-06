@@ -39,8 +39,7 @@ impl<'a> ModalFrame<'a> {
             .title_style(self.theme.title)
             .borders(Borders::ALL)
             .border_type(overlay::border_type(self.basic_terminal))
-            .border_style(self.border_style.unwrap_or(self.theme.lavender))
-            .style(Style::default().bg(self.theme.base));
+            .border_style(self.border_style.unwrap_or(self.theme.lavender));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         inner
@@ -72,18 +71,33 @@ mod tests {
     fn test_modal_frame_render() {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
-        let theme = Theme::default();
+        let theme = Theme::mocha();
 
+        let popup = Rect::new(10, 5, 60, 14);
         terminal
             .draw(|f| {
                 let full = Rect::new(0, 0, 80, 24);
-                let popup = Rect::new(10, 5, 60, 14);
                 let modal = ModalFrame::new("Test Modal", &theme, false);
                 let inner = modal.render(f, popup, full);
                 assert_eq!(inner.width, 58);
                 assert_eq!(inner.height, 12);
             })
             .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(popup.x, popup.y)].bg, ratatui::style::Color::Reset);
+        assert_eq!(
+            buffer[(popup.x + popup.width - 1, popup.y)].bg,
+            ratatui::style::Color::Reset
+        );
+        assert_eq!(
+            buffer[(popup.x, popup.y + popup.height - 1)].bg,
+            ratatui::style::Color::Reset
+        );
+        assert_eq!(
+            buffer[(popup.x + popup.width - 1, popup.y + popup.height - 1)].bg,
+            ratatui::style::Color::Reset
+        );
     }
 
     #[test]

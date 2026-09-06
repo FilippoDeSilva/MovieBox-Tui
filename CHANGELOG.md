@@ -12,8 +12,8 @@
   - Streamlined the in-flight display into a unified active status line with spinner (`⠋ Downloading MovieBox-Tui v...` / `⠋ Installing MovieBox-Tui v...`) and a cross-platform safety warning (`⚠ Please wait • do not close terminal` / `[!] Please wait - do not close terminal`).
 ### Fixed
 - **Landing Screen ASCII Banner Bleed-Through**:
-- **Modal Frame Backdrop Isolation**:
-  - Applied opaque theme background styling (`theme.base`) to `ModalFrame`, preventing terminal background transparency or buffer bleed through dialog borders.
+- **Modal Frame Corner Backdrops & Transparent Halos**:
+  - Removed block-level background color overrides from `ModalFrame`, eliminating dark rectangular halos and square pixel spillage around rounded corner glyphs (`╭`, `╮`, `╰`, `╯`) across transparent and custom terminal themes.
 - **Update Modal Geometry & Border Clearances**:
   - Widened the modal from 72 to 76 columns to align with standard dialog geometry and provide a generous 3-column safety margin, preventing text lines and bullet points from crowding the outer borders.
 - **Search Bar Synthetic Cursor Artifacts**:
