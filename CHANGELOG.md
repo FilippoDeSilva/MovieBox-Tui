@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.18] - 2026-09-06
 
 ### Added
 - **Minimal Update Available Modal & Indented Release Notes**:
