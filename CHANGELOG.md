@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.17] - 2026-09-06
 
 ### Added
 - **Anchored Provider Selection Menu**:
