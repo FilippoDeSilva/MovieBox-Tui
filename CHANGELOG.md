@@ -18,8 +18,8 @@
   - Widened the modal from 72 to 76 columns to align with standard dialog geometry and provide a generous 3-column safety margin, preventing text lines and bullet points from crowding the outer borders.
 - **Search Bar Synthetic Cursor Artifacts**:
   - Removed artificial block glyphs (`▎` / `█`) drawn directly into search input paragraphs, relying on native terminal cursor positioning without visual cursor duplication or blinking redraw churn.
-- **README Media Player Preview**:
-  - Embedded the media preview via centered user-attachment asset URL in `README.md` and `docs/README.md`, replacing static image and link placeholders.
+- **README Walkthrough Media Attachment**:
+  - Formatted the WebM walkthrough attachment link in `README.md` and `docs/README.md` for native inline playback.
 - **CI Performance Benchmark Runner Tolerance**:
   - Bound wall-clock timing assertion tolerances during unoptimized debug test execution in `tests/performance_audit.rs`, eliminating flaky runner noise failures across virtualized CI runners while maintaining release regression bounds.
 ### Performance
