@@ -176,6 +176,9 @@ pub(crate) fn classify_terminal(colorterm: &str, term: &str, term_program: &str)
         ColorSupport::Basic
     }
 }
+pub fn theme_color(style: Style, fallback: Color) -> Color {
+    style.fg.unwrap_or(fallback)
+}
 
 impl Theme {
     pub fn mocha() -> Self {
@@ -1088,5 +1091,12 @@ mod tests {
             assert_eq!(swatches[1].content, "■ ");
             assert_eq!(swatches[2].content, "■");
         }
+    }
+    #[test]
+    fn test_theme_color() {
+        let with_fg = Style::default().fg(Color::Red);
+        assert_eq!(theme_color(with_fg, Color::Blue), Color::Red);
+        let without_fg = Style::default();
+        assert_eq!(theme_color(without_fg, Color::Blue), Color::Blue);
     }
 }

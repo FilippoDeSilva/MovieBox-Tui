@@ -593,6 +593,24 @@ impl AppState {
             .unwrap_or(self.active_provider)
     }
 
+    pub fn is_selected_details_favorited(&self) -> bool {
+        let Some(details) = &self.selected_details else {
+            return false;
+        };
+        let details_subject_id = self.active_subject_id.as_deref().unwrap_or("");
+        let title = &details.title;
+        let type_val = if details.is_series() { 2 } else { 1 };
+        let year = details.year.as_deref().unwrap_or("N/A");
+        let provider = self.provider_for_subject(details_subject_id);
+        self.favorites.is_favorite(&crate::models::SubjectIdentity {
+            provider: provider.cache_key(),
+            subject_id: details_subject_id,
+            title,
+            stype: type_val,
+            release_year: year,
+        })
+    }
+
     pub fn available_providers(&self) -> Vec<ProviderKind> {
         crate::models::ProviderKind::ENABLED
             .into_iter()
@@ -1094,10 +1112,6 @@ pub enum TvManagerRow {
     Done,
 }
 
-fn playlist_is_url(source: &str) -> bool {
-    crate::tui::text::is_http_url(source)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddonManagerRow {
     Header(&'static str),
@@ -1167,14 +1181,14 @@ impl AppState {
     pub fn tv_manager_rows(&self) -> Vec<TvManagerRow> {
         let mut rows = vec![TvManagerRow::Header("URL playlists")];
         for (index, source) in self.tv_playlists.iter().enumerate() {
-            if playlist_is_url(source) {
+            if crate::tui::text::is_http_url(source) {
                 rows.push(TvManagerRow::Playlist(index));
             }
         }
         rows.push(TvManagerRow::AddUrl);
         rows.push(TvManagerRow::Header("File playlists"));
         for (index, source) in self.tv_playlists.iter().enumerate() {
-            if !playlist_is_url(source) {
+            if !crate::tui::text::is_http_url(source) {
                 rows.push(TvManagerRow::Playlist(index));
             }
         }

@@ -435,15 +435,6 @@ pub(crate) fn no_results_button_hitboxes(
     };
     (btn1, btn2)
 }
-#[allow(dead_code)]
-pub(crate) fn render_favorites_landing(
-    frame: &mut Frame,
-    area: Rect,
-    state: &AppState,
-    theme: &Theme,
-) {
-    render_landing_deck(frame, area, state, theme);
-}
 
 pub(crate) fn render_landing_deck(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     if area.height < 3 || area.width < 20 {
@@ -3392,7 +3383,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = Rect::new(0, 0, 80, 24);
-                render_favorites_landing(frame, area, &state, &theme);
+                render_landing_deck(frame, area, &state, &theme);
             })
             .unwrap();
 
@@ -3439,7 +3430,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = Rect::new(0, 0, 80, 24);
-                render_favorites_landing(frame, area, &state, &theme);
+                render_landing_deck(frame, area, &state, &theme);
             })
             .unwrap();
 

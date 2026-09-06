@@ -19,6 +19,7 @@ src/
   logging.rs                    file logging (rotation, sanitization)
   models.rs                     shared domain models (SearchResult, BrowseMetrics, StreamPool,
                                 Notification, SubjectIdentity)
+  net.rs                        fallback DNS resolution, HTTP client builder, URL validation
   player.rs                     player detection (OnceLock) and command construction (mpv/VLC/IINA/Android)
   providers/
     mod.rs                      provider module tree

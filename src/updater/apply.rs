@@ -232,7 +232,7 @@ fn spawn_windows_helper(staged_path: &Path, current_exe: &Path) -> Result<(), St
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
+        cmd.creation_flags(crate::player::CREATE_NO_WINDOW);
     }
     cmd.spawn()
         .map_err(|e| format!("failed to spawn Windows update helper: {e}"))?;

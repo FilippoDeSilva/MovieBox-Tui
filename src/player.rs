@@ -2,6 +2,8 @@ pub mod tracker;
 
 use std::{path::Path, process::Command};
 
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerKind {
     Mpv,
@@ -589,7 +591,7 @@ fn query_windows_registry_value(key: &str, value_name: Option<&str>) -> Option<S
     } else {
         cmd.arg("/ve");
     }
-    cmd.creation_flags(0x08000000);
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd.output().ok()?;
     if !output.status.success() {
@@ -1522,5 +1524,9 @@ mod tests {
                 .iter()
                 .any(|c| c.contains("C:") && c.contains("vlc.exe"))
         );
+    }
+    #[test]
+    fn test_create_no_window_constant() {
+        assert_eq!(CREATE_NO_WINDOW, 0x0800_0000);
     }
 }

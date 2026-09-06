@@ -34,7 +34,7 @@ impl App {
                 self.action_sender.send(Action::Quit).ok();
                 return None;
             }
-            if !self.has_active_modal() {
+            if !self.state.has_active_modal() {
                 if let KeyCode::Char('t') = key.code {
                     if self.state.tv_enabled {
                         self.action_sender.send(Action::ToggleTvMode).ok();
@@ -82,7 +82,7 @@ impl App {
             && self.state.input_mode != InputMode::Editing
             && !self.state.tv_input_active
             && !self.state.addon_input_active
-            && !self.has_active_modal()
+            && !self.state.has_active_modal()
         {
             self.action_sender.send(Action::CancelDownload).ok();
             return None;
@@ -1204,10 +1204,6 @@ impl App {
             },
         }
         None
-    }
-
-    fn has_active_modal(&self) -> bool {
-        self.state.has_active_modal()
     }
 }
 

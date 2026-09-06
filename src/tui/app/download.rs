@@ -251,7 +251,7 @@ impl App {
                     .arg(&link);
                 #[cfg(target_os = "windows")]
                 {
-                    cmd.creation_flags(0x08000000);
+                    cmd.creation_flags(crate::player::CREATE_NO_WINDOW);
                 }
 
                 cmd.stdout(std::process::Stdio::piped());

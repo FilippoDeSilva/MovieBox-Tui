@@ -74,6 +74,11 @@ pub fn http_client_builder() -> reqwest::ClientBuilder {
         .pool_max_idle_per_host(8)
 }
 
+pub fn is_http_url(source: &str) -> bool {
+    let trimmed = source.trim();
+    trimmed.starts_with("http://") || trimmed.starts_with("https://")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,5 +120,14 @@ mod tests {
         let original = FallbackResolver::new();
         let _clone = original.clone();
         let _builder = http_client_builder();
+    }
+    #[test]
+    fn test_is_http_url() {
+        assert!(is_http_url("http://example.com"));
+        assert!(is_http_url("https://example.com/playlist.m3u8"));
+        assert!(is_http_url("   https://example.com   "));
+        assert!(!is_http_url("/local/path/file.m3u"));
+        assert!(!is_http_url("stremio://addon.example.com"));
+        assert!(!is_http_url(""));
     }
 }

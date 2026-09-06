@@ -30,7 +30,7 @@ impl M3UParser {
         url: &str,
     ) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
         let trimmed = url.trim();
-        let is_remote = crate::tui::text::is_http_url(trimmed);
+        let is_remote = crate::net::is_http_url(trimmed);
         let content = if is_remote {
             let file_path = self.cache_dir.join(cache_filename(trimmed));
             let mut needs_download = true;

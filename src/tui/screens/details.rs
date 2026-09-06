@@ -3,7 +3,10 @@ pub(crate) use crate::tui::widgets::{
     extract_media_tags, loading_spinner as stream_loading_spinner, render_poster_placeholder,
     resolution_badge_spans,
 };
-use crate::tui::{state::AppState, theme::Theme};
+use crate::tui::{
+    state::AppState,
+    theme::{Theme, theme_color},
+};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -813,30 +816,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let language_focused =
             !modal_active && state.details_pane == crate::tui::state::DetailsPane::Languages;
-        let lang_border = if modal_active {
-            theme.muted
-        } else if language_focused {
-            focused_border_style(theme)
-        } else {
-            unfocused_border_style(theme)
-        };
-        let lang_title_style = if modal_active {
-            theme.muted
-        } else if language_focused {
-            focused_title_style(theme)
-        } else {
-            unfocused_title_style(theme)
-        };
-        let lang_highlight_style = if modal_active {
-            theme.muted
-        } else {
-            selection_style(language_focused, state.basic_terminal, theme)
-        };
-        let lang_highlight_symbol = if modal_active {
-            "  "
-        } else {
-            selection_symbol(language_focused, state.basic_terminal)
-        };
+        let (lang_border, lang_title_style, lang_highlight_style, lang_highlight_symbol) =
+            pane_styles(language_focused, modal_active, state.basic_terminal, theme);
         let lang_list = List::new(lang_items)
             .block(
                 Block::default()
@@ -881,30 +862,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let seasons_focused =
             !modal_active && state.details_pane == crate::tui::state::DetailsPane::Seasons;
-        let seasons_border = if modal_active {
-            theme.muted
-        } else if seasons_focused {
-            focused_border_style(theme)
-        } else {
-            unfocused_border_style(theme)
-        };
-        let seasons_title_style = if modal_active {
-            theme.muted
-        } else if seasons_focused {
-            focused_title_style(theme)
-        } else {
-            unfocused_title_style(theme)
-        };
-        let seasons_highlight_style = if modal_active {
-            theme.muted
-        } else {
-            selection_style(seasons_focused, state.basic_terminal, theme)
-        };
-        let seasons_highlight_symbol = if modal_active {
-            "  "
-        } else {
-            selection_symbol(seasons_focused, state.basic_terminal)
-        };
+        let (
+            seasons_border,
+            seasons_title_style,
+            seasons_highlight_style,
+            seasons_highlight_symbol,
+        ) = pane_styles(seasons_focused, modal_active, state.basic_terminal, theme);
         let seasons_list = List::new(seasons_items)
             .block(
                 Block::default()
@@ -1010,30 +973,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
         let episodes_focused =
             !modal_active && state.details_pane == crate::tui::state::DetailsPane::Episodes;
-        let eps_border = if modal_active {
-            theme.muted
-        } else if episodes_focused {
-            focused_border_style(theme)
-        } else {
-            unfocused_border_style(theme)
-        };
-        let eps_title_style = if modal_active {
-            theme.muted
-        } else if episodes_focused {
-            focused_title_style(theme)
-        } else {
-            unfocused_title_style(theme)
-        };
-        let eps_highlight_style = if modal_active {
-            theme.muted
-        } else {
-            selection_style(episodes_focused, state.basic_terminal, theme)
-        };
-        let eps_highlight_symbol = if modal_active {
-            "  "
-        } else {
-            selection_symbol(episodes_focused, state.basic_terminal)
-        };
+        let (eps_border, eps_title_style, eps_highlight_style, eps_highlight_symbol) =
+            pane_styles(episodes_focused, modal_active, state.basic_terminal, theme);
         let eps_list = List::new(ep_items)
             .block(
                 Block::default()
@@ -1074,13 +1015,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
     let streams_focused =
         !modal_active && state.details_pane == crate::tui::state::DetailsPane::Streams;
-    let streams_border = if modal_active {
-        theme.muted
-    } else if streams_focused {
-        focused_border_style(theme)
-    } else {
-        unfocused_border_style(theme)
-    };
+    let (streams_border, streams_title_style, streams_highlight_style, streams_highlight_symbol) =
+        pane_styles(streams_focused, modal_active, state.basic_terminal, theme);
 
     let list = &state.selected_resources;
     let visible_count = list.len();
@@ -1125,13 +1061,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         .borders(Borders::ALL)
         .border_type(crate::tui::overlay::border_type(state.basic_terminal))
         .title(ratatui::text::Line::from(streams_title).alignment(Alignment::Left))
-        .title_style(if modal_active {
-            theme.muted
-        } else if streams_focused {
-            focused_title_style(theme)
-        } else {
-            unfocused_title_style(theme)
-        })
+        .title_style(streams_title_style)
         .border_style(streams_border)
         .padding(ratatui::widgets::Padding::horizontal(1));
 
@@ -1294,16 +1224,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 stream_chunks[0],
             );
 
-            let streams_highlight_style = if modal_active {
-                theme.muted
-            } else {
-                selection_style(streams_focused, state.basic_terminal, theme)
-            };
-            let streams_highlight_symbol = if modal_active {
-                "  "
-            } else {
-                selection_symbol(streams_focused, state.basic_terminal)
-            };
             let streams_list = List::new(list_items.clone())
                 .highlight_style(streams_highlight_style)
                 .highlight_symbol(streams_highlight_symbol);
@@ -1314,16 +1234,6 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 &mut state.resource_list_state,
             );
         } else {
-            let streams_highlight_style = if modal_active {
-                theme.muted
-            } else {
-                selection_style(streams_focused, state.basic_terminal, theme)
-            };
-            let streams_highlight_symbol = if modal_active {
-                "  "
-            } else {
-                selection_symbol(streams_focused, state.basic_terminal)
-            };
             let streams_list = List::new(list_items)
                 .highlight_style(streams_highlight_style)
                 .highlight_symbol(streams_highlight_symbol);
@@ -1671,10 +1581,6 @@ fn pane_title(
     Line::from(title)
 }
 
-fn theme_color(style: Style, fallback: ratatui::style::Color) -> ratatui::style::Color {
-    style.fg.unwrap_or(fallback)
-}
-
 fn focused_border_style(theme: &Theme) -> Style {
     theme.lavender
 }
@@ -1689,6 +1595,32 @@ fn focused_title_style(theme: &Theme) -> Style {
 
 fn unfocused_title_style(theme: &Theme) -> Style {
     theme.subtext1
+}
+
+fn pane_styles(
+    focused: bool,
+    modal_active: bool,
+    basic_terminal: bool,
+    theme: &Theme,
+) -> (Style, Style, Style, &'static str) {
+    if modal_active {
+        (theme.muted, theme.muted, theme.muted, "  ")
+    } else {
+        (
+            if focused {
+                focused_border_style(theme)
+            } else {
+                unfocused_border_style(theme)
+            },
+            if focused {
+                focused_title_style(theme)
+            } else {
+                unfocused_title_style(theme)
+            },
+            selection_style(focused, basic_terminal, theme),
+            selection_symbol(focused, basic_terminal),
+        )
+    }
 }
 
 fn metadata_style(theme: &Theme) -> Style {
@@ -1923,27 +1855,10 @@ fn details_footer(
 ) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
     let compact = width < DETAILS_FOOTER_SPLIT_THRESHOLD;
     let is_streams = state.details_pane == crate::tui::state::DetailsPane::Streams;
-    let is_languages = state.details_pane == crate::tui::state::DetailsPane::Languages;
     let is_seasons = state.details_pane == crate::tui::state::DetailsPane::Seasons;
     let is_episodes = state.details_pane == crate::tui::state::DetailsPane::Episodes;
 
-    let is_favorited = if let Some(details) = &state.selected_details {
-        let details_subject_id = state.active_subject_id.as_deref().unwrap_or("");
-        let title = &details.title;
-        let type_val = if details.is_series() { 2 } else { 1 };
-        let year = details.year.as_deref().unwrap_or("N/A");
-        state
-            .favorites
-            .is_favorite(&crate::models::SubjectIdentity {
-                provider: state.provider_for_subject(details_subject_id).cache_key(),
-                subject_id: details_subject_id,
-                title,
-                stype: type_val,
-                release_year: year,
-            })
-    } else {
-        false
-    };
+    let is_favorited = state.is_selected_details_favorited();
     let fav_label = if is_favorited {
         "Unfavorite"
     } else {
@@ -1955,108 +1870,49 @@ fn details_footer(
             .as_ref()
             .is_some_and(|d| d.id.provider == crate::providers::ProviderKind::Addons);
 
-    let mut primary = Vec::new();
-    let mut secondary = Vec::new();
-
-    if is_streams {
-        primary.extend(footer_group("Enter", "Play", true, theme, modal_active));
-        primary.extend(footer_group(
-            "d",
-            if compact { "Save" } else { "Download" },
-            false,
-            theme,
-            modal_active,
-        ));
-        secondary.extend(footer_group("f", fav_label, false, theme, modal_active));
-        if show_provider {
-            secondary.extend(footer_group(
-                crate::tui::text::CTRL_P_STR,
-                "Provider",
-                false,
-                theme,
-                modal_active,
-            ));
-        }
-        secondary.extend(footer_group("Esc", "Back", false, theme, modal_active));
-    } else if is_languages {
-        primary.extend(footer_group("Enter", "Select", true, theme, modal_active));
-        primary.extend(footer_group("f", fav_label, false, theme, modal_active));
-        if show_provider {
-            secondary.extend(footer_group(
-                crate::tui::text::CTRL_P_STR,
-                "Provider",
-                false,
-                theme,
-                modal_active,
-            ));
-        }
-        secondary.extend(footer_group("Tab", "Streams", false, theme, modal_active));
-        secondary.extend(footer_group("Esc", "Back", false, theme, modal_active));
+    let (enter_label, d_label) = if is_streams {
+        ("Play", Some(if compact { "Save" } else { "Download" }))
     } else if is_seasons {
-        primary.extend(footer_group("Enter", "Select", true, theme, modal_active));
-        primary.extend(footer_group(
-            "d",
-            if compact {
+        (
+            "Select",
+            Some(if compact {
                 "Download"
             } else {
                 "Download Season"
-            },
-            false,
-            theme,
-            modal_active,
-        ));
-        primary.extend(footer_group("f", fav_label, false, theme, modal_active));
-        if show_provider {
-            secondary.extend(footer_group(
-                crate::tui::text::CTRL_P_STR,
-                "Provider",
-                false,
-                theme,
-                modal_active,
-            ));
-        }
-        secondary.extend(footer_group("Tab", "Streams", false, theme, modal_active));
-        secondary.extend(footer_group("Esc", "Back", false, theme, modal_active));
+            }),
+        )
     } else if is_episodes {
-        primary.extend(footer_group("Enter", "Select", true, theme, modal_active));
-        primary.extend(footer_group(
-            "d",
-            if compact {
+        (
+            "Select",
+            Some(if compact {
                 "Download"
             } else {
                 "Download Episode"
-            },
+            }),
+        )
+    } else {
+        ("Select", None)
+    };
+
+    let mut primary = footer_group("Enter", enter_label, true, theme, modal_active);
+    if let Some(d) = d_label {
+        primary.extend(footer_group("d", d, false, theme, modal_active));
+    }
+
+    let mut secondary = footer_group("f", fav_label, false, theme, modal_active);
+    if show_provider {
+        secondary.extend(footer_group(
+            crate::tui::text::CTRL_P_STR,
+            "Provider",
             false,
             theme,
             modal_active,
         ));
-        primary.extend(footer_group("f", fav_label, false, theme, modal_active));
-        if show_provider {
-            secondary.extend(footer_group(
-                crate::tui::text::CTRL_P_STR,
-                "Provider",
-                false,
-                theme,
-                modal_active,
-            ));
-        }
-        secondary.extend(footer_group("Tab", "Streams", false, theme, modal_active));
-        secondary.extend(footer_group("Esc", "Back", false, theme, modal_active));
-    } else {
-        primary.extend(footer_group("Enter", "Select", true, theme, modal_active));
-        primary.extend(footer_group("f", fav_label, false, theme, modal_active));
-        if show_provider {
-            secondary.extend(footer_group(
-                crate::tui::text::CTRL_P_STR,
-                "Provider",
-                false,
-                theme,
-                modal_active,
-            ));
-        }
-        secondary.extend(footer_group("Tab", "Streams", false, theme, modal_active));
-        secondary.extend(footer_group("Esc", "Back", false, theme, modal_active));
     }
+    if !is_streams {
+        secondary.extend(footer_group("Tab", "Streams", false, theme, modal_active));
+    }
+    secondary.extend(footer_group("Esc", "Back", false, theme, modal_active));
     if let Some(last) = secondary.last_mut() {
         *last = Span::raw("");
     }

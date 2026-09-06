@@ -969,13 +969,7 @@ impl App {
                 .state
                 .subtitle_list
                 .iter()
-                .map(|(name, _)| {
-                    if name == "None" {
-                        "No subtitles".to_string()
-                    } else {
-                        crate::tui::text::sanitize_language_label(name)
-                    }
-                })
+                .map(|(name, _)| crate::tui::text::format_subtitle_label(name))
                 .collect::<Vec<_>>();
             let confirm_label = if self.state.is_download_subtitle_popup {
                 "Download"

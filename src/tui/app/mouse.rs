@@ -281,13 +281,7 @@ impl App {
                 .state
                 .subtitle_list
                 .iter()
-                .map(|(name, _)| {
-                    if name == "None" {
-                        "No subtitles".to_string()
-                    } else {
-                        crate::tui::text::sanitize_language_label(name)
-                    }
-                })
+                .map(|(name, _)| crate::tui::text::format_subtitle_label(name))
                 .collect::<Vec<_>>();
             let confirm_label = if self.state.is_download_subtitle_popup {
                 "Download"
@@ -1149,30 +1143,7 @@ impl App {
         let is_languages = self.state.details_pane == DetailsPane::Languages;
         let compact = width < crate::tui::screens::details::DETAILS_FOOTER_SPLIT_THRESHOLD;
 
-        let is_favorited = if let Some(details) = &self.state.selected_details {
-            let details_subject_id = self.state.active_subject_id.as_deref().unwrap_or("");
-            let title = &details.title;
-            let type_val = if details.is_series() { 2 } else { 1 };
-            let year = details.year.as_deref().unwrap_or("N/A");
-            let provider = self
-                .state
-                .search_results
-                .iter()
-                .find(|r| r.id == details_subject_id)
-                .map(|r| r.provider)
-                .unwrap_or(self.state.active_provider);
-            self.state
-                .favorites
-                .is_favorite(&crate::models::SubjectIdentity {
-                    provider: provider.cache_key(),
-                    subject_id: details_subject_id,
-                    title,
-                    stype: type_val,
-                    release_year: year,
-                })
-        } else {
-            false
-        };
+        let is_favorited = self.state.is_selected_details_favorited();
         let fav_label_len = if is_favorited { 10 } else { 8 };
 
         enum FooterAction {

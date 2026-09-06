@@ -524,7 +524,7 @@ pub fn stream_item_to_release(
     episode: usize,
 ) -> Option<Release> {
     let url = stream.url.as_ref()?.trim();
-    if !crate::tui::text::is_http_url(url) {
+    if !crate::net::is_http_url(url) {
         return None;
     }
 

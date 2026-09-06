@@ -32,6 +32,18 @@
   - Added automated GitHub Actions deployment workflow (`.github/workflows/pages.yml`) publishing the documentation site to GitHub Pages on every push to `main`.
   - Added documentation build integrity validation step in CI hygiene pipeline (`.github/workflows/ci.yml`).
 
+
+### Changed
+- **Codebase Cleanups, Dead Code Removal & Shared Logic Centralization**:
+  - Removed obsolete compatibility forwarders and dead code (`render_favorites_landing`, `remove_last_grapheme`, `pad_to_width`, `ctrl_key`, and unused shortcut constants).
+  - Centralized `theme_color` in `src/tui/theme.rs`, eliminating duplicate definitions across widgets and screens.
+  - Centralized favorite status lookups for active details into `AppState::is_selected_details_favorited`, unifying 30-line duplicate calculations in details screen rendering and mouse hitbox detection.
+  - Unified subtitle picker label formatting (`"None"` -> `"No subtitles"`, language sanitization) into `format_subtitle_label`.
+  - Consolidated details pane border, title, and selection styling through `pane_styles`, eliminating over 50 lines of duplicate style branching.
+  - Streamlined details footer action definitions into declarative primary/secondary group builders, cutting redundant code blocks while preserving exact keybindings and layout.
+  - Hardened cross-platform process spawning by unifying the Windows `CREATE_NO_WINDOW` (`0x08000000`) flag into a canonical constant in `player.rs`.
+  - Decoupled network URL validation by moving `is_http_url` to `crate::net`, eliminating backend network provider dependencies on the TUI text formatting module.
+
 ### Fixed
 - **Global Modal Background Unfocus & Dimming**:
   - Automatically unfocused and dimmed all background components across Details, Home, and Runner views whenever any modal or popup dialog is active, replacing bright active borders, focus bullets, and selection highlight rectangles with dimmed styling (`theme.muted`).

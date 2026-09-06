@@ -4,11 +4,7 @@ use ratatui::{
 };
 
 use crate::providers::models::ProviderKind;
-use crate::tui::theme::Theme;
-
-fn theme_color(style: Style, fallback: Color) -> Color {
-    style.fg.unwrap_or(fallback)
-}
+use crate::tui::theme::{Theme, theme_color};
 
 pub fn resolution_label(resolution: i64) -> &'static str {
     match resolution {

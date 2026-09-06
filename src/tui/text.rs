@@ -5,12 +5,6 @@ pub fn width(value: &str) -> usize {
     UnicodeWidthStr::width(value)
 }
 
-pub fn remove_last_grapheme(value: &mut String) {
-    if let Some((index, _)) = value.grapheme_indices(true).next_back() {
-        value.truncate(index);
-    }
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TextInputBuffer {
     content: String,
@@ -305,15 +299,6 @@ pub fn truncate_width(value: &str, max_width: usize) -> String {
     output
 }
 
-pub fn pad_to_width(value: &str, target: usize) -> String {
-    let current = width(value);
-    if current >= target {
-        value.to_string()
-    } else {
-        format!("{value}{}", " ".repeat(target - current))
-    }
-}
-
 pub fn truncate_middle_width(value: &str, max_width: usize) -> String {
     if width(value) <= max_width {
         return value.to_string();
@@ -406,6 +391,14 @@ pub fn sanitize_language_label(name: &str) -> String {
     }
 }
 
+pub fn format_subtitle_label(name: &str) -> String {
+    if name == "None" {
+        "No subtitles".to_string()
+    } else {
+        sanitize_language_label(name)
+    }
+}
+
 pub fn strip_emojis(input: &str) -> String {
     input
         .chars()
@@ -439,15 +432,6 @@ pub fn clean_stream_text(input: &str) -> String {
     cleaned.trim().to_string()
 }
 
-#[cfg(target_os = "macos")]
-pub const CTRL_PREFIX: &str = "^";
-
-#[cfg(not(target_os = "macos"))]
-pub const CTRL_PREFIX: &str = "Ctrl+";
-
-pub fn ctrl_key(key: &str) -> String {
-    format!("{CTRL_PREFIX}{key}")
-}
 pub const CTRL_S_STR: &str = if cfg!(target_os = "macos") {
     "^S"
 } else {
@@ -463,30 +447,10 @@ pub const CTRL_A_STR: &str = if cfg!(target_os = "macos") {
 } else {
     "Ctrl+A"
 };
-pub const CTRL_D_STR: &str = if cfg!(target_os = "macos") {
-    "^D"
-} else {
-    "Ctrl+D"
-};
-pub const CTRL_F_STR: &str = if cfg!(target_os = "macos") {
-    "^F"
-} else {
-    "Ctrl+F"
-};
-pub const CTRL_H_STR: &str = if cfg!(target_os = "macos") {
-    "^H"
-} else {
-    "Ctrl+H"
-};
 pub const CTRL_P_STR: &str = if cfg!(target_os = "macos") {
     "^P"
 } else {
     "Ctrl+P"
-};
-pub const CTRL_R_STR: &str = if cfg!(target_os = "macos") {
-    "^R"
-} else {
-    "Ctrl+R"
 };
 
 pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
@@ -534,10 +498,7 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     lines
 }
 
-pub fn is_http_url(source: &str) -> bool {
-    let trimmed = source.trim();
-    trimmed.starts_with("http://") || trimmed.starts_with("https://")
-}
+pub use crate::net::is_http_url;
 pub fn extract_4digit_year(raw: &str) -> String {
     raw.as_bytes()
         .windows(4)
@@ -847,5 +808,11 @@ mod tests {
         assert_eq!(cjk_buf.cursor_prefix_str(), "电");
         assert_eq!(cjk_buf.cursor_column_offset(), 2);
         assert_eq!(cjk_buf.cursor_split_parts(), ("电", "影", ""));
+    }
+    #[test]
+    fn test_format_subtitle_label() {
+        assert_eq!(format_subtitle_label("None"), "No subtitles");
+        assert_eq!(format_subtitle_label("eng"), "English");
+        assert_eq!(format_subtitle_label("Spanish"), "Spanish");
     }
 }
