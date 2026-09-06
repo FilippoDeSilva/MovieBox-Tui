@@ -545,11 +545,12 @@ async fn download_segment(
             )));
         }
 
-        let mut file = tokio::fs::OpenOptions::new()
+        let raw_file = tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path)
             .await?;
+        let mut file = tokio::io::BufWriter::with_capacity(256 * 1024, raw_file);
         let mut response = response;
         let mut written = existing;
         let mut unbatched_bytes = 0u64;
@@ -581,7 +582,7 @@ async fn download_segment(
                             let _ = progress.send((unbatched_bytes, attempt)).await;
                         }
                         file.flush().await?;
-                        file.sync_data().await?;
+                        file.get_mut().sync_data().await?;
                         return Ok(());
                     }
                 }

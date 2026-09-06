@@ -25,6 +25,7 @@ MovieBox-TUI/
     ├── error_handling.rs      # Failure state cleanup, error toasts, and recovery
     ├── history_audit.rs       # Cross-mode watch progress, series advancement, & boundary audit
     ├── favorites_lifecycle.rs # Favorites persistence, identity, and navigation lifecycle
+    ├── performance_audit.rs   # Empirical benchmark measurements (truncation, hashing, M3U, draw latency)
     └── live_stream_verification.rs # Live MovieBox CDN signed stream & resolution verification (opt-in)
 ```
 
@@ -46,8 +47,8 @@ Integration tests live in the `tests/` directory and test externally observable 
 - **`error_handling.rs`**: Validates active player session lifecycle, playback debounce guards, search failure cleanup, stream and download resolution failure notifications, URL scheme rejection, and authoritative player bypass protections.
 - **`history_audit.rs`**: Validates cross-mode watch progress, series advancement and completion tracking, threshold boundaries for in-progress states, history disk persistence roundtrips, Lua tracker reconciliation, update precision preservation, repeated play deduplication, and `/history` search list integration.
 - **`favorites_lifecycle.rs`**: Validates Favorites persistence boundaries, identity deduplication, `/favorites` loading, landing-row navigation, and independence from watch-history clearing.
+- **`performance_audit.rs`**: Validates empirical performance benchmarks and regression thresholds across algorithmic hot paths (SIMD text truncation, MD5 hex table lookup, M3U capacity preallocation, and headless frame draw latencies).
 - **`live_stream_verification.rs`**: Validates real-world stream link resolution across MovieBox signed CDN endpoints and 4KHDHub multi-mirror releases. The tests are `#[ignore]`-gated for offline execution; opt in with `cargo test --test live_stream_verification -- --ignored`.
-
 ---
 
 ## 2. Running Automated Tests

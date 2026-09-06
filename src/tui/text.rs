@@ -1,8 +1,13 @@
+use std::borrow::Cow;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 pub fn width(value: &str) -> usize {
-    UnicodeWidthStr::width(value)
+    if value.is_ascii() {
+        value.len()
+    } else {
+        UnicodeWidthStr::width(value)
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -276,27 +281,43 @@ impl PartialEq<TextInputBuffer> for String {
     }
 }
 
-pub fn truncate_width(value: &str, max_width: usize) -> String {
+pub fn truncate_width<'a>(value: &'a str, max_width: usize) -> Cow<'a, str> {
+    if value.is_ascii() {
+        if value.len() <= max_width {
+            return Cow::Borrowed(value);
+        }
+        if max_width <= 3 {
+            return Cow::Owned(".".repeat(max_width));
+        }
+        let content_width = max_width - 3;
+        let mut output = String::with_capacity(content_width + 3);
+        output.push_str(&value[..content_width]);
+        output.push_str("...");
+        return Cow::Owned(output);
+    }
+
     if width(value) <= max_width {
-        return value.to_string();
+        return Cow::Borrowed(value);
     }
     if max_width <= 3 {
-        return ".".repeat(max_width);
+        return Cow::Owned(".".repeat(max_width));
     }
 
     let content_width = max_width - 3;
-    let mut output = String::new();
+    let mut cut_byte = 0;
     let mut used = 0;
-    for grapheme in value.graphemes(true) {
+    for (offset, grapheme) in value.grapheme_indices(true) {
         let grapheme_width = width(grapheme);
         if used + grapheme_width > content_width {
             break;
         }
-        output.push_str(grapheme);
         used += grapheme_width;
+        cut_byte = offset + grapheme.len();
     }
+    let mut output = String::with_capacity(cut_byte + 3);
+    output.push_str(&value[..cut_byte]);
     output.push_str("...");
-    output
+    Cow::Owned(output)
 }
 
 pub fn truncate_middle_width(value: &str, max_width: usize) -> String {
@@ -314,30 +335,45 @@ pub fn truncate_middle_width(value: &str, max_width: usize) -> String {
     let start_width = content_width.div_ceil(2);
     let end_width = content_width - start_width;
 
-    let mut start = String::new();
+    if value.is_ascii() {
+        let front = &value[..start_width];
+        let rear = &value[value.len() - end_width..];
+        let mut output = String::with_capacity(front.len() + 3 + rear.len());
+        output.push_str(front);
+        output.push('…');
+        output.push_str(rear);
+        return output;
+    }
+
+    let mut start_cut = 0;
     let mut used = 0;
-    for grapheme in value.graphemes(true) {
+    for (offset, grapheme) in value.grapheme_indices(true) {
         let grapheme_width = width(grapheme);
         if used + grapheme_width > start_width {
             break;
         }
-        start.push_str(grapheme);
         used += grapheme_width;
+        start_cut = offset + grapheme.len();
     }
 
-    let mut end = Vec::new();
+    let mut end_cut = value.len();
     used = 0;
-    for grapheme in value.graphemes(true).rev() {
+    for (offset, grapheme) in value.grapheme_indices(true).rev() {
         let grapheme_width = width(grapheme);
         if used + grapheme_width > end_width {
             break;
         }
-        end.push(grapheme);
         used += grapheme_width;
+        end_cut = offset;
     }
-    end.reverse();
 
-    format!("{start}…{}", end.concat())
+    let front = &value[..start_cut];
+    let rear = &value[end_cut..];
+    let mut output = String::with_capacity(front.len() + 3 + rear.len());
+    output.push_str(front);
+    output.push('…');
+    output.push_str(rear);
+    output
 }
 
 pub fn sanitize_language_label(name: &str) -> String {
@@ -470,7 +506,7 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
             let word_len = width(word);
             if current_len == 0 {
                 if word_len > max_width {
-                    lines.push(truncate_width(word, max_width));
+                    lines.push(truncate_width(word, max_width).into_owned());
                 } else {
                     current_line.push_str(word);
                     current_len = word_len;
@@ -482,7 +518,7 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
             } else {
                 lines.push(current_line);
                 if word_len > max_width {
-                    lines.push(truncate_width(word, max_width));
+                    lines.push(truncate_width(word, max_width).into_owned());
                     current_line = String::new();
                     current_len = 0;
                 } else {
@@ -814,5 +850,41 @@ mod tests {
         assert_eq!(format_subtitle_label("None"), "No subtitles");
         assert_eq!(format_subtitle_label("eng"), "English");
         assert_eq!(format_subtitle_label("Spanish"), "Spanish");
+    }
+    #[test]
+    fn test_truncate_width_and_simd_ascii_zero_alloc() {
+        let ascii_fit = "MovieBox";
+        match truncate_width(ascii_fit, 10) {
+            Cow::Borrowed(b) => assert_eq!(b, "MovieBox"),
+            Cow::Owned(_) => panic!("expected borrowed Cow for fitting ascii string"),
+        }
+        let ascii_exact = "MovieBox";
+        match truncate_width(ascii_exact, 8) {
+            Cow::Borrowed(b) => assert_eq!(b, "MovieBox"),
+            Cow::Owned(_) => panic!("expected borrowed Cow for exact ascii string"),
+        }
+        assert_eq!(truncate_width("MovieBox-Tui Terminal", 11), "MovieBox...");
+        assert_eq!(truncate_width("Short", 3), "...");
+        assert_eq!(truncate_width("Short", 2), "..");
+        assert_eq!(truncate_width("Short", 1), ".");
+        assert_eq!(truncate_width("Short", 0), "");
+
+        let cjk = "电影院线上映";
+        assert_eq!(width(cjk), 12);
+        match truncate_width(cjk, 12) {
+            Cow::Borrowed(b) => assert_eq!(b, "电影院线上映"),
+            Cow::Owned(_) => panic!("expected borrowed Cow for fitting non-ascii string"),
+        }
+        assert_eq!(truncate_width(cjk, 8), "电影...");
+
+        let mixed = "Inception 2 (2010)";
+        assert_eq!(truncate_middle_width(mixed, 18), "Inception 2 (2010)");
+        assert_eq!(truncate_middle_width(mixed, 10), "Incep…010)");
+        assert_eq!(truncate_middle_width("Short", 2), "..");
+        assert_eq!(truncate_middle_width("Short", 0), "");
+
+        assert_eq!(width(""), 0);
+        assert_eq!(width("abc 123"), 7);
+        assert_eq!(width("🦀"), 2);
     }
 }

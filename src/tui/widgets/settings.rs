@@ -383,7 +383,7 @@ fn render_row(
     let display_label = if label_width > max_label_w && max_label_w >= 4 {
         crate::tui::text::truncate_width(row.label, max_label_w)
     } else {
-        row.label.to_string()
+        std::borrow::Cow::Borrowed(row.label)
     };
     let display_label_w = crate::tui::text::width(&display_label);
     let pad =
@@ -405,7 +405,7 @@ fn render_row(
     let display_subtext = if crate::tui::text::width(row.subtext) > max_subtext_w {
         crate::tui::text::truncate_width(row.subtext, max_subtext_w)
     } else {
-        row.subtext.to_string()
+        std::borrow::Cow::Borrowed(row.subtext)
     };
     let subtext_width = crate::tui::text::width(&display_subtext);
     let subtext_pad = area_width.saturating_sub(subtext_indent.len() + subtext_width);

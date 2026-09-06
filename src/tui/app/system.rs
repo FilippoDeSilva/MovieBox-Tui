@@ -1,9 +1,5 @@
 use super::App;
-use crate::tui::{
-    action::Action,
-    overlay::NotificationKind,
-    state::{InputMode, Screen},
-};
+use crate::tui::{action::Action, overlay::NotificationKind, state::Screen};
 
 impl App {
     pub(super) async fn handle_system(&mut self, action: Action) -> Option<()> {
@@ -11,7 +7,6 @@ impl App {
             Action::Tick => {
                 let mut needs_redraw = (self.state.is_loading && self.state.tick_count % 5 == 0)
                     || self.state.tick_count < 15
-                    || self.state.input_mode == InputMode::Editing
                     || (self.state.active_screen == Screen::Home
                         && self.state.search_results.is_empty()
                         && self.state.search_query.is_empty()
@@ -58,6 +53,7 @@ impl App {
                                 .take(10)
                                 .map(|c| c.name.clone())
                                 .collect();
+                            self.state.dirty = true;
                         } else {
                             self.action_sender
                                 .send(Action::Suggest(query_trimmed.to_string()))
@@ -65,6 +61,7 @@ impl App {
                         }
                     } else {
                         self.state.search_suggestions.clear();
+                        self.state.dirty = true;
                     }
                 }
 

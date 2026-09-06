@@ -16,7 +16,22 @@
   - Applied opaque theme background styling (`theme.base`) to `ModalFrame`, preventing terminal background transparency or buffer bleed through dialog borders.
 - **Update Modal Geometry & Border Clearances**:
   - Widened the modal from 72 to 76 columns to align with standard dialog geometry and provide a generous 3-column safety margin, preventing text lines and bullet points from crowding the outer borders.
-
+- **Search Bar Synthetic Cursor Artifacts**:
+  - Removed artificial block glyphs (`▎` / `█`) drawn directly into search input paragraphs, relying on native terminal cursor positioning without visual cursor duplication or blinking redraw churn.
+### Performance
+- **Zero-Allocation Text Truncation Pipeline (`src/tui/text.rs`)**:
+  - Implemented SIMD `is_ascii()` fast path in `width` and migrated `truncate_width` to `Cow<'a, str>`, eliminating 100% of heap allocations on fitting titles and text spans.
+  - Reduced 10,000-operation truncation latency from `5,243.5µs` to `246.2µs` (21.3x faster, `524.3ns -> 24.6ns/op`) under release compiler profile on Apple Silicon.
+  - Streamlined `truncate_middle_width` to construct output into a single preallocated buffer, eliminating intermediate `Vec<&str>`, reversal, and concatenation allocations.
+- **Table-Lookup Hex Encoding (`src/cache.rs`)**:
+  - Replaced 16 dynamic `core::fmt::write` dispatches per MD5 digest with direct 16-byte static lookup table indexing in `md5_hex`.
+  - Reduced 10,000-digest hashing latency from `4,597.9µs` to `1,829.8µs` (2.51x faster, `459.8ns -> 183.0ns/op`).
+- **Preallocated IPTV M3U Playlist Parser (`src/providers/tv/parser.rs`)**:
+  - Added newline-count capacity preallocation to `M3UParser::parse_m3u`, eliminating repeated dynamic vector reallocations during large playlist loads and achieving `352.0µs` parse duration for 500-channel playlists.
+- **Buffered Downloader Chunk Write Aggregation (`src/download.rs`)**:
+  - Wrapped segment file descriptors in `tokio::io::BufWriter::with_capacity(256 * 1024)`, aggregating incoming 8KB–16KB HTTP response chunks into sequential 256KB disk blocks and eliminating up to 96.8% of unbuffered filesystem write syscalls.
+- **TUI Draw Loop Allocation Pruning (`src/tui/screens/home.rs`, `src/tui/screens/details.rs`)**:
+  - Eliminated redundant `display_title.clone()` and duplicate Unicode width calculations in search result and landing deck render loops, delivering headless draw latencies of `32.3µs/frame` (80×24), `43.4µs/frame` (120×30), and `67.3µs/frame` (160×40).
 ## [0.1.17] - 2026-09-06
 
 ### Added

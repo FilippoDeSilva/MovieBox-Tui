@@ -563,7 +563,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let available_audio_w =
                 text_width.saturating_sub(current_badge_w + provider_w + bullet_w + label_w);
             let display_audios = if crate::tui::text::width(&audios) > available_audio_w {
-                crate::tui::text::truncate_width(&audios, available_audio_w)
+                crate::tui::text::truncate_width(&audios, available_audio_w).into_owned()
             } else {
                 audios
             };
@@ -612,7 +612,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let display_genres = if val_w > available_genre_w {
                 crate::tui::text::truncate_width(&genres, available_genre_w)
             } else {
-                genres.clone()
+                std::borrow::Cow::Borrowed(genres.as_str())
             };
             extra_meta_w += label_w + crate::tui::text::width(&display_genres);
             extra_meta_spans.push(Span::styled(display_genres, meta_val_s));
@@ -639,7 +639,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let display_dir = if val_w > available_dir_w {
                 crate::tui::text::truncate_width(dir, available_dir_w)
             } else {
-                dir.to_string()
+                std::borrow::Cow::Borrowed(dir)
             };
             extra_meta_w += sep_w + label_w + crate::tui::text::width(&display_dir);
             extra_meta_spans.push(Span::styled(display_dir, meta_val_s));
@@ -666,7 +666,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             let display_cast = if val_w > available_cast_w {
                 crate::tui::text::truncate_width(cast, available_cast_w)
             } else {
-                cast.to_string()
+                std::borrow::Cow::Borrowed(cast)
             };
             extra_meta_spans.push(Span::styled(display_cast, meta_val_s));
         }
@@ -947,7 +947,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         });
                     let ep_base = if let Some(t) = ep_title_opt {
                         let candidate = format!("EP {ep:02} · {t}");
-                        crate::tui::text::truncate_width(&candidate, ep_max_w)
+                        crate::tui::text::truncate_width(&candidate, ep_max_w).into_owned()
                     } else {
                         format!("EP {ep:02}")
                     };
@@ -1179,13 +1179,13 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
 
                 if is_ultra_compact {
                     stream_spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&release_title, stream_width),
+                        crate::tui::text::truncate_width(&release_title, stream_width).into_owned(),
                         primary_style,
                     ));
                 } else if is_compact {
                     stream_spans.push(Span::styled(format!("{codec:<6}  "), secondary_style));
                     stream_spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&release_title, stream_width),
+                        crate::tui::text::truncate_width(&release_title, stream_width).into_owned(),
                         primary_style,
                     ));
                 } else if is_wide {
@@ -1203,7 +1203,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         secondary_style,
                     ));
                     stream_spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&release_title, stream_width),
+                        crate::tui::text::truncate_width(&release_title, stream_width).into_owned(),
                         primary_style,
                     ));
                 } else {
@@ -1217,11 +1217,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                         secondary_style,
                     ));
                     stream_spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&release_title, stream_width),
+                        crate::tui::text::truncate_width(&release_title, stream_width).into_owned(),
                         primary_style,
                     ));
                 }
-
                 ListItem::new(ratatui::text::Line::from(stream_spans)).style(row_style)
             })
             .collect();

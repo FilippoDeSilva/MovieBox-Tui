@@ -103,7 +103,8 @@ impl M3UParser {
     }
 
     pub fn parse_m3u(&self, content: &str) -> Vec<Channel> {
-        let mut channels = Vec::new();
+        let estimated = content.as_bytes().iter().filter(|&&b| b == b'\n').count() / 2;
+        let mut channels = Vec::with_capacity(estimated.max(16));
         let mut current_channel = Channel::default();
 
         for line in content.lines() {

@@ -27,8 +27,8 @@ The cache directory is `dirs::cache_dir()/moviebox-tui` (macOS
 ## Properties
 
 - **Binary MessagePack Envelopes**: Cache entries are serialized with `rmp-serde` wrapped in a binary envelope starting with the 4-byte magic signature `MBC1` and an 8-byte TTL timestamp (`CacheEnvelope<T>`). Legacy JSON files are read and migrated on the fly.
+- **Fast Table-Lookup Hex Hashing**: Cache file naming and key hashing in `md5_hex` uses static 16-byte lookup table encoding, eliminating dynamic `core::fmt::write` formatting allocations and speeding up digest encoding by 2.51x.
 - **Provider namespacing**: Keys include `provider.cache_key()`, preventing collisions across sources.
-- **TTL**: Streams expire after 2h; search/details/captions/manifests after 24h; homepage/catalogs after 1h; remote TV playlists after 24h; images after 30 days. Local M3U files are reread from disk directly without caching.
 - **Atomic writes**: Entries are written to a unique temp file (`path.with_extension("tmp-PID-STAMP")`) and atomically replaced (`durable_replace`), preventing truncated or corrupt files on unexpected exits.
 - **Validation**: Empty search or stream results are never written or served from cache.
 - **Purge**: Background cleanup runs at startup to delete entries older than 7 days. `/settings` → Maintenance → Clear Disk Cache recursively empties all cached provider responses, images, TV playlists, temporary subtitles across Android/Windows/Unix, resets in-memory LRU caches, and cancels in-flight background request tasks.

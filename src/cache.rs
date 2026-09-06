@@ -82,13 +82,14 @@ pub fn set_typed_cache<T: Serialize + ?Sized>(path: &Path, expiry_secs: u64, dat
 
 pub fn md5_hex(value: &str) -> String {
     use md5::{Digest, Md5};
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
     let mut hasher = Md5::new();
     hasher.update(value.as_bytes());
     let result = hasher.finalize();
     let mut safe_query = String::with_capacity(32);
-    for b in result {
-        use std::fmt::Write;
-        let _ = write!(&mut safe_query, "{:02x}", b);
+    for &b in &result {
+        safe_query.push(HEX_CHARS[(b >> 4) as usize] as char);
+        safe_query.push(HEX_CHARS[(b & 0x0f) as usize] as char);
     }
     safe_query
 }

@@ -1187,7 +1187,8 @@ impl App {
                                     .saturating_sub(colon.len());
                                 if budget > 0 {
                                     spans.push(Span::styled(
-                                        crate::tui::text::truncate_width(&clean_rest, budget),
+                                        crate::tui::text::truncate_width(&clean_rest, budget)
+                                            .into_owned(),
                                         self.theme.text_dim,
                                     ));
                                 }
@@ -1198,14 +1199,16 @@ impl App {
                                 crate::tui::text::truncate_width(
                                     &clean,
                                     line_width.saturating_sub(8),
-                                ),
+                                )
+                                .into_owned(),
                                 self.theme.text,
                             ));
                         }
                     } else {
                         let clean = bullet.replace('`', "");
                         spans.push(Span::styled(
-                            crate::tui::text::truncate_width(&clean, line_width.saturating_sub(8)),
+                            crate::tui::text::truncate_width(&clean, line_width.saturating_sub(8))
+                                .into_owned(),
                             self.theme.text,
                         ));
                     }
@@ -1213,7 +1216,8 @@ impl App {
                     let clean = trimmed.replace('`', "");
                     spans.push(Span::raw("      "));
                     spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&clean, line_width.saturating_sub(6)),
+                        crate::tui::text::truncate_width(&clean, line_width.saturating_sub(6))
+                            .into_owned(),
                         self.theme.text_dim,
                     ));
                 }

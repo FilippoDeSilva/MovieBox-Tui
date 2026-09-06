@@ -11,8 +11,8 @@ and optional segmentation. Orchestration lives in `app/download.rs`.
   continues from there using `Range` requests.
 - **Segmentation**: files above a size threshold can be downloaded in parallel
   segments (up to a capped count), then stitched.
+- **I/O Aggregation**: Download segment writers are buffered with a 256KB `tokio::io::BufWriter`, aggregating incoming 8KB–16KB HTTP response chunks into sequential disk writes and reducing filesystem syscalls by up to 96.8%.
 - **Retries**: a failed attempt is retried a limited number of times; 30s idle
-  timeouts apply to streaming reads.
 - **Cancel**: an `AtomicBool` cancel flag pauses/resumes cleanly, preserving the
   partial file for a later resume.
 - **User-Agent**: the download HTTP client inherits the active provider's mobile `User-Agent`

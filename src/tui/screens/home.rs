@@ -829,9 +829,9 @@ pub(crate) fn render_discover_landing(
         let display_desc = if max_desc_w >= 4 && crate::tui::text::width(desc) > max_desc_w {
             crate::tui::text::truncate_width(desc, max_desc_w)
         } else if max_desc_w < 4 {
-            String::new()
+            std::borrow::Cow::Borrowed("")
         } else {
-            desc.to_string()
+            std::borrow::Cow::Borrowed(desc)
         };
         let tag_len = crate::tui::text::width(&display_desc);
         let pad_len = (inner_area.width as usize).saturating_sub(margins_len + title_w + tag_len);
@@ -891,49 +891,21 @@ pub(crate) fn dynamic_search_placeholder(state: &AppState) -> &'static str {
 }
 
 #[cfg(test)]
-fn search_content(
-    state: &AppState,
-    view: SearchViewState,
-    show_cursor: bool,
-    width: u16,
-    real_cursor: bool,
-) -> String {
+fn search_content(state: &AppState, view: SearchViewState, width: u16) -> String {
     let prefix = if state.basic_terminal { "> " } else { "❯ " };
     let editing = view == SearchViewState::Editing;
-    let cursor_width = usize::from(editing && !real_cursor);
     let available = width
         .saturating_sub(4)
-        .saturating_sub(crate::tui::text::width(prefix) as u16)
-        .saturating_sub(cursor_width as u16) as usize;
+        .saturating_sub(crate::tui::text::width(prefix) as u16) as usize;
     let has_status = state.status_timer > 0 && !state.status_message.is_empty();
 
     if state.search_query.is_empty() {
         let content = if has_status && !editing {
             crate::tui::text::truncate_width(&state.status_message, available)
         } else {
-            dynamic_search_placeholder(state).to_string()
+            std::borrow::Cow::Borrowed(dynamic_search_placeholder(state))
         };
-        if editing {
-            let cursor = if !real_cursor {
-                let cursor_char = if state.basic_terminal { "█" } else { "▎" };
-                if show_cursor { cursor_char } else { " " }
-            } else {
-                ""
-            };
-            format!("{prefix}{cursor}{content}")
-        } else {
-            format!("{prefix}{content}")
-        }
-    } else if editing && !real_cursor {
-        let (before, cursor_grapheme, after) = state.search_query.cursor_split_parts();
-        let cursor_char = if show_cursor {
-            if state.basic_terminal { "█" } else { "▎" }
-        } else {
-            cursor_grapheme
-        };
-        let full = format!("{before}{cursor_char}{after}");
-        let truncated = crate::tui::text::truncate_width(&full, available);
-        format!("{prefix}{truncated}")
+        format!("{prefix}{content}")
     } else {
         let content = crate::tui::text::truncate_width(state.search_query.as_str(), available);
         format!("{prefix}{content}")
@@ -946,7 +918,6 @@ fn render_search_bar(
     state: &AppState,
     theme: &Theme,
     view: SearchViewState,
-    show_cursor: bool,
     landing: bool,
 ) {
     if landing {
@@ -1111,7 +1082,7 @@ fn render_search_bar(
         let prefix = if state.basic_terminal { "> " } else { "❯ " };
         let prefix_width = crate::tui::text::width(prefix) as u16;
         let editing = view == SearchViewState::Editing;
-        let real_cursor = editing && show_cursor && !state.basic_terminal && !modal_active;
+        let real_cursor = editing && !state.basic_terminal && !modal_active;
         let prefix_style = if modal_active {
             theme.text_dim
         } else if editing {
@@ -1133,17 +1104,8 @@ fn render_search_bar(
         };
         let placeholder_text = crate::tui::text::truncate_width(raw_placeholder, available_text_w);
         let search_line = if is_query_empty {
-            let placeholder_text = placeholder_text.as_str();
-
-            if editing && !modal_active {
-                let cursor_char = if state.basic_terminal { "█" } else { "▎" };
-                let cursor_str = if show_cursor { cursor_char } else { " " };
-                Line::from(vec![
-                    Span::styled(prefix, prefix_style),
-                    Span::styled(cursor_str, theme.accent),
-                    Span::styled(placeholder_text, theme.text_dim),
-                ])
-            } else if has_status {
+            let placeholder_text: &str = placeholder_text.as_ref();
+            if has_status {
                 Line::from(vec![
                     Span::styled(prefix, prefix_style),
                     Span::styled(placeholder_text, theme.accent),
@@ -1154,19 +1116,6 @@ fn render_search_bar(
                     Span::styled(placeholder_text, theme.text_dim),
                 ])
             }
-        } else if editing && !real_cursor && !modal_active {
-            let (before, cursor_grapheme, after) = state.search_query.cursor_split_parts();
-            let cursor_char = if show_cursor {
-                if state.basic_terminal { "█" } else { "▎" }
-            } else {
-                cursor_grapheme
-            };
-            Line::from(vec![
-                Span::styled(prefix, prefix_style),
-                Span::styled(before, theme.text),
-                Span::styled(cursor_char, theme.accent),
-                Span::styled(after, theme.text),
-            ])
         } else {
             let text_style = if modal_active {
                 theme.text_dim
@@ -1253,7 +1202,7 @@ fn render_search_bar(
             .split(area);
 
         let editing = view == SearchViewState::Editing;
-        let real_cursor = editing && show_cursor && !state.basic_terminal;
+        let real_cursor = editing && !state.basic_terminal;
         let has_status = state.status_timer > 0
             && !state.status_message.is_empty()
             && state.search_query.is_empty()
@@ -1269,38 +1218,24 @@ fn render_search_bar(
                 dynamic_search_placeholder(state)
             };
 
-            if editing {
-                let cursor_char = if state.basic_terminal { "█" } else { "▎" };
-                let cursor_str = if show_cursor { cursor_char } else { " " };
-                Line::from(vec![
-                    Span::styled(prefix, theme.accent),
-                    Span::styled(cursor_str, theme.accent),
-                    Span::styled(placeholder_text, theme.text_dim),
-                ])
-            } else if has_status {
+            if has_status {
                 Line::from(vec![
                     Span::styled(prefix, theme.accent),
                     Span::styled(placeholder_text, theme.accent),
                 ])
             } else {
                 Line::from(vec![
-                    Span::styled(prefix, theme.text_dim),
+                    Span::styled(
+                        prefix,
+                        if editing {
+                            theme.accent
+                        } else {
+                            theme.text_dim
+                        },
+                    ),
                     Span::styled(placeholder_text, theme.text_dim),
                 ])
             }
-        } else if editing && !real_cursor {
-            let (before, cursor_grapheme, after) = state.search_query.cursor_split_parts();
-            let cursor_char = if show_cursor {
-                if state.basic_terminal { "█" } else { "▎" }
-            } else {
-                cursor_grapheme
-            };
-            Line::from(vec![
-                Span::styled(prefix, theme.accent),
-                Span::styled(before, theme.text),
-                Span::styled(cursor_char, theme.accent),
-                Span::styled(after, theme.text),
-            ])
         } else {
             Line::from(vec![
                 Span::styled(prefix, if editing { theme.accent } else { theme.text }),
@@ -1437,9 +1372,6 @@ fn home_bottom_bar_spans(
 }
 
 pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) {
-    let is_actively_typing =
-        state.last_search_edit.elapsed() < std::time::Duration::from_millis(500);
-    let show_cursor = is_actively_typing || (state.tick_count % 10) < 5;
     let view = search_view_state(state);
     let search_bar_area;
 
@@ -1536,15 +1468,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         };
 
         if !state.tv_config_popup && !update_active {
-            render_search_bar(
-                frame,
-                search_card_area,
-                state,
-                theme,
-                view,
-                show_cursor,
-                true,
-            );
+            render_search_bar(frame, search_card_area, state, theme, view, true);
         }
         search_bar_area = search_card_area;
         let suggestions_open =
@@ -1586,15 +1510,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             width: chunks[0].width.saturating_sub(4),
             ..chunks[0]
         };
-        render_search_bar(
-            frame,
-            search_bar_area,
-            state,
-            theme,
-            view,
-            show_cursor,
-            false,
-        );
+        render_search_bar(frame, search_bar_area, state, theme, view, false);
         let list_block = Block::default();
         if !state.search_results.is_empty() {
             let initial_metrics = state.result_metrics(results_chunk.height, results_chunk.width);
@@ -1865,7 +1781,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     ));
                 }
                 row1_spans.push(ratatui::text::Span::styled(
-                    display_title.clone(),
+                    display_title.as_ref(),
                     title_style,
                 ));
 
@@ -1992,7 +1908,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                                 let g_trunc = crate::tui::text::truncate_width(
                                     &genre_buf,
                                     text_area.width.saturating_sub(2) as usize,
-                                );
+                                )
+                                .into_owned();
                                 row3_spans
                                     .push(ratatui::text::Span::styled(g_trunc, theme.subtext1));
                             }
@@ -2317,7 +2234,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                     .max(8);
                 let addon_label = format!("{} v{} ", a.name, a.version.as_deref().unwrap_or("1.0"));
                 let name = ratatui::text::Span::styled(
-                    crate::tui::text::truncate_width(&addon_label, name_budget),
+                    crate::tui::text::truncate_width(&addon_label, name_budget).into_owned(),
                     if is_selected {
                         theme.text.add_modifier(ratatui::style::Modifier::BOLD)
                     } else {
@@ -3279,16 +3196,18 @@ mod tests {
             basic_terminal: false,
             ..Default::default()
         };
-        let content_rich = search_content(&state_rich, SearchViewState::Editing, true, 80, false);
-        assert!(content_rich.contains("❯ ▎Search movies, series & anime…"));
+        let content_rich = search_content(&state_rich, SearchViewState::Editing, 80);
+        assert!(content_rich.contains("❯ Search movies, series & anime…"));
+        assert!(!content_rich.contains("▎"));
 
         let state_basic = AppState {
             input_mode: InputMode::Editing,
             basic_terminal: true,
             ..Default::default()
         };
-        let content_basic = search_content(&state_basic, SearchViewState::Editing, true, 80, false);
-        assert!(content_basic.contains("> █Search movies, series & anime…"));
+        let content_basic = search_content(&state_basic, SearchViewState::Editing, 80);
+        assert!(content_basic.contains("> Search movies, series & anime…"));
+        assert!(!content_basic.contains("█"));
     }
 
     #[test]
